@@ -1,9 +1,16 @@
 -- For overriding if/then/else
-{-# LANGUAGE RebindableSyntax #-}
+{-# LANGUAGE DataKinds, KindSignatures, TypeOperators,
+      TypeFamilies, RebindableSyntax, FlexibleInstances,
+        MultiParamTypeClasses #-}
 
 module Blarney.RTL where
 
+import Prelude
 import Blarney.Bit
+import Blarney.Pin
+import Blarney.Prelude
+import Control.Monad
+import GHC.TypeLits
 
 -- Each RTL variable has a unique id
 type VarId = Int
@@ -26,13 +33,20 @@ type Assign = (Bit 1, VarId, Pin)
 
 -- The RTL monad
 data RTL a =
-  RTL { runRTL :: RTLR -> RTLS -> (RTLS, RTLW, a)
+  RTL { runRTL :: RTLR -> RTLS -> (RTLS, RTLW, a) }
 
 instance Monad RTL where
   return a = RTL (\r s -> (s, [], a))
   m >>= f = RTL (\r s -> let (s0, w0, a) = runRTL m r s
                              (s1, w1, b) = runRTL (f a) r s0
                          in  (s1, w0 ++ w1, b))
+
+instance Applicative RTL where
+  pure = return
+  (<*>) = ap
+
+instance Functor RTL where
+  fmap = liftM
 
 get :: RTL RTLS
 get = RTL (\r s -> (s, [], s))
@@ -46,7 +60,7 @@ ask = RTL (\r s -> (s, [], r))
 local :: RTLR -> RTL a -> RTL a
 local r m = RTL (\_ s -> runRTL m r s)
 
-write :: RTLW -> RTL ()
+write :: Assign -> RTL ()
 write w = RTL (\r s -> (s, [w], ()))
 
 fresh :: RTL VarId
@@ -61,55 +75,61 @@ class Var v where
   (<==) :: v n -> Bit n -> RTL ()
 
 -- Register variables
-data Reg n = Reg { regId :: VarId, regVal :: Bit n }
+data Reg (n :: Nat) = Reg { regId :: VarId, regVal :: Bit n }
 
 -- Wire variables
-data Wire n = Sig { wireId :: VarId, wireVal :: Bit n }
+data Wire (n :: Nat) = Wire { wireId :: VarId, wireVal :: Bit n }
 
 -- Register assignment
-instance Var (Reg n) where
+instance Var Reg where
   val r = regVal r
   r <== x = do
     (cond, as) <- ask
     write (cond, regId r, unBit x)
 
 -- Wire assignment
-instance Var (Wire n) where
-  val r = regVal r
+instance Var Wire where
+  val r = wireVal r
   r <== x = do
     (cond, as) <- ask
     write (cond, wireId r, unBit x)
 
+-- RTL conditional
+when :: Bit 1 -> RTL () -> RTL ()
+when cond a = do
+  (c, as) <- ask
+  local (cond .&. c, as) a
+
 -- RTL if/then/else
-class IfThenElse b where
+class IfThenElse b a where
   ifThenElse :: b -> a -> a -> a
 
-instance IfThenElse RTL (Bit 1) where
-  ifThenElse :: Bit 1 -> RTL () -> RTL () -> RTL ()
+instance IfThenElse Bool a where
+  ifThenElse False a b = a
+  ifThenElse True a b = a
+
+instance IfThenElse (Bit 1) (RTL ()) where
   ifThenElse c a b =
     do (cond, as) <- ask
-       local (cond <&> c, as) a
-       local (inv cond <&> c, as) a
-
--- Obtain only the assignments to the given variable
-assigns :: VarId -> [Assign] ->
+       local (cond .&. c, as) a
+       local (inv cond .&. c, as) a
 
 -- Create register
-makeReg :: KnownNat n => Integer -> RTL (Reg (Bit n))
+makeReg :: KnownNat n => Integer -> RTL (Reg n)
 makeReg init =
   do v <- fresh
      (cond, as) <- ask
      let en  = orList [b | (b, w, p) <- as, v == w]
-     let inp = pick [(b, Bit p :: Bit n) | (b, w, p) <- as, v == w]
+     let inp = select [(b, Bit p) | (b, w, p) <- as, v == w]
      let out = regEn init en inp
      return (Reg v out)
 
 -- Create Wire
-makeWire :: KnownNat n => Integer -> RTL (Wire (Bit n))
+makeWire :: KnownNat n => Integer -> RTL (Wire n)
 makeWire def =
   do v <- fresh
      (cond, as) <- ask
      let none = inv (orList [b | (b, w, p) <- as, v == w])
-     let asNew = as ++ [(none, v, fromInteger def]
-     let out = pick [(b, Bit p :: Bit n) | (b, w, p) <- asNew, v == w]
+     let out = select ([(b, Bit p) | (b, w, p) <- as, v == w] ++
+                         [(none, fromInteger def)])
      return (Wire v out)

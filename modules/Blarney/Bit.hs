@@ -1,70 +1,40 @@
--- For Observable Sharing
-{-# OPTIONS_GHC -fno-cse -fno-full-laziness #-}
-
 -- For type-level naturals
-{-# LANGUAGE DataKinds, KindSignatures, TypeOperators, TypeFamilies, GADTs #-}
+{-# LANGUAGE DataKinds, KindSignatures, TypeOperators, TypeFamilies #-}
 
 module Blarney.Bit
-  ( Bit        -- "Bit n" is a bit vector of n bits
-  , (.&.)      -- Bitwise and
-  , (.|.)      -- Bitwise or
-  , (.^.)      -- Bitwise xor
-  , (?)        -- Mux
-  , (.==.)     -- Equality
-  , (.!=.)     -- Disequality
-  , (.<.)      -- Less than
-  , (.>.)      -- Greater than
-  , (.<=.)     -- Less than or equal
-  , (.>=.)     -- Greater than or equal
-  , shl        -- Shift left
-  , shr        -- Shift right
-  , reg        -- Register
-  , regEn      -- Register with enable
-  , (#)        -- Bit concatenation
-  , bit        -- Bit selection
-  , (!)        -- Bit range selection
-  , zeroExtend -- Zero extend
-  , signExtend -- Sign extend
-  , upper      -- Extract most significant bits
-  , lower      -- Extract least significant bits
+  ( Bit(..)      -- "Bit n" is a bit vector of n bits
+  , replicateBit -- Replicate bit to produce bit vector
+  , low          -- Bit vector of all 0's
+  , high         -- Bit vector of all 1's
+  , inv          -- Bitwise invert
+  , (.&.)        -- Bitwise and
+  , (.|.)        -- Bitwise or
+  , (.^.)        -- Bitwise xor
+  , (?)          -- Mux
+  , (.==.)       -- Equality
+  , (.!=.)       -- Disequality
+  , (.<.)        -- Less than
+  , (.>.)        -- Greater than
+  , (.<=.)       -- Less than or equal
+  , (.>=.)       -- Greater than or equal
+  , (.+.)        -- Add
+  , (.-.)        -- Subtract
+  , (.*.)        -- Multiply
+  , (.<<.)       -- Shift left
+  , (.>>.)       -- Shift right
+  , reg          -- Register
+  , regEn        -- Register with enable
+  , (#)          -- Bit concatenation
+  , bit          -- Bit selection
+  , bits         -- Bit range selection
+  , zeroExtend   -- Zero extend
+  , signExtend   -- Sign extend
+  , upper        -- Extract most significant bits
+  , lower        -- Extract least significant bits
   ) where
 
--- For type-level literals
+import Blarney.Pin
 import GHC.TypeLits
-
--- For type-level indices
-import Blarney.TypeIndex
-
--- For Observable Sharing
-import Data.IORef
-import System.IO.Unsafe(unsafePerformIO)
-
--- Every instance of a component in the circuit has a unique id
-type InstId = Int
-
--- Primitive component name
-type PrimName = String
-
--- Primitive components may have compile-time parameters
--- A parameter has a name and a value, both represented as strings
-data Param = String :-> String deriving Show
-
--- An output pin from a primitive component instance
-data Pin = 
-  Pin {
-    -- What kind of primitive produced this pin?
-    pinPrim :: PrimName
-    -- Compile-time parameters
-  , pinParams :: [Param]
-    -- Unique id of primitive instance that produced it
-  , pinInstRef :: IORef (Maybe InstId)
-    -- Inputs to the primitive instance
-  , pinInputs :: [Pin]
-    -- Output pin number
-  , pinOutNum :: Int
-    -- Bit width of pin
-  , pinWidth :: Int
-  }
 
 -- Phantom type for a pin, capturing the bit width
 newtype Bit (n :: Nat) = Bit { unBit :: Pin }
@@ -77,33 +47,6 @@ widthOf a = fromInteger (natVal a)
 width :: Bit n -> Int
 width (Bit pin) = pinWidth pin
 
--- Helper function for creating instance of a primitive component
-{-# NOINLINE primInst #-}
-primInst :: PrimName -> [Param] -> [Pin] -> [Int] -> [Pin]
-primInst prim params ins outWidths = map outPin (zip [0..] outWidths)
-  where
-    outPin (i, w) = Pin {
-                        pinPrim    = prim
-                      , pinParams  = params
-                      , pinInstRef = ref
-                      , pinInputs  = ins
-                      , pinOutNum  = i
-                      , pinWidth   = w
-                    }
-
-    {-# NOINLINE ref #-}
-    ref = newRef Nothing
-
--- Use of unsafePerformIO to implement Observable Sharing
-{-# NOINLINE newRef #-}
-newRef :: Maybe InstId -> IORef (Maybe InstId)
-newRef x = unsafePerformIO (newIORef x)
-
--- Create instance of primitive component which has one output
-primInst1 :: PrimName -> [Param] -> [Pin] -> Int -> Pin
-primInst1 prim params ins outWidth =
-  head (primInst prim params ins [outWidth])
-
 -- Unary arithmetic primitive
 primArith1 :: PrimName -> [Param] -> Bit n -> Bit n
 primArith1 prim params a = Bit (primInst1 prim params [unBit a] (width a))
@@ -112,6 +55,19 @@ primArith1 prim params a = Bit (primInst1 prim params [unBit a] (width a))
 primArith2 :: PrimName -> [Param] -> Bit n -> Bit n -> Bit n
 primArith2 prim params a b =
   Bit (primInst1 prim params [unBit a, unBit b] (width a))
+
+-- Replicate bit
+replicateBit :: KnownNat n => Bit 1 -> Bit n
+replicateBit a = result
+  where result = Bit (primInst1 "replicate" [] [unBit a] (widthOf result))
+
+-- All 0's
+low :: KnownNat n => Bit n
+low = replicateBit 0
+
+-- All 1's
+high :: KnownNat n => Bit n
+high = replicateBit 1
 
 -- Bitwise invert
 inv :: Bit n -> Bit n
@@ -166,6 +122,21 @@ primCmp2 prim params a b =
 (.>=.) :: Bit n -> Bit n -> Bit 1
 (.>=.) = primCmp2 ">=" []
 
+-- Add
+infixl 6 .+.
+(.+.) :: Bit n -> Bit n -> Bit n
+(.+.) = primArith2 "+" []
+
+-- Subtract
+infixl 6 .-.
+(.-.) :: Bit n -> Bit n -> Bit n
+(.-.) = primArith2 "-" []
+
+-- Multiply
+infixl 7 .*.
+(.*.) :: Bit n -> Bit n -> Bit n
+(.*.) = primArith2 "*" []
+
 -- Arithmetic
 instance KnownNat n => Num (Bit n) where
   (+)           = primArith2 "+" []
@@ -180,12 +151,12 @@ instance KnownNat n => Num (Bit n) where
      w          = widthOf result
 
 -- Shift left
-shl :: n ~ (2^m) => Bit n -> Bit m -> Bit n
-shl x y = Bit (primInst1 "shl" [] [] (width x))
+(.<<.) :: n ~ (2^m) => Bit n -> Bit m -> Bit n
+x .<<. y = Bit (primInst1 "<<" [] [] (width x))
 
 -- Shift right
-shr :: n ~ (2^m) => Bit n -> Bit m -> Bit n
-shr x y = Bit (primInst1 "shr" [] [] (width x))
+(.>>.) :: n ~ (2^m) => Bit n -> Bit m -> Bit n
+x .>>. y = Bit (primInst1 ">>" [] [] (width x))
 
 -- Register
 reg :: Integer -> Bit n -> Bit n
@@ -202,17 +173,23 @@ regEn init en a =
 a # b = Bit (primInst1 "#" [] [unBit a, unBit b] (width a + width b))
 
 -- Bit selection
-bit :: (KnownNat i, (i+1) <= n) => I i -> Bit n -> Bit 1
-bit i a = 
-  Bit (primInst1 "bit" ["index" :-> show (natVal i)] [unBit a] 1)
+bit :: (KnownNat n, 1 <= n) => Bit n -> Int -> Bit 1
+bit a i = Bit (primInst1 "bit" params [unBit a] 1)
+  where
+    params = if i >= fromInteger (natVal a) then
+               error "Blarney.Bit.bit: index out of range"
+             else
+               ["index" :-> show i]
 
 -- Sub-range selection
-(!) :: (KnownNat hi, KnownNat lo, (hi+1) <= n, lo <= hi, (lo+m)~hi) =>
-       Bit n -> (I hi, I lo) -> Bit m
-a ! (hi, lo) =
-  Bit (primInst1 "range" ["high" :-> show (natVal hi),
-                          "low"  :-> show (natVal lo)]
-      [unBit a] (fromInteger (natVal hi - natVal lo)))
+bits :: (KnownNat m, m <= n) => Bit n -> (Int, Int) -> Bit m
+bits a (hi, lo) = result
+  where
+    result = Bit (primInst1 "range" params [unBit a] (hi-lo))
+    params = if lo > hi || (hi-lo) /= widthOf result then
+               error "Blarney.Bit.bits: sub-range does not match bit width"
+             else
+               ["high" :-> show hi, "low"  :-> show lo]
 
 -- Zero extend
 zeroExtend :: (KnownNat m, n <= m) => Bit n -> Bit m
