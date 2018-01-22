@@ -159,14 +159,14 @@ x .<<. y = Bit (primInst1 "<<" [] [] (width x))
 x .>>. y = Bit (primInst1 ">>" [] [] (width x))
 
 -- Register
-reg :: Integer -> Bit n -> Bit n
-reg init = primArith1 "reg" ["init" :-> show init]
+reg :: Bit n -> Bit n -> Bit n
+reg = primArith2 "reg" []
 
 -- Register with enable
-regEn :: Integer -> Bit 1 -> Bit n -> Bit n
+regEn :: Bit n -> Bit 1 -> Bit n -> Bit n
 regEn init en a = 
-  Bit (primInst1 "regEn" ["init" :-> show init]
-        [unBit en, unBit a] (width a))
+  Bit (primInst1 "regEn" []
+        [unBit init, unBit en, unBit a] (width a))
 
 -- Concatenation
 (#) :: Bit n -> Bit m -> Bit (n+m)

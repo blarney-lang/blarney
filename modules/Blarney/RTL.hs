@@ -1,12 +1,13 @@
 -- For overriding if/then/else
 {-# LANGUAGE DataKinds, KindSignatures, TypeOperators,
       TypeFamilies, RebindableSyntax, FlexibleInstances,
-        MultiParamTypeClasses #-}
+        MultiParamTypeClasses, FlexibleContexts, ScopedTypeVariables #-}
 
 module Blarney.RTL where
 
 import Prelude
 import Blarney.Bit
+import Blarney.Bits
 import Blarney.Pin
 import Blarney.Prelude
 import Control.Monad
@@ -71,28 +72,28 @@ fresh = do
 
 -- Mutable variables
 class Var v where
-  val :: v n -> Bit n
-  (<==) :: v n -> Bit n -> RTL ()
+  val :: Bits a => v a -> a
+  (<==) :: Bits a => v a -> a -> RTL ()
 
 -- Register variables
-data Reg (n :: Nat) = Reg { regId :: VarId, regVal :: Bit n }
+data Reg a = Reg { regId :: VarId, regVal :: a }
 
 -- Wire variables
-data Wire (n :: Nat) = Wire { wireId :: VarId, wireVal :: Bit n }
+data Wire a = Wire { wireId :: VarId, wireVal :: a }
 
 -- Register assignment
 instance Var Reg where
   val r = regVal r
   r <== x = do
     (cond, as) <- ask
-    write (cond, regId r, unBit x)
+    write (cond, regId r, unBit (pack x))
 
 -- Wire assignment
 instance Var Wire where
   val r = wireVal r
   r <== x = do
     (cond, as) <- ask
-    write (cond, wireId r, unBit x)
+    write (cond, wireId r, unBit (pack x))
 
 -- RTL conditional
 when :: Bit 1 -> RTL () -> RTL ()
@@ -115,21 +116,21 @@ instance IfThenElse (Bit 1) (RTL ()) where
        local (inv cond .&. c, as) a
 
 -- Create register
-makeReg :: KnownNat n => Integer -> RTL (Reg n)
+makeReg :: Bits a => a -> RTL (Reg a)
 makeReg init =
   do v <- fresh
      (cond, as) <- ask
      let en  = orList [b | (b, w, p) <- as, v == w]
      let inp = select [(b, Bit p) | (b, w, p) <- as, v == w]
-     let out = regEn init en inp
+     let out = unpack (regEn (pack init) en inp)
      return (Reg v out)
 
 -- Create Wire
-makeWire :: KnownNat n => Integer -> RTL (Wire n)
+makeWire :: Bits a => a -> RTL (Wire a)
 makeWire def =
   do v <- fresh
      (cond, as) <- ask
      let none = inv (orList [b | (b, w, p) <- as, v == w])
      let out = select ([(b, Bit p) | (b, w, p) <- as, v == w] ++
-                         [(none, fromInteger def)])
-     return (Wire v out)
+                          [(none, pack def)])
+     return (Wire v (unpack out))

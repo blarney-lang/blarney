@@ -13,26 +13,26 @@ data FIFO a =
   }
 
 -- FIFO module (simple one-element FIFO)
-makeFIFO :: forall n. KnownNat n => RTL (FIFO (Bit n))
+makeFIFO :: forall a. Bits a => RTL (FIFO a)
 makeFIFO = do
   -- Register holding the one element
-  reg :: Reg n <- makeReg 0
+  reg :: Reg a <- makeReg (unpack 0)
 
   -- Register defining whether or not FIFO is full
-  full :: Reg 1 <- makeReg 0
+  full :: Reg (Bit 1) <- makeReg 0
 
   -- Wires for communicating with methods
-  doDeq :: Wire 1 <- makeWire 0
-  doEnq :: Wire 1 <- makeWire 0
-  enqVal :: Wire n <- makeWire 0
+  doDeq :: Wire (Bit 1) <- makeWire 0
+  doEnq :: Wire (Bit 1) <- makeWire 0
+  enqVal :: Wire a <- makeWire (unpack 0)
 
   -- Update register on enqueue
-  when (val doEnq) $
+  when (val doEnq) $ do
     reg <== val enqVal
     full <== 1
 
   -- Update full flag on dequeue
-  when (val doDeq) $
+  when (val doDeq) $ do
     full <== 0
 
   -- Methods
@@ -41,11 +41,10 @@ makeFIFO = do
   let notEmpty = val full .==. 1
 
   let enq a = do
-    doEnq <== 1
-    enqVal <== a
+        doEnq <== 1
+        enqVal <== a
 
-  let deq = do
-    doDeq <== 1
+  let deq = doDeq <== 1
 
   let first = val reg
 
