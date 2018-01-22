@@ -12,13 +12,13 @@ data FIFO a =
   , first    :: a
   }
 
--- FIDO module (simple one-element FIFO)
+-- FIFO module (simple one-element FIFO)
 makeFIFO :: forall n. KnownNat n => RTL (FIFO (Bit n))
 makeFIFO = do
   -- Register holding the one element
   reg :: Reg n <- makeReg 0
 
-  -- Register definings whether or not FIFO is full
+  -- Register defining whether or not FIFO is full
   full :: Reg 1 <- makeReg 0
 
   -- Wires for communicating with methods
