@@ -162,3 +162,59 @@ instance (FShow b, DisplayType a) => DisplayType (b -> a) where
 
 display :: DisplayType a => a
 display = displayType (Format [])
+
+
+
+primDisplay :: [FormatItem] -> IO Netlist
+primDisplay items =
+  forM items $ \item -> do
+    case item of
+        FormatString s -> 
+        FormatBit p -> do
+          (pNetlist, pId) <- pinToNetlist p
+          return (
+
+-- XXX: IN PROGRESS
+
+data Pin =
+  Pin {
+    -- What kind of primitive produced this pin?
+    pinPrim :: PrimName
+    -- Compile-time parameters
+  , pinParams :: [Param]
+    -- Unique id of primitive instance that produced it
+  , pinInstRef :: IORef (Maybe InstId)
+    -- Inputs to the primitive instance
+  , pinInputs :: [Pin]
+    -- Output pin number
+  , pinOutNum :: OutputNumber
+    -- Bit width of pin
+  , pinWidth :: Int
+  }
+
+
+-- Convert RTL monad to a netlist
+netlist :: RTL () -> IO Netlist
+netlist rtl = do
+  i <- newIORef (0 :: Int)
+  let displayStmts = [(go, items) | RTLDisplay (go, Format items) <- acts]
+  forM displayStmts $ \(go, items) -> do
+    (goNetlist, goId) <- pinToNetlist go
+    forM items $ \item -> do
+      case item of
+        FormatString s ->
+        FormatBit p -> do
+          (pNetlist, pId) <- pinToNetlist p
+
+  result <- JL.mapM (pinToNetlist i) sa
+  let nls = JL.map fst result
+  let wires = JL.map snd result
+  let outs  = JL.zipWith (\w b -> (getName b, w)) wires sb
+  return (Netlist { namedOutputs = JL.toList outs
+                     , nets = JL.toList (JL.concat nls)
+                     })
+
+  where
+    (_, acts, _) = runRTL rtl (1, [a | RTLAssign a <- acts]) 0
+    displayPins = [ (go, [pin | FormatBit pin <- items])
+                  | RTLDisplay (go, Format items) <- acts ]
