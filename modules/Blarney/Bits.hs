@@ -1,6 +1,6 @@
 -- For type-level naturals
 {-# LANGUAGE DataKinds, KindSignatures, TypeOperators,
-      TypeFamilies, UndecidableInstances #-}
+      TypeFamilies, UndecidableInstances, FlexibleContexts #-}
 
 module Blarney.Bits where
 

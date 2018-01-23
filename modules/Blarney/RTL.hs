@@ -1,7 +1,7 @@
 -- For overriding if/then/else
 {-# LANGUAGE DataKinds, KindSignatures, TypeOperators,
-      TypeFamilies, RebindableSyntax, FlexibleInstances,
-        MultiParamTypeClasses, FlexibleContexts, ScopedTypeVariables #-}
+      TypeFamilies, RebindableSyntax, MultiParamTypeClasses,
+        FlexibleContexts, ScopedTypeVariables #-}
 
 module Blarney.RTL where
 
@@ -10,6 +10,7 @@ import Blarney.Bit
 import Blarney.Bits
 import Blarney.Pin
 import Blarney.Prelude
+import Blarney.Format
 import Control.Monad
 import GHC.TypeLits
 
@@ -20,13 +21,19 @@ type VarId = Int
 -- The state component is the next unique variable id
 type RTLS = VarId
 
--- The writer component is a list of variable assignments made so far
-type RTLW = [Assign]
+-- The writer component is a list of RTL actions
+type RTLW = [RTLAction]
+
+-- RTL actions
+data RTLAction =
+    RTLAssign Assign
+  | RTLDisplay (Bit 1, Format)
 
 -- The reader component is a bit defining the current condition and a
 -- list of all assigments made in the RTL block.  The list of
 -- assignments is obtained by circular programming, passing the
--- writer assignments of the monad as the reader assignments.
+-- writer assignments from the output of the monad to the
+-- reader assignments in.
 type RTLR = (Bit 1, [Assign])
 
 -- A conditional assignment
@@ -61,8 +68,11 @@ ask = RTL (\r s -> (s, [], r))
 local :: RTLR -> RTL a -> RTL a
 local r m = RTL (\_ s -> runRTL m r s)
 
-write :: Assign -> RTL ()
-write w = RTL (\r s -> (s, [w], ()))
+writeAssign :: Assign -> RTL ()
+writeAssign w = RTL (\r s -> (s, [RTLAssign w], ()))
+
+writeDisplay :: (Bit 1, Format) -> RTL ()
+writeDisplay w = RTL (\r s -> (s, [RTLDisplay w], ()))
 
 fresh :: RTL VarId
 fresh = do
@@ -70,7 +80,9 @@ fresh = do
   set (v+1)
   return v
 
+
 -- Mutable variables
+infix 1 <==
 class Var v where
   val :: Bits a => v a -> a
   (<==) :: Bits a => v a -> a -> RTL ()
@@ -86,14 +98,14 @@ instance Var Reg where
   val r = regVal r
   r <== x = do
     (cond, as) <- ask
-    write (cond, regId r, unBit (pack x))
+    writeAssign (cond, regId r, unBit (pack x))
 
 -- Wire assignment
 instance Var Wire where
   val r = wireVal r
   r <== x = do
     (cond, as) <- ask
-    write (cond, wireId r, unBit (pack x))
+    writeAssign (cond, wireId r, unBit (pack x))
 
 -- RTL conditional
 when :: Bit 1 -> RTL () -> RTL ()
@@ -134,3 +146,19 @@ makeWire def =
      let out = select ([(b, Bit p) | (b, w, p) <- as, v == w] ++
                           [(none, pack def)])
      return (Wire v (unpack out))
+
+-- RTL display statements
+class DisplayType a where
+  displayType :: Format -> a
+
+instance DisplayType (RTL a) where
+  displayType x = do
+     (cond, as) <- ask
+     writeDisplay (cond, x)
+     return (error "Return value of 'display' should be ignored")
+
+instance (FShow b, DisplayType a) => DisplayType (b -> a) where
+  displayType x b = displayType (x <> fshow b)
+
+display :: DisplayType a => a
+display = displayType (Format [])

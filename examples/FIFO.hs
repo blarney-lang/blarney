@@ -50,3 +50,23 @@ makeFIFO = do
 
   -- Return interface
   return (FIFO notFull notEmpty enq deq first)
+
+-- Top-level module
+makeTop :: RTL ()
+makeTop = do
+  -- Counter
+  counter :: Reg (Bit 8) <- makeReg 0
+  counter <== val counter + 1
+
+  -- Instantiate a FIFO
+  fifo :: FIFO (Bit 8) <- makeFIFO
+
+  -- Writer side
+  when (notFull fifo) $ do
+    enq fifo (val counter)
+    display "Enqueued " (val counter)
+
+  -- Reader side
+  when (notEmpty fifo) $ do
+    deq fifo
+    display "Dequeued " (first fifo)
