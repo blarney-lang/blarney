@@ -8,11 +8,13 @@ module Blarney.RTL where
 import Prelude
 import Blarney.Bit
 import Blarney.Bits
-import Blarney.Pin
+import Blarney.Unbit
 import Blarney.Prelude
 import Blarney.Format
+import qualified Blarney.JList as JL
 import Control.Monad
 import GHC.TypeLits
+import Data.IORef
 
 -- Each RTL variable has a unique id
 type VarId = Int
@@ -37,7 +39,7 @@ data RTLAction =
 type RTLR = (Bit 1, [Assign])
 
 -- A conditional assignment
-type Assign = (Bit 1, VarId, Pin)
+type Assign = (Bit 1, VarId, Unbit)
 
 -- The RTL monad
 data RTL a =
@@ -98,14 +100,14 @@ instance Var Reg where
   val r = regVal r
   r <== x = do
     (cond, as) <- ask
-    writeAssign (cond, regId r, unBit (pack x))
+    writeAssign (cond, regId r, unbit (pack x))
 
 -- Wire assignment
 instance Var Wire where
   val r = wireVal r
   r <== x = do
     (cond, as) <- ask
-    writeAssign (cond, wireId r, unBit (pack x))
+    writeAssign (cond, wireId r, unbit (pack x))
 
 -- RTL conditional
 when :: Bit 1 -> RTL () -> RTL ()
@@ -162,3 +164,30 @@ instance (FShow b, DisplayType a) => DisplayType (b -> a) where
 
 display :: DisplayType a => a
 display = displayType (Format [])
+
+-- Add display primitive to netlist
+addDisplayPrim :: (Bit 1, [FormatItem]) -> Netlist ()
+addDisplayPrim (cond, items) = do
+    c <- flatten (unbit cond)
+    ins <- mapM flatten [b | FormatBit b <- items]
+    id <- netlistFreshId
+    let net = Net {
+                  netName = "display"
+                , netParams = params
+                , netInstId = id
+                , netInputs = c:ins
+                , netWidth = 0 -- Unused
+              }
+    netlistAdd net
+  where
+    params = [show i :-> s | (i, FormatString s) <- zip [0..] items]
+
+-- Convert RTL monad to a netlist
+netlist :: RTL () -> IO [Net]
+netlist rtl = do
+  i <- newIORef (0 :: Int)
+  (nl, _) <- runNetlist (mapM_ addDisplayPrim displays) i
+  return (JL.toList nl)
+  where
+    (_, acts, _) = runRTL rtl (1, [a | RTLAssign a <- acts]) 0
+    displays = [(go, items) | RTLDisplay (go, Format items) <- acts]

@@ -33,33 +33,33 @@ module Blarney.Bit
   , lower        -- Extract least significant bits
   ) where
 
-import Blarney.Pin
+import Blarney.Unbit
 import GHC.TypeLits
 
--- Phantom type for a pin, capturing the bit width
-newtype Bit (n :: Nat) = Bit { unBit :: Pin }
+-- Phantom type wrapping an untyped bit vector, capturing the bit width
+newtype Bit (n :: Nat) = Bit { unbit :: Unbit }
 
 -- Determine bit width from type
 widthOf :: KnownNat n => Bit n -> Int
 widthOf a = fromInteger (natVal a)
 
--- Determine bit width from pin
+-- Determine bit width
 width :: Bit n -> Int
-width (Bit pin) = pinWidth pin
+width (Bit b) = unbitWidth b
 
 -- Unary arithmetic primitive
 primArith1 :: PrimName -> [Param] -> Bit n -> Bit n
-primArith1 prim params a = Bit (primInst1 prim params [unBit a] (width a))
+primArith1 prim params a = Bit (primInst1 prim params [unbit a] (width a))
 
 -- Binary arithmetic primitive
 primArith2 :: PrimName -> [Param] -> Bit n -> Bit n -> Bit n
 primArith2 prim params a b =
-  Bit (primInst1 prim params [unBit a, unBit b] (width a))
+  Bit (primInst1 prim params [unbit a, unbit b] (width a))
 
 -- Replicate bit
 replicateBit :: KnownNat n => Bit 1 -> Bit n
 replicateBit a = result
-  where result = Bit (primInst1 "replicate" [] [unBit a] (widthOf result))
+  where result = Bit (primInst1 "replicate" [] [unbit a] (widthOf result))
 
 -- All 0's
 low :: KnownNat n => Bit n
@@ -91,12 +91,12 @@ infixl 6 .^.
 -- Mux
 (?) :: Bit 1 -> (Bit n, Bit n) -> Bit n
 sel ? (a, b) =
-  Bit (primInst1 "?" [] [unBit sel, unBit a, unBit b] (width a))
+  Bit (primInst1 "?" [] [unbit sel, unbit a, unbit b] (width a))
 
 -- Binary comparison helper
 primCmp2 :: PrimName -> [Param] -> Bit n -> Bit n -> Bit 1
 primCmp2 prim params a b =
-  Bit (primInst1 prim params [unBit a, unBit b] 1)
+  Bit (primInst1 prim params [unbit a, unbit b] 1)
 
 -- Equality
 (.==.) :: Bit n -> Bit n -> Bit 1
@@ -166,15 +166,15 @@ reg = primArith2 "reg" []
 regEn :: Bit n -> Bit 1 -> Bit n -> Bit n
 regEn init en a = 
   Bit (primInst1 "regEn" []
-        [unBit init, unBit en, unBit a] (width a))
+        [unbit init, unbit en, unbit a] (width a))
 
 -- Concatenation
 (#) :: Bit n -> Bit m -> Bit (n+m)
-a # b = Bit (primInst1 "#" [] [unBit a, unBit b] (width a + width b))
+a # b = Bit (primInst1 "#" [] [unbit a, unbit b] (width a + width b))
 
 -- Bit selection
 bit :: (KnownNat n, 1 <= n) => Bit n -> Int -> Bit 1
-bit a i = Bit (primInst1 "bit" params [unBit a] 1)
+bit a i = Bit (primInst1 "bit" params [unbit a] 1)
   where
     params = if i >= fromInteger (natVal a) then
                error "Blarney.Bit.bit: index out of range"
@@ -185,7 +185,7 @@ bit a i = Bit (primInst1 "bit" params [unBit a] 1)
 bits :: (KnownNat m, m <= n) => Bit n -> (Int, Int) -> Bit m
 bits a (hi, lo) = result
   where
-    result = Bit (primInst1 "range" params [unBit a] (hi-lo))
+    result = Bit (primInst1 "range" params [unbit a] (hi-lo))
     params = if lo > hi || (hi-lo) /= widthOf result then
                error "Blarney.Bit.bits: sub-range does not match bit width"
              else
@@ -196,7 +196,7 @@ zeroExtend :: (KnownNat m, n <= m) => Bit n -> Bit m
 zeroExtend a = result
    where
      params     = ["ext" :-> show (w - width a)]
-     result     = Bit (primInst1 "zeroExtend" params [unBit a] w)
+     result     = Bit (primInst1 "zeroExtend" params [unbit a] w)
      w          = widthOf result
 
 -- Sign extend
@@ -205,7 +205,7 @@ signExtend a = result
    where
      params     = ["ext" :-> show (w - width a),
                    "msb" :-> show (width a - 1)]
-     result     = Bit (primInst1 "signExtend" params [unBit a] w)
+     result     = Bit (primInst1 "signExtend" params [unbit a] w)
      w          = widthOf result
 
 -- Extract most significant bits
@@ -214,7 +214,7 @@ upper a = result
    where
      params     = ["hi" :-> show (width a - 1),
                    "lo" :-> show (width a - w)]
-     result     = Bit (primInst1 "range" params [unBit a] w)
+     result     = Bit (primInst1 "range" params [unbit a] w)
      w          = widthOf result
 
 -- Extract least significant bits
@@ -223,5 +223,5 @@ lower a = result
    where
      params     = ["hi" :-> show (w - 1),
                    "lo" :-> "0"]
-     result     = Bit (primInst1 "range" params [unBit a] w)
+     result     = Bit (primInst1 "range" params [unbit a] w)
      w          = widthOf result

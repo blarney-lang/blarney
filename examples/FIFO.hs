@@ -52,8 +52,8 @@ makeFIFO = do
   return (FIFO notFull notEmpty enq deq first)
 
 -- Top-level module
-makeTop :: RTL ()
-makeTop = do
+top :: RTL ()
+top = do
   -- Counter
   counter :: Reg (Bit 8) <- makeReg 0
   counter <== val counter + 1
@@ -70,3 +70,9 @@ makeTop = do
   when (notEmpty fifo) $ do
     deq fifo
     display "Dequeued " (first fifo)
+
+-- Main function
+main :: IO ()
+main = do
+  nl <- netlist top
+  print nl
