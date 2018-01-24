@@ -142,7 +142,7 @@ instance KnownNat n => Num (Bit n) where
   (+)           = primArith2 "+" []
   (-)           = primArith2 "-" []
   (*)           = primArith2 "*" []
-  negate        = primArith1 "-" []
+  negate        = primArith1 "negate" []
   abs           = id
   signum a      = (a .==. 0) ? (0, 1)
   fromInteger i = result
@@ -160,13 +160,19 @@ x .>>. y = Bit (primInst1 ">>" [] [] (width x))
 
 -- Register
 reg :: Bit n -> Bit n -> Bit n
-reg = primArith2 "reg" []
+reg init = primArith1 "reg" ["init" :-> getInit (unbit init)]
+
+-- Determine initialiser
+getInit :: Unbit -> String
+getInit b
+  | unbitPrim b == "const" = lookupParam (unbitParams b) "val"
+  | otherwise = error "Initialiser must be a constant"
 
 -- Register with enable
 regEn :: Bit n -> Bit 1 -> Bit n -> Bit n
 regEn init en a = 
-  Bit (primInst1 "regEn" []
-        [unbit init, unbit en, unbit a] (width a))
+  Bit (primInst1 "regEn" ["init" :-> getInit (unbit init)]
+        [unbit en, unbit a] (width a))
 
 -- Concatenation
 (#) :: Bit n -> Bit m -> Bit (n+m)

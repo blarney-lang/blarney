@@ -73,6 +73,4 @@ top = do
 
 -- Main function
 main :: IO ()
-main = do
-  nl <- netlist top
-  print nl
+main = netlist top >>= emitVerilog

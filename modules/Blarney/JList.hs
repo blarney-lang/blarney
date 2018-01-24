@@ -1,4 +1,4 @@
--- A small library for join-lists.
+-- A small library for join-lists, providing constant-time append
 
 module Blarney.JList 
   ( JList(..)     -- data JList a = Zero | One a | JList a :+: JList a

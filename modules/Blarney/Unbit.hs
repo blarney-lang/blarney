@@ -27,6 +27,11 @@ type PrimName = String
 -- A parameter has a name and a value, both represented as strings
 data Param = String :-> String deriving Show
 
+lookupParam :: [Param] -> String -> String
+lookupParam ps p = case [v | (k :-> v) <- ps, p == k] of
+                     [] -> error ("Unrecognised parameter '" ++ p ++ "'")
+                     v:vs -> v
+
 -- A untyped bit vector output from a primitive component instance
 data Unbit = 
   Unbit {

@@ -120,7 +120,7 @@ class IfThenElse b a where
   ifThenElse :: b -> a -> a -> a
 
 instance IfThenElse Bool a where
-  ifThenElse False a b = a
+  ifThenElse False a b = b
   ifThenElse True a b = a
 
 instance IfThenElse (Bit 1) (RTL ()) where
