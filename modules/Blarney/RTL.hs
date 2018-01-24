@@ -8,11 +8,13 @@ module Blarney.RTL where
 import Prelude
 import Blarney.Bit
 import Blarney.Bits
-import Blarney.Pin
+import Blarney.Unbit
 import Blarney.Prelude
 import Blarney.Format
+import qualified Blarney.JList as JL
 import Control.Monad
 import GHC.TypeLits
+import Data.IORef
 
 -- Each RTL variable has a unique id
 type VarId = Int
@@ -37,7 +39,7 @@ data RTLAction =
 type RTLR = (Bit 1, [Assign])
 
 -- A conditional assignment
-type Assign = (Bit 1, VarId, Pin)
+type Assign = (Bit 1, VarId, Unbit)
 
 -- The RTL monad
 data RTL a =
@@ -98,14 +100,14 @@ instance Var Reg where
   val r = regVal r
   r <== x = do
     (cond, as) <- ask
-    writeAssign (cond, regId r, unBit (pack x))
+    writeAssign (cond, regId r, unbit (pack x))
 
 -- Wire assignment
 instance Var Wire where
   val r = wireVal r
   r <== x = do
     (cond, as) <- ask
-    writeAssign (cond, wireId r, unBit (pack x))
+    writeAssign (cond, wireId r, unbit (pack x))
 
 -- RTL conditional
 when :: Bit 1 -> RTL () -> RTL ()
@@ -163,58 +165,29 @@ instance (FShow b, DisplayType a) => DisplayType (b -> a) where
 display :: DisplayType a => a
 display = displayType (Format [])
 
-
-
-primDisplay :: [FormatItem] -> IO Netlist
-primDisplay items =
-  forM items $ \item -> do
-    case item of
-        FormatString s -> 
-        FormatBit p -> do
-          (pNetlist, pId) <- pinToNetlist p
-          return (
-
--- XXX: IN PROGRESS
-
-data Pin =
-  Pin {
-    -- What kind of primitive produced this pin?
-    pinPrim :: PrimName
-    -- Compile-time parameters
-  , pinParams :: [Param]
-    -- Unique id of primitive instance that produced it
-  , pinInstRef :: IORef (Maybe InstId)
-    -- Inputs to the primitive instance
-  , pinInputs :: [Pin]
-    -- Output pin number
-  , pinOutNum :: OutputNumber
-    -- Bit width of pin
-  , pinWidth :: Int
-  }
-
+-- Add display primitive to netlist
+addDisplayPrim :: (Bit 1, [FormatItem]) -> Netlist ()
+addDisplayPrim (cond, items) = do
+    c <- flatten (unbit cond)
+    ins <- mapM flatten [b | FormatBit b <- items]
+    id <- netlistFreshId
+    let net = Net {
+                  netName = "display"
+                , netParams = params
+                , netInstId = id
+                , netInputs = c:ins
+                , netWidth = 0 -- Unused
+              }
+    netlistAdd net
+  where
+    params = [show i :-> s | (i, FormatString s) <- zip [0..] items]
 
 -- Convert RTL monad to a netlist
-netlist :: RTL () -> IO Netlist
+netlist :: RTL () -> IO [Net]
 netlist rtl = do
   i <- newIORef (0 :: Int)
-  let displayStmts = [(go, items) | RTLDisplay (go, Format items) <- acts]
-  forM displayStmts $ \(go, items) -> do
-    (goNetlist, goId) <- pinToNetlist go
-    forM items $ \item -> do
-      case item of
-        FormatString s ->
-        FormatBit p -> do
-          (pNetlist, pId) <- pinToNetlist p
-
-  result <- JL.mapM (pinToNetlist i) sa
-  let nls = JL.map fst result
-  let wires = JL.map snd result
-  let outs  = JL.zipWith (\w b -> (getName b, w)) wires sb
-  return (Netlist { namedOutputs = JL.toList outs
-                     , nets = JL.toList (JL.concat nls)
-                     })
-
+  (nl, _) <- runNetlist (mapM_ addDisplayPrim displays) i
+  return (JL.toList nl)
   where
     (_, acts, _) = runRTL rtl (1, [a | RTLAssign a <- acts]) 0
-    displayPins = [ (go, [pin | FormatBit pin <- items])
-                  | RTLDisplay (go, Format items) <- acts ]
+    displays = [(go, items) | RTLDisplay (go, Format items) <- acts]

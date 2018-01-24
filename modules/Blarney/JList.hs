@@ -12,7 +12,7 @@ module Blarney.JList
   ) where
 
 import Prelude hiding (map, mapM, concat, zipWith)
-import Monad hiding (mapM)
+import Control.Monad hiding (mapM)
 
 data JList a = Zero | One a | JList a :+: JList a
   deriving (Show, Eq)
@@ -37,6 +37,10 @@ instance Monad JList where
   Zero >>= f = Zero
   One a >>= f = f a
   (as :+: bs) >>= f = (as >>= f) :+: (bs >>= f)
+
+instance Applicative JList where
+  pure = return
+  (<*>) = ap
 
 map :: (a -> b) -> JList a -> JList b
 map = fmap
