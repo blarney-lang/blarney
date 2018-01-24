@@ -1,14 +1,21 @@
 -- Emit netlist in Verilog format
 
 module Blarney.Verilog
-  ( emitVerilog
+  ( printVerilog
+  , writeVerilog
   ) where
 
 import Blarney.Unbit
 import System.IO
 
-emitVerilog :: [Net] -> IO ()
-emitVerilog = hWriteVerilog stdout
+printVerilog :: [Net] -> IO ()
+printVerilog = hWriteVerilog stdout
+
+writeVerilog :: String -> [Net] -> IO ()
+writeVerilog filename netlist = do
+  h <- openFile filename WriteMode
+  hWriteVerilog h netlist
+  hClose h
 
 hWriteVerilog :: Handle -> [Net] -> IO ()
 hWriteVerilog h netlist = do
@@ -46,32 +53,38 @@ hWriteVerilog h netlist = do
           emit ";\n"
 
     emitInst net
+      | netName net == "display" = return ()
       | netName net `elem` ["reg", "regEn"] = return ()
       | netName net == "const" = do
+          emit "assign "
           emitWire (netInstId net, 0)
-          emit " <= "
+          emit " = "
           emit (lookupParam (netParams net) "val")
           emit ";\n"
       | netName net == "~" = do
+          emit "assign "
           emitWire (netInstId net, 0)
-          emit " <= ~"
+          emit " = ~"
           emitWire (netInputs net !! 0)
           emit ";\n"
       | netName net == "negate" = do
+          emit "assign "
           emitWire (netInstId net, 0)
-          emit " <= -"
+          emit " = -"
           emitWire (netInputs net !! 0)
           emit ";\n"
       | netName net == "replicate" = do
+          emit "assign "
           emitWire (netInstId net, 0)
-          emit " <= {"
+          emit " = {"
           emit (show (netWidth net))
           emit "{"
           emitWire (netInputs net !! 0)
           emit "}};\n"
       | netName net == "?" = do
+          emit "assign "
           emitWire (netInstId net, 0)
-          emit " <= "
+          emit " = "
           emitWire (netInputs net !! 0)
           emit " ? "
           emitWire (netInputs net !! 1)
@@ -79,22 +92,25 @@ hWriteVerilog h netlist = do
           emitWire (netInputs net !! 2)
           emit ";\n"
       | netName net == "#" = do
+          emit "assign "
           emitWire (netInstId net, 0)
-          emit " <= {"
+          emit " = {"
           emitWire (netInputs net !! 0)
           emit ","
           emitWire (netInputs net !! 1)
           emit "};\n"
       | netName net == "bit" = do
+          emit "assign "
           emitWire (netInstId net, 0)
-          emit " <= "
+          emit " = "
           emitWire (netInputs net !! 0)
           emit "["
           emit (lookupParam (netParams net) "index")
           emit "];\n"
       | netName net == "range" = do
+          emit "assign "
           emitWire (netInstId net, 0)
-          emit " <= "
+          emit " = "
           emitWire (netInputs net !! 0)
           emit "["
           emit (lookupParam (netParams net) "high")
@@ -102,16 +118,18 @@ hWriteVerilog h netlist = do
           emit (lookupParam (netParams net) "low")
           emit "];\n"
       | netName net == "zeroExtend" = do
+          emit "assign "
           emitWire (netInstId net, 0)
-          emit " <= "
+          emit " = "
           emit "{"
           emit (lookupParam (netParams net) "ext")
           emit "{1`b0},"
           emitWire (netInputs net !! 0)
           emit "};\n"
       | netName net == "signExtend" = do
+          emit "assign "
           emitWire (netInstId net, 0)
-          emit " <= "
+          emit " = "
           emit "{"
           emit (lookupParam (netParams net) "ext")
           emit "{"
@@ -123,8 +141,9 @@ hWriteVerilog h netlist = do
           emit "};\n"
       | otherwise = do
           -- Default case: binary operator
+          emit "assign "
           emitWire (netInstId net, 0)
-          emit " <= "
+          emit " = "
           emitWire (netInputs net !! 0)
           emit (netName net)
           emitWire (netInputs net !! 1)
@@ -147,18 +166,29 @@ hWriteVerilog h netlist = do
       | netName net == "display" = do
           emit "if ("
           emitWire (netInputs net !! 0)
-          emit " == 1) $display("
-          emitDisplay 0 (netParams net) (tail (netInputs net))
+          emit " == 1) $display(\""
+          emitDisplayFormat 0 (netParams net) (tail (netInputs net))
+          emit ","
+          emitDisplayArgs 0 (netParams net) (tail (netInputs net))
           emit ");\n"
       | otherwise = return ()
 
-    emitDisplay n [] [] = return ()
-    emitDisplay n ((k :-> v) : params) xs
+    emitDisplayFormat n [] [] = emit "\\n\""
+    emitDisplayFormat n ((k :-> v) : params) xs
+      | show n == k = do
+          emit "%s"
+          emitDisplayFormat (n+1) params xs
+    emitDisplayFormat n params (x:xs) = do
+      emit "%x"
+      emitDisplayFormat (n+1) params xs
+
+    emitDisplayArgs n [] [] = return ()
+    emitDisplayArgs n ((k :-> v) : params) xs
       | show n == k = do
           emit ("\"" ++ v ++ "\"")
           if null params && null xs then return () else emit ","
-          emitDisplay (n+1) params xs
-    emitDisplay n params (x:xs) = do
+          emitDisplayArgs (n+1) params xs
+    emitDisplayArgs n params (x:xs) = do
       emitWire x
       if null params && null xs then return () else emit ","
-      emitDisplay (n+1) params xs
+      emitDisplayArgs (n+1) params xs

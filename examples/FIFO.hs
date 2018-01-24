@@ -73,4 +73,4 @@ top = do
 
 -- Main function
 main :: IO ()
-main = netlist top >>= emitVerilog
+main = netlist top >>= writeVerilog "/tmp/fifo.v"
