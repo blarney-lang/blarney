@@ -30,6 +30,7 @@ type RTLW = [RTLAction]
 data RTLAction =
     RTLAssign Assign
   | RTLDisplay (Bit 1, Format)
+  | RTLFinish (Bit 1)
 
 -- The reader component is a bit defining the current condition and a
 -- list of all assigments made in the RTL block.  The list of
@@ -75,6 +76,9 @@ writeAssign w = RTL (\r s -> (s, [RTLAssign w], ()))
 
 writeDisplay :: (Bit 1, Format) -> RTL ()
 writeDisplay w = RTL (\r s -> (s, [RTLDisplay w], ()))
+
+writeFinish :: Bit 1 -> RTL ()
+writeFinish w = RTL (\r s -> (s, [RTLFinish w], ()))
 
 fresh :: RTL VarId
 fresh = do
@@ -149,6 +153,12 @@ makeWire def =
                           [(none, pack def)])
      return (Wire v (unpack out))
 
+-- RTL finish statements
+finish :: RTL ()
+finish = do
+  (cond, as) <- ask
+  writeFinish cond
+
 -- RTL display statements
 class DisplayType a where
   displayType :: Format -> a
@@ -182,12 +192,29 @@ addDisplayPrim (cond, items) = do
   where
     params = [show i :-> s | (i, FormatString s) <- zip [0..] items]
 
+-- Add finish primitive to netlist
+addFinishPrim :: Bit 1 -> Netlist ()
+addFinishPrim cond = do
+  c <- flatten (unbit cond)
+  id <- netlistFreshId
+  let net = Net {
+                netName = "finish"
+              , netParams = []
+              , netInstId = id
+              , netInputs = [c]
+              , netWidth = 0 -- Unused
+            }
+  netlistAdd net
+
 -- Convert RTL monad to a netlist
 netlist :: RTL () -> IO [Net]
 netlist rtl = do
   i <- newIORef (0 :: Int)
-  (nl, _) <- runNetlist (mapM_ addDisplayPrim displays) i
+  (nl, _) <- runNetlist rtl' i
   return (JL.toList nl)
   where
     (_, acts, _) = runRTL rtl (1, [a | RTLAssign a <- acts]) 0
-    displays = [(go, items) | RTLDisplay (go, Format items) <- acts]
+    disps = [(go, items) | RTLDisplay (go, Format items) <- acts]
+    fins  = [go | RTLFinish go <- acts]
+    rtl'  = do mapM_ addDisplayPrim disps
+               mapM_ addFinishPrim fins

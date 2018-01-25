@@ -37,6 +37,7 @@ hWriteVerilog h netlist = do
 
     emitDecl net
       | netName net == "display" = return ()
+      | netName net == "finish" = return ()
       | netName net `elem` ["reg", "regEn"] = do
           emit "reg ["
           emit (show (netWidth net-1))
@@ -54,6 +55,7 @@ hWriteVerilog h netlist = do
 
     emitInst net
       | netName net == "display" = return ()
+      | netName net == "finish" = return ()
       | netName net `elem` ["reg", "regEn"] = return ()
       | netName net == "const" = do
           emit "assign "
@@ -171,6 +173,10 @@ hWriteVerilog h netlist = do
           emit ","
           emitDisplayArgs 0 (netParams net) (tail (netInputs net))
           emit ");\n"
+      | netName net == "finish" = do
+          emit "if ("
+          emitWire (netInputs net !! 0)
+          emit " == 1) $finish;\n"
       | otherwise = return ()
 
     emitDisplayFormat n [] [] = emit "\\n\""
@@ -179,7 +185,7 @@ hWriteVerilog h netlist = do
           emit "%s"
           emitDisplayFormat (n+1) params xs
     emitDisplayFormat n params (x:xs) = do
-      emit "%x"
+      emit "%d"
       emitDisplayFormat (n+1) params xs
 
     emitDisplayArgs n [] [] = return ()

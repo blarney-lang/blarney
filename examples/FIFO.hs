@@ -1,3 +1,5 @@
+-- Single-element FIFO
+
 module FIFO where
 
 import Blarney
@@ -55,21 +57,24 @@ makeFIFO = do
 top :: RTL ()
 top = do
   -- Counter
-  counter :: Reg (Bit 8) <- makeReg 0
-  counter <== val counter + 1
+  timer :: Reg (Bit 8) <- makeReg 0
+  timer <== val timer + 1
 
   -- Instantiate a FIFO
   fifo :: FIFO (Bit 8) <- makeFIFO
 
   -- Writer side
   when (notFull fifo) $ do
-    enq fifo (val counter)
-    display "Enqueued " (val counter)
+    enq fifo (val timer)
+    display "Enqueued " (val timer)
 
   -- Reader side
   when (notEmpty fifo) $ do
     deq fifo
     display "Dequeued " (first fifo)
+
+  -- Terminate after 100 cycles
+  when (val timer .==. 100) finish
 
 -- Main function
 main :: IO ()

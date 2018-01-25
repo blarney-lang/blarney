@@ -150,13 +150,24 @@ instance KnownNat n => Num (Bit n) where
      result     = Bit (primInst1 "const" ["val" :-> show i] [] w)
      w          = widthOf result
 
+-- Division
+instance KnownNat n => Fractional (Bit n) where
+  (/)          = primArith2 "/" []
+  recip        = error "Undefined function: 'recip' for bit vectors"
+  fromRational = error "Undefined function: 'fromRational' for bit vectors"
+
+-- Modulus
+infixl 7 %
+(%) :: Bit n -> Bit n -> Bit n
+(%) = primArith2 "%" []
+
 -- Shift left
 (.<<.) :: n ~ (2^m) => Bit n -> Bit m -> Bit n
-x .<<. y = Bit (primInst1 "<<" [] [] (width x))
+x .<<. y = Bit (primInst1 "<<" [] [unbit x, unbit y] (width x))
 
 -- Shift right
 (.>>.) :: n ~ (2^m) => Bit n -> Bit m -> Bit n
-x .>>. y = Bit (primInst1 ">>" [] [] (width x))
+x .>>. y = Bit (primInst1 ">>" [] [unbit x, unbit y] (width x))
 
 -- Register
 reg :: Bit n -> Bit n -> Bit n
