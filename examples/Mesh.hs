@@ -4,7 +4,6 @@ module Mesh where
 
 import Blarney
 import Data.List
-import Control.Monad hiding (when)
 
 type Mesh a = [[a]]
 
