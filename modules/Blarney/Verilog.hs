@@ -121,9 +121,9 @@ hWriteVerilog h netlist = do
           emit " = "
           emitWire (netInputs net !! 0)
           emit "["
-          emit (lookupParam (netParams net) "high")
+          emit (lookupParam (netParams net) "hi")
           emit ":"
-          emit (lookupParam (netParams net) "low")
+          emit (lookupParam (netParams net) "lo")
           emit "];\n"
       | netName net == "zeroExtend" = do
           emit "assign "

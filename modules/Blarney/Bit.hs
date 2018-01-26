@@ -211,7 +211,7 @@ bits a (hi, lo) = result
     params = if lo > hi || (hi-lo) /= widthOf result then
                error "Blarney.Bit.bits: sub-range does not match bit width"
              else
-               ["high" :-> show hi, "low"  :-> show lo]
+               ["hi" :-> show hi, "lo"  :-> show lo]
 
 -- Zero extend
 zeroExtend :: (KnownNat m, n <= m) => Bit n -> Bit m

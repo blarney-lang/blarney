@@ -4,7 +4,7 @@ import Blarney
 import Data.IntMap (IntMap, empty, insertWith, keys, (!), fromList)
 
 -- Max number of nodes
-type MaxNodes = 32
+type MaxNodes = 64
 
 -- Networks
 type NodeId = Int
@@ -47,7 +47,7 @@ makeNode id = do
   -- Update method
   let update t r = do
         reaching <== r
-        let newOnes = countOnes (r .&. inv (val reaching))
+        let newOnes :: Count = lower (countOnes (r .&. inv (val reaching)))
         when (newOnes .!=. 0) $ do
           changed <== 1
         total <== val total + t * newOnes
