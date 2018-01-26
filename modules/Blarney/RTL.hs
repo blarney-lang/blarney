@@ -15,6 +15,7 @@ import qualified Blarney.JList as JL
 import Control.Monad
 import GHC.TypeLits
 import Data.IORef
+import Data.IntMap (IntMap, findWithDefault, fromListWith)
 
 -- Each RTL variable has a unique id
 type VarId = Int
@@ -37,7 +38,7 @@ data RTLAction =
 -- assignments is obtained by circular programming, passing the
 -- writer assignments from the output of the monad to the
 -- reader assignments in.
-type RTLR = (Bit 1, [Assign])
+type RTLR = (Bit 1, IntMap [Assign])
 
 -- A conditional assignment
 type Assign = (Bit 1, VarId, Unbit)
@@ -137,9 +138,10 @@ instance IfThenElse (Bit 1) (RTL ()) where
 makeReg :: Bits a => a -> RTL (Reg a)
 makeReg init =
   do v <- fresh
-     (cond, as) <- ask
-     let en  = orList [b | (b, w, p) <- as, v == w]
-     let inp = select [(b, Bit p) | (b, w, p) <- as, v == w]
+     (cond, assignMap) <- ask
+     let as = findWithDefault [] v assignMap
+     let en  = orList [b | (b, _, p) <- as]
+     let inp = select [(b, Bit p) | (b, _, p) <- as]
      let out = unpack (regEn (pack init) en inp)
      return (Reg v out)
 
@@ -147,9 +149,10 @@ makeReg init =
 makeWire :: Bits a => a -> RTL (Wire a)
 makeWire def =
   do v <- fresh
-     (cond, as) <- ask
-     let none = inv (orList [b | (b, w, p) <- as, v == w])
-     let out = select ([(b, Bit p) | (b, w, p) <- as, v == w] ++
+     (cond, assignMap) <- ask
+     let as = findWithDefault [] v assignMap
+     let none = inv (orList [b | (b, _, p) <- as])
+     let out = select ([(b, Bit p) | (b, _, p) <- as] ++
                           [(none, pack def)])
      return (Wire v (unpack out))
 
@@ -213,7 +216,8 @@ netlist rtl = do
   (nl, _) <- runNetlist rtl' i
   return (JL.toList nl)
   where
-    (_, acts, _) = runRTL rtl (1, [a | RTLAssign a <- acts]) 0
+    (_, acts, _) = runRTL rtl (1, assignMap) 0
+    assignMap = fromListWith (++) [(v, [a]) | RTLAssign a@(_, v,_) <- acts]
     disps = [(go, items) | RTLDisplay (go, Format items) <- acts]
     fins  = [go | RTLFinish go <- acts]
     rtl'  = do mapM_ addDisplayPrim disps
