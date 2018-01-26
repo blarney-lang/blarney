@@ -1,3 +1,5 @@
+-- Calculate average shortest path of undirected graph/network
+
 import Blarney
 import Data.IntMap (IntMap, empty, insertWith, keys, (!), fromList)
 
