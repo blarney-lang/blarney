@@ -69,6 +69,12 @@ hWriteVerilog h netlist = do
           emit " = ~"
           emitWire (netInputs net !! 0)
           emit ";\n"
+      | netName net == "countOnes" = do
+          emit "assign "
+          emitWire (netInstId net, 0)
+          emit " = $countones("
+          emitWire (netInputs net !! 0)
+          emit ");\n"
       | netName net == "negate" = do
           emit "assign "
           emitWire (netInstId net, 0)

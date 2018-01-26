@@ -22,6 +22,7 @@ module Blarney.Bit
   , (.*.)        -- Multiply
   , (.<<.)       -- Shift left
   , (.>>.)       -- Shift right
+  , countOnes    -- Population count
   , reg          -- Register
   , regEn        -- Register with enable
   , (#)          -- Bit concatenation
@@ -162,12 +163,16 @@ infixl 7 %
 (%) = primArith2 "%" []
 
 -- Shift left
-(.<<.) :: n ~ (2^m) => Bit n -> Bit m -> Bit n
+(.<<.) :: Bit n -> Bit n -> Bit n
 x .<<. y = Bit (primInst1 "<<" [] [unbit x, unbit y] (width x))
 
 -- Shift right
-(.>>.) :: n ~ (2^m) => Bit n -> Bit m -> Bit n
+(.>>.) :: Bit n -> Bit n -> Bit n
 x .>>. y = Bit (primInst1 ">>" [] [unbit x, unbit y] (width x))
+
+-- Shift right
+countOnes :: Bit n -> Bit n
+countOnes x = Bit (primInst1 "countOnes" [] [unbit x] (width x))
 
 -- Register
 reg :: Bit n -> Bit n -> Bit n
