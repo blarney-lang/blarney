@@ -171,8 +171,11 @@ x .<<. y = Bit (primInst1 "<<" [] [unbit x, unbit y] (width x))
 x .>>. y = Bit (primInst1 ">>" [] [unbit x, unbit y] (width x))
 
 -- Shift right
-countOnes :: Bit n -> Bit n
-countOnes x = Bit (primInst1 "countOnes" [] [unbit x] (width x))
+countOnes :: Bit (2^n) -> Bit n
+countOnes x = Bit (primInst1 "countOnes" [] [unbit x] (log2 (width x)))
+  where
+    log2 1 = 0
+    log2 n = 1 + log2 (n `div` 2)
 
 -- Register
 reg :: Bit n -> Bit n -> Bit n

@@ -1,7 +1,7 @@
 -- For overriding if/then/else
 {-# LANGUAGE DataKinds, KindSignatures, TypeOperators,
       TypeFamilies, RebindableSyntax, MultiParamTypeClasses,
-        FlexibleContexts, ScopedTypeVariables #-}
+        FlexibleContexts, ScopedTypeVariables, FlexibleInstances #-}
 
 module Blarney.RTL where
 

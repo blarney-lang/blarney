@@ -1,34 +1,24 @@
 -- Calculate average shortest path of undirected graph/network
 
 import Blarney
-import Data.IntMap (IntMap, empty, insertWith, keys, (!), fromList)
+import Network
+import Data.IntMap (IntMap, keys, (!), fromList)
 
--- Max number of nodes
+-- Max number of nodes in network (must be a power of 2)
 type MaxNodes = 64
 
--- Networks
-type NodeId = Int
-type Network = IntMap [NodeId]
-
--- Network parser
-edges :: [String] -> [(NodeId, NodeId)]
-edges (x:y:ys) = (read x, read y) : edges ys
-edges other = []
-
-addEdge :: (NodeId, NodeId) -> Network -> Network
-addEdge (from, to) =
-  insertWith (++) from [to] . insertWith (++) to [from]
-
-parseNetwork :: String -> Network
-parseNetwork = foldr addEdge empty . edges . drop 2 . words
-
--- Hardware types
-type Count = Bit 32
+-- Reaching vector, hot for each node that reaches
 type Reaching = Bit MaxNodes
+
+-- Number of clock cycles that have elapsed
+type Time = Bit 32
+
+-- Holds the sum of path lengths
+type Count = Bit 32
 
 data Node =
   Node {
-    update   :: Count -> Reaching -> RTL ()
+    update   :: Time -> Reaching -> RTL ()
   , reaching :: Reaching
   , total    :: Count
   , changed  :: Bit 1
@@ -38,7 +28,7 @@ makeNode :: NodeId -> RTL Node
 makeNode id = do
   -- Bit vector of all nodes reaching this node
   -- Initially, node reaches itself
-  reaching :: Reg Reaching <- makeReg (fromInteger (2 ^ toInteger id))
+  reaching <- makeReg (fromInteger (2 ^ toInteger id))
   -- Track the sum of the lengths of paths reaching this node
   total <- makeReg 0
   -- Has this node changed?
@@ -47,10 +37,10 @@ makeNode id = do
   -- Update method
   let update t r = do
         reaching <== r
-        let newOnes :: Count = lower (countOnes (r .&. inv (val reaching)))
+        let newOnes = countOnes (r .&. inv (val reaching))
         when (newOnes .!=. 0) $ do
           changed <== 1
-        total <== val total + t * newOnes
+        total <== val total + t * zeroExtend newOnes
 
   return (Node update (val reaching) (val total) (val changed))
 
@@ -62,7 +52,7 @@ compile net = do
   -- Mapping from node id to node
   let nodeMap = fromList (zip (keys net) nodes)
   -- Timer
-  timer :: Reg Count <- makeReg 0
+  timer <- makeReg 0
   timer <== val timer + 1
   -- Call update method for each node
   forM (zip (keys net) nodes) $ \(id, node) -> do
@@ -74,8 +64,6 @@ compile net = do
     finish
 
 main :: IO ()
-main = do
-  contents <- readFile "n1.edges"
-  let net = parseNetwork contents
-  nl <- netlist (compile net)
-  writeVerilog "/tmp/asp.v" nl
+main = readFile "n1.edges"
+   >>= netlist . compile . parseNetwork
+   >>= writeVerilog "/tmp/asp.v"
