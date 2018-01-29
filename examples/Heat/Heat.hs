@@ -42,4 +42,4 @@ top t w h = do
 -- Main function
 main :: IO ()
 main =
-  netlist (top 100 16 16) >>= writeVerilog "/tmp/heat.v"
+  netlist (top 100 16 16) >>= writeNetlist "/tmp/heat.net"
