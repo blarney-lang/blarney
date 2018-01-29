@@ -77,7 +77,7 @@ primInst1 prim params ins outWidth =
   head (primInst prim params ins [outWidth])
 
 -- A reader/writer monad for accumulating the netlist
-data Netlist a = Netlist { runNetlist :: NetlistR -> IO (NetlistW, a) }
+newtype Netlist a = Netlist { runNetlist :: NetlistR -> IO (NetlistW, a) }
 
 -- The reader component contains a IORef containing the next unique net id
 type NetlistR = IORef Int

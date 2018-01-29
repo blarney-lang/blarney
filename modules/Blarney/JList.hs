@@ -9,9 +9,10 @@ module Blarney.JList
   , concat        -- :: JList (JList a) -> JList a
   , zipWith       -- :: (a -> b -> c) -> JList a -> JList b -> JList c
   , lazyZipWith   -- :: (a -> b -> c) -> JList a -> JList b -> JList c
+  , (++)          -- :: JList a -> JList a -> JList a
   ) where
 
-import Prelude hiding (map, mapM, concat, zipWith)
+import Prelude hiding (map, mapM, concat, zipWith, (++))
 import Control.Monad hiding (mapM)
 
 data JList a = Zero | One a | JList a :+: JList a
@@ -66,3 +67,8 @@ lazyZipWith f Zero x = Zero
 lazyZipWith f (One a) x = let One b = x in One (f a b)
 lazyZipWith f (a0 :+: a1) x =
   let b0 :+: b1 = x in lazyZipWith f a0 b0 :+: lazyZipWith f a1 b1
+
+(++) :: JList a -> JList a -> JList a
+Zero ++ ys = ys
+xs ++ Zero = xs
+xs ++ ys = xs :+: ys

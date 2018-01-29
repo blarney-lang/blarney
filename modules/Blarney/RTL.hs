@@ -25,7 +25,7 @@ type VarId = Int
 type RTLS = VarId
 
 -- The writer component is a list of RTL actions
-type RTLW = [RTLAction]
+type RTLW = JL.JList RTLAction
 
 -- RTL actions
 data RTLAction =
@@ -44,14 +44,14 @@ type RTLR = (Bit 1, IntMap [Assign])
 type Assign = (Bit 1, VarId, Unbit)
 
 -- The RTL monad
-data RTL a =
+newtype RTL a =
   RTL { runRTL :: RTLR -> RTLS -> (RTLS, RTLW, a) }
 
 instance Monad RTL where
-  return a = RTL (\r s -> (s, [], a))
+  return a = RTL (\r s -> (s, JL.Zero, a))
   m >>= f = RTL (\r s -> let (s0, w0, a) = runRTL m r s
                              (s1, w1, b) = runRTL (f a) r s0
-                         in  (s1, w0 ++ w1, b))
+                         in  (s1, w1 JL.++ w0, b))
 
 instance Applicative RTL where
   pure = return
@@ -61,32 +61,31 @@ instance Functor RTL where
   fmap = liftM
 
 get :: RTL RTLS
-get = RTL (\r s -> (s, [], s))
+get = RTL (\r s -> (s, JL.Zero, s))
 
 set :: RTLS -> RTL ()
-set s' = RTL (\r s -> (s', [], ()))
+set s' = RTL (\r s -> (s', JL.Zero, ()))
 
 ask :: RTL RTLR
-ask = RTL (\r s -> (s, [], r))
+ask = RTL (\r s -> (s, JL.Zero, r))
 
 local :: RTLR -> RTL a -> RTL a
 local r m = RTL (\_ s -> runRTL m r s)
 
 writeAssign :: Assign -> RTL ()
-writeAssign w = RTL (\r s -> (s, [RTLAssign w], ()))
+writeAssign w = RTL (\r s -> (s, JL.One (RTLAssign w), ()))
 
 writeDisplay :: (Bit 1, Format) -> RTL ()
-writeDisplay w = RTL (\r s -> (s, [RTLDisplay w], ()))
+writeDisplay w = RTL (\r s -> (s, JL.One (RTLDisplay w), ()))
 
 writeFinish :: Bit 1 -> RTL ()
-writeFinish w = RTL (\r s -> (s, [RTLFinish w], ()))
+writeFinish w = RTL (\r s -> (s, JL.One (RTLFinish w), ()))
 
 fresh :: RTL VarId
 fresh = do
   v <- get
   set (v+1)
   return v
-
 
 -- Mutable variables
 infix 1 <==
@@ -216,7 +215,8 @@ netlist rtl = do
   (nl, _) <- runNetlist rtl' i
   return (JL.toList nl)
   where
-    (_, acts, _) = runRTL rtl (1, assignMap) 0
+    (_, actsJL, _) = runRTL rtl (1, assignMap) 0
+    acts = JL.toList actsJL
     assignMap = fromListWith (++) [(v, [a]) | RTLAssign a@(_, v,_) <- acts]
     disps = [(go, items) | RTLDisplay (go, Format items) <- acts]
     fins  = [go | RTLFinish go <- acts]
