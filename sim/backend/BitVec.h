@@ -278,4 +278,13 @@ inline void signExtBU(BU a, BU r, uint32_t aw, uint32_t rw)
   signExtCoreBU(a, r, aw, rw, aChunks, rChunks);
 }
 
+// Replicate bit
+inline void replicateBU(uint8_t bit, BU r, uint32_t w)
+{
+  uint32_t numChunks = (w+ChunkSize-1)/ChunkSize;
+  Chunk ones = ~0;
+  for (uint32_t i = 0; i < numChunks; i++) r[i] = ones;
+  r[numChunks-1] = fitMSCU(r[numChunks-1], w);
+}
+
 #endif

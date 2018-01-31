@@ -79,7 +79,7 @@ class Parser {
     void demandStr(char** s);
 
     // Parse net inputs or exit with a parse error
-    void demandInputs(Seq<NetInput>* inputs);
+    void demandInputs(Seq<NetWire>* inputs);
 
     // Parse net parameters or exit with a parse error
     void demandParams(Seq<NetParam>* params);

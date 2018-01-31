@@ -6,12 +6,12 @@
 #include <string.h>
 #include "Seq.h"
 
-// Unique id for nets
+// Unique id for primitive components (nets)
 typedef unsigned NetId;
 
-// A net input is a pair containing a net id and a pin number 
-// (Nets may have many output pins)
-struct NetInput {
+// A net wire is a pair containing a net id and a pin number 
+// (Components may have many output pins)
+struct NetWire {
   NetId id;
   unsigned pin;
 };
@@ -31,7 +31,7 @@ struct Net {
   char* prim;
 
   // Inputs to the component
-  SmallSeq<NetInput> inputs;
+  SmallSeq<NetWire> inputs;
 
   // Parameters of the component
   SmallSeq<NetParam> params;
@@ -49,7 +49,24 @@ struct Net {
   }
 };
 
-// A netlist is a sequence of nets
-typedef Seq<Net> Netlist;
+// Netlist structure
+struct Netlist {
+  // A netlist is a sequence of nets, indexed by net id
+  Seq<Net*> nets;
+
+  // Add a net
+  // The given net will be freed by the destructor
+  void addNet(Net* net);
+
+  // Determine roots of the netlist
+  // That is, components with no outputs or external outputs
+  void roots(Seq<Net*>* result);
+
+  // Depth-first search
+  void dfs(Seq<Net*>* result);
+
+  // Destructor
+  ~Netlist();
+};
 
 #endif

@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "Netlist.h"
 #include "Parser.h"
+#include "CodeGen.h"
 
 int main()
 {
@@ -10,7 +11,8 @@ int main()
   Netlist netlist;
   parser.demandNetlist(&netlist);
 
-  printf("Parsed %i characters and %i lines\n",
-    parser.next, parser.lineNumber);
+  CodeGen codeGen;
+  codeGen.gen(&netlist);
+
   return 0;
 }

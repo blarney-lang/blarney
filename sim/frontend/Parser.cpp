@@ -243,9 +243,9 @@ void Parser::demandNet(Net* net)
 }
 
 // Parse net inputs or exit with a parse error
-void Parser::demandInputs(Seq<NetInput>* inputs)
+void Parser::demandInputs(Seq<NetWire>* inputs)
 {
-  NetInput input;
+  NetWire input;
   demand("[");
   if (eat("]")) return;
   do {
@@ -279,7 +279,8 @@ void Parser::demandNetlist(Netlist* netlist)
 {
   spaces();
   while (!isEnd()) {
-    netlist->extend();
-    demandNet(&netlist->elems[netlist->numElems-1]);
+    Net* net = new Net;
+    demandNet(net);
+    netlist->addNet(net);
   }
 }

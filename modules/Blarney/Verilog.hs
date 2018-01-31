@@ -38,6 +38,10 @@ hWriteVerilog h netlist = do
     emitDecl net
       | netName net == "display" = return ()
       | netName net == "finish" = return ()
+      | netName net `elem` ["<", "<=", ">", ">=", "==", "!="] = do
+          emit "wire [0:0] "
+          emitWire (netInstId net, 0)
+          emit ";\n"
       | netName net `elem` ["reg", "regEn"] = do
           emit "reg ["
           emit (show (netWidth net-1))
