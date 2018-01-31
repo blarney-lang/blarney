@@ -6,6 +6,7 @@ module Blarney
   , module Blarney.Format
   , module Blarney.Verilog
   , module Blarney.Netlist
+  , module Blarney.Recipe
   , module Control.Monad
   , module GHC.TypeLits
   ) where
@@ -17,5 +18,6 @@ import Blarney.RTL
 import Blarney.Format
 import Blarney.Verilog
 import Blarney.Netlist
+import Blarney.Recipe
 import Control.Monad hiding (when)
 import GHC.TypeLits
