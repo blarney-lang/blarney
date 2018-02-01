@@ -4,6 +4,8 @@
 // Bit-vector primitives for any (statically-known) width
 // These are only used for bit vectors whose widths exceed 64
 
+#include <stdint.h>
+
 // Types
 // =====
 

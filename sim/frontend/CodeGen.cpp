@@ -16,7 +16,6 @@ CodeGen::~CodeGen() {
   if (outFile != NULL && outFile != stdout) fclose(stdout);
 }
 
-
 // Exit with an error message
 void CodeGen::genError(const char* fmt, ...)
 {
@@ -109,11 +108,25 @@ void CodeGen::binOp(NetId r, NetWire a, char* op, NetWire b, unsigned width)
   }
 }
 
+inline bool isBinOp(char* op)
+{
+  return strcmp(op, "+") == 0
+      || strcmp(op, "-") == 0
+      || strcmp(op, "*") == 0
+      || strcmp(op, "%") == 0
+      || strcmp(op, "/") == 0
+      || strcmp(op, "&") == 0
+      || strcmp(op, "|") == 0
+      || strcmp(op, "^") == 0
+      || strcmp(op, "<<") == 0
+      || strcmp(op, ">>") == 0;
+}
+
 // Generate code for comparison operator
 void CodeGen::cmpOp(NetId r, NetWire a, char* op, NetWire b, unsigned width)
 {
-   if (width <= 64)
-    emit("w%d = w%d %s w%d;\n", r, a, op, b);
+  if (width <= 64)
+    emit("w%d_0 = w%d_%d %s w%d_%d;\n", r, a.id, a.pin, op, b.id, b.pin);
   else {
     const char* prim;
     if (strcmp(op, "<") == 0)
@@ -134,6 +147,16 @@ void CodeGen::cmpOp(NetId r, NetWire a, char* op, NetWire b, unsigned width)
     emit("w%d_0 = %s(w%d_%d, w%d_%d, %d);\n",
       r, prim, a.id, a.pin, b.id, b.pin, width);
   }
+}
+
+inline bool isCmpOp(char* op)
+{
+  return strcmp(op, "<")  == 0
+      || strcmp(op, "<=") == 0
+      || strcmp(op, ">")  == 0
+      || strcmp(op, ">=") == 0
+      || strcmp(op, "==") == 0
+      || strcmp(op, "!=") == 0;
 }
 
 // Generate code for replication operator
@@ -158,7 +181,7 @@ void CodeGen::display(Seq<NetWire>* wires, Seq<NetParam>* params) {
     if (pi < params->numElems) {
       NetParam p = params->elems[pi];
       if (i == atoi(p.key)) {
-        emit("  printf(\"(\%s\", \"%s\");\n", p.val);
+        emit("  printf(\"%%s\", \"%s\");\n", p.val);
         pi++;
         i++;
         continue;
@@ -166,7 +189,7 @@ void CodeGen::display(Seq<NetWire>* wires, Seq<NetParam>* params) {
     }
     if (wi < wires->numElems) {
       NetWire w = wires->elems[wi];
-      emit("  printf(\"\%d\", w%d_%d);\n", w.id, w.pin);
+      emit("  printf(\"%%d\", w%d_%d);\n", w.id, w.pin);
       wi++;
       i++;
     }
@@ -202,6 +225,85 @@ void CodeGen::gen(Netlist* netlist)
 {
   Seq<Net*> sorted;
   netlist->topSort(&sorted);
+
+  // Includes
+  emit("#include <stdio.h>\n");
+  emit("#include <stdlib.h>\n");
+  emit("#include <BitVec.h>\n");
+
+  // Main function
+  emit("int main() {\n");
+
+  // Generate declarations
   genDecls(&sorted);
-  // TODO: complete me
+
+  // Initialise registers and constant wires
+  for (unsigned i = 0; i < netlist->nets.numElems; i++) {
+    Net* net = netlist->nets.elems[i];
+    NetWire wire;
+    wire.name = net->name;
+    wire.id = net->id;
+    wire.pin = 0;
+    if (!strcmp(net->prim, "const")) {
+      initWire(wire, net->width, net->lookup("val"));
+    }
+    if (!strcmp(net->prim, "reg") ||
+        !strcmp(net->prim, "regEn")) {
+      initWire(wire, net->width, net->lookup("init"));
+    }
+  }
+
+  // Begin the clock loop
+  emit("while (1) {\n");
+
+  // Data-flow
+  for (unsigned i = 0; i < netlist->nets.numElems; i++) {
+    Net* net = netlist->nets.elems[i];
+    if (isBinOp(net->prim)) {
+      NetWire a = net->inputs.elems[0];
+      NetWire b = net->inputs.elems[1];
+      binOp(net->id, a, net->prim, b, net->width);
+    }
+    if (isCmpOp(net->prim)) {
+      NetWire a = net->inputs.elems[0];
+      NetWire b = net->inputs.elems[1];
+      cmpOp(net->id, a, net->prim, b, net->width);
+    }
+    if (strcmp(net->prim, "display") == 0) {
+      display(&net->inputs, &net->params);
+    }
+    if (strcmp(net->prim, "replicate") == 0) {
+      replicate(net->id, net->inputs.elems[0], net->width);
+    }
+  }
+
+  // Finish statements
+  for (unsigned i = 0; i < netlist->nets.numElems; i++) {
+    Net* net = netlist->nets.elems[i];
+    if (strcmp(net->prim, "finish") == 0) {
+      NetWire cond = net->inputs.elems[0];
+      emit("if (w%d_%d) break;", cond.id, cond.pin);
+    }
+  }
+
+  // Register update
+  for (unsigned i = 0; i < netlist->nets.numElems; i++) {
+    Net* net = netlist->nets.elems[i];
+    if (strcmp(net->prim, "regEn") == 0) {
+      NetWire cond = net->inputs.elems[0];
+      NetWire data = net->inputs.elems[1];
+      emit("if (w%d_%d) w%d_0 = w%d_%d;\n",
+        cond.id, cond.pin, net->id, data.id, data.pin);
+    }
+    if (strcmp(net->prim, "reg") == 0) {
+      NetWire data = net->inputs.elems[0];
+      emit("w%d_0 = w%d_%d;\n", net->id, data.id, data.pin);
+    }
+  }
+
+  // End the clock loop
+  emit("}\n");
+
+  // End the main function
+  emit ("return 0;\n}");
 }

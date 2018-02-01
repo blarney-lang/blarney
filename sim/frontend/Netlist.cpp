@@ -41,6 +41,15 @@ Netlist::~Netlist()
   delete nameToId;
 }
 
+// Roots for the topological sort
+// Is the net a register or a component with no inputs?
+inline bool isRoot(Net* net)
+{
+  return net->inputs.numElems == 0
+      || !strcmp(net->prim, "reg")
+      || !strcmp(net->prim, "regEn");
+}
+
 // Topological sort
 // Exits with an error if combinatorial loop detected
 void Netlist::topSort(Seq<Net*>* result)
@@ -59,7 +68,7 @@ void Netlist::topSort(Seq<Net*>* result)
   Seq<Net*> roots;
   for (unsigned i = 0; i < nets.numElems; i++) {
     Net* net = nets.elems[i];
-    if (net->isRoot()) {
+    if (isRoot(net)) {
       roots.append(net);
       discovered[net->id] = true;
     }
@@ -69,7 +78,7 @@ void Netlist::topSort(Seq<Net*>* result)
   Seq<Net*>* outgoing = new SmallSeq<Net*> [nets.numElems];
   for (unsigned i = 0; i < nets.numElems; i++) {
     Net* netTo = nets.elems[i];
-    if (netTo->isRoot()) continue;
+    if (isRoot(netTo)) continue;
     for (unsigned j = 0; j < netTo->inputs.numElems; j++) {
       NetWire* netFrom = &netTo->inputs.elems[j];
       outgoing[netFrom->id].append(netTo);

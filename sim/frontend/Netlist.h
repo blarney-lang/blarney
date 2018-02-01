@@ -49,21 +49,13 @@ struct Net {
   unsigned width;
 
   // Lookup a parameter
-  inline char* lookup(char* k)
+  inline char* lookup(const char* k)
   {
-    for (int i = 0; i < params.numElems; i++)
+    for (int i = 0; i < params.numElems; i++) {
       if (strcmp(params.elems[i].key, k) == 0)
         return params.elems[i].val;
+    }
     return NULL;
-  }
-
-  // Is this a root
-  // That is, a register or a component with no inputs
-  inline bool isRoot()
-  {
-    return inputs.numElems == 0
-        || !strcmp(prim, "reg")
-        || !strcmp(prim, "regEn");
   }
 };
 

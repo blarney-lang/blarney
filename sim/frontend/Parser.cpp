@@ -217,14 +217,16 @@ void Parser::demandWord(char** s)
 // Demand a quoted string or exit with a parse error
 void Parser::demandStr(char** s)
 {
-  int begin = next;
   demand("\"");
+  int begin = next;
   bool escape = false;
   for (;;) {
     char c = getChar();
     if (!escape && c == '\\') escape = true;
     else if (c == '"' && !escape) {
+      ungetChar();
       *s = copyLast(next-begin);
+      demand("\"");
       spaces();
       return;
     }
