@@ -9,8 +9,8 @@ fact = do
   -- Recipe to compute factorial
   let recipe =
         While (val n .>. 0) $ Do [
-          n <== val n - 1
-        , acc <== val acc + val n
+          do n <== val n - 1
+             acc <== val acc + val n
         ]
 
   -- Single cycle pulse
@@ -20,8 +20,9 @@ fact = do
   done <- run pulse recipe
 
   -- Display result when recipe done
-  when done $
+  when done $ do
     display "fact(8) = " (val acc)
+    finish
 
 main :: IO ()
 main = 
