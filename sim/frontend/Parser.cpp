@@ -235,7 +235,8 @@ void Parser::demandStr(char** s)
 // Parse a net or exit with a parse error
 void Parser::demandNet(Net* net)
 {
-  demandNat(&net->id);
+  demandStr(&net->name);
+  net->id = -1;
   demandWord(&net->prim);
   demandInputs(&net->inputs);
   demandParams(&net->params);
@@ -250,7 +251,8 @@ void Parser::demandInputs(Seq<NetWire>* inputs)
   if (eat("]")) return;
   do {
     demand("(");
-    demandNat(&input.id);
+    demandStr(&input.name);
+    input.id = -1;
     demand(",");
     demandNat(&input.pin);
     demand(")");
@@ -274,13 +276,13 @@ void Parser::demandParams(Seq<NetParam>* params)
   demand("]");
 }
 
-// Parse a netlist or exit with a parse error
-void Parser::demandNetlist(Netlist* netlist)
+// Parse a sequence of nets or exit with a parse error
+void Parser::demandNets(Seq<Net>* nets)
 {
   spaces();
   while (!isEnd()) {
-    Net* net = new Net;
+    nets->extend();
+    Net* net = &nets->elems[nets->numElems-1];
     demandNet(net);
-    netlist->addNet(net);
   }
 }

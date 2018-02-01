@@ -8,8 +8,10 @@ int main()
   Parser parser;
   parser.readFile("/tmp/heat.net");
 
-  Netlist netlist;
-  parser.demandNetlist(&netlist);
+  Seq<Net> nets;
+  parser.demandNets(&nets);
+
+  Netlist netlist(&nets);
 
   CodeGen codeGen;
   codeGen.gen(&netlist);

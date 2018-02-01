@@ -87,8 +87,8 @@ class Parser {
     // Parse a net or exit with a parse error
     void demandNet(Net* net);
 
-    // Parse a netlist or exit with a parse error
-    void demandNetlist(Netlist* netlist);
+    // Parse a sequence of nets or exit with a parse error
+    void demandNets(Seq<Net>* nets);
 };
 
 #endif

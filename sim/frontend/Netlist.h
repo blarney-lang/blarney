@@ -5,13 +5,19 @@
 
 #include <string.h>
 #include "Seq.h"
+#include "Hash.h"
 
-// Unique id for primitive components (nets)
-typedef unsigned NetId;
+// Unique string for primitive components (nets)
+typedef char* NetName;
 
-// A net wire is a pair containing a net id and a pin number 
+// Unique int for primitive components (nets)
+// (For faster lookup, compared to strings)
+typedef int NetId;
+
+// A net wire is a net id and a pin number 
 // (Components may have many output pins)
 struct NetWire {
+  NetName name;
   NetId id;
   unsigned pin;
 };
@@ -24,6 +30,9 @@ struct NetParam {
 
 // A net is a component instance
 struct Net {
+  // Net name
+  NetName name;
+
   // Net id
   NetId id;
 
@@ -54,9 +63,14 @@ struct Netlist {
   // A netlist is a sequence of nets, indexed by net id
   Seq<Net*> nets;
 
-  // Add a net
-  // The given net will be freed by the destructor
-  void addNet(Net* net);
+  // Maintain mapping from net name to net id
+  Hash<NetId>* nameToId;
+
+  // Constructor
+  Netlist(Seq<Net>* nets);
+
+  // Destructor
+  ~Netlist();
 
   // Determine roots of the netlist
   // That is, components with no outputs or external outputs
@@ -65,8 +79,6 @@ struct Netlist {
   // Depth-first search
   void dfs(Seq<Net*>* result);
 
-  // Destructor
-  ~Netlist();
 };
 
 #endif

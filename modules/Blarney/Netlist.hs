@@ -25,11 +25,11 @@ hWriteNetlist h netlist = do
     emit = hPutStr h
 
     emitNet net = do
-      emit (show (netInstId net))
+      emit (show (show (netInstId net)))
       emit " "
       emit (netName net)
       emit " ["
-      emitList (netInputs net)
+      emitList [(show id, pin) | (id, pin) <- netInputs net]
       emit "] ["
       emitList (netParams net)
       emit "] "

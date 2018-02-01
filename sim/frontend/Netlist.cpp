@@ -1,21 +1,43 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "Netlist.h"
+#include "Hash.h"
 
-// Add a net
-// The given net will be freed by the destructor
-void Netlist::addNet(Net* net)
+// Constructor
+Netlist::Netlist(Seq<Net>* ns)
 {
-  NetId id = net->id;
-  unsigned oldNumElems = nets.numElems;
-  if (id >= nets.maxElems) nets.setCapacity(id*2);
-  if (id >= nets.numElems) nets.numElems = id+1;
-  for (unsigned i = oldNumElems; i < nets.numElems; i++) nets.elems[i] = NULL;
-  if (nets.elems[id] != NULL) {
-    fprintf(stderr, "Duplicate net id in netlist: %d\n", id);
-    exit(EXIT_FAILURE);
+  // Create a hash table whose number of buckets equals the number of nets
+  nameToId = new Hash<NetId> (ns->numElems);
+  // Populate the hash table and assign net ids
+  for (unsigned i = 0; i < ns->numElems; i++) {
+    Net* net = &ns->elems[i];
+    if (nameToId->member(net->name)) {
+      fprintf(stderr, "Duplicate net name: '%s'\n", net->name);
+      exit(EXIT_FAILURE);
+    }
+    else {
+      net->id = i;
+      nets.append(net);
+      nameToId->insert(net->name, i);
+    }
   }
-  nets.elems[id] = net;
+  // Propagate net ids throughout netlist
+  for (unsigned i = 0; i < nets.numElems; i++) {
+    Net* net = nets.elems[i];
+    for (unsigned j = 0; j < net->inputs.numElems; j++) {
+      NetWire* input = & net->inputs.elems[j];
+      if (! nameToId->lookup(input->name, &input->id)) {
+        fprintf(stderr, "Unknown net: '%s'\n", input->name);
+        exit(EXIT_FAILURE);
+      }
+    }
+  }
+}
+
+// Destructor
+Netlist::~Netlist()
+{
+  delete nameToId;
 }
 
 // Determine roots of the netlist
@@ -67,9 +89,4 @@ void Netlist::dfs(Seq<Net*>* result)
   delete [] visited;
 }
 
-// Destructor
-Netlist::~Netlist()
-{
-  for (unsigned i = 0; i < nets.numElems; i++)
-    if (nets.elems[i] != NULL) delete nets.elems[i];
-}
+
