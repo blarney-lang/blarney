@@ -56,6 +56,15 @@ struct Net {
         return params.elems[i].val;
     return NULL;
   }
+
+  // Is this a root
+  // That is, a register or a component with no inputs
+  inline bool isRoot()
+  {
+    return inputs.numElems == 0
+        || !strcmp(prim, "reg")
+        || !strcmp(prim, "regEn");
+  }
 };
 
 // Netlist structure
@@ -72,12 +81,9 @@ struct Netlist {
   // Destructor
   ~Netlist();
 
-  // Determine roots of the netlist
-  // That is, components with no outputs or external outputs
-  void roots(Seq<Net*>* result);
-
-  // Depth-first search
-  void dfs(Seq<Net*>* result);
+  // Topological sort
+  // Exits with an error if combinatorial loop detected
+  void topSort(Seq<Net*>* result);
 
 };
 

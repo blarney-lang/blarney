@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <assert.h>
 #include "Netlist.h"
 #include "Hash.h"
 
@@ -25,7 +26,7 @@ Netlist::Netlist(Seq<Net>* ns)
   for (unsigned i = 0; i < nets.numElems; i++) {
     Net* net = nets.elems[i];
     for (unsigned j = 0; j < net->inputs.numElems; j++) {
-      NetWire* input = & net->inputs.elems[j];
+      NetWire* input = &net->inputs.elems[j];
       if (! nameToId->lookup(input->name, &input->id)) {
         fprintf(stderr, "Unknown net: '%s'\n", input->name);
         exit(EXIT_FAILURE);
@@ -40,53 +41,75 @@ Netlist::~Netlist()
   delete nameToId;
 }
 
-// Determine roots of the netlist
-// That is, components with no outputs or external outputs
-void Netlist::roots(Seq<Net*>* result)
+// Topological sort
+// Exits with an error if combinatorial loop detected
+void Netlist::topSort(Seq<Net*>* result)
 {
   result->clear();
 
+  // Track which nets have been discovered and removed
+  bool* discovered = new bool [nets.numElems];
+  bool* removed = new bool [nets.numElems];
+  for (unsigned i = 0; i < nets.numElems; i++) {
+    removed[i] = false;
+    discovered[i] = false;
+  }
+
+  // Find initial roots
+  Seq<Net*> roots;
   for (unsigned i = 0; i < nets.numElems; i++) {
     Net* net = nets.elems[i];
-    if (strcmp(net->prim, "display") == 0 ||
-        strcmp(net->prim, "finish") == 0) {
-      result->append(net);
+    if (net->isRoot()) {
+      roots.append(net);
+      discovered[net->id] = true;
     }
   }
-}
 
-// Recursive depth-first search
-void dfsHelp(Seq<Net*>* nets, NetId root, bool* visited, Seq<Net*>* result)
-{
-  if (visited[root]) return;
-  visited[root] = true;
-  Net* net = nets->elems[root];
-  for (unsigned i = 0; i < net->inputs.numElems; i++) {
-    NetWire wire = net->inputs.elems[i];
-    dfsHelp(nets, wire.id, visited, result);
+  // For each net, find outgoing nets
+  Seq<Net*>* outgoing = new SmallSeq<Net*> [nets.numElems];
+  for (unsigned i = 0; i < nets.numElems; i++) {
+    Net* netTo = nets.elems[i];
+    if (netTo->isRoot()) continue;
+    for (unsigned j = 0; j < netTo->inputs.numElems; j++) {
+      NetWire* netFrom = &netTo->inputs.elems[j];
+      outgoing[netFrom->id].append(netTo);
+    }
   }
-  result->append(net);
-}
 
-// Depth-first search
-void Netlist::dfs(Seq<Net*>* result)
-{
-  result->clear();
+  // Remove a root on each iteration
+  while (roots.numElems > 0) {
+    // Remove a root
+    Net* root = roots.pop();
+    removed[root->id] = true;
+    result->append(root);
+    // Is any outgoing node from root now itself a root?
+    for (unsigned i = 0; i < outgoing[root->id].numElems; i++) {
+      Net* out = outgoing[root->id].elems[i];
+      if (discovered[out->id]) continue;
+      unsigned numInputs = 0;
+      for (unsigned j = 0; j < out->inputs.numElems; j++) {
+        if (! removed[out->inputs.elems[j].id]) {
+          numInputs++;
+          break;
+        }
+      }
+      // This outgoing node is now a root
+      if (numInputs == 0) {
+        roots.append(out);
+        discovered[out->id] = true;
+      }
+    }
+  }
 
-  // Maintain a visited set
-  bool* visited = new bool [nets.numElems];
-  for (unsigned i = 0; i < nets.numElems; i++) visited[i] = false;
-
-  // Determine roots
-  Seq<Net*> rootNets;
-  roots(&rootNets);
-
-  // DFS from each root
-  for (unsigned i = 0; i < rootNets.numElems; i++)
-    dfsHelp(&nets, rootNets.elems[i]->id, visited, result);
+  // Combinatorial cycle?
+  bool cyclic = result->numElems < nets.numElems;
+  if (cyclic) {
+    fprintf(stderr, "Error: combinatorial cycle detected\n");
+    exit(EXIT_FAILURE);
+  }
 
   // Free memory
-  delete [] visited;
+  delete [] outgoing;
+  delete [] discovered;
+  delete [] removed;
 }
-
-

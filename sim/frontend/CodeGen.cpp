@@ -201,7 +201,7 @@ void CodeGen::genDecls(Seq<Net*>* nets)
 void CodeGen::gen(Netlist* netlist)
 {
   Seq<Net*> sorted;
-  netlist->dfs(&sorted);
+  netlist->topSort(&sorted);
   genDecls(&sorted);
   // TODO: complete me
 }
