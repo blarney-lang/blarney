@@ -68,7 +68,7 @@ struct Netlist {
   Hash<NetId>* nameToId;
 
   // Constructor
-  Netlist(Seq<Net>* nets);
+  Netlist(Seq<Net*>* nets);
 
   // Destructor
   ~Netlist();

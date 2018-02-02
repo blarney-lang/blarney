@@ -279,12 +279,13 @@ void Parser::demandParams(Seq<NetParam>* params)
 }
 
 // Parse a sequence of nets or exit with a parse error
-void Parser::demandNets(Seq<Net>* nets)
+// Allocates memory for each net
+void Parser::demandNets(Seq<Net*>* nets)
 {
   spaces();
   while (!isEnd()) {
-    nets->extend();
-    Net* net = &nets->elems[nets->numElems-1];
+    Net* net = new Net;
     demandNet(net);
+    nets->append(net);
   }
 }

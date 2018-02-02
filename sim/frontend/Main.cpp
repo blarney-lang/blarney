@@ -14,7 +14,7 @@ int main(int argc, char* argv[])
   Parser parser;
   parser.readFile(argv[1]);
 
-  Seq<Net> nets;
+  Seq<Net*> nets;
   parser.demandNets(&nets);
 
   Netlist netlist(&nets);

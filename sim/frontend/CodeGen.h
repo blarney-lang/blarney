@@ -40,6 +40,9 @@ struct CodeGen {
   // Generate code to initialise wire
   void initWire(NetWire wire, unsigned width, char* init);
 
+  // Generate code for unnary operator
+  void unaryOp(NetId r, char* op, NetWire a, unsigned width);
+
   // Generate code for binary operator
   void binOp(NetId r, NetWire a, char* op, NetWire b, unsigned width);
 
@@ -48,6 +51,15 @@ struct CodeGen {
 
   // Generate code for replication operator
   void replicate(NetId r, NetWire a, unsigned width);
+
+  // Generate code for register
+  void reg(NetId r, NetWire data, unsigned width);
+
+  // Generate code for register with enable
+  void regEn(NetId r, NetWire cond, NetWire data, unsigned width);
+
+  // Generate code for zero extend operator
+  void zeroExtend(NetId r, NetWire a, unsigned rw, unsigned aw);
 
   // Generate code for display statement
   void display(Seq<NetWire>* vals, Seq<NetParam>* params);

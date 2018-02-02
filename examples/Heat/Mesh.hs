@@ -26,7 +26,7 @@ right :: Mesh a -> Mesh [a]
 right m = [map (:[]) xs ++ [[]] | x:xs <- m]
 
 left :: Mesh a -> Mesh [a]
-left = reverse . right . reverse
+left = map reverse . right . map reverse
 
 above :: Mesh a -> Mesh [a]
 above = transpose . left . transpose

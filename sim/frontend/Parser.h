@@ -88,7 +88,8 @@ class Parser {
     void demandNet(Net* net);
 
     // Parse a sequence of nets or exit with a parse error
-    void demandNets(Seq<Net>* nets);
+    // Allocates memory for each net
+    void demandNets(Seq<Net*>* nets);
 };
 
 #endif

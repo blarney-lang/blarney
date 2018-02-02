@@ -5,13 +5,13 @@
 #include "Hash.h"
 
 // Constructor
-Netlist::Netlist(Seq<Net>* ns)
+Netlist::Netlist(Seq<Net*>* ns)
 {
   // Create a hash table whose number of buckets equals the number of nets
   nameToId = new Hash<NetId> (ns->numElems);
   // Populate the hash table and assign net ids
   for (unsigned i = 0; i < ns->numElems; i++) {
-    Net* net = &ns->elems[i];
+    Net* net = ns->elems[i];
     if (nameToId->member(net->name)) {
       fprintf(stderr, "Duplicate net name: '%s'\n", net->name);
       exit(EXIT_FAILURE);

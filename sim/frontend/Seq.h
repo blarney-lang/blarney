@@ -34,6 +34,9 @@ template <class T> class Seq
         elems[i] = seq.elems[i];
     }
 
+    // Copy operator
+    Seq<T>& operator=(const Seq<T>& seq) = delete;
+
     // Set capacity of sequence
     void setCapacity(int n) {
       maxElems = n;

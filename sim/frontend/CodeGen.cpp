@@ -69,6 +69,34 @@ void CodeGen::initWire(NetWire wire, unsigned width, char* init)
   }
 }
 
+inline bool isUnaryOp(char* op)
+{
+  return strcmp(op, "~") == 0
+      || strcmp(op, "countOnes") == 0;
+}
+
+// Generate code for unnary operator
+void CodeGen::unaryOp(NetId r, char* op, NetWire a, unsigned width)
+{
+   if (isStdInt(width))
+    emit("w%d_0 = %s(w%d_%d);\n", r, op, a.id, a.pin);
+  else if (width <= 64)
+    emit("w%d_0 = %s(w%d_%d) & ((1ul << %d)-1ul);\n",
+      r, op, a.id, a.pin, width);
+  else {
+    const char* prim;
+    if (strcmp(op, "~") == 0)
+      prim = "notBU";
+    else if (strcmp(op, "countOnes") == 0)
+      prim = "countOnesBU";
+    else
+      genError("Unknown primitive '%s'\n", op);
+
+    emit("%s(w%d_%d, w%d_0, %d);\n",
+        prim, a.id, a.pin, r, width);
+  }
+}
+
 // Generate code for binary operator
 void CodeGen::binOp(NetId r, NetWire a, char* op, NetWire b, unsigned width)
 {
@@ -174,6 +202,37 @@ void CodeGen::replicate(NetId r, NetWire a, unsigned width)
     emit("replicateBU(w%d_%d, w%d_0, %d);\n", a.id, a.pin, r, width);
 }
 
+// Generate code for register
+void CodeGen::reg(NetId r, NetWire data, unsigned width)
+{
+  if (width <= 64)
+    emit("w%d_0 = w%d_%d;\n", r, data.id, data.pin);
+  else {
+    unsigned numChunks = (width+31)/32;
+    emit("memcpy(w%d_0, w%d_%d, %d);\n", r, data.id, data.pin, numChunks);
+  }
+}
+
+// Generate code for register with enable
+void CodeGen::regEn(NetId r, NetWire cond, NetWire data, unsigned width)
+{
+  emit("if (w%d_%d) ", cond.id, cond.pin);
+  reg(r, data, width);
+}
+
+// Generate code for zero extend operator
+void CodeGen::zeroExtend(NetId r, NetWire a, unsigned rw, unsigned aw)
+{
+  if (rw <= 64)
+    emit("w%d_0 = w%d_%d;\n", r, a.id, a.pin);
+  else {
+    if (aw <= 64)
+      emit("toBU(w%d_%d, w%d_0, %d);\n", a.id, a.pin, r, rw);
+    else
+      emit("zeroExtBU(w%d_%d, w%d_0, %d, %d);\n", a.id, a.pin, r, aw, rw);
+  }
+}
+
 // Generate code for display statement
 void CodeGen::display(Seq<NetWire>* wires, Seq<NetParam>* params) {
   NetWire cond = wires->elems[0];
@@ -230,9 +289,14 @@ void CodeGen::gen(Netlist* netlist)
   Seq<Net*> sorted;
   netlist->topSort(&sorted);
 
+  // Keep track of which nets we've handled
+  bool* handled = new bool [sorted.numElems];
+  for (unsigned i = 0; i < sorted.numElems; i++) handled[i] = false;
+
   // Includes
   emit("#include <stdio.h>\n");
   emit("#include <stdlib.h>\n");
+  emit("#include <string.h>\n");
   emit("#include <BitVec.h>\n");
 
   // Main function
@@ -249,6 +313,7 @@ void CodeGen::gen(Netlist* netlist)
     wire.id = net->id;
     wire.pin = 0;
     if (!strcmp(net->prim, "const")) {
+      handled[net->id] = true;
       initWire(wire, net->width, net->lookup("val"));
     }
     if (!strcmp(net->prim, "reg") ||
@@ -263,21 +328,35 @@ void CodeGen::gen(Netlist* netlist)
   // Data-flow
   for (unsigned i = 0; i < sorted.numElems; i++) {
     Net* net = sorted.elems[i];
+    if (isUnaryOp(net->prim)) {
+      NetWire a = net->inputs.elems[0];
+      unaryOp(net->id, net->prim, a, net->width);
+      handled[net->id] = true;
+    }
     if (isBinOp(net->prim)) {
       NetWire a = net->inputs.elems[0];
       NetWire b = net->inputs.elems[1];
       binOp(net->id, a, net->prim, b, net->width);
+      handled[net->id] = true;
     }
     if (isCmpOp(net->prim)) {
       NetWire a = net->inputs.elems[0];
       NetWire b = net->inputs.elems[1];
       cmpOp(net->id, a, net->prim, b, net->width);
+      handled[net->id] = true;
+    }
+    if (strcmp(net->prim, "zeroExtend") == 0) {
+      CodeGen::zeroExtend(net->id, net->inputs.elems[0],
+        net->width+atoi(net->lookup("ext")), net->width);
+      handled[net->id] = true;
     }
     if (strcmp(net->prim, "display") == 0) {
       display(&net->inputs, &net->params);
+      handled[net->id] = true;
     }
     if (strcmp(net->prim, "replicate") == 0) {
       replicate(net->id, net->inputs.elems[0], net->width);
+      handled[net->id] = true;
     }
   }
 
@@ -287,6 +366,7 @@ void CodeGen::gen(Netlist* netlist)
     if (strcmp(net->prim, "finish") == 0) {
       NetWire cond = net->inputs.elems[0];
       emit("if (w%d_%d) break;\n", cond.id, cond.pin);
+      handled[net->id] = true;
     }
   }
 
@@ -296,12 +376,13 @@ void CodeGen::gen(Netlist* netlist)
     if (strcmp(net->prim, "regEn") == 0) {
       NetWire cond = net->inputs.elems[0];
       NetWire data = net->inputs.elems[1];
-      emit("if (w%d_%d) w%d_0 = w%d_%d;\n",
-        cond.id, cond.pin, net->id, data.id, data.pin);
+      regEn(net->id, cond, data, net->width);
+      handled[net->id] = true;
     }
     if (strcmp(net->prim, "reg") == 0) {
       NetWire data = net->inputs.elems[0];
-      emit("w%d_0 = w%d_%d;\n", net->id, data.id, data.pin);
+      reg(net->id, data, net->width);
+      handled[net->id] = true;
     }
   }
 
@@ -310,4 +391,12 @@ void CodeGen::gen(Netlist* netlist)
 
   // End the main function
   emit ("return 0;\n}");
+
+  // Check for unhandled nets
+  for (unsigned i = 0; i < sorted.numElems; i++) {
+    Net* net = sorted.elems[i];
+    if (!handled[net->id])
+      genError("Unhandled primitive '%s'\n", net->prim);
+  }
+  delete [] handled;
 }

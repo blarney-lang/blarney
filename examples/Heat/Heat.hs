@@ -36,10 +36,10 @@ top t w h = do
   when (val timer .==. fromInteger t) $ do
     forM_ (zip [0..] grid) $ \(i, row) -> 
       forM_ (zip [0..] row) $ \(j, cell) ->
-        display (show i) "," (show j) ":" (val cell)
+        display (show i) "," (show j) ":" (val cell .>>. 16)
     finish
 
 -- Main function
 main :: IO ()
 main =
-  netlist (top 100 16 16) >>= writeNetlist "/tmp/heat.net"
+  netlist (top 100 64 64) >>= writeNetlist "/tmp/heat.net"

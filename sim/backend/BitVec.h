@@ -5,6 +5,7 @@
 // These are only used for bit vectors whose widths exceed 64
 
 #include <stdint.h>
+#include <stdbool.h>
 
 // Types
 // =====
@@ -243,6 +244,12 @@ inline uint64_t countOnesBU(BU a, uint32_t w)
   for (uint32_t i = 0; i < numChunks; i++)
     count += __builtin_popcount(a[i]);
   return count;
+}
+
+// Population count on 64 bits
+inline uint64_t countOnes(uint64_t a)
+{
+  return __builtin_popcountll(a);
 }
 
 // Bit concatentation
