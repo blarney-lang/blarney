@@ -76,7 +76,7 @@ void CodeGen::binOp(NetId r, NetWire a, char* op, NetWire b, unsigned width)
     emit("w%d_0 = w%d_%d %s w%d_%d;\n",
       r, a.id, a.pin, op, b.id, b.pin);
   else if (width <= 64)
-    emit("w%d_0 = (w%d_%d %s w%d_%d) & ((1ul << %d)-1);\n",
+    emit("w%d_0 = (w%d_%d %s w%d_%d) & ((1ul << %d)-1ul);\n",
       r, a.id, a.pin, op, b.id, b.pin, width);
   else {
     const char* prim;
@@ -162,9 +162,13 @@ inline bool isCmpOp(char* op)
 // Generate code for replication operator
 void CodeGen::replicate(NetId r, NetWire a, unsigned width)
 {
-  if (width <= 64) {
+  if (width <= 32) {
+    uint32_t ones = (1ul << width)-1;
+    emit("w%d_0 = w%d_%d ? 0x%x : 0;\n", r, a.id, a.pin, ones);
+  }
+  else if (width <= 64) {
     uint64_t ones = (1ul << width)-1;
-    emit("w%d_0 = w%d_%d ? 0x%lxul : %luul;\n", r, a.id, a.pin, ones, 0);
+    emit("w%d_0 = w%d_%d ? 0x%lxul : 0ul;\n", r, a.id, a.pin, ones);
   }
   else
     emit("replicateBU(w%d_%d, w%d_0, %d);\n", a.id, a.pin, r, width);
@@ -238,8 +242,8 @@ void CodeGen::gen(Netlist* netlist)
   genDecls(&sorted);
 
   // Initialise registers and constant wires
-  for (unsigned i = 0; i < netlist->nets.numElems; i++) {
-    Net* net = netlist->nets.elems[i];
+  for (unsigned i = 0; i < sorted.numElems; i++) {
+    Net* net = sorted.elems[i];
     NetWire wire;
     wire.name = net->name;
     wire.id = net->id;
@@ -257,8 +261,8 @@ void CodeGen::gen(Netlist* netlist)
   emit("while (1) {\n");
 
   // Data-flow
-  for (unsigned i = 0; i < netlist->nets.numElems; i++) {
-    Net* net = netlist->nets.elems[i];
+  for (unsigned i = 0; i < sorted.numElems; i++) {
+    Net* net = sorted.elems[i];
     if (isBinOp(net->prim)) {
       NetWire a = net->inputs.elems[0];
       NetWire b = net->inputs.elems[1];
@@ -278,17 +282,17 @@ void CodeGen::gen(Netlist* netlist)
   }
 
   // Finish statements
-  for (unsigned i = 0; i < netlist->nets.numElems; i++) {
-    Net* net = netlist->nets.elems[i];
+  for (unsigned i = 0; i < sorted.numElems; i++) {
+    Net* net = sorted.elems[i];
     if (strcmp(net->prim, "finish") == 0) {
       NetWire cond = net->inputs.elems[0];
-      emit("if (w%d_%d) break;", cond.id, cond.pin);
+      emit("if (w%d_%d) break;\n", cond.id, cond.pin);
     }
   }
 
   // Register update
-  for (unsigned i = 0; i < netlist->nets.numElems; i++) {
-    Net* net = netlist->nets.elems[i];
+  for (unsigned i = 0; i < sorted.numElems; i++) {
+    Net* net = sorted.elems[i];
     if (strcmp(net->prim, "regEn") == 0) {
       NetWire cond = net->inputs.elems[0];
       NetWire data = net->inputs.elems[1];
