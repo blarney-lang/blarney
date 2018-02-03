@@ -140,7 +140,9 @@ makeReg init =
      (cond, assignMap) <- ask
      let as = findWithDefault [] v assignMap
      let en  = orList [b | (b, _, p) <- as]
-     let inp = select [(b, Bit p) | (b, _, p) <- as]
+     let inp = case as of
+                 [(b, _, p)] -> Bit p
+                 other -> select [(b, Bit p) | (b, _, p) <- as]
      let out = unpack (regEn (pack init) en inp)
      return (Reg v out)
 

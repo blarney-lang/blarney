@@ -41,6 +41,39 @@ Netlist::~Netlist()
   delete nameToId;
 }
 
+// Split register->register connections with an intermediate wire
+void Netlist::splitRegReg()
+{
+  for (unsigned i = 0; i < nets.numElems; i++) {
+    Net* net = nets.elems[i];
+    if (strcmp(net->prim, "reg") == 0 ||
+        strcmp(net->prim, "regEn") == 0) {
+      for (unsigned j = 0; j < net->inputs.numElems; j++) {
+        NetWire input = net->inputs.elems[j];
+        Net* inputNet = nets.elems[input.id];
+        if (strcmp(inputNet->prim, "reg") == 0 ||
+            strcmp(inputNet->prim, "regEn") == 0) {
+          // Create new input
+          NetWire newInput;
+          newInput.id = nets.numElems;
+          newInput.name = (char*) "rrsplit";
+          newInput.pin = 0;
+          // Create new net
+          Net* newNet = new Net;
+          newNet->id = nets.numElems;
+          newNet->name = (char*) "rrsplit";
+          newNet->prim = (char*) "id";
+          newNet->inputs.append(input);
+          newNet->width = inputNet->width;
+          nets.append(newNet);
+          // Replace old input with new input
+          net->inputs.elems[j] = newInput;
+        }
+      }
+    }
+  }
+}
+
 // Roots for the topological sort
 // Is the net a register or a component with no inputs?
 inline bool isRoot(Net* net)

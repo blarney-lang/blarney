@@ -36,7 +36,7 @@ makeNode id = do
 
   -- Update method
   let update t r = do
-        reaching <== r
+        reaching <== val reaching .|. r
         let newOnes = countOnes (r .&. inv (val reaching))
         when (newOnes .!=. 0) $ do
           changed <== 1
@@ -52,7 +52,7 @@ compile net = do
   -- Mapping from node id to node
   let nodeMap = fromList (zip (keys net) nodes)
   -- Timer
-  timer <- makeReg 0
+  timer <- makeReg 1
   timer <== val timer + 1
   -- Call update method for each node
   forM (zip (keys net) nodes) $ \(id, node) -> do
@@ -60,7 +60,8 @@ compile net = do
     update node (val timer) newReaching
   -- Terminate when nothing changes
   when (inv (orList (map changed nodes))) $ do
-    display "Sum = " (sumList (map total nodes))
+    --display "Sum = " (sumList (map total nodes))
+    display "diameter = " (val timer - 1)
     finish
 
 main :: IO ()

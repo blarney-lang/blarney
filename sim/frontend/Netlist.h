@@ -73,6 +73,9 @@ struct Netlist {
   // Destructor
   ~Netlist();
 
+  // Split register->register connections with an intermediate wire
+  void splitRegReg();
+
   // Topological sort
   // Exits with an error if combinatorial loop detected
   void topSort(Seq<Net*>* result);

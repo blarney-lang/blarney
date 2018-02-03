@@ -3,6 +3,9 @@
 
 module Blarney.Bit
   ( Bit(..)      -- "Bit n" is a bit vector of n bits
+  , width        -- Obtain width of bit vector
+  , widthOf      -- Obtain width using type
+  , ofWidth      -- Set bit width
   , replicateBit -- Replicate bit to produce bit vector
   , low          -- Bit vector of all 0's
   , high         -- Bit vector of all 1's
@@ -47,6 +50,10 @@ widthOf a = fromInteger (natVal a)
 -- Determine bit width
 width :: Bit n -> Int
 width (Bit b) = unbitWidth b
+
+-- Set bit width
+ofWidth :: Bit n -> Int -> Bit n
+ofWidth (Bit p) n = Bit (p { unbitWidth = n })
 
 -- Unary arithmetic primitive
 primArith1 :: PrimName -> [Param] -> Bit n -> Bit n
@@ -171,15 +178,17 @@ x .<<. y = Bit (primInst1 "<<" [] [unbit x, unbit y] (width x))
 x .>>. y = Bit (primInst1 ">>" [] [unbit x, unbit y] (width x))
 
 -- Shift right
-countOnes :: Bit (2^n) -> Bit n
-countOnes x = Bit (primInst1 "countOnes" [] [unbit x] (log2 (width x)))
+countOnes :: Bit (2^n) -> Bit (n+1)
+countOnes x = Bit (primInst1 "countOnes" [] [unbit x] (log2 (width x)+1))
   where
     log2 1 = 0
     log2 n = 1 + log2 (n `div` 2)
 
 -- Register
-reg :: Bit n -> Bit n -> Bit n
-reg init = primArith1 "reg" ["init" :-> getInit (unbit init)]
+reg :: KnownNat n => Bit n -> Bit n -> Bit n
+reg init a = 
+  Bit (primInst1 "reg" ["init" :-> getInit (unbit init)]
+        [unbit a] (widthOf init))
 
 -- Determine initialiser
 getInit :: Unbit -> String
@@ -188,10 +197,10 @@ getInit b
   | otherwise = error "Initialiser must be a constant"
 
 -- Register with enable
-regEn :: Bit n -> Bit 1 -> Bit n -> Bit n
+regEn :: KnownNat n => Bit n -> Bit 1 -> Bit n -> Bit n
 regEn init en a = 
   Bit (primInst1 "regEn" ["init" :-> getInit (unbit init)]
-        [unbit en, unbit a] (width a))
+        [unbit en, unbit a] (widthOf init))
 
 -- Concatenation
 (#) :: Bit n -> Bit m -> Bit (n+m)

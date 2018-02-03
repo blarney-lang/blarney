@@ -133,9 +133,9 @@ hWriteVerilog h netlist = do
           emit "assign "
           emitWire (netInstId net, 0)
           emit " = "
-          emit "{"
+          emit "{{"
           emit (lookupParam (netParams net) "ext")
-          emit "{1`b0},"
+          emit "{1'b0}},"
           emitWire (netInputs net !! 0)
           emit "};\n"
       | netName net == "signExtend" = do

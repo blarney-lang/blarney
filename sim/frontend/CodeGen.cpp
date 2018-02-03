@@ -286,6 +286,12 @@ void CodeGen::genDecls(Seq<Net*>* nets)
 // Generate code
 void CodeGen::gen(Netlist* netlist)
 {
+  // Perform register->register splitting pass
+  // (So that there is an intermediate wire going into every register)
+  netlist->splitRegReg();
+
+  // Perform topological sort
+  // (So that wires are assigned in data-flow order)
   Seq<Net*> sorted;
   netlist->topSort(&sorted);
 
@@ -356,6 +362,11 @@ void CodeGen::gen(Netlist* netlist)
     }
     if (strcmp(net->prim, "replicate") == 0) {
       replicate(net->id, net->inputs.elems[0], net->width);
+      handled[net->id] = true;
+    }
+    if (strcmp(net->prim, "id") == 0) {
+      NetWire data = net->inputs.elems[0];
+      emit("w%d_0 = w%d_%d;\n", net->id, data.id, data.pin);
       handled[net->id] = true;
     }
   }
