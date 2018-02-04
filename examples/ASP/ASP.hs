@@ -5,7 +5,7 @@ import Network
 import Data.IntMap (IntMap, keys, (!), fromList)
 
 -- Max number of nodes in network (must be a power of 2)
-type MaxNodes = 16
+type MaxNodes = 2048
 
 -- Reaching vector, hot for each node that reaches
 type Reaching = Bit MaxNodes
@@ -65,6 +65,6 @@ compile net = do
     finish
 
 main :: IO ()
-main = readFile "n1.edges"
+main = readFile "n4.edges"
    >>= netlist . compile . parseNetwork
    >>= writeNetlist "/tmp/asp.net"

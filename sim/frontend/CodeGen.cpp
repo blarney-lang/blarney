@@ -71,14 +71,14 @@ void CodeGen::initWire(NetWire wire, unsigned width, char* init)
 
 inline bool isUnaryOp(char* op)
 {
-  return strcmp(op, "~") == 0
-      || strcmp(op, "countOnes") == 0;
+  return strcmp(op, "~") == 0;
 }
 
 // Generate code for unnary operator
 void CodeGen::unaryOp(NetId r, char* op, NetWire a, unsigned width)
 {
-   if (isStdInt(width))
+  width = 1 << (width-1);
+  if (isStdInt(width))
     emit("w%d_0 = %s(w%d_%d);\n", r, op, a.id, a.pin);
   else if (width <= 64)
     emit("w%d_0 = %s(w%d_%d) & ((1ul << %d)-1ul);\n",
@@ -87,8 +87,6 @@ void CodeGen::unaryOp(NetId r, char* op, NetWire a, unsigned width)
     const char* prim;
     if (strcmp(op, "~") == 0)
       prim = "notBU";
-    else if (strcmp(op, "countOnes") == 0)
-      prim = "countOnesBU";
     else
       genError("Unknown primitive '%s'\n", op);
 
@@ -218,6 +216,20 @@ void CodeGen::regEn(NetId r, NetWire cond, NetWire data, unsigned width)
 {
   emit("if (w%d_%d) ", cond.id, cond.pin);
   reg(r, data, width);
+}
+
+// Generate code for count-ones
+void CodeGen::countOnes(NetId r, NetWire a, unsigned width)
+{
+  if (isStdInt(width))
+    emit("w%d_0 = countOnes(w%d_%d);\n", r, a.id, a.pin);
+  else if (width <= 64)
+    emit("w%d_0 = countOnes(w%d_%d) & ((1ul << %d)-1ul);\n",
+      r, a.id, a.pin, width);
+  else {
+    emit("w%d_0 = countOnesBU(w%d_%d, %d);\n",
+        r, a.id, a.pin, width);
+  }
 }
 
 // Generate code for zero extend operator
@@ -354,6 +366,10 @@ void CodeGen::gen(Netlist* netlist)
     if (strcmp(net->prim, "zeroExtend") == 0) {
       CodeGen::zeroExtend(net->id, net->inputs.elems[0],
         net->width+atoi(net->lookup("ext")), net->width);
+      handled[net->id] = true;
+    }
+    if (strcmp(net->prim, "countOnes") == 0) {
+      countOnes(net->id, net->inputs.elems[0], 1 << (net->width-1));
       handled[net->id] = true;
     }
     if (strcmp(net->prim, "display") == 0) {

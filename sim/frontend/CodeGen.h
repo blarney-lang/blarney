@@ -58,6 +58,9 @@ struct CodeGen {
   // Generate code for register with enable
   void regEn(NetId r, NetWire cond, NetWire data, unsigned width);
 
+  // Generate code for count-ones
+  void countOnes(NetId r, NetWire a, unsigned width);
+
   // Generate code for zero extend operator
   void zeroExtend(NetId r, NetWire a, unsigned rw, unsigned aw);
 
