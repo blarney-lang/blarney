@@ -1,70 +1,75 @@
--- Calculate average shortest path of undirected graph/network
-
 import Blarney
 import Network
-import Data.IntMap (IntMap, keys, (!), fromList)
+import Data.IntMap (IntMap, (!), keys)
 
--- Max number of nodes in network (must be a power of 2)
-type MaxNodes = 2048
+-- Graphs
 
--- Reaching vector, hot for each node that reaches
-type Reaching = Bit MaxNodes
+type Vertex = Int 
+type Graph = IntMap [Vertex]
 
--- Number of clock cycles that have elapsed
-type Time = Bit 32
+-- Sets
 
--- Holds the sum of path lengths
-type Count = Bit 32
+type MaxVertices = 2048
 
-data Node =
-  Node {
-    update   :: Time -> Reaching -> RTL ()
-  , reaching :: Reaching
-  , total    :: Count
-  , changed  :: Bit 1
-  }
+type Set = Bit MaxVertices
 
-makeNode :: NodeId -> RTL Node
-makeNode id = do
-  -- Bit vector of all nodes reaching this node
-  -- Initially, node reaches itself
-  reaching <- makeReg (fromInteger (2 ^ toInteger id))
-  -- Track the sum of the lengths of paths reaching this node
-  total <- makeReg 0
-  -- Has this node changed?
-  changed <- makeWire 0
+empty :: Set
+empty = 0
 
-  -- Update method
-  let update t r = do
-        reaching <== val reaching .|. r
-        let newOnes = countOnes (r .&. inv (val reaching))
-        when (newOnes .!=. 0) $ do
-          changed <== 1
-        total <== val total + t * zeroExtend newOnes
+singleton :: Vertex -> Set
+singleton v = fromInteger (2 ^ toInteger v)
 
-  return (Node update (val reaching) (val total) (val changed))
+size :: Set -> Bit 32
+size = zeroExtend . countOnes
 
--- Network compiler
-compile :: Network -> RTL ()
-compile net = do
-  -- Create each node
-  nodes <- mapM makeNode (keys net)
-  -- Mapping from node id to node
-  let nodeMap = fromList (zip (keys net) nodes)
-  -- Timer
-  timer <- makeReg 1
-  timer <== val timer + 1
-  -- Call update method for each node
-  forM (zip (keys net) nodes) $ \(id, node) -> do
-    let newReaching = orList [reaching (nodeMap!n) | n <- net!id]
-    update node (val timer) newReaching
-  -- Terminate when nothing changes
-  when (inv (orList (map changed nodes))) $ do
-    --display "Sum = " (sumList (map total nodes))
-    display "diameter = " (val timer - 1)
+union :: Set -> Set -> Set
+union = (.|.)
+
+unions :: [Set] -> Set
+unions = foldr union empty
+
+-- Processing
+
+combine :: Graph -> (Vertex -> Set) -> Vertex -> Set
+combine g f v = unions (singleton v : map f (g!v))
+
+initial :: Graph -> [Set]
+initial g = map singleton (keys g)
+
+step :: Graph -> [Set] -> [Set]
+step g l = map (combine g (l !!)) (keys g)
+
+levels :: Graph -> [Set]
+levels g = outs
+  where outs = zipWith reg (initial g) (step g outs)
+
+-- Shortest paths
+
+diffs :: [Set] -> [Bit 32]
+diffs sets = zipWith (-) newSizes oldSizes
+  where
+    newSizes = map size sets
+    oldSizes = map (reg 0) newSizes
+ 
+ssp :: Graph -> (Bit 1, Bit 32, Bit 32)
+ssp g = (done, diam, total)
+  where
+    ds    = diffs (levels g)
+    done  = andList [d .==. 0 | d <- ds]
+    total = reg 0 (total + sum [diam * d | d <- ds])
+    diam  = reg 0 (diam + 1)
+
+-- Compile graph to RTL
+
+compile :: Graph -> RTL ()
+compile g = do
+  let (done, diam, total) = ssp g
+  when done $ do
+    display "Diameter = " (diam - 1)
     finish
 
+-- Main function
 main :: IO ()
-main = readFile "n4.edges"
+main = readFile "n1.edges"
    >>= netlist . compile . parseNetwork
    >>= writeNetlist "/tmp/asp.net"
