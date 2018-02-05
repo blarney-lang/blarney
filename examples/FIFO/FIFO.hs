@@ -23,30 +23,16 @@ makeFIFO = do
   -- Register defining whether or not FIFO is full
   full :: Reg (Bit 1) <- makeReg 0
 
-  -- Wires for communicating with methods
-  doDeq :: Wire (Bit 1) <- makeWire 0
-  doEnq :: Wire (Bit 1) <- makeWire 0
-  enqVal :: Wire a <- makeWire (unpack 0)
-
-  -- Update register on enqueue
-  when (val doEnq) $ do
-    reg <== val enqVal
-    full <== 1
-
-  -- Update full flag on dequeue
-  when (val doDeq) $ do
-    full <== 0
-
   -- Methods
   let notFull = val full .==. 0
 
   let notEmpty = val full .==. 1
 
   let enq a = do
-        doEnq <== 1
-        enqVal <== a
+        reg <== a
+        full <== 1
 
-  let deq = doDeq <== 1
+  let deq = full <== 0
 
   let first = val reg
 

@@ -3,26 +3,31 @@ import Blarney
 fact :: RTL ()
 fact = do
   -- State
-  n :: Reg (Bit 32) <- makeReg 8
+  n   :: Reg (Bit 32) <- makeReg 0
   acc :: Reg (Bit 32) <- makeReg 0
 
-  -- Recipe to compute factorial
+  -- Compute factorial of 10
   let recipe =
-        While (val n .>. 0) $ Do [
-          do n <== val n - 1
-             acc <== val acc + val n
+        Seq [
+          n := 10,
+          While (val n .>. 0) $ Par [
+              n := val n - 1,
+              acc := val acc + val n
+          ]
         ]
-
+       
   -- Single cycle pulse
   let pulse = reg 1 0
 
   -- Trigger factorial recipe on pulse
   done <- run pulse recipe
 
-  -- Display result when recipe done
+  -- Display result and terminate simulation
   when done $ do
-    display "fact(8) = " (val acc)
+    display "fact(10) = " (val acc)
     finish
+
+  return ()
 
 main :: IO ()
 main = 
