@@ -77,7 +77,6 @@ inline bool isUnaryOp(char* op)
 // Generate code for unnary operator
 void CodeGen::unaryOp(NetId r, char* op, NetWire a, unsigned width)
 {
-  width = 1 << (width-1);
   if (isStdInt(width))
     emit("w%d_0 = %s(w%d_%d);\n", r, op, a.id, a.pin);
   else if (width <= 64)

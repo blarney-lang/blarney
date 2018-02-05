@@ -51,7 +51,7 @@ diameter g = (done, diam)
     done     = andList (zipWith (.==.) newSizes oldSizes)
     newSizes = map size (levels g)
     oldSizes = map (reg 0) newSizes
-    diam     = reg 1 (1 + diam)
+    diam     = reg 0 (1 + diam)
 
 -- Compile graph to RTL
 
@@ -59,7 +59,7 @@ compile :: Graph -> RTL ()
 compile g = do
   let (done, diam) = diameter g
   when done $ do
-    display "Diameter = " diam
+    display "Diameter = " (diam - 1)
     finish
 
 -- Main function
