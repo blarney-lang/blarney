@@ -290,7 +290,7 @@ void CodeGen::genDecls(Seq<Net*>* nets)
         strcmp(net->prim, "==") == 0 ||
         strcmp(net->prim, "!=") == 0)
       width = 1;
-    declareWire(wire, net->width);
+    declareWire(wire, width);
   }
 }
 
