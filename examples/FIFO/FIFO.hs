@@ -15,7 +15,7 @@ data FIFO a =
   }
 
 -- FIFO module (simple one-element FIFO)
-makeFIFO :: forall a. Bits a => RTL (FIFO a)
+makeFIFO :: Bits a => RTL (FIFO a)
 makeFIFO = do
   -- Register holding the one element
   reg :: Reg a <- makeReg (unpack 0)
