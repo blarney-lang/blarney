@@ -1,11 +1,9 @@
 -- For type-level naturals
-{-# LANGUAGE DataKinds, KindSignatures, TypeOperators, TypeFamilies #-}
+{-# LANGUAGE DataKinds, KindSignatures, TypeOperators, TypeFamilies, GADTs #-}
 
 module Blarney.Bit
   ( Bit(..)      -- "Bit n" is a bit vector of n bits
-  , width        -- Obtain width of bit vector
   , widthOf      -- Obtain width using type
-  , ofWidth      -- Set bit width
   , replicateBit -- Replicate bit to produce bit vector
   , low          -- Bit vector of all 0's
   , high         -- Bit vector of all 1's
@@ -41,33 +39,21 @@ import Blarney.Unbit
 import GHC.TypeLits
 
 -- Phantom type wrapping an untyped bit vector, capturing the bit width
-newtype Bit (n :: Nat) = Bit { unbit :: Unbit }
+data Bit (n :: Nat) where
+  Bit :: KnownNat n => Unbit -> Bit n
+
+-- Get back the untyped representation
+unbit :: Bit n -> Unbit
+unbit (Bit b) = b
 
 -- Determine bit width from type
-widthOf :: KnownNat n => Bit n -> Int
-widthOf a = fromInteger (natVal a)
-
--- Determine bit width
-width :: Bit n -> Int
-width (Bit b) = unbitWidth b
-
--- Set bit width
-ofWidth :: Bit n -> Int -> Bit n
-ofWidth (Bit p) n = Bit (p { unbitWidth = n })
-
--- Unary arithmetic primitive
-primArith1 :: PrimName -> [Param] -> Bit n -> Bit n
-primArith1 prim params a = Bit (primInst1 prim params [unbit a] (width a))
-
--- Binary arithmetic primitive
-primArith2 :: PrimName -> [Param] -> Bit n -> Bit n -> Bit n
-primArith2 prim params a b =
-  Bit (primInst1 prim params [unbit a, unbit b] (width a))
+widthOf :: Bit n -> Int
+widthOf a@(Bit _) = fromInteger (natVal a)
 
 -- Replicate bit
 replicateBit :: KnownNat n => Bit 1 -> Bit n
 replicateBit a = result
-  where result = Bit (primInst1 "replicate" [] [unbit a] (widthOf result))
+  where result = Bit (makePrim1 (ReplicateBit (widthOf result) [unbit a]))
 
 -- All 0's
 low :: KnownNat n => Bit n
@@ -79,108 +65,105 @@ high = replicateBit 1
 
 -- Bitwise invert
 inv :: Bit n -> Bit n
-inv = primArith1 "~" []
+inv a@(Bit ua) = Bit (makePrim1 (Not (widthOf a)) [ua])
 
 -- Bitwise and
 infixl 7 .&.
-(.&.) :: Bit n -> Bit n -> Bit n
-(.&.) = primArith2 "&" []
+(.&.) :: KnownNat n => Bit n -> Bit n -> Bit n
+a@(Bit ua) .&. Bit ub = Bit (makePrim1 (And (natVal a)) [ua, ub])
+--a@(Bit ua) .&. Bit ub = Bit (makePrim1 (And (widthOf a)) [ua, ub])
 
 -- Bitwise or
 infixl 5 .|.
 (.|.) :: Bit n -> Bit n -> Bit n
-(.|.) = primArith2 "|" []
+a@(Bit ua) .|. Bit ub = Bit (makePrim1 (Or (widthOf a)) [ua, ub])
 
 -- Bitwise xor
 infixl 6 .^.
 (.^.) :: Bit n -> Bit n -> Bit n
-(.^.) = primArith2 "^" []
-
--- Mux
-(?) :: Bit 1 -> (Bit n, Bit n) -> Bit n
-sel ? (a, b) =
-  Bit (primInst1 "?" [] [unbit sel, unbit a, unbit b] (width a))
-
--- Binary comparison helper
-primCmp2 :: PrimName -> [Param] -> Bit n -> Bit n -> Bit 1
-primCmp2 prim params a b =
-  Bit (primInst1 prim params [unbit a, unbit b] 1)
+a@(Bit ua) .^. Bit ub = Bit (makePrim1 (Xor (widthOf a)) [ua, ub])
 
 -- Equality
 (.==.) :: Bit n -> Bit n -> Bit 1
-(.==.) = primCmp2 "==" []
+a@(Bit ua) .==. Bit ub = Bit (makePrim1 (Equal (widthOf a)) [ua, ub])
 
 -- Disequality
 (.!=.) :: Bit n -> Bit n -> Bit 1
-(.!=.) = primCmp2 "!=" []
+a@(Bit ua) .!=. Bit ub = Bit (makePrim1 (NotEqual (widthOf a)) [ua, ub])
 
 -- Less than
 (.<.) :: Bit n -> Bit n -> Bit 1
-(.<.) = primCmp2 "<" []
+a@(Bit ua) .<. Bit ub = Bit (makePrim1 (LessThan (widthOf a)) [ua, ub])
 
 -- Less than or equal
 (.<=.) :: Bit n -> Bit n -> Bit 1
-(.<=.) = primCmp2 "<=" []
+a@(Bit ua) .<=. Bit ub = Bit (makePrim1 (LessThanEq (widthOf a)) [ua, ub])
 
 -- Greater than
 (.>.) :: Bit n -> Bit n -> Bit 1
-(.>.) = primCmp2 ">" []
+a@(Bit ua) .>. Bit ub = Bit (makePrim1 (GreaterThan (widthOf a)) [ua, ub])
 
 -- Greater than or equal
 (.>=.) :: Bit n -> Bit n -> Bit 1
-(.>=.) = primCmp2 ">=" []
+a@(Bit ua) .>=. Bit ub = Bit (makePrim1 (GreaterThanEq (widthOf a)) [ua, ub])
 
 -- Add
 infixl 6 .+.
 (.+.) :: Bit n -> Bit n -> Bit n
-(.+.) = primArith2 "+" []
+a@(Bit ua) .+. Bit ub = Bit (makePrim1 (Add (widthOf a)) [ua, ub])
 
 -- Subtract
 infixl 6 .-.
 (.-.) :: Bit n -> Bit n -> Bit n
-(.-.) = primArith2 "-" []
+a@(Bit ua) .-. Bit ub = Bit (makePrim1 (Sub (widthOf a)) [ua, ub])
 
 -- Multiply
 infixl 7 .*.
 (.*.) :: Bit n -> Bit n -> Bit n
-(.*.) = primArith2 "*" []
+a@(Bit ua) .*. Bit ub = Bit (makePrim1 (Mul (widthOf a)) [ua, ub])
+
+-- Mux
+mux :: Bit 1 -> Bit n -> Bit n -> Bit n
+mux (Bit uc) a@(Bit ua) (Bit ub) =
+  Bit (makePrim1 (Mux (widthOf a)) [uc, ua, ub])
 
 -- Arithmetic
 instance KnownNat n => Num (Bit n) where
-  (+)           = primArith2 "+" []
-  (-)           = primArith2 "-" []
-  (*)           = primArith2 "*" []
-  negate        = primArith1 "negate" []
+  (+)           = (.+.)
+  (-)           = (.-.)
+  (*)           = (.*.)
+  negate a      = inv a .+. 1
   abs           = id
-  signum a      = (a .==. 0) ? (0, 1)
+  signum a      = mux (a .==. 0) 0 1
   fromInteger i = result
    where
-     result     = Bit (primInst1 "const" ["val" :-> show i] [] w)
+     result     = Bit (makePrim1 (Const w i) [])
      w          = widthOf result
 
 -- Division
 instance KnownNat n => Fractional (Bit n) where
-  (/)          = primArith2 "/" []
+  a@(Bit ua) / Bit ub = Bit (makePrim1 (Div (widthOf a)) [ua, ub])
   recip        = error "Undefined function: 'recip' for bit vectors"
   fromRational = error "Undefined function: 'fromRational' for bit vectors"
 
 -- Modulus
 infixl 7 %
 (%) :: Bit n -> Bit n -> Bit n
-(%) = primArith2 "%" []
+a@(Bit ua) / Bit ub = Bit (makePrim1 (Mod (widthOf a)) [ua, ub])
 
 -- Shift left
 (.<<.) :: Bit n -> Bit n -> Bit n
-x .<<. y = Bit (primInst1 "<<" [] [unbit x, unbit y] (width x))
+a@(Bit ua) .<<. Bit ub = Bit (makePrim1 (ShiftLeft (widthOf a)) [ua, ub])
 
 -- Shift right
 (.>>.) :: Bit n -> Bit n -> Bit n
-x .>>. y = Bit (primInst1 ">>" [] [unbit x, unbit y] (width x))
+a@(Bit ua) .>>. Bit ub = Bit (makePrim1 (ShiftRight (widthOf a)) [ua, ub])
 
 -- Shift right
 countOnes :: Bit (2^n) -> Bit (n+1)
-countOnes x = Bit (primInst1 "countOnes" [] [unbit x] (log2 (width x)+1))
+countOnes a@(Bit ua) = Bit (makePrim1 (CountOnes w) [ua])
   where
+    w = log2 (widthOf a) + 1
     log2 1 = 0
     log2 n = 1 + log2 (n `div` 2)
 
