@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE GADTs, DataKinds #-}
 
 module Blarney.Recipe 
   ( Recipe(..)

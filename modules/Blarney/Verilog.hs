@@ -48,6 +48,8 @@ hWriteVerilog h netlist = do
           emit ":0] "
           emitWire (netInstId net, 0)
           emit " = "
+          emit (show (netWidth net))
+          emit "'d"
           emit (lookupParam (netParams net) "init")
           emit ";\n"
       | otherwise = do
@@ -65,6 +67,8 @@ hWriteVerilog h netlist = do
           emit "assign "
           emitWire (netInstId net, 0)
           emit " = "
+          emit (show (netWidth net))
+          emit "'d"
           emit (lookupParam (netParams net) "val")
           emit ";\n"
       | netName net == "~" = do
