@@ -263,21 +263,6 @@ void Parser::demandInputs(Seq<NetWire>* inputs)
   demand("]");
 }
 
-// Parse net parameters or exit with a parse error
-void Parser::demandParams(Seq<NetParam>* params)
-{
-  NetParam param;
-  demand("[");
-  if (eat("]")) return;
-  do {
-    demandStr(&param.key);
-    demand(":->");
-    demandStr(&param.val);
-    params->append(param);
-  } while (eat(","));
-  demand("]");
-}
-
 // Parse a sequence of nets or exit with a parse error
 // Allocates memory for each net
 void Parser::demandNets(Seq<Net*>* nets)

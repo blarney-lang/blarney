@@ -84,8 +84,8 @@ class Parser {
     // Parse net parameters or exit with a parse error
     void demandParams(Seq<NetParam>* params);
 
-    // Parse a net or exit with a parse error
-    void demandNet(Net* net);
+    // Parse a primitive component or exit with a parse error
+    void demandPrim(Prim* prim);
 
     // Parse a sequence of nets or exit with a parse error
     // Allocates memory for each net
