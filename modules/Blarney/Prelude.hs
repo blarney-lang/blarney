@@ -7,9 +7,11 @@ module Blarney.Prelude
   , andList
   , sumList
   , select
+  , (?)
   ) where
 
 import Blarney.Bit
+import Blarney.Bits
 import GHC.TypeLits
 
 -- Parallel reduce for a commutative an associative operator
@@ -38,3 +40,7 @@ sumList = tree (.+.) low
 -- One-hot select
 select :: KnownNat n => [(Bit 1, Bit n)] -> Bit n
 select alts = orList [replicateBit sel .&. val | (sel, val) <- alts]
+
+-- Mux
+(?) :: Bits a => Bit 1 -> (a, a) -> a
+c ? (a, b) = unpack (mux c (pack a) (pack b))

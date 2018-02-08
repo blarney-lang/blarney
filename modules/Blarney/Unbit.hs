@@ -38,23 +38,20 @@ data Prim =
   | Mod OutputWidth
     -- Bitwise
   | Not OutputWidth
-  | Inv OutputWidth
   | And OutputWidth
   | Or OutputWidth
   | Xor OutputWidth
     -- Shift
   | ShiftLeft OutputWidth
-  | ShiftWidth OutputWidth
+  | ShiftRight OutputWidth
     -- Comparison
   | Equal InputWidth
   | NotEqual InputWidth
   | LessThan InputWidth
   | LessThanEq InputWidth
-  | GreaterThan InputWidth
-  | GreaterThanEq InputWidth
     -- Stateful
-  | Reg InputWidth
-  | RegEn InputWidth
+  | Register Integer InputWidth
+  | RegisterEn Integer InputWidth
     -- Width adjustment
   | ReplicateBit OutputWidth
   | ZeroExtend InputWidth OutputWidth
@@ -65,9 +62,18 @@ data Prim =
     -- Misc
   | Mux OutputWidth
   | CountOnes OutputWidth
+    -- Simulation-time I/O
+  | Display DisplayArgs
+  | Finish
     -- Custom
-    -- (component name, input names, output names, parameters)
-  | Custom String [String] [String] [Param]
+    -- (component name, input names, output names/widths, parameters)
+  | Custom String [String] [(String, Int)] [Param]
+  deriving Show
+
+-- For storing the string literals in a display primitive
+-- e.g. [(2, "Hello"), (5, "World")] indicates that argument 2 
+-- of the display statement is "Hello" and argument 5 is "World."
+type DisplayArgs = [(Int, String)]
 
 -- Custom components may have compile-time parameters
 -- A parameter has a name and a value, both represented as strings
@@ -101,7 +107,7 @@ makePrim prim ins numOuts =
       , unbitInputs  = ins
       , unbitOutNum  = i
     }
-  | i <- 0 .. (numOuts-1) ]
+  | i <- [0 .. (numOuts-1)] ]
   where
     {-# NOINLINE ref #-}
     ref = newRef Nothing
