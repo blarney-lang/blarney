@@ -90,7 +90,7 @@ hWriteVerilog h netlist = do
           ZeroExtend wi wo  -> emitWireDecl wo wire
           SignExtend wi wo  -> emitWireDecl wo wire
           SelectBits hi lo  -> emitWireDecl (hi-lo) wire
-          Concat w          -> emitWireDecl w wire
+          Concat aw bw      -> emitWireDecl (aw+bw) wire
           Mux w             -> emitWireDecl w wire
           CountOnes w       -> emitWireDecl w wire
           Display args      -> return ()
@@ -238,7 +238,7 @@ hWriteVerilog h netlist = do
         ZeroExtend wi wo  -> emitZeroExtendInst net wi wo
         SignExtend wi wo  -> emitSignExtendInst net wi wo
         SelectBits hi lo  -> emitSelectBitsInst net hi lo
-        Concat w          -> emitConcatInst net
+        Concat aw bw      -> emitConcatInst net
         Mux w             -> emitMuxInst net
         CountOnes w       -> emitPrefixOpInst "$countones" net
         Display args      -> return ()
@@ -264,9 +264,9 @@ hWriteVerilog h netlist = do
           emit "if ("
           emitWire (netInputs net !! 0)
           emit " == 1) $display(\""
-          emitDisplayFormat 0 args (tail (netInputs net))
+          emitDisplayFormat args
           emit ","
-          emitDisplayArgs 0 args (tail (netInputs net))
+          emitDisplayArgs args (tail (netInputs net))
           emit ");\n"
         Finish -> do
           emit "if ("
@@ -274,22 +274,20 @@ hWriteVerilog h netlist = do
           emit " == 1) $finish;\n"
         other -> return ()
 
-    emitDisplayFormat n [] [] = emit "\\n\""
-    emitDisplayFormat n ((k, v) : params) xs
-      | n == k = do
-          emit "%s"
-          emitDisplayFormat (n+1) params xs
-    emitDisplayFormat n params (x:xs) = do
+    emitDisplayFormat [] = emit "\\n\""
+    emitDisplayFormat (DisplayArgString s : args) = do
+      emit "%s"
+      emitDisplayFormat args
+    emitDisplayFormat (DisplayArgBit w : args) = do
       emit "%d"
-      emitDisplayFormat (n+1) params xs
+      emitDisplayFormat args
 
-    emitDisplayArgs n [] [] = return ()
-    emitDisplayArgs n ((k, v) : params) xs
-      | n == k = do
-          emit ("\"" ++ v ++ "\"")
-          if null params && null xs then return () else emit ","
-          emitDisplayArgs (n+1) params xs
-    emitDisplayArgs n params (x:xs) = do
-      emitWire x
-      if null params && null xs then return () else emit ","
-      emitDisplayArgs (n+1) params xs
+    emitDisplayArgs [] _ = return ()
+    emitDisplayArgs (DisplayArgString s : args) wires = do
+      emit ("\"" ++ s ++ "\"")
+      if null args then return () else emit ","
+      emitDisplayArgs args wires
+    emitDisplayArgs (DisplayArgBit w : args) (wire:wires) = do
+      emitWire wire
+      if null args then return () else emit ","
+      emitDisplayArgs args wires

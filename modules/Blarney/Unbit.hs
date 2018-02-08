@@ -58,22 +58,24 @@ data Prim =
   | SignExtend InputWidth OutputWidth
     -- Bit selection and concatenation
   | SelectBits BitIndex BitIndex
-  | Concat OutputWidth
+  | Concat InputWidth InputWidth
     -- Misc
   | Mux OutputWidth
   | CountOnes OutputWidth
     -- Simulation-time I/O
-  | Display DisplayArgs
+  | Display [DisplayArg]
   | Finish
     -- Custom
     -- (component name, input names, output names/widths, parameters)
   | Custom String [String] [(String, Int)] [Param]
   deriving Show
 
--- For storing the string literals in a display primitive
--- e.g. [(2, "Hello"), (5, "World")] indicates that argument 2 
--- of the display statement is "Hello" and argument 5 is "World."
-type DisplayArgs = [(Int, String)]
+-- Display a string literal or a wire of a given width
+data DisplayArg = DisplayArgString String | DisplayArgBit InputWidth
+
+instance Show DisplayArg where
+  show (DisplayArgString s) = show s
+  show (DisplayArgBit w) = show w
 
 -- Custom components may have compile-time parameters
 -- A parameter has a name and a value, both represented as strings

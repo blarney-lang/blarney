@@ -191,8 +191,10 @@ regEn init en a =
 
 -- Concatenation
 (#) :: Bit n -> Bit m -> Bit (n+m)
-a # b = Bit w (makePrim1 (Concat w) [unbit a, unbit b])
-  where w = width a + width b
+a # b = Bit (wa + wb) (makePrim1 (Concat wa wb) [unbit a, unbit b])
+  where
+    wa = width a
+    wb = width b
 
 -- Bit selection
 bit :: Bit n -> Int -> Bit 1

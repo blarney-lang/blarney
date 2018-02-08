@@ -185,7 +185,7 @@ display = displayType (Format [])
 addDisplayPrim :: (Bit 1, [FormatItem]) -> Netlist ()
 addDisplayPrim (cond, items) = do
     c <- flatten (unbit cond)
-    ins <- mapM flatten [b | FormatBit b <- items]
+    ins <- mapM flatten [b | FormatBit w b <- items]
     id <- netlistFreshId
     let net = Net {
                   netPrim = Display args
@@ -194,7 +194,10 @@ addDisplayPrim (cond, items) = do
               }
     netlistAdd net
   where
-    args = [(i, s) | (i, FormatString s) <- zip [0..] items]
+    args = map toDisplayArg items
+    toDisplayArg (FormatString s) = DisplayArgString s
+    toDisplayArg (FormatBit w b) = DisplayArgBit w
+
 
 -- Add finish primitive to netlist
 addFinishPrim :: Bit 1 -> Netlist ()
