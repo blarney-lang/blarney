@@ -140,10 +140,11 @@ makeReg init =
      (cond, assignMap) <- ask
      let as = findWithDefault [] v assignMap
      let en = orList [b | (b, _, p) <- as]
-     let w = width (pack init)
+     let w = unbitWidth (unbit (pack init))
+     let bit w p = Bit (p { unbitWidth = w })
      let inp = case as of
-                 [(b, _, p)] -> Bit w p
-                 other -> select [(b, Bit w p) | (b, _, p) <- as]
+                 [(b, _, p)] -> bit w p
+                 other -> select [(b, bit w p) | (b, _, p) <- as]
      let out = unpack (regEn (pack init) en inp)
      return (Reg v out)
 
@@ -152,10 +153,11 @@ makeWire :: Bits a => a -> RTL (Wire a)
 makeWire def =
   do v <- fresh
      (cond, assignMap) <- ask
-     let w = width (pack def)
+     let w = unbitWidth (unbit (pack def))
+     let bit w p = Bit (p { unbitWidth = w })
      let as = findWithDefault [] v assignMap
      let none = inv (orList [b | (b, _, p) <- as])
-     let out = select ([(b, Bit w p) | (b, _, p) <- as] ++
+     let out = select ([(b, bit w p) | (b, _, p) <- as] ++
                           [(none, pack def)])
      return (Wire v (unpack out))
 

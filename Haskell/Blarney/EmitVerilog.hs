@@ -35,6 +35,8 @@ hWriteVerilog h netlist = do
       emit "_"
       emit (show outNum)
 
+    emitInput = emitWire
+
     emitDeclHelper width wire = do
       emit "["
       emit (show (width-1))
@@ -93,6 +95,7 @@ hWriteVerilog h netlist = do
           Concat aw bw      -> emitWireDecl (aw+bw) wire
           Mux w             -> emitWireDecl w wire
           CountOnes w       -> emitWireDecl w wire
+          Identity w        -> emitWireDecl w wire
           Display args      -> return ()
           Finish            -> return ()
           Custom p is os ps -> 
@@ -110,16 +113,16 @@ hWriteVerilog h netlist = do
       emit "assign "
       emitWire (netInstId net, 0)
       emit " = " >> emit op >> emit "("
-      emitWire (netInputs net !! 0)
+      emitInput (netInputs net !! 0)
       emit ");\n"
 
     emitInfixOpInst op net = do
       emit "assign "
       emitWire (netInstId net, 0)
       emit " = "
-      emitWire (netInputs net !! 0)
+      emitInput (netInputs net !! 0)
       emit " " >> emit op >> emit " "
-      emitWire (netInputs net !! 1)
+      emitInput (netInputs net !! 1)
       emit ";\n"
 
     emitReplicateInst w net = do
@@ -128,34 +131,34 @@ hWriteVerilog h netlist = do
       emit " = {"
       emit (show w)
       emit "{"
-      emitWire (netInputs net !! 0)
+      emitInput (netInputs net !! 0)
       emit "}};\n"
 
     emitMuxInst net = do
       emit "assign "
       emitWire (netInstId net, 0)
       emit " = "
-      emitWire (netInputs net !! 0)
+      emitInput (netInputs net !! 0)
       emit " ? "
-      emitWire (netInputs net !! 1)
+      emitInput (netInputs net !! 1)
       emit " : "
-      emitWire (netInputs net !! 2)
+      emitInput (netInputs net !! 2)
       emit ";\n"
 
     emitConcatInst net = do
       emit "assign "
       emitWire (netInstId net, 0)
       emit " = {"
-      emitWire (netInputs net !! 0)
+      emitInput (netInputs net !! 0)
       emit ","
-      emitWire (netInputs net !! 1)
+      emitInput (netInputs net !! 1)
       emit "};\n"
 
     emitSelectBitsInst net hi lo = do
       emit "assign "
       emitWire (netInstId net, 0)
       emit " = "
-      emitWire (netInputs net !! 0)
+      emitInput (netInputs net !! 0)
       emit "["
       emit (show hi)
       emit ":"
@@ -169,7 +172,7 @@ hWriteVerilog h netlist = do
       emit "{{"
       emit (show (wo-wi))
       emit "{1'b0}},"
-      emitWire (netInputs net !! 0)
+      emitInput (netInputs net !! 0)
       emit "};\n"
 
     emitSignExtendInst net wi wo = do
@@ -179,11 +182,11 @@ hWriteVerilog h netlist = do
       emit "{"
       emit (show (wo-wi))
       emit "{"
-      emitWire (netInputs net !! 0)
+      emitInput (netInputs net !! 0)
       emit "["
       emit (show (wi-1))
       emit "],"
-      emitWire (netInputs net !! 0)
+      emitInput (netInputs net !! 0)
       emit "};\n"
 
     emitCustomInst net name ins outs params = do
@@ -241,6 +244,7 @@ hWriteVerilog h netlist = do
         Concat aw bw      -> emitConcatInst net
         Mux w             -> emitMuxInst net
         CountOnes w       -> emitPrefixOpInst "$countones" net
+        Identity w        -> emitPrefixOpInst "" net
         Display args      -> return ()
         Finish            -> return ()
         Custom p is os ps -> emitCustomInst net p is os ps
@@ -250,19 +254,19 @@ hWriteVerilog h netlist = do
         Register init w -> do
           emitWire (netInstId net, 0)
           emit " <= "
-          emitWire (netInputs net !! 0)
+          emitInput (netInputs net !! 0)
           emit ";\n"
         RegisterEn init w -> do
           emit "if ("
-          emitWire (netInputs net !! 0)
+          emitInput (netInputs net !! 0)
           emit " == 1) "
           emitWire (netInstId net, 0)
           emit " <= "
-          emitWire (netInputs net !! 1)
+          emitInput (netInputs net !! 1)
           emit ";\n"
         Display args -> do
           emit "if ("
-          emitWire (netInputs net !! 0)
+          emitInput (netInputs net !! 0)
           emit " == 1) $display(\""
           emitDisplayFormat args
           emit ","
@@ -270,7 +274,7 @@ hWriteVerilog h netlist = do
           emit ");\n"
         Finish -> do
           emit "if ("
-          emitWire (netInputs net !! 0)
+          emitInput (netInputs net !! 0)
           emit " == 1) $finish;\n"
         other -> return ()
 
@@ -288,6 +292,6 @@ hWriteVerilog h netlist = do
       if null args then return () else emit ","
       emitDisplayArgs args wires
     emitDisplayArgs (DisplayArgBit w : args) (wire:wires) = do
-      emitWire wire
+      emitInput wire
       if null args then return () else emit ","
       emitDisplayArgs args wires

@@ -22,6 +22,7 @@ type InstId = Int
 type OutputNumber = Int
 
 -- Bit vector widths and indices
+type Width = Int
 type InputWidth = Int
 type OutputWidth = Int
 type BitIndex = Int
@@ -62,6 +63,7 @@ data Prim =
     -- Misc
   | Mux OutputWidth
   | CountOnes OutputWidth
+  | Identity OutputWidth
     -- Simulation-time I/O
   | Display [DisplayArg]
   | Finish
@@ -86,7 +88,7 @@ lookupParam ps p = case [v | (k :-> v) <- ps, p == k] of
                      [] -> error ("Unrecognised parameter '" ++ p ++ "'")
                      v:vs -> v
 
--- A untyped bit vector output from a primitive component instance
+-- A untyped bit vector output wire from a primitive component instance
 data Unbit = 
   Unbit {
     -- What kind of primitive produced this bit vector?
@@ -97,19 +99,22 @@ data Unbit =
   , unbitInputs :: [Unbit]
     -- Output pin number
   , unbitOutNum :: OutputNumber
+    -- Width of this output pin
+  , unbitWidth :: Int
   }
 
 -- Helper function for creating instance of a primitive component
 {-# NOINLINE makePrim #-}
-makePrim :: Prim -> [Unbit] -> Int -> [Unbit]
-makePrim prim ins numOuts =
+makePrim :: Prim -> [Unbit] -> [Int] -> [Unbit]
+makePrim prim ins outWidths =
   [ Unbit {
         unbitPrim    = prim
       , unbitInstRef = ref
       , unbitInputs  = ins
       , unbitOutNum  = i
+      , unbitWidth   = w
     }
-  | i <- [0 .. (numOuts-1)] ]
+  | (i, w) <- zip [0..] outWidths ]
   where
     {-# NOINLINE ref #-}
     ref = newRef Nothing
@@ -120,8 +125,8 @@ newRef :: Maybe InstId -> IORef (Maybe InstId)
 newRef x = unsafePerformIO (newIORef x)
 
 -- Create instance of primitive component which has one output
-makePrim1 :: Prim -> [Unbit] -> Unbit
-makePrim1 prim ins = head (makePrim prim ins 1)
+makePrim1 :: Prim -> [Unbit] -> Int -> Unbit
+makePrim1 prim ins width = head (makePrim prim ins [width])
 
 -- Netlists are lists of nets
 data Net =
@@ -184,5 +189,5 @@ flatten b =
                        , netInputs  = ins
                        }
          addNet net
-         return (id, unbitOutNum b)
-       Just id -> return (id, unbitOutNum b)
+         return ((id, unbitOutNum b))
+       Just id -> return ((id, unbitOutNum b))

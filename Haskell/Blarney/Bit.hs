@@ -39,14 +39,18 @@ import Blarney.Util
 import GHC.TypeLits
 
 -- Phantom type wrapping an untyped bit vector, capturing the bit width
-data Bit (n :: Nat) = Bit { width :: Int, unbit :: Unbit }
+newtype Bit (n :: Nat) = Bit { unbit :: Unbit }
+
+-- Extract width from bit vector
+width :: Bit n -> Int
+width = unbitWidth . unbit
 
 -- Replicate bit
 replicateBit :: KnownNat n => Bit 1 -> Bit n
 replicateBit a = result
   where
     n = fromInteger (natVal result)
-    result = Bit n (makePrim1 (ReplicateBit n) [unbit a])
+    result = Bit (makePrim1 (ReplicateBit n) [unbit a] n)
 
 -- All 0's
 low :: KnownNat n => Bit n
@@ -58,45 +62,45 @@ high = replicateBit 1
 
 -- Bitwise invert
 inv :: Bit n -> Bit n
-inv a = Bit wa (makePrim1 (Not wa) [unbit a])
+inv a = Bit (makePrim1 (Not wa) [unbit a] wa)
   where wa = width a
 
 -- Bitwise and
 infixl 7 .&.
 (.&.) :: Bit n -> Bit n -> Bit n
-a .&. b = Bit wa (makePrim1 (And wa) [unbit a, unbit b])
+a .&. b = Bit (makePrim1 (And wa) [unbit a, unbit b] wa)
   where wa = width a
 
 -- Bitwise or
 infixl 5 .|.
 (.|.) :: Bit n -> Bit n -> Bit n
-a .|. b = Bit wa (makePrim1 (Or wa) [unbit a, unbit b])
+a .|. b = Bit (makePrim1 (Or wa) [unbit a, unbit b] wa)
   where wa = width a
 
 -- Bitwise xor
 infixl 6 .^.
 (.^.) :: Bit n -> Bit n -> Bit n
-a .^. b = Bit wa (makePrim1 (Xor wa) [unbit a, unbit b])
+a .^. b = Bit (makePrim1 (Xor wa) [unbit a, unbit b] wa)
   where wa = width a
 
 -- Equality
 (.==.) :: Bit n -> Bit n -> Bit 1
-a .==. b = Bit 1 (makePrim1 (Equal wa) [unbit a, unbit b])
+a .==. b = Bit (makePrim1 (Equal wa) [unbit a, unbit b] 1)
   where wa = width a
 
 -- Disequality
 (.!=.) :: Bit n -> Bit n -> Bit 1
-a .!=. b = Bit 1 (makePrim1 (NotEqual wa) [unbit a, unbit b])
+a .!=. b = Bit (makePrim1 (NotEqual wa) [unbit a, unbit b] 1)
   where wa = width a
 
 -- Less than
 (.<.) :: Bit n -> Bit n -> Bit 1
-a .<. b = Bit 1 (makePrim1 (LessThan wa) [unbit a, unbit b])
+a .<. b = Bit (makePrim1 (LessThan wa) [unbit a, unbit b] 1)
   where wa = width a
 
 -- Less than or equal
 (.<=.) :: Bit n -> Bit n -> Bit 1
-a .<=. b = Bit 1 (makePrim1 (LessThanEq wa) [unbit a, unbit b])
+a .<=. b = Bit (makePrim1 (LessThanEq wa) [unbit a, unbit b] 1)
   where wa = width a
 
 -- Greater than
@@ -110,24 +114,24 @@ a .>=. b = b .<=. a
 -- Add
 infixl 6 .+.
 (.+.) :: Bit n -> Bit n -> Bit n
-a .+. b = Bit wa (makePrim1 (Add wa) [unbit a, unbit b])
+a .+. b = Bit (makePrim1 (Add wa) [unbit a, unbit b] wa)
   where wa = width a
 
 -- Subtract
 infixl 6 .-.
 (.-.) :: Bit n -> Bit n -> Bit n
-a .-. b = Bit wa (makePrim1 (Sub wa) [unbit a, unbit b])
+a .-. b = Bit (makePrim1 (Sub wa) [unbit a, unbit b] wa)
   where wa = width a
 
 -- Multiply
 infixl 7 .*.
 (.*.) :: Bit n -> Bit n -> Bit n
-a .*. b = Bit wa (makePrim1 (Mul wa) [unbit a, unbit b])
+a .*. b = Bit (makePrim1 (Mul wa) [unbit a, unbit b] wa)
   where wa = width a
 
 -- Mux
 mux :: Bit 1 -> Bit n -> Bit n -> Bit n
-mux c a b = Bit wa (makePrim1 (Mux wa) [unbit c, unbit a, unbit b])
+mux c a b = Bit (makePrim1 (Mux wa) [unbit c, unbit a, unbit b] wa)
   where wa = width a
 
 -- Arithmetic
@@ -140,12 +144,12 @@ instance KnownNat n => Num (Bit n) where
   signum a      = mux (a .==. 0) 0 1
   fromInteger i = result
    where
-     result     = Bit w (makePrim1 (Const w i) [])
+     result     = Bit (makePrim1 (Const w i) [] w)
      w          = fromInteger (natVal result)
 
 -- Division
 instance KnownNat n => Fractional (Bit n) where
-  a / b        = Bit wa (makePrim1 (Div wa) [unbit a, unbit b])
+  a / b        = Bit (makePrim1 (Div wa) [unbit a, unbit b] wa)
     where wa   = width a
   recip        = error "Undefined function: 'recip' for bit vectors"
   fromRational = error "Undefined function: 'fromRational' for bit vectors"
@@ -153,27 +157,27 @@ instance KnownNat n => Fractional (Bit n) where
 -- Modulus
 infixl 7 %
 (%) :: Bit n -> Bit n -> Bit n
-a % b = Bit wa (makePrim1 (Mod wa) [unbit a, unbit b])
+a % b = Bit (makePrim1 (Mod wa) [unbit a, unbit b] wa)
   where wa = width a
 
 -- Shift left
 (.<<.) :: Bit n -> Bit n -> Bit n
-a .<<. b = Bit wa (makePrim1 (ShiftLeft wa) [unbit a, unbit b])
+a .<<. b = Bit (makePrim1 (ShiftLeft wa) [unbit a, unbit b] wa)
   where wa = width a
 
 -- Shift right
 (.>>.) :: Bit n -> Bit n -> Bit n
-a .>>. b = Bit wa (makePrim1 (ShiftRight wa) [unbit a, unbit b])
+a .>>. b = Bit (makePrim1 (ShiftRight wa) [unbit a, unbit b] wa)
   where wa = width a
 
 -- Shift right
 countOnes :: Bit (2^n) -> Bit (n+1)
-countOnes a = Bit wr (makePrim1 (CountOnes wr) [unbit a])
+countOnes a = Bit (makePrim1 (CountOnes wr) [unbit a] wr)
   where wr = log2 (width a) + 1
 
 -- Register
 reg :: Bit n -> Bit n -> Bit n
-reg init a = Bit w (makePrim1 (Register (getInit (unbit init)) w) [unbit a])
+reg init a = Bit (makePrim1 (Register (getInit (unbit init)) w) [unbit a] w)
   where w = width init
 
 -- Determine initialiser
@@ -186,19 +190,19 @@ getInit a =
 -- Register with enable
 regEn :: Bit n -> Bit 1 -> Bit n -> Bit n
 regEn init en a =
-    Bit w (makePrim1 (RegisterEn (getInit (unbit init)) w) [unbit en, unbit a])
+    Bit (makePrim1 (RegisterEn (getInit (unbit init)) w) [unbit en, unbit a] w)
   where w = width init
 
 -- Concatenation
 (#) :: Bit n -> Bit m -> Bit (n+m)
-a # b = Bit (wa + wb) (makePrim1 (Concat wa wb) [unbit a, unbit b])
+a # b = Bit (makePrim1 (Concat wa wb) [unbit a, unbit b] (wa+wb))
   where
     wa = width a
     wb = width b
 
 -- Bit selection
 bit :: Bit n -> Int -> Bit 1
-bit a i = Bit 1 (makePrim1 p [unbit a])
+bit a i = Bit (makePrim1 p [unbit a] 1)
   where
     p = if i >= width a then
           error ("Blarney.Bit.bit: index " ++ show i ++
@@ -210,7 +214,7 @@ bit a i = Bit 1 (makePrim1 p [unbit a])
 bits :: (KnownNat m, m <= n) => Bit n -> (Int, Int) -> Bit m
 bits a (hi, lo) = result
   where
-    result = Bit wr (makePrim1 p [unbit a])
+    result = Bit (makePrim1 p [unbit a] wr)
     wr = fromInteger (natVal result)
     p = if lo > hi || (hi-lo) /= wr then
           error "Blarney.Bit.bits: sub-range does not match bit width"
@@ -221,21 +225,21 @@ bits a (hi, lo) = result
 zeroExtend :: (KnownNat m, n <= m) => Bit n -> Bit m
 zeroExtend a = result
    where
-     result = Bit wr (makePrim1 (ZeroExtend (width a) wr) [unbit a])
+     result = Bit (makePrim1 (ZeroExtend (width a) wr) [unbit a] wr)
      wr     = fromInteger (natVal result)
 
 -- Sign extend
 signExtend :: (KnownNat m, n <= m) => Bit n -> Bit m
 signExtend a = result
    where
-     result = Bit wr (makePrim1 (SignExtend (width a) wr) [unbit a])
+     result = Bit (makePrim1 (SignExtend (width a) wr) [unbit a] wr)
      wr     = fromInteger (natVal result)
 
 -- Extract most significant bits
 upper :: (KnownNat m, m <= n) => Bit n -> Bit m
 upper a = result
    where
-     result = Bit wr (makePrim1 (SelectBits (wa-1) (wa-wr)) [unbit a])
+     result = Bit (makePrim1 (SelectBits (wa-1) (wa-wr)) [unbit a] wr)
      wa     = width a
      wr     = fromInteger (natVal result)
 
@@ -243,5 +247,5 @@ upper a = result
 lower :: (KnownNat m, m <= n) => Bit n -> Bit m
 lower a = result
    where
-     result = Bit wr (makePrim1 (SelectBits (wr-1) 0) [unbit a])
+     result = Bit (makePrim1 (SelectBits (wr-1) 0) [unbit a] wr)
      wr     = fromInteger (natVal result)
