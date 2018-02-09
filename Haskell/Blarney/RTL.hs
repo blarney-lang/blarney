@@ -182,40 +182,39 @@ display :: DisplayType a => a
 display = displayType (Format [])
 
 -- Add display primitive to netlist
-addDisplayPrim :: (Bit 1, [FormatItem]) -> Netlist ()
+addDisplayPrim :: (Bit 1, [FormatItem]) -> Flatten ()
 addDisplayPrim (cond, items) = do
     c <- flatten (unbit cond)
     ins <- mapM flatten [b | FormatBit w b <- items]
-    id <- netlistFreshId
+    id <- freshId
     let net = Net {
                   netPrim = Display args
                 , netInstId = id
                 , netInputs = c:ins
               }
-    netlistAdd net
+    addNet net
   where
     args = map toDisplayArg items
     toDisplayArg (FormatString s) = DisplayArgString s
     toDisplayArg (FormatBit w b) = DisplayArgBit w
 
-
 -- Add finish primitive to netlist
-addFinishPrim :: Bit 1 -> Netlist ()
+addFinishPrim :: Bit 1 -> Flatten ()
 addFinishPrim cond = do
   c <- flatten (unbit cond)
-  id <- netlistFreshId
+  id <- freshId
   let net = Net {
                 netPrim = Finish
               , netInstId = id
               , netInputs = [c]
             }
-  netlistAdd net
+  addNet net
 
 -- Convert RTL monad to a netlist
 netlist :: RTL () -> IO [Net]
 netlist rtl = do
   i <- newIORef (0 :: Int)
-  (nl, _) <- runNetlist rtl' i
+  (nl, _) <- runFlatten rtl' i
   return (JL.toList nl)
   where
     (_, actsJL, _) = runRTL rtl (1, assignMap) 0

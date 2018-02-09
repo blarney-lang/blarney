@@ -135,54 +135,54 @@ data Net =
 type WireId = (InstId, OutputNumber)
 
 -- A reader/writer monad for accumulating the netlist
-newtype Netlist a = Netlist { runNetlist :: NetlistR -> IO (NetlistW, a) }
+newtype Flatten a = Flatten { runFlatten :: FlattenR -> IO (FlattenW, a) }
 
 -- The reader component contains a IORef containing the next unique net id
-type NetlistR = IORef Int
+type FlattenR = IORef Int
 
 -- The writer component is the netlist
-type NetlistW = JL.JList Net
+type FlattenW = JL.JList Net
 
-instance Monad Netlist where
-  return a = Netlist (\r -> return (JL.Zero, a))
-  m >>= f  = Netlist (\r -> do (w0, a) <- runNetlist m r
-                               (w1, b) <- runNetlist (f a) r
+instance Monad Flatten where
+  return a = Flatten (\r -> return (JL.Zero, a))
+  m >>= f  = Flatten (\r -> do (w0, a) <- runFlatten m r
+                               (w1, b) <- runFlatten (f a) r
                                return (w0 JL.:+: w1, b))
 
-instance Applicative Netlist where
+instance Applicative Flatten where
   pure = return
   (<*>) = ap
 
-instance Functor Netlist where
+instance Functor Flatten where
   fmap = liftM
 
-netlistFreshId :: Netlist Int
-netlistFreshId = Netlist $ \r -> do
+freshId :: Flatten Int
+freshId = Flatten $ \r -> do
   id <- readIORef r
   writeIORef r (id+1)
   return (JL.Zero, id)
 
-netlistAdd :: Net -> Netlist ()
-netlistAdd net = Netlist $ \r -> return (JL.One net, ())
+addNet :: Net -> Flatten ()
+addNet net = Flatten $ \r -> return (JL.One net, ())
 
-netlistLift :: IO a -> Netlist a
-netlistLift m = Netlist $ \r -> do
+doIO :: IO a -> Flatten a
+doIO m = Flatten $ \r -> do
   a <- m
   return (JL.Zero, a)
 
 -- Flatten bit vector to netlist
-flatten :: Unbit -> Netlist WireId
+flatten :: Unbit -> Flatten WireId
 flatten b =
-  do val <- netlistLift (readIORef (unbitInstRef b))
+  do val <- doIO (readIORef (unbitInstRef b))
      case val of
        Nothing -> do
-         id <- netlistFreshId
-         netlistLift (writeIORef (unbitInstRef b) (Just id))
+         id <- freshId
+         doIO (writeIORef (unbitInstRef b) (Just id))
          ins <- mapM flatten (unbitInputs b)
          let net = Net { netPrim    = unbitPrim b
                        , netInstId  = id
                        , netInputs  = ins
                        }
-         netlistAdd net
+         addNet net
          return (id, unbitOutNum b)
        Just id -> return (id, unbitOutNum b)
