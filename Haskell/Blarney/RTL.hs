@@ -193,6 +193,7 @@ addDisplayPrim (cond, items) = do
                   netPrim = Display args
                 , netInstId = id
                 , netInputs = c:ins
+                , netOutputWidths = []
               }
     addNet net
   where
@@ -209,6 +210,7 @@ addFinishPrim cond = do
                 netPrim = Finish
               , netInstId = id
               , netInputs = [c]
+              , netOutputWidths = []
             }
   addNet net
 
@@ -216,7 +218,7 @@ addFinishPrim cond = do
 netlist :: RTL () -> IO [Net]
 netlist rtl = do
   i <- newIORef (0 :: Int)
-  (nl, _) <- runFlatten rtl' i
+  (nl, _) <- runFlatten roots i
   return (JL.toList nl)
   where
     (_, actsJL, _) = runRTL rtl (1, assignMap) 0
@@ -224,5 +226,5 @@ netlist rtl = do
     assignMap = fromListWith (++) [(v, [a]) | RTLAssign a@(_, v,_) <- acts]
     disps = [(go, items) | RTLDisplay (go, Format items) <- acts]
     fins  = [go | RTLFinish go <- acts]
-    rtl'  = do mapM_ addDisplayPrim disps
+    roots = do mapM_ addDisplayPrim disps
                mapM_ addFinishPrim fins

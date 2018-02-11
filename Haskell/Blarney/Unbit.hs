@@ -100,7 +100,9 @@ data Unbit =
     -- Output pin number
   , unbitOutNum :: OutputNumber
     -- Width of this output pin
-  , unbitWidth :: Int
+  , unbitWidth :: Width
+    -- Width of each output pin
+  , unbitWidths :: [Width]
   }
 
 -- Helper function for creating instance of a primitive component
@@ -113,6 +115,7 @@ makePrim prim ins outWidths =
       , unbitInputs  = ins
       , unbitOutNum  = i
       , unbitWidth   = w
+      , unbitWidths  = outWidths
     }
   | (i, w) <- zip [0..] outWidths ]
   where
@@ -131,9 +134,10 @@ makePrim1 prim ins width = head (makePrim prim ins [width])
 -- Netlists are lists of nets
 data Net =
   Net {
-      netPrim    :: Prim
-    , netInstId  :: InstId
-    , netInputs  :: [WireId]
+      netPrim         :: Prim
+    , netInstId       :: InstId
+    , netInputs       :: [WireId]
+    , netOutputWidths :: [Width]
   } deriving Show
 
 -- An wire is uniquely identified by an instance id and an output number
@@ -184,9 +188,10 @@ flatten b =
          id <- freshId
          doIO (writeIORef (unbitInstRef b) (Just id))
          ins <- mapM flatten (unbitInputs b)
-         let net = Net { netPrim    = unbitPrim b
-                       , netInstId  = id
-                       , netInputs  = ins
+         let net = Net { netPrim         = unbitPrim b
+                       , netInstId       = id
+                       , netInputs       = ins
+                       , netOutputWidths = (unbitWidths b)
                        }
          addNet net
          return ((id, unbitOutNum b))

@@ -219,7 +219,7 @@ hWriteVerilog h netlist = do
 
     emitInst net =
       case netPrim net of
-        Const w i         -> emitAssignConst w i net
+        Const w i         -> return ()
         Add w             -> emitInfixOpInst "+" net
         Sub w             -> emitInfixOpInst "-" net
         Mul w             -> emitInfixOpInst "*" net
