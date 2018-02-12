@@ -364,6 +364,20 @@ hWriteC h netlistOrig = do
           emit (show w)
           emit "); "
 
+    emitCountOnes net w
+      | w <= 64 = do
+          emitWire (netInstId net, 0)
+          emit " = countOnes("
+          emitInput (netInputs net !! 0)
+          emit ");\n"
+      | otherwise = do
+          emitWire (netInstId net, 0)
+          emit " = countOnesBU("
+          emitInput (netInputs net !! 0)
+          emit ", "
+          emit (show w)
+          emit ");\n"
+
     emitMuxInst net = do
       emitWire (netInstId net, 0)
       emit " = "
@@ -406,8 +420,7 @@ hWriteC h netlistOrig = do
         SelectBits w hi lo -> emitSelectBitsInst net w hi lo
         Concat aw bw       -> emitConcatInst net aw bw
         Mux w              -> emitMuxInst net
-        CountOnes w        -> emitPrefixOpInst "countOnes"
-                                "countOnesBU" net w False
+        CountOnes w        -> emitCountOnes net (2^(w-1))
         Identity w         -> emitIdentityInst net
         Display args       -> emitDisplay net args
         Finish             -> return ()
