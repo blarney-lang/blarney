@@ -70,35 +70,35 @@ hWriteVerilog h netlist = do
     emitDecl net =
       let wire = (netInstId net, 0) in
         case netPrim net of
-          Const w i         -> emitWireInitDecl w wire i
-          Add w             -> emitWireDecl w wire
-          Sub w             -> emitWireDecl w wire
-          Mul w             -> emitWireDecl w wire
-          Div w             -> emitWireDecl w wire
-          Mod w             -> emitWireDecl w wire
-          Not w             -> emitWireDecl w wire
-          And w             -> emitWireDecl w wire
-          Or  w             -> emitWireDecl w wire
-          Xor w             -> emitWireDecl w wire
-          ShiftLeft w       -> emitWireDecl w wire
-          ShiftRight w      -> emitWireDecl w wire
-          Equal w           -> emitWireDecl 1 wire
-          NotEqual w        -> emitWireDecl 1 wire
-          LessThan w        -> emitWireDecl 1 wire
-          LessThanEq w      -> emitWireDecl 1 wire
-          Register i w      -> emitRegInitDecl w wire i
-          RegisterEn i w    -> emitRegInitDecl w wire i
-          ReplicateBit w    -> emitWireDecl w wire
-          ZeroExtend wi wo  -> emitWireDecl wo wire
-          SignExtend wi wo  -> emitWireDecl wo wire
-          SelectBits hi lo  -> emitWireDecl (hi-lo) wire
-          Concat aw bw      -> emitWireDecl (aw+bw) wire
-          Mux w             -> emitWireDecl w wire
-          CountOnes w       -> emitWireDecl w wire
-          Identity w        -> emitWireDecl w wire
-          Display args      -> return ()
-          Finish            -> return ()
-          Custom p is os ps -> 
+          Const w i          -> emitWireInitDecl w wire i
+          Add w              -> emitWireDecl w wire
+          Sub w              -> emitWireDecl w wire
+          Mul w              -> emitWireDecl w wire
+          Div w              -> emitWireDecl w wire
+          Mod w              -> emitWireDecl w wire
+          Not w              -> emitWireDecl w wire
+          And w              -> emitWireDecl w wire
+          Or  w              -> emitWireDecl w wire
+          Xor w              -> emitWireDecl w wire
+          ShiftLeft w        -> emitWireDecl w wire
+          ShiftRight w       -> emitWireDecl w wire
+          Equal w            -> emitWireDecl 1 wire
+          NotEqual w         -> emitWireDecl 1 wire
+          LessThan w         -> emitWireDecl 1 wire
+          LessThanEq w       -> emitWireDecl 1 wire
+          Register i w       -> emitRegInitDecl w wire i
+          RegisterEn i w     -> emitRegInitDecl w wire i
+          ReplicateBit w     -> emitWireDecl w wire
+          ZeroExtend wi wo   -> emitWireDecl wo wire
+          SignExtend wi wo   -> emitWireDecl wo wire
+          SelectBits w hi lo -> emitWireDecl (hi-lo) wire
+          Concat aw bw       -> emitWireDecl (aw+bw) wire
+          Mux w              -> emitWireDecl w wire
+          CountOnes w        -> emitWireDecl w wire
+          Identity w         -> emitWireDecl w wire
+          Display args       -> return ()
+          Finish             -> return ()
+          Custom p is os ps  -> 
             sequence_ [ emitWireDecl w (netInstId net, n)
                       | ((o, w), n) <- zip os [0..] ]
 
@@ -219,35 +219,35 @@ hWriteVerilog h netlist = do
 
     emitInst net =
       case netPrim net of
-        Const w i         -> return ()
-        Add w             -> emitInfixOpInst "+" net
-        Sub w             -> emitInfixOpInst "-" net
-        Mul w             -> emitInfixOpInst "*" net
-        Div w             -> emitInfixOpInst "/" net
-        Mod w             -> emitInfixOpInst "%" net
-        Not w             -> emitPrefixOpInst "~" net
-        And w             -> emitInfixOpInst "&" net
-        Or  w             -> emitInfixOpInst "|" net
-        Xor w             -> emitInfixOpInst "^" net
-        ShiftLeft w       -> emitInfixOpInst "<<" net
-        ShiftRight w      -> emitInfixOpInst ">>" net
-        Equal w           -> emitInfixOpInst "==" net
-        NotEqual w        -> emitInfixOpInst "!=" net
-        LessThan w        -> emitInfixOpInst "<" net
-        LessThanEq w      -> emitInfixOpInst "<=" net
-        Register i w      -> return ()
-        RegisterEn i w    -> return ()
-        ReplicateBit w    -> emitReplicateInst w net
-        ZeroExtend wi wo  -> emitZeroExtendInst net wi wo
-        SignExtend wi wo  -> emitSignExtendInst net wi wo
-        SelectBits hi lo  -> emitSelectBitsInst net hi lo
-        Concat aw bw      -> emitConcatInst net
-        Mux w             -> emitMuxInst net
-        CountOnes w       -> emitPrefixOpInst "$countones" net
-        Identity w        -> emitPrefixOpInst "" net
-        Display args      -> return ()
-        Finish            -> return ()
-        Custom p is os ps -> emitCustomInst net p is os ps
+        Const w i          -> return ()
+        Add w              -> emitInfixOpInst "+" net
+        Sub w              -> emitInfixOpInst "-" net
+        Mul w              -> emitInfixOpInst "*" net
+        Div w              -> emitInfixOpInst "/" net
+        Mod w              -> emitInfixOpInst "%" net
+        Not w              -> emitPrefixOpInst "~" net
+        And w              -> emitInfixOpInst "&" net
+        Or  w              -> emitInfixOpInst "|" net
+        Xor w              -> emitInfixOpInst "^" net
+        ShiftLeft w        -> emitInfixOpInst "<<" net
+        ShiftRight w       -> emitInfixOpInst ">>" net
+        Equal w            -> emitInfixOpInst "==" net
+        NotEqual w         -> emitInfixOpInst "!=" net
+        LessThan w         -> emitInfixOpInst "<" net
+        LessThanEq w       -> emitInfixOpInst "<=" net
+        Register i w       -> return ()
+        RegisterEn i w     -> return ()
+        ReplicateBit w     -> emitReplicateInst w net
+        ZeroExtend wi wo   -> emitZeroExtendInst net wi wo
+        SignExtend wi wo   -> emitSignExtendInst net wi wo
+        SelectBits w hi lo -> emitSelectBitsInst net hi lo
+        Concat aw bw       -> emitConcatInst net
+        Mux w              -> emitMuxInst net
+        CountOnes w        -> emitPrefixOpInst "$countones" net
+        Identity w         -> emitPrefixOpInst "" net
+        Display args       -> return ()
+        Finish             -> return ()
+        Custom p is os ps  -> emitCustomInst net p is os ps
  
     emitAlways net =
       case netPrim net of

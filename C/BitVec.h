@@ -5,7 +5,7 @@
 // These are only used for bit vectors whose widths exceed 64
 
 #include <stdint.h>
-#include <stdbool.h>
+#include <string.h>
 
 // Types
 // =====
@@ -140,6 +140,15 @@ inline void rightBU(BU a, BU b, BU r, uint32_t w)
 {
   uint32_t numChunks = (w+ChunkSize-1)/ChunkSize;
   rightCoreBU(a, fromBU(b, w), r, w, numChunks);
+}
+
+// Right shift and convert to 64 bits
+inline uint64_t fromShiftedBU(BU a, uint32_t sh, uint32_t w)
+{
+  uint32_t numChunks = (w+ChunkSize-1)/ChunkSize;
+  Chunk tmp[numChunks];
+  rightCoreBU(a, sh, tmp, w, numChunks);
+  return fromBU(tmp, w);
 }
 
 // Fit the most significant chunk into range according to given width
@@ -294,6 +303,13 @@ inline void replicateBU(uint8_t bit, BU r, uint32_t w)
   Chunk ones = ~0;
   for (uint32_t i = 0; i < numChunks; i++) r[i] = ones;
   r[numChunks-1] = fitMSCU(r[numChunks-1], w);
+}
+
+// Copy
+inline void copyBU(BU a, BU r, uint32_t w)
+{
+  uint32_t numChunks = (w+ChunkSize-1)/ChunkSize;
+  memcpy(r, a, numChunks * sizeof(Chunk));
 }
 
 #endif

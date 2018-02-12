@@ -58,7 +58,7 @@ data Prim =
   | ZeroExtend InputWidth OutputWidth
   | SignExtend InputWidth OutputWidth
     -- Bit selection and concatenation
-  | SelectBits BitIndex BitIndex
+  | SelectBits InputWidth BitIndex BitIndex
   | Concat InputWidth InputWidth
     -- Misc
   | Mux OutputWidth

@@ -208,7 +208,7 @@ bit a i = Bit (makePrim1 p [unbit a] 1)
           error ("Blarney.Bit.bit: index " ++ show i ++
                    " out of range [" ++ show (width a) ++ ":0]")
         else
-          SelectBits i i
+          SelectBits (width a) i i
 
 -- Sub-range selection
 bits :: (KnownNat m, m <= n) => Bit n -> (Int, Int) -> Bit m
@@ -219,7 +219,7 @@ bits a (hi, lo) = result
     p = if lo > hi || (hi-lo) /= wr then
           error "Blarney.Bit.bits: sub-range does not match bit width"
         else
-          SelectBits hi lo
+          SelectBits (width a) hi lo
 
 -- Zero extend
 zeroExtend :: (KnownNat m, n <= m) => Bit n -> Bit m
@@ -239,7 +239,7 @@ signExtend a = result
 upper :: (KnownNat m, m <= n) => Bit n -> Bit m
 upper a = result
    where
-     result = Bit (makePrim1 (SelectBits (wa-1) (wa-wr)) [unbit a] wr)
+     result = Bit (makePrim1 (SelectBits wa (wa-1) (wa-wr)) [unbit a] wr)
      wa     = width a
      wr     = fromInteger (natVal result)
 
@@ -247,5 +247,6 @@ upper a = result
 lower :: (KnownNat m, m <= n) => Bit n -> Bit m
 lower a = result
    where
-     result = Bit (makePrim1 (SelectBits (wr-1) 0) [unbit a] wr)
+     result = Bit (makePrim1 (SelectBits wa (wr-1) 0) [unbit a] wr)
+     wa     = width a
      wr     = fromInteger (natVal result)
