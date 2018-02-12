@@ -139,10 +139,12 @@ makeReg init =
   do v <- fresh
      (cond, assignMap) <- ask
      let as = findWithDefault [] v assignMap
-     let en  = orList [b | (b, _, p) <- as]
+     let en = orList [b | (b, _, p) <- as]
+     let w = unbitWidth (unbit (pack init))
+     let bit w p = Bit (p { unbitWidth = w })
      let inp = case as of
-                 [(b, _, p)] -> Bit p
-                 other -> select [(b, Bit p) | (b, _, p) <- as]
+                 [(b, _, p)] -> bit w p
+                 other -> select [(b, bit w p) | (b, _, p) <- as]
      let out = unpack (regEn (pack init) en inp)
      return (Reg v out)
 
@@ -151,9 +153,11 @@ makeWire :: Bits a => a -> RTL (Wire a)
 makeWire def =
   do v <- fresh
      (cond, assignMap) <- ask
+     let w = unbitWidth (unbit (pack def))
+     let bit w p = Bit (p { unbitWidth = w })
      let as = findWithDefault [] v assignMap
      let none = inv (orList [b | (b, _, p) <- as])
-     let out = select ([(b, Bit p) | (b, _, p) <- as] ++
+     let out = select ([(b, bit w p) | (b, _, p) <- as] ++
                           [(none, pack def)])
      return (Wire v (unpack out))
 
@@ -180,41 +184,41 @@ display :: DisplayType a => a
 display = displayType (Format [])
 
 -- Add display primitive to netlist
-addDisplayPrim :: (Bit 1, [FormatItem]) -> Netlist ()
+addDisplayPrim :: (Bit 1, [FormatItem]) -> Flatten ()
 addDisplayPrim (cond, items) = do
     c <- flatten (unbit cond)
-    ins <- mapM flatten [b | FormatBit b <- items]
-    id <- netlistFreshId
+    ins <- mapM flatten [b | FormatBit w b <- items]
+    id <- freshId
     let net = Net {
-                  netName = "display"
-                , netParams = params
+                  netPrim = Display args
                 , netInstId = id
                 , netInputs = c:ins
-                , netWidth = 0 -- Unused
+                , netOutputWidths = []
               }
-    netlistAdd net
+    addNet net
   where
-    params = [show i :-> s | (i, FormatString s) <- zip [0..] items]
+    args = map toDisplayArg items
+    toDisplayArg (FormatString s) = DisplayArgString s
+    toDisplayArg (FormatBit w b) = DisplayArgBit w
 
 -- Add finish primitive to netlist
-addFinishPrim :: Bit 1 -> Netlist ()
+addFinishPrim :: Bit 1 -> Flatten ()
 addFinishPrim cond = do
   c <- flatten (unbit cond)
-  id <- netlistFreshId
+  id <- freshId
   let net = Net {
-                netName = "finish"
-              , netParams = []
+                netPrim = Finish
               , netInstId = id
               , netInputs = [c]
-              , netWidth = 0 -- Unused
+              , netOutputWidths = []
             }
-  netlistAdd net
+  addNet net
 
 -- Convert RTL monad to a netlist
 netlist :: RTL () -> IO [Net]
 netlist rtl = do
   i <- newIORef (0 :: Int)
-  (nl, _) <- runNetlist rtl' i
+  (nl, _) <- runFlatten roots i
   return (JL.toList nl)
   where
     (_, actsJL, _) = runRTL rtl (1, assignMap) 0
@@ -222,5 +226,5 @@ netlist rtl = do
     assignMap = fromListWith (++) [(v, [a]) | RTLAssign a@(_, v,_) <- acts]
     disps = [(go, items) | RTLDisplay (go, Format items) <- acts]
     fins  = [go | RTLFinish go <- acts]
-    rtl'  = do mapM_ addDisplayPrim disps
+    roots = do mapM_ addDisplayPrim disps
                mapM_ addFinishPrim fins

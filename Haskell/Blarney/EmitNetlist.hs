@@ -1,4 +1,4 @@
-module Blarney.Netlist
+module Blarney.EmitNetlist
   ( printNetlist
   , writeNetlist
   ) where
@@ -23,21 +23,7 @@ hWriteNetlist h netlist = do
     mapM_ emitNet netlist
   where
     emit = hPutStr h
-
-    emitNet net = do
-      emit (show (show (netInstId net)))
-      emit " "
-      emit (netName net)
-      emit " ["
-      emitList [(show id, pin) | (id, pin) <- netInputs net]
-      emit "] ["
-      emitList (netParams net)
-      emit "] "
-      emit (show (netWidth net))
-      emit "\n"
-
-    emitList [] = return ()
-    emitList (x:xs) = do
-      emit (show x)
-      if null xs then return () else emit ", "
-      emitList xs
+    emitNet net = emit $
+      show (netInstId net) ++ " " ++
+      "(" ++ show (netPrim net) ++ ") " ++
+      show (netInputs net) ++ "\n"

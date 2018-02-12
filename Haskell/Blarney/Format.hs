@@ -6,7 +6,7 @@ import Blarney.Unbit
 import Blarney.Bit
 
 data FormatItem = 
-    FormatBit Unbit
+    FormatBit Int Unbit
   | FormatString String
 
 newtype Format = Format [FormatItem]
@@ -27,7 +27,8 @@ instance FormatType a => FormatType (String -> a) where
   formatType f s = formatType (f <> Format [FormatString s])
 
 instance FormatType a => FormatType (Bit n -> a) where
-  formatType f b = formatType (f <> Format [FormatBit (unbit b)])
+  formatType f b = formatType (f <> Format [FormatBit (unbitWidth ub) ub])
+    where ub = unbit b
 
 instance FormatType a => FormatType (Format -> a) where
   formatType f f' = formatType (f <> f')

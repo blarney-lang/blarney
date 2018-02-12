@@ -4,8 +4,9 @@ module Blarney
   , module Blarney.Prelude
   , module Blarney.RTL
   , module Blarney.Format
-  , module Blarney.Verilog
-  , module Blarney.Netlist
+  , module Blarney.EmitVerilog
+  , module Blarney.EmitNetlist
+  , module Blarney.EmitC
   , module Blarney.Recipe
   , module Control.Monad
   , module GHC.TypeLits
@@ -16,8 +17,9 @@ import Blarney.Bits
 import Blarney.Prelude
 import Blarney.RTL
 import Blarney.Format
-import Blarney.Verilog
-import Blarney.Netlist
+import Blarney.EmitVerilog
+import Blarney.EmitNetlist
+import Blarney.EmitC
 import Blarney.Recipe
 import Control.Monad hiding (when)
 import GHC.TypeLits
