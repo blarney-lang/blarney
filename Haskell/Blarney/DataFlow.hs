@@ -1,6 +1,23 @@
+{- Data-flow passes over netlist -}
+
+module Blarney.DataFlow
+  ( dataFlow
+  , sequentialise
+  ) where
+
+import Blarney.Unbit
+import qualified Blarney.JList as JL
+import qualified Data.IntSet as IS
+import qualified Data.Set as S
+import qualified Data.Map as M
+import Data.Array as A
+
 {-
 
-This module introduces data-flow ordering on netlists.  It does so
+Data-flow pass
+==============
+
+This function introduces data-flow ordering on netlists.  It does so
 using a depth-first (post-order) traversal starting from each root.  A
 root is: (1) a component with no outputs; or (2) the child of a
 register.  A leaf is: (1) any component with no inputs; (2) a
@@ -10,15 +27,6 @@ cycles.  Such cycles must be combinatorial cycles since registers are
 considered as leaves.
 
 -}
-
-module Blarney.DataFlow
-  ( dataFlow
-  ) where
-
-import Blarney.Unbit
-import qualified Blarney.JList as JL
-import qualified Data.IntSet as S
-import Data.Array as A
 
 -- Is given net a leaf?
 isLeaf :: Net -> Bool
@@ -34,7 +42,7 @@ dataFlow :: [Net] -> [Net]
 dataFlow nets =
     JL.toList 
   . fst
-  . dfsList S.empty S.empty
+  . dfsList IS.empty IS.empty
   $ roots
   where
     -- Number of nets
@@ -68,11 +76,56 @@ dataFlow nets =
 
     -- DFS from a single root node
     dfs as vs net
-      | id `S.member` as = error "Combinatorial cycle detected"
-      | id `S.member` vs = (JL.Zero, vs)
-      | isLeaf net       = (JL.One net, S.insert id vs)
-      | otherwise        = (cs JL.:+: JL.One net, vs')
+      | id `IS.member` as = error "Combinatorial cycle detected"
+      | id `IS.member` vs = (JL.Zero, vs)
+      | isLeaf net        = (JL.One net, IS.insert id vs)
+      | otherwise         = (cs JL.:+: JL.One net, vs')
       where
         id        = netInstId net
         children  = map (lookup . fst) (netInputs net)
-        (cs, vs') = dfsList (S.insert id as) (S.insert id vs) children
+        (cs, vs') = dfsList (IS.insert id as) (IS.insert id vs) children
+
+{-
+
+Sequentialisation pass
+======================
+
+This pass introduces temporary register variables, where necessary, so
+that parallel register updates can be performed sequentially
+
+-}
+
+-- Extract state variables (that are updated on each cycle) from net
+getStateVars :: Net -> [(WireId, Width)]
+getStateVars net =
+  case netPrim net of
+    Register i w   -> [((netInstId net, 0), w)]
+    RegisterEn i w -> [((netInstId net, 0), w)]
+    other          -> []
+
+sequentialise :: [Net] -> [Net]
+sequentialise nets = intro (length nets) M.empty nets
+  where
+    intro id mod [] = []
+    intro id mod (net:nets)
+      | null stateVars = net : intro id mod nets
+      | otherwise      = new ++ [net {netInputs = ins}] ++ intro id' mod' nets
+      where
+        stateVars       = getStateVars net
+        mod'            = M.union (M.fromList stateVars) mod
+        (id', new, ins) = replace id (netInputs net)
+
+        replace id [] = (id, [], [])
+        replace id (i:is) =
+          let (id0, new0, wire)  = rep id i
+              (id1, new1, wires) = replace id0 is
+          in  (id1, new0 ++ new1, wire:wires)
+
+        rep id i =
+          case M.lookup i mod of
+            Nothing -> (id, [], i)
+            Just w  -> let net = Net { netPrim = Identity w
+                                     , netInstId = id
+                                     , netInputs = [i]
+                                     , netOutputWidths = [w] }
+                       in  (id+1, [net], (id, 0))

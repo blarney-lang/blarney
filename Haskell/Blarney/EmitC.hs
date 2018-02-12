@@ -3,15 +3,12 @@
 module Blarney.EmitC
   ( printC
   , writeC
-  , sequentialise
   ) where
 
 import Blarney.Unbit
 import Blarney.DataFlow
 import System.IO
 import Data.Bits
-import qualified Data.Set as S
-import qualified Data.Map as M
 
 -- Emit C code to standard out
 printC :: [Net] -> IO ()
@@ -24,43 +21,7 @@ writeC filename netlist = do
   hWriteC h netlist
   hClose h
 
--- Extract state variables (that are updated on each cycle) from net
-getStateVars :: Net -> [(WireId, Width)]
-getStateVars net =
-  case netPrim net of
-    Register i w   -> [((netInstId net, 0), w)]
-    RegisterEn i w -> [((netInstId net, 0), w)]
-    other          -> []
-
--- This pass introduces temporary register variables, where necessary,
--- so that parallel register updates can be performed sequentially
-sequentialise :: [Net] -> [Net]
-sequentialise nets = intro (length nets) M.empty nets
-  where
-    intro id mod [] = []
-    intro id mod (net:nets)
-      | null stateVars = net : intro id mod nets
-      | otherwise      = new ++ [net {netInputs = ins}] ++ intro id' mod' nets
-      where
-        stateVars       = getStateVars net
-        mod'            = M.union (M.fromList stateVars) mod
-        (id', new, ins) = replace id (netInputs net)
-
-        replace id [] = (id, [], [])
-        replace id (i:is) =
-          let (id0, new0, wire)  = rep id i
-              (id1, new1, wires) = replace id0 is
-          in  (id1, new0 ++ new1, wire:wires)
-
-        rep id i =
-          case M.lookup i mod of
-            Nothing -> (id, [], i)
-            Just w  -> let net = Net { netPrim = Identity w
-                                     , netInstId = id
-                                     , netInputs = [i]
-                                     , netOutputWidths = [w] }
-                       in  (id+1, [net], (id, 0))
-
+-- Emit C code to handle
 hWriteC :: Handle -> [Net] -> IO ()
 hWriteC h netlistOrig = do
     let netlist = sequentialise $ dataFlow netlistOrig
@@ -72,14 +33,15 @@ hWriteC h netlistOrig = do
     mapM_ emitDecls netlist
     emit "};\n\n"
     emit "State* createState() {\n"
-    emit "State* s = calloc(1, sizeof(State));\n"
+    emit "State* s = (State*) calloc(1, sizeof(State));\n"
     mapM_ emitInits netlist
     emit "return s;\n}\n\n"
     emit "int main() {\n"
     emit "State* s = createState();\n"
     emit "while (1) {\n"
     mapM_ emitInst netlist
-    --mapM_ emitAlways netlist
+    mapM_ emitFinishes netlist
+    mapM_ emitUpdates netlist
     emit "}\n"
     emit "return 0;\n}\n"
   where
@@ -447,7 +409,73 @@ hWriteC h netlistOrig = do
         CountOnes w        -> emitPrefixOpInst "countOnes"
                                 "countOnesBU" net w False
         Identity w         -> emitIdentityInst net
-        Display args       -> return ()
+        Display args       -> emitDisplay net args
         Finish             -> return ()
         Custom p is os ps  ->
           error "Custom primitives not yet supported in C backend"
+
+    emitFinish net = do
+      emit "if ("
+      emitInput (netInputs net !! 0)
+      emit ") break;\n"
+
+    emitCopy net inp w 
+      | w <= 64 = do
+          emitWire (netInstId net, 0)
+          emit " = "
+          emitInput inp
+          emit ";"
+      | otherwise = do
+          emit "copyBU("
+          emitInput inp
+          emit ", "
+          emitWire (netInstId net, 0)
+          emit ", "
+          emit (show w)
+          emit ");"
+
+    emitCopyEn net en inp w = do
+      emit "if ("
+      emitInput en
+      emit ") { "
+      emitCopy net inp w
+      emit " }\n"
+
+    emitDisplay net args = do
+      emit "if ("
+      emitInput (netInputs net !! 0)
+      emit ") printf(\""
+      emitDisplayFormat args
+      emit ","
+      emitDisplayArgs args (tail (netInputs net))
+      emit ");\n"
+
+    emitDisplayFormat [] = emit "\\n\""
+    emitDisplayFormat (DisplayArgString s : args) = do
+      emit "%s"
+      emitDisplayFormat args
+    emitDisplayFormat (DisplayArgBit w : args) = do
+      emit "%d"
+      emitDisplayFormat args
+
+    emitDisplayArgs [] _ = return ()
+    emitDisplayArgs (DisplayArgString s : args) wires = do
+      emit ("\"" ++ s ++ "\"")
+      if null args then return () else emit ","
+      emitDisplayArgs args wires
+    emitDisplayArgs (DisplayArgBit w : args) (wire:wires) = do
+      emitInput wire
+      if null args then return () else emit ","
+      emitDisplayArgs args wires
+
+    emitUpdates net =
+      case netPrim net of
+        Register i w   -> emitCopy net (netInputs net !! 0) w >> emit "\n"
+        RegisterEn i w -> emitCopyEn net (netInputs net !! 0)
+                            (netInputs net !! 1) w
+        other          -> return ()
+
+    emitFinishes net =
+      case netPrim net of
+        Finish         -> emitFinish net
+        other          -> return ()
