@@ -33,6 +33,9 @@ writeCXX dir netlistIn = do
   -- C++ file containing main function
   writeMain (dir ++ "/main.cpp")
 
+  -- Generate makefile
+  writeMakefile (dir ++ "/Makefile")
+
 -- List of lines of code
 type Code = [String]
 
@@ -518,7 +521,7 @@ emitDisplay net args =
   ++ emitDisplayArgs args (tail (netInputs net))
   ++ ");"
   where
-    emitDisplayFormat [] = "\""
+    emitDisplayFormat [] = "\\n\""
     emitDisplayFormat (DisplayArgString s : args) = do
       "%s" ++  emitDisplayFormat args
     emitDisplayFormat (DisplayArgBit w : args) = do
@@ -593,8 +596,23 @@ writeMain filename = do
     , "#include \"step.h\""
     , "int main () {"
     , "  init();"
-    , "  while (step());"
+    , "  while (! step());"
     , "  return 0;"
     , "}"
+    ]
+  hClose h
+
+writeMakefile :: String -> IO ()
+writeMakefile filename = do
+  h <- openFile filename WriteMode
+  mapM (hPutStrLn h)
+    [ "CC=g++"
+    , "ifndef BLARNEY_ROOT"
+    , "$(error Please set BLARNEY_ROOT)"
+    , "endif"
+    , "main: $(patsubst %.cpp,%.o,$(wildcard *.cpp))"
+    , "\t$(CC) *.o -o main"
+    , "%.o: %.cpp"
+    , "\t$(CC) -I $(BLARNEY_ROOT)/C -c $< -o $@"
     ]
   hClose h
