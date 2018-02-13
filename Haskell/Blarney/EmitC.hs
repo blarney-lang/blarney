@@ -29,15 +29,12 @@ hWriteC h netlistOrig = do
     emit "#include <stdlib.h>\n"
     emit "#include <stdint.h>\n"
     emit "#include <BitVec.h>\n\n"
-    emit "struct State {\n"
     mapM_ emitDecls netlist
-    emit "};\n\n"
-    emit "State* createState() {\n"
-    emit "State* s = (State*) calloc(1, sizeof(State));\n"
+    emit "void initState() {\n"
     mapM_ emitInits netlist
-    emit "return s;\n}\n\n"
+    emit "\n}\n\n"
     emit "int main() {\n"
-    emit "State* s = createState();\n"
+    emit "initState();\n"
     emit "while (1) {\n"
     mapM_ emitInst netlist
     mapM_ emitFinishes netlist
@@ -54,7 +51,6 @@ hWriteC h netlistOrig = do
       emit (show outNum)
 
     emitWire wire = do
-      emit "s->"
       emitWirePlain wire
 
     emitInput = emitWire
