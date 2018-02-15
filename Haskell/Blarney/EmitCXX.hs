@@ -13,6 +13,7 @@ import Blarney.Partition
 import System.IO
 import System.Process
 import Data.Bits
+import qualified Data.IntSet as IS
 
 -- Parameters for C++ generator
 data CXXGenParams =
@@ -46,22 +47,13 @@ writeCXXWith params netlistIn = do
   -- Create output directory
   system ("mkdir -p " ++ dir)
 
-  -- Header file containing externs
-  writeGlobalsHeader (dir ++ "/globals.h") netlist
+  -- Emit C++ files
+  writeFiles params netlist
 
-  -- C++ file containing global variables
-  writeGlobalsBody (dir ++ "/globals.cpp") netlist
-
-  -- C++ file(s) containing global variable initialisation
-  writeInits params netlist
-
-  -- C++ file(s) containing step function
-  writeSteps params netlist
-
-  -- C++ file containing main function
+  -- Emit C++ file containing main function
   writeMain params
 
-  -- Generate makefile
+  -- Emit makefile
   writeMakefile params
 
 -- List of lines of code
@@ -210,15 +202,17 @@ writeMulti dir name code = write code Nothing 0 0
           hPutStrLn h line
           write code (Just h) i (j+1)
 
--- Emit initialisation function
-writeInits :: CXXGenParams -> [Net] -> IO ()
-writeInits params nets =
-  writeMulti (targetDir params) "init" (concatMap emitInits nets)
-
--- Emit step functions
-writeSteps :: CXXGenParams -> [Net] -> IO ()
-writeSteps params nets 
+-- Emit C++ files
+writeFiles :: CXXGenParams -> [Net] -> IO ()
+writeFiles params nets 
   | numThreads params <= 1 = do
+      -- Header file containing globals variables
+      writeGlobalsHeader (targetDir params ++ "/globals.h") nets
+      -- C++ file containing global variables
+      writeGlobalsBody (targetDir params ++ "/globals.cpp") nets
+      -- Write initialisation functions
+      writeMulti (targetDir params) "init" $
+        concatMap emitInits nets
       -- Write step functions
       writeMulti (targetDir params) "step0" $
         concatMap emitInst nets
@@ -226,6 +220,14 @@ writeSteps params nets
       writeMulti (targetDir params) "update0" $
         concatMap emitUpdates nets
   | otherwise = do
+      -- Header file containing globals variables
+      writeGlobalsHeader (targetDir params ++ "/globals.h") nets
+      -- C++ file containing global variables
+      writeGlobalsBody (targetDir params ++ "/globals.cpp") $
+        unique IS.empty (concat subNets)
+      -- Write initialisation functions
+      writeMulti (targetDir params) "init" $
+        concatMap emitInits nets
       -- Write step functions for each thread
       sequence_
         [ writeMulti (targetDir params) ("step" ++ show t) $
@@ -238,6 +240,10 @@ writeSteps params nets
         | (t, nets) <- zip [0..] subNets ]
   where
     subNets = partition (numThreads params) nets
+    unique seen [] = []
+    unique seen (net:nets)
+      | netInstId net `IS.member` seen = unique seen nets
+      | otherwise = net : unique (IS.insert (netInstId net) seen) nets
 
 -- Generic infix operator instance
 emitInfixOpInst :: String -> String -> Net -> Width -> Bool -> String

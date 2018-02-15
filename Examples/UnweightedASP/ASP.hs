@@ -70,6 +70,8 @@ compile g = do
 
 -- Main function
 main :: IO ()
-main = readFile "n1.edges"
+main = readFile "n4.edges"
    >>= netlist . compile . parseNetwork
-   >>= writeNetlist "/tmp/asp.net"
+   >>= writeCXXWith params
+  where
+    params = (defaultCXXGenParams "/tmp/asp") { numThreads = 1 }
