@@ -41,5 +41,6 @@ top t w h = do
 
 -- Main function
 main :: IO ()
-main =
-  netlist (top 100 64 64) >>= writeNetlist "/tmp/heat.net"
+main = netlist (top 100000 64 64) >>= writeCXXWith params
+  where
+    params = (defaultCXXGenParams "/tmp/heat") { numThreads = 2 }
