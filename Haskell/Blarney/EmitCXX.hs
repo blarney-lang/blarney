@@ -163,13 +163,14 @@ writeGlobalsBody filename nets = do
   hClose h
 
 -- Split C++ function over multiple files
-writeMulti :: String  -- Target directory
-           -> String  -- Name of function
-           -> Code    -- Function body
+writeMulti :: CXXGenParams  -- Code gen parameters
+           -> String        -- Name of function
+           -> Code          -- Function body
            -> IO ()
-writeMulti dir name code = write code Nothing 0 0
+writeMulti params name code = write code Nothing 0 0
   where
-    linesPerFile = 1000
+    dir = targetDir params
+    linesPerFile = maxLinesPerFile params
 
     write code Nothing i j = do
       -- Open a new file
@@ -211,13 +212,13 @@ writeFiles params nets
       -- C++ file containing global variables
       writeGlobalsBody (targetDir params ++ "/globals.cpp") nets
       -- Write initialisation functions
-      writeMulti (targetDir params) "init" $
+      writeMulti params "init" $
         concatMap emitInits nets
       -- Write step functions
-      writeMulti (targetDir params) "step0" $
+      writeMulti params "step0" $
         concatMap emitInst nets
       -- Write update functions
-      writeMulti (targetDir params) "update0" $
+      writeMulti params "update0" $
         concatMap emitUpdates nets
   | otherwise = do
       -- Header file containing globals variables
@@ -226,16 +227,16 @@ writeFiles params nets
       writeGlobalsBody (targetDir params ++ "/globals.cpp") $
         unique IS.empty (concat subNets)
       -- Write initialisation functions
-      writeMulti (targetDir params) "init" $
+      writeMulti params "init" $
         concatMap emitInits nets
       -- Write step functions for each thread
       sequence_
-        [ writeMulti (targetDir params) ("step" ++ show t) $
+        [ writeMulti params ("step" ++ show t) $
             concatMap emitInst nets
         | (t, nets) <- zip [0..] subNets ]
       -- Write update functions for each thread
       sequence_
-        [ writeMulti (targetDir params) ("update" ++ show t) $
+        [ writeMulti params ("update" ++ show t) $
             concatMap emitUpdates nets
         | (t, nets) <- zip [0..] subNets ]
   where
