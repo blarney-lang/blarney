@@ -1,7 +1,5 @@
 -- Single-element FIFO
 
-module FIFO where
-
 import Blarney
 
 -- FIFO interface

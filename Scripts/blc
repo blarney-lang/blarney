@@ -1,0 +1,17 @@
+#!/bin/sh
+
+if [ -z "$BLARNEY_ROOT" ]; then
+  echo "Please set BLARNEY_ROOT"
+  exit 1
+fi
+
+if [ -z "$1" ]; then
+  echo "Usage: blc [FILE].hs"
+  exit 1
+fi
+
+
+EXTS="-XScopedTypeVariables -XDataKinds"
+INC="$BLARNEY_ROOT/Haskell"
+
+ghc -O $EXTS -i$INC --make $1
