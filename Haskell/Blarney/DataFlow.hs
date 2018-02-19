@@ -1,7 +1,10 @@
 {- Data-flow passes over netlist -}
 
 module Blarney.DataFlow
-  ( dataFlow
+  ( buildNetArray
+  , getRoot
+  , postOrder
+  , dataFlow
   , sequentialise
   ) where
 
@@ -37,45 +40,26 @@ isLeaf net =
     Const i w      -> True
     other          -> False
 
--- Return nets in data-flow order
-dataFlow :: [Net] -> [Net]
-dataFlow nets =
+-- Post-order traversal (netlist represented as an array)
+postOrder :: Array InstId Net -> [Net] -> [Net]
+postOrder nets roots =
     JL.toList 
   . fst
-  . dfsList IS.empty IS.empty
+  . dfsMany IS.empty IS.empty
   $ roots
   where
-    -- Number of nets
-    n = length nets
-
-    -- Array mapping net ids to nets
-    netArray = array (0, n-1) [(netInstId net, net) | net <- nets]
-
-    -- Lookup net
-    lookup i = netArray A.! i
-
-    -- Roots of netlist
-    roots = concatMap root nets
-
-    -- Is given net a root?
-    root net =
-      case netPrim net of
-        Register i w   -> map (lookup . fst) (netInputs net)
-        RegisterEn i w -> map (lookup . fst) (netInputs net)
-        Display args   -> [net]
-        Finish         -> [net]
-        other          -> []
+    lookup i = nets A.! i
 
     -- DFS from a list of root nodes
-    dfsList as vs nets =
+    dfsMany as vs nets =
       case nets of
         []   -> (JL.Zero, vs)
-        n:ns -> let (left, vs')  = dfs as vs n
-                    (rest, vs'') = dfsList as vs' ns
+        n:ns -> let (left, vs')  = dfsOne as vs n
+                    (rest, vs'') = dfsMany as vs' ns
                 in  (left JL.:+: rest, vs'')
 
     -- DFS from a single root node
-    dfs as vs net
+    dfsOne as vs net
       | id `IS.member` as = error "Combinatorial cycle detected"
       | id `IS.member` vs = (JL.Zero, vs)
       | isLeaf net        = (JL.One net, IS.insert id vs)
@@ -83,7 +67,38 @@ dataFlow nets =
       where
         id        = netInstId net
         children  = map (lookup . fst) (netInputs net)
-        (cs, vs') = dfsList (IS.insert id as) (IS.insert id vs) children
+        (cs, vs') = dfsMany (IS.insert id as) (IS.insert id vs) children
+
+-- Return empty list if not a root, singleton list otherwise
+getRoot :: Array InstId Net -> Net -> [Net]
+getRoot netArray net =
+  case netPrim net of
+    Register i w   -> map (lookup . fst) (netInputs net)
+    RegisterEn i w -> map (lookup . fst) (netInputs net)
+    Display args   -> [net]
+    Finish         -> [net]
+    other          -> []
+  where lookup i = netArray A.! i
+
+-- Convert netlist to array representation
+buildNetArray :: [Net] -> Array InstId Net
+buildNetArray nets = netArray
+  where
+    -- Number of nets
+    n = length nets
+
+    -- Array mapping net ids to nets
+    netArray = array (0, n-1) [(netInstId net, net) | net <- nets]
+
+-- Return nets in data-flow order
+dataFlow :: [Net] -> [Net]
+dataFlow nets = postOrder netArray roots
+  where
+    -- Netlist array
+    netArray = buildNetArray nets
+
+    -- Roots of netlist
+    roots = concatMap (getRoot netArray) nets
 
 {-
 

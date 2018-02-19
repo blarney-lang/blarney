@@ -1,40 +1,67 @@
 -- Emit netlist in C++ format
 
 module Blarney.EmitCXX
-  ( writeCXX
+  ( CXXGenParams(..)
+  , defaultCXXGenParams
+  , writeCXXWith
+  , writeCXX
+  , writeCXXMulti
   ) where
 
 import Blarney.Unbit
 import Blarney.DataFlow
+import Blarney.Partition
 import System.IO
 import System.Process
 import Data.Bits
+import qualified Data.IntSet as IS
+
+-- Parameters for C++ generator
+data CXXGenParams =
+  CXXGenParams {
+    targetDir       :: String -- Target directory
+  , numThreads      :: Int    -- Number of hardware threads to use
+  , maxLinesPerFile :: Int    -- Max lines of code per source file
+  }
+
+-- Some defaults
+defaultCXXGenParams :: String -> CXXGenParams
+defaultCXXGenParams dir =
+  CXXGenParams {
+    targetDir       = dir
+  , numThreads      = 1
+  , maxLinesPerFile = 1000
+  }
 
 -- Write C++ files to directory
 writeCXX :: String -> [Net] -> IO ()
-writeCXX dir netlistIn = do
-  let netlist = sequentialise $ dataFlow netlistIn
+writeCXX dir = writeCXXWith (defaultCXXGenParams dir)
+
+-- Write C++ files to directory (use multiple threads_
+writeCXXMulti :: Int -> String -> [Net] -> IO ()
+writeCXXMulti n dir = writeCXXWith params
+  where
+    params = (defaultCXXGenParams dir) { numThreads = n }
+
+-- Write C++ files to directory with given parameters
+writeCXXWith :: CXXGenParams -> [Net] -> IO ()
+writeCXXWith params netlistIn = do
+  let netlist = sequentialise (dataFlow netlistIn)
+
+  -- Target directory
+  let dir = targetDir params
 
   -- Create output directory
   system ("mkdir -p " ++ dir)
 
-  -- Header file containing externs
-  writeGlobalsHeader (dir ++ "/globals.h") netlist
+  -- Emit C++ files
+  writeFiles params netlist
 
-  -- C++ file containing global variables
-  writeGlobalsBody (dir ++ "/globals.cpp") netlist
+  -- Emit C++ file containing main function
+  writeMain params
 
-  -- C++ file(s) containing global variable initialisation
-  writeInits dir netlist
-
-  -- C++ file(s) containing step function
-  writeSteps dir netlist
-
-  -- C++ file containing main function
-  writeMain (dir ++ "/main.cpp")
-
-  -- Generate makefile
-  writeMakefile (dir ++ "/Makefile")
+  -- Emit makefile
+  writeMakefile params
 
 -- List of lines of code
 type Code = [String]
@@ -128,6 +155,7 @@ writeGlobalsHeader filename nets = do
   hPutStrLn h "#ifndef _GLOBALS_H_"
   hPutStrLn h "#define _GLOBALS_H_"
   hPutStrLn h "#include <stdint.h>"
+  hPutStrLn h "extern bool finished;"
   mapM_ (mapM_ (hPutStrLn h) . emitExterns) nets
   hPutStrLn h "#endif"
   hClose h
@@ -137,36 +165,35 @@ writeGlobalsBody :: String -> [Net] -> IO ()
 writeGlobalsBody filename nets = do
   h <- openFile filename WriteMode
   hPutStrLn h "#include \"globals.h\""
+  hPutStrLn h "bool finished;"
   mapM_ (mapM_ (hPutStrLn h) . emitDecls) nets
   hClose h
 
 -- Split C++ function over multiple files
-writeMulti :: String  -- Target directory
-           -> String  -- Name of function
-           -> Code    -- Function body
+writeMulti :: CXXGenParams  -- Code gen parameters
+           -> String        -- Name of function
+           -> Code          -- Function body
            -> IO ()
-writeMulti dir name code = write code Nothing 0 0
+writeMulti params name code = write code Nothing 0 0
   where
-    linesPerFile = 1000
+    dir = targetDir params
+    linesPerFile = maxLinesPerFile params
 
     write code Nothing i j = do
       -- Open a new file
-      h <- openFile (dir ++ "/" ++ name ++ show i ++ ".cpp") WriteMode
+      h <- openFile (dir ++ "/" ++ name ++ "_" ++ show i ++ ".cpp") WriteMode
       hPutStrLn h "#include <stdio.h>"
       hPutStrLn h "#include <BitVec.h>"
       hPutStrLn h "#include \"globals.h\""
-      hPutStrLn h ("bool " ++ name ++ show i ++ "() {\n")
+      hPutStrLn h ("void " ++ name ++ "_" ++ show i ++ "() {\n")
       write code (Just h) i 0
     write [] (Just h) i j = do
       -- Write top-level file
-      hPutStrLn h "return false;"
       hPutStrLn h "}"
-      let proto = ["bool " ++ name ++ show n ++ "();" | n <- [0..i]]
-               ++ ["bool " ++ name ++ "();"]
-      let top   = ["bool " ++ name ++ "() {"]
-               ++ ["return"]
-               ++ [name ++ show n ++ "() ||" | n <- [0..i]]
-               ++ ["false;"]
+      let proto = ["void " ++ name ++ "_" ++ show n ++ "();" | n <- [0..i]]
+               ++ ["void " ++ name ++ "();"]
+      let top   = ["void " ++ name ++ "() {"]
+               ++ [name ++ "_" ++ show n ++ "();" | n <- [0..i]]
                ++ ["}"]
       mapM_ (hPutStrLn h) proto
       mapM_ (hPutStrLn h) top
@@ -176,7 +203,6 @@ writeMulti dir name code = write code Nothing 0 0
       hClose h
     write (line:code) (Just h) i j
       | j == linesPerFile = do
-          hPutStrLn h "return false;"
           hPutStrLn h "}"
           hClose h
           write (line:code) Nothing (i+1) 0
@@ -184,16 +210,48 @@ writeMulti dir name code = write code Nothing 0 0
           hPutStrLn h line
           write code (Just h) i (j+1)
 
-writeInits :: String -> [Net] -> IO ()
-writeInits dir nets =
-  writeMulti dir "init" (concatMap emitInits nets)
-
-writeSteps :: String -> [Net] -> IO ()
-writeSteps dir nets =
-  writeMulti dir "step" $
-    concatMap emitInst nets ++
-    concatMap emitFinishes nets ++
-    concatMap emitUpdates nets
+-- Emit C++ files
+writeFiles :: CXXGenParams -> [Net] -> IO ()
+writeFiles params nets 
+  | numThreads params <= 1 = do
+      -- Header file containing globals variables
+      writeGlobalsHeader (targetDir params ++ "/globals.h") nets
+      -- C++ file containing global variables
+      writeGlobalsBody (targetDir params ++ "/globals.cpp") nets
+      -- Write initialisation functions
+      writeMulti params "init" $
+        concatMap emitInits nets
+      -- Write step functions
+      writeMulti params "step0" $
+        concatMap emitInst nets
+      -- Write update functions
+      writeMulti params "update0" $
+        concatMap emitUpdates nets
+  | otherwise = do
+      let netlist = unique IS.empty (concat subNets)
+      -- Header file containing globals variables
+      writeGlobalsHeader (targetDir params ++ "/globals.h") netlist
+      -- C++ file containing global variables
+      writeGlobalsBody (targetDir params ++ "/globals.cpp") netlist
+      -- Write initialisation functions
+      writeMulti params "init" $
+        concatMap emitInits netlist
+      -- Write step functions for each thread
+      sequence_
+        [ writeMulti params ("step" ++ show t) $
+            concatMap emitInst nets
+        | (t, nets) <- zip [0..] subNets ]
+      -- Write update functions for each thread
+      sequence_
+        [ writeMulti params ("update" ++ show t) $
+            concatMap emitUpdates nets
+        | (t, nets) <- zip [0..] subNets ]
+  where
+    subNets = partition (numThreads params) nets
+    unique seen [] = []
+    unique seen (net:nets)
+      | netInstId net `IS.member` seen = unique seen nets
+      | otherwise = net : unique (IS.insert (netInstId net) seen) nets
 
 -- Generic infix operator instance
 emitInfixOpInst :: String -> String -> Net -> Width -> Bool -> String
@@ -480,12 +538,11 @@ emitIdentityInst net =
   ++ emitInput (netInputs net !! 0)
   ++ ";"
 
-
 emitFinish :: Net -> String
 emitFinish net =
     "if ("
   ++ emitInput (netInputs net !! 0)
-  ++ ") return true;"
+  ++ ") finished = true;"
 
 emitCopy :: Net -> WireId -> Width -> String
 emitCopy net inp w 
@@ -546,12 +603,6 @@ emitUpdates net =
                          (netInputs net !! 1) w]
     other          -> []
 
-emitFinishes :: Net -> Code
-emitFinishes net =
-  case netPrim net of
-    Finish -> [emitFinish net]
-    other  -> []
-
 emitInst :: Net -> Code
 emitInst net =
   case netPrim net of
@@ -582,28 +633,79 @@ emitInst net =
     CountOnes w        -> [emitCountOnes net (2^(w-1))]
     Identity w         -> [emitIdentityInst net]
     Display args       -> [emitDisplay net args]
-    Finish             -> []
+    Finish             -> [emitFinish net]
     Custom p is os ps  -> []
 
-writeMain :: String -> IO ()
-writeMain filename = do
-  h <- openFile filename WriteMode
-  mapM (hPutStrLn h)
-    [ "#include <stdio.h>"
-    , "#include <BitVec.h>"
-    , "#include \"globals.h\""
-    , "#include \"init.h\""
-    , "#include \"step.h\""
-    , "int main () {"
-    , "  init();"
-    , "  while (! step());"
-    , "  return 0;"
-    , "}"
-    ]
-  hClose h
+writeMain :: CXXGenParams -> IO ()
+writeMain params
+  | numThreads params <= 1 = do
+      let filename = targetDir params ++ "/main.cpp"
+      h <- openFile filename WriteMode
+      mapM (hPutStrLn h) $
+        [ "#include <stdio.h>"
+        , "#include <BitVec.h>"
+        , "#include \"globals.h\""
+        , "#include \"init.h\""
+        , "#include \"step0.h\""
+        , "#include \"update0.h\""
+        , "int main () {"
+        , "  init();"
+        , "  while (! finished) { step0(); update0(); }"
+        , "  return 0;"
+        , "}"
+        ]
+      hClose h
+  | otherwise = do
+      let filename = targetDir params ++ "/main.cpp"
+      h <- openFile filename WriteMode
+      let threads = [0 .. numThreads params - 1]
+      mapM (hPutStrLn h) $
+        [ "#include <stdio.h>"
+        , "#include <BitVec.h>"
+        , "#include <pthread.h>"
+        , "#include \"globals.h\""
+        , "#include \"init.h\""
+        ] ++
+        [ "#include \"step" ++ show t ++ ".h\"" | t <- threads ] ++
+        [ "#include \"update" ++ show t ++ ".h\"" | t <- threads ] ++
+        [ "#define NUM_THREADS " ++ show (numThreads params)
+        , "struct Time { uint64_t val; uint64_t pad[15]; };"
+        , "volatile Time times[NUM_THREADS];"
+        , "inline void sync(uint64_t t, unsigned me) {"
+        , "  times[me].val = t+1; // Increment my time"
+        , "  // Wait for others time to increment"
+        , "  for (unsigned other = 0; other < NUM_THREADS; other++)"
+        , "    if (other != me) { while (times[other].val == t); }"
+        , "}"
+        ] ++
+        concat [ [ "void* threadBody" ++ show tid ++ "(void* args) {"
+                 , "  uint64_t t = 0;"
+                 , "  while (! finished) {"
+                 , "    step" ++ show tid ++ "();"
+                 , "    sync(t, " ++ show tid ++ "); t++;"
+                 , "    update" ++ show tid ++ "();"
+                 , "    sync(t," ++ show tid ++ "); t++;"
+                 , "  }"
+                 , "  return NULL;"
+                 , "}"]
+               | tid <- threads] ++
+        [ "int main () {"
+        , "  pthread_t threads[NUM_THREADS];"
+        , "  init();"
+        ] ++
+        [ "  pthread_create(&threads[" ++ show t ++ " ], NULL, " ++
+               "threadBody" ++ show t ++ ", NULL);"
+        | t <- threads ] ++
+        [ "  for (unsigned i = 0; i < NUM_THREADS; i++)" 
+        , "    pthread_join(threads[i], NULL);"
+        , "  return 0;"
+        , "}"
+        ]
+      hClose h
 
-writeMakefile :: String -> IO ()
-writeMakefile filename = do
+writeMakefile :: CXXGenParams -> IO ()
+writeMakefile params = do
+  let filename = targetDir params ++ "/Makefile"
   h <- openFile filename WriteMode
   mapM (hPutStrLn h)
     [ "CC=g++"
@@ -611,8 +713,11 @@ writeMakefile filename = do
     , "$(error Please set BLARNEY_ROOT)"
     , "endif"
     , "main: $(patsubst %.cpp,%.o,$(wildcard *.cpp))"
-    , "\t$(CC) *.o -o main"
+    , if numThreads params <= 1 then
+        "\t$(CC) *.o -o main"
+      else
+        "\t$(CC) *.o -lpthread -o main"
     , "%.o: %.cpp"
-    , "\t$(CC) -I $(BLARNEY_ROOT)/C -c $< -o $@"
+    , "\t$(CC) -O -I $(BLARNEY_ROOT)/C -c $< -o $@"
     ]
   hClose h

@@ -1,7 +1,5 @@
 -- Single-element FIFO
 
-module FIFO where
-
 import Blarney
 
 -- FIFO interface
@@ -64,4 +62,4 @@ top = do
 
 -- Main function
 main :: IO ()
-main = netlist top >>= writeVerilog "/tmp/fifo.v"
+main = netlist top >>= writeCXX "/tmp/fifo"
