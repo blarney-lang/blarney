@@ -45,7 +45,9 @@ writeCXXMulti n dir = writeCXXWith params
 
 -- Write C++ files to directory with given parameters
 writeCXXWith :: CXXGenParams -> [Net] -> IO ()
-writeCXXWith params netlist = do
+writeCXXWith params netlistIn = do
+  let netlist = sequentialise (dataFlow netlistIn)
+
   -- Target directory
   let dir = targetDir params
 
@@ -212,7 +214,6 @@ writeMulti params name code = write code Nothing 0 0
 writeFiles :: CXXGenParams -> [Net] -> IO ()
 writeFiles params nets 
   | numThreads params <= 1 = do
-      let netlist = sequentialise $ dataFlow nets
       -- Header file containing globals variables
       writeGlobalsHeader (targetDir params ++ "/globals.h") nets
       -- C++ file containing global variables
