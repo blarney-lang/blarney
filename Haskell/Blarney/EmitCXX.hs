@@ -5,6 +5,7 @@ module Blarney.EmitCXX
   , defaultCXXGenParams
   , writeCXXWith
   , writeCXX
+  , writeCXXMulti
   ) where
 
 import Blarney.Unbit
@@ -36,11 +37,15 @@ defaultCXXGenParams dir =
 writeCXX :: String -> [Net] -> IO ()
 writeCXX dir = writeCXXWith (defaultCXXGenParams dir)
 
+-- Write C++ files to directory (use multiple threads_
+writeCXXMulti :: Int -> String -> [Net] -> IO ()
+writeCXXMulti n dir = writeCXXWith params
+  where
+    params = (defaultCXXGenParams dir) { numThreads = n }
+
 -- Write C++ files to directory with given parameters
 writeCXXWith :: CXXGenParams -> [Net] -> IO ()
-writeCXXWith params netlistIn = do
-  let netlist = sequentialise $ dataFlow netlistIn
-
+writeCXXWith params netlist = do
   -- Target directory
   let dir = targetDir params
 
@@ -207,6 +212,7 @@ writeMulti params name code = write code Nothing 0 0
 writeFiles :: CXXGenParams -> [Net] -> IO ()
 writeFiles params nets 
   | numThreads params <= 1 = do
+      let netlist = sequentialise $ dataFlow nets
       -- Header file containing globals variables
       writeGlobalsHeader (targetDir params ++ "/globals.h") nets
       -- C++ file containing global variables
@@ -221,14 +227,14 @@ writeFiles params nets
       writeMulti params "update0" $
         concatMap emitUpdates nets
   | otherwise = do
+      let netlist = unique IS.empty (concat subNets)
       -- Header file containing globals variables
-      writeGlobalsHeader (targetDir params ++ "/globals.h") nets
+      writeGlobalsHeader (targetDir params ++ "/globals.h") netlist
       -- C++ file containing global variables
-      writeGlobalsBody (targetDir params ++ "/globals.cpp") $
-        unique IS.empty (concat subNets)
+      writeGlobalsBody (targetDir params ++ "/globals.cpp") netlist
       -- Write initialisation functions
       writeMulti params "init" $
-        concatMap emitInits nets
+        concatMap emitInits netlist
       -- Write step functions for each thread
       sequence_
         [ writeMulti params ("step" ++ show t) $
