@@ -32,6 +32,7 @@ data RTLAction =
     RTLAssign Assign
   | RTLDisplay (Bit 1, Format)
   | RTLFinish (Bit 1)
+  | RTLOutput (Width, String, Unbit)
 
 -- The reader component is a bit defining the current condition and a
 -- list of all assigments made in the RTL block.  The list of
@@ -80,6 +81,10 @@ writeDisplay w = RTL (\r s -> (s, JL.One (RTLDisplay w), ()))
 
 writeFinish :: Bit 1 -> RTL ()
 writeFinish w = RTL (\r s -> (s, JL.One (RTLFinish w), ()))
+
+writeOutput :: (Width, String, Unbit) -> RTL ()
+writeOutput w =
+  RTL (\r s -> (s, JL.One (RTLOutput w), ()))
 
 fresh :: RTL VarId
 fresh = do
@@ -183,6 +188,12 @@ instance (FShow b, DisplayType a) => DisplayType (b -> a) where
 display :: DisplayType a => a
 display = displayType (Format [])
 
+-- RTL output statements
+output :: String -> Bit n -> RTL ()
+output str v = do
+  let u = unbit v
+  writeOutput (unbitWidth u, str, u)
+
 -- Add display primitive to netlist
 addDisplayPrim :: (Bit 1, [FormatItem]) -> Flatten ()
 addDisplayPrim (cond, items) = do
@@ -214,6 +225,19 @@ addFinishPrim cond = do
             }
   addNet net
 
+-- Add output primitive to netlist
+addOutputPrim :: (Width, String, Unbit) -> Flatten ()
+addOutputPrim (w, str, value) = do
+  c <- flatten value
+  id <- freshId
+  let net = Net {
+                netPrim = Output w str
+              , netInstId = id
+              , netInputs = [c]
+              , netOutputWidths = []
+            }
+  addNet net
+
 -- Convert RTL monad to a netlist
 netlist :: RTL () -> IO [Net]
 netlist rtl = do
@@ -226,5 +250,7 @@ netlist rtl = do
     assignMap = fromListWith (++) [(v, [a]) | RTLAssign a@(_, v,_) <- acts]
     disps = [(go, items) | RTLDisplay (go, Format items) <- acts]
     fins  = [go | RTLFinish go <- acts]
+    outs  = [out | RTLOutput out <- acts]
     roots = do mapM_ addDisplayPrim disps
                mapM_ addFinishPrim fins
+               mapM_ addOutputPrim outs

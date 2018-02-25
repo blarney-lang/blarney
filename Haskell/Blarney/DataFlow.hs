@@ -75,6 +75,7 @@ getRoot netArray net =
   case netPrim net of
     Register i w   -> map (lookup . fst) (netInputs net)
     RegisterEn i w -> map (lookup . fst) (netInputs net)
+    Output w str   -> [net]
     Display args   -> [net]
     Finish         -> [net]
     other          -> []
