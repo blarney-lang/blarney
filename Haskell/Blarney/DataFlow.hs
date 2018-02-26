@@ -38,6 +38,7 @@ isLeaf net =
     Register i w   -> True
     RegisterEn i w -> True
     Const i w      -> True
+    Input w s      -> True
     other          -> False
 
 -- Post-order traversal (netlist represented as an array)

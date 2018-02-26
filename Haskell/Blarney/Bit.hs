@@ -256,5 +256,5 @@ lower a = result
 input :: KnownNat n => String -> Bit n
 input str = out
   where
-    out = Bit (makePrim1 (Output w str) [] w)
+    out = Bit (makePrim1 (Input w str) [] w)
     w   = fromInteger (natVal out)
