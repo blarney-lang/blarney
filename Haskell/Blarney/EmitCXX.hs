@@ -114,11 +114,20 @@ emitDecl prim wire w
   | otherwise = "uint32_t " ++ emitWire wire ++
       "[" ++ show (numChunks w) ++ "];"
 
+-- Emit C++ input declaration
+emitInputDecl :: Prim -> Code
+emitInputDecl (Input w str)
+  | w <= 64 = [typeOf w ++ " " ++ str ++ ";"]
+  | otherwise = ["uint32_t " ++ str ++
+      "[" ++ show (numChunks w) ++ "];"]
+emitInputDecl other = []
+
 -- Emit C++ variable declarations for a given net
 emitDecls :: Net -> Code
 emitDecls net =
-  [ emitDecl (netPrim net) (netInstId net, n) w
-  | (n, w) <- zip [0..] (netOutputWidths net) ]
+  emitInputDecl (netPrim net) ++
+     [ emitDecl (netPrim net) (netInstId net, n) w
+     | (n, w) <- zip [0..] (netOutputWidths net) ]
 
 -- Emit C++ extern variable declarations for a given net
 emitExterns :: Net -> Code
@@ -544,6 +553,13 @@ emitFinish net =
   ++ emitInput (netInputs net !! 0)
   ++ ") finished = true;"
 
+emitInputPrim :: String -> Net -> String
+emitInputPrim str net =
+     emitWire (netInstId net, 0)
+  ++ " = "
+  ++ str
+  ++ ";"
+
 emitCopy :: Net -> WireId -> Width -> String
 emitCopy net inp w 
   | w <= 64 = 
@@ -634,6 +650,7 @@ emitInst net =
     Identity w         -> [emitIdentityInst net]
     Display args       -> [emitDisplay net args]
     Finish             -> [emitFinish net]
+    Input w str        -> [emitInputPrim str net]
     Custom p is os ps  -> []
 
 writeMain :: CXXGenParams -> IO ()
