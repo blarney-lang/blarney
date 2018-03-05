@@ -38,6 +38,7 @@ isLeaf net =
     Register i w   -> True
     RegisterEn i w -> True
     Const i w      -> True
+    Input w s      -> True
     other          -> False
 
 -- Post-order traversal (netlist represented as an array)
@@ -75,6 +76,7 @@ getRoot netArray net =
   case netPrim net of
     Register i w   -> map (lookup . fst) (netInputs net)
     RegisterEn i w -> map (lookup . fst) (netInputs net)
+    Output w str   -> [net]
     Display args   -> [net]
     Finish         -> [net]
     other          -> []

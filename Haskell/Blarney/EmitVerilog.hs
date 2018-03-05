@@ -19,7 +19,10 @@ writeVerilog filename netlist = do
 
 hWriteVerilog :: Handle -> [Net] -> IO ()
 hWriteVerilog h netlist = do
-    emit "module top (input wire clock);\n"
+    emit "module top (\n"
+    emit "  input wire clock\n"
+    mapM_ emitInputOutput netlist
+    emit ");\n"
     mapM_ emitDecl netlist
     mapM_ emitInst netlist
     emit "always @(posedge clock) begin\n"
@@ -98,9 +101,19 @@ hWriteVerilog h netlist = do
           Identity w         -> emitWireDecl w wire
           Display args       -> return ()
           Finish             -> return ()
+          Input w s          -> emitWireDecl w wire
+          Output w s         -> return ()
           Custom p is os ps  -> 
             sequence_ [ emitWireDecl w (netInstId net, n)
                       | ((o, w), n) <- zip os [0..] ]
+
+    emitInputOutput net =
+      case netPrim net of
+        Input w s ->
+          emit (", input wire [" ++ show (w-1) ++ ":0] " ++ s ++ "\n")
+        Output w s -> 
+          emit (", output wire [" ++ show (w-1) ++ ":0] " ++ s ++ "\n")
+        other -> return ()
 
     emitAssignConst w i net = do
       emit "assign "
@@ -217,6 +230,18 @@ hWriteVerilog h netlist = do
              | ((name, wire), i) <- zip args [1..] ]
       emit ");\n"
 
+    emitOutputInst net s = do
+      emit ("assign " ++ s ++ " = ")
+      emitInput (netInputs net !! 0)
+      emit ";\n"
+
+    emitInputInst net s = do
+      emit "assign "
+      emitWire (netInstId net, 0)
+      emit " = "
+      emit s
+      emit ";\n"
+
     emitInst net =
       case netPrim net of
         Const w i          -> return ()
@@ -247,6 +272,8 @@ hWriteVerilog h netlist = do
         Identity w         -> emitPrefixOpInst "" net
         Display args       -> return ()
         Finish             -> return ()
+        Input w s          -> emitInputInst net s
+        Output w s         -> emitOutputInst net s
         Custom p is os ps  -> emitCustomInst net p is os ps
  
     emitAlways net =

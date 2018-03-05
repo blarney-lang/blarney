@@ -60,6 +60,9 @@ data Prim =
     -- Bit selection and concatenation
   | SelectBits InputWidth BitIndex BitIndex
   | Concat InputWidth InputWidth
+    -- External I/O
+  | Input OutputWidth String
+  | Output InputWidth String
     -- Misc
   | Mux OutputWidth
   | CountOnes OutputWidth

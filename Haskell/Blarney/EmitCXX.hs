@@ -104,6 +104,7 @@ mask w = let i = (1 :: Integer) `shiftL` w in lit (i-1) w
 -- than the array pointed at
 useAlias (Mux _)      = True
 useAlias (Identity _) = True
+useAlias (Output _ _) = True
 useAlias other        = False
 
 -- Emit C++ variable declaration
@@ -114,11 +115,23 @@ emitDecl prim wire w
   | otherwise = "uint32_t " ++ emitWire wire ++
       "[" ++ show (numChunks w) ++ "];"
 
+-- Emit C++ I/O declaration
+emitIODecl :: Prim -> Code
+emitIODecl (Input w str)
+  | w <= 64 = [typeOf w ++ " " ++ str ++ ";"]
+  | otherwise = ["uint32_t " ++ str ++
+      "[" ++ show (numChunks w) ++ "];"]
+emitIODecl (Output w str)
+  | w <= 64 = [typeOf w ++ " " ++ str ++ ";"]
+  | otherwise = ["uint32_t* " ++ str ++ ";"]
+emitIODecl other = []
+
 -- Emit C++ variable declarations for a given net
 emitDecls :: Net -> Code
 emitDecls net =
-  [ emitDecl (netPrim net) (netInstId net, n) w
-  | (n, w) <- zip [0..] (netOutputWidths net) ]
+  emitIODecl (netPrim net) ++
+     [ emitDecl (netPrim net) (netInstId net, n) w
+     | (n, w) <- zip [0..] (netOutputWidths net) ]
 
 -- Emit C++ extern variable declarations for a given net
 emitExterns :: Net -> Code
@@ -544,6 +557,29 @@ emitFinish net =
   ++ emitInput (netInputs net !! 0)
   ++ ") finished = true;"
 
+emitInputPrim :: String -> Net -> Width -> String
+emitInputPrim str net w
+  | w <= 64 =
+         emitWire (netInstId net, 0)
+      ++ " = "
+      ++ str
+      ++ ";"
+  | otherwise =
+         "copyBU("
+      ++ str
+      ++ ", "
+      ++ emitWire (netInstId net, 0)
+      ++ ", "
+      ++ show w
+      ++ ");"
+
+emitOutputPrim :: String -> Net -> String
+emitOutputPrim str net =
+     str 
+  ++ " = "
+  ++ emitInput (netInputs net !! 0)
+  ++ ";"
+
 emitCopy :: Net -> WireId -> Width -> String
 emitCopy net inp w 
   | w <= 64 = 
@@ -551,7 +587,7 @@ emitCopy net inp w
       ++ " = "
       ++ emitInput inp
       ++ ";"
-  | otherwise = do
+  | otherwise =
          "copyBU("
       ++ emitInput inp
       ++ ", "
@@ -634,6 +670,8 @@ emitInst net =
     Identity w         -> [emitIdentityInst net]
     Display args       -> [emitDisplay net args]
     Finish             -> [emitFinish net]
+    Input w str        -> [emitInputPrim str net w]
+    Output w str       -> [emitOutputPrim str net]
     Custom p is os ps  -> []
 
 writeMain :: CXXGenParams -> IO ()

@@ -1,4 +1,4 @@
-Fact:
+Fact: Fact.hs
 	blc Fact.hs
 
 clean:

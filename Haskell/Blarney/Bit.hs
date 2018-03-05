@@ -32,6 +32,7 @@ module Blarney.Bit
   , signExtend   -- Sign extend
   , upper        -- Extract most significant bits
   , lower        -- Extract least significant bits
+  , input        -- External input
   ) where
 
 import Blarney.Unbit
@@ -250,3 +251,10 @@ lower a = result
      result = Bit (makePrim1 (SelectBits wa (wr-1) 0) [unbit a] wr)
      wa     = width a
      wr     = fromInteger (natVal result)
+
+-- External input
+input :: KnownNat n => String -> Bit n
+input str = out
+  where
+    out = Bit (makePrim1 (Input w str) [] w)
+    w   = fromInteger (natVal out)
