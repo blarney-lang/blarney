@@ -47,15 +47,15 @@ top = do
         Seq [
           While (val i .<. 100) $
             Do [
-              do store ram (val i) (lower (val i))
-                 i <== val i + 1
+              store ram (val i) (lower (val i)),
+              i <== val i + 1
             ],
-          i := 0,
+          Do [ i <== 0 ],
           While (val i .<. 100) $
             Do [
               load ram (val i),
-              do display "ram[" (val i) "] = " (out ram),
-                 i <== val i + 1
+              display "ram[" (val i) "] = " (out ram),
+              i <== val i + 1
             ]
         ]
 
