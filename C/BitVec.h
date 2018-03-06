@@ -5,7 +5,9 @@
 // These are only used for bit vectors whose widths exceed 64
 
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 // Types
 // =====
@@ -310,6 +312,78 @@ inline void copyBU(BU a, BU r, uint32_t w)
 {
   uint32_t numChunks = (w+ChunkSize-1)/ChunkSize;
   memcpy(r, a, numChunks * sizeof(Chunk));
+}
+
+// Initialise RAM
+template <typename T> inline void initRAM(
+  const char* filename, T* ram, unsigned size)
+{
+  FILE* fp = fopen(filename, "rt");
+  if (fp == NULL) {
+    fprintf(stderr, "Can't open RAM initialistion file '%s'\n", filename);
+    exit(EXIT_FAILURE);
+  }
+  for (unsigned i = 0; i < size; i++) ram[i] = 0;
+  unsigned addr = 0;
+  uint64_t data;
+  while (addr < size && fscanf(fp, "%lx", &data) > 0)
+    ram[addr++] = (T) data;
+  fclose(fp);
+}
+
+// Initialise RAM (arbitrary width)
+template <unsigned numChunks> inline void initRAMBU(
+  const char* filename, uint32_t ram[][numChunks], unsigned size)
+{
+  FILE* fp = fopen(filename, "rt");
+  if (fp == NULL) { 
+    fprintf(stderr, "Can't open RAM initialistion file '%s'\n", filename);
+    exit(EXIT_FAILURE);
+  }
+  unsigned numNibbles = numChunks * 8;
+  uint32_t* nibbles = new uint32_t [numNibbles];
+  for (unsigned i = 0; i < size; i++)
+    for (unsigned j = 0; j < numChunks; j++)
+      ram[i][j] = 0;
+  unsigned addr = 0;
+  unsigned nibbleCount = 0;
+  while (addr < size) {
+    if (nibbleCount >= numNibbles) {
+      fprintf(stderr, "Hex file data wider than RAM ('%s')\n", filename);
+      exit(EXIT_FAILURE);
+    }
+    int ch = fgetc(fp);
+    if (ch == EOF || isspace(ch)) {
+      // Populate RAM location
+      unsigned wordCount = 0;
+      for (int i = nibbleCount-1, j = 0; i >= 0; i--) {
+        ram[addr][wordCount] = 
+          ram[addr][wordCount] | (nibbles[i] << (4*j));
+        if (j == 7) {
+          j = 0;
+          wordCount++;
+        }
+        else
+          j++;
+      }
+      // Move to next location
+      nibbleCount = 0;
+      addr++;
+      while (isspace(ch)) ch = fgetc(fp);
+    }
+    if (ch == EOF) break;
+    ch = toupper(ch);
+    unsigned nibble;
+    if (ch >= '0' && ch <= '9') nibble = ch - '0';
+    else if (ch >= 'A' && ch <= 'F') nibble = 10 + (ch - 'A');
+    else {
+      fprintf(stderr, "Invalid hex file '%s'\n", filename);
+      exit(EXIT_FAILURE);
+    }
+    nibbles[nibbleCount++] = nibble;
+  }
+  delete [] nibbles;
+  fclose(fp);
 }
 
 #endif

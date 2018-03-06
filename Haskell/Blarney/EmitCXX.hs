@@ -126,9 +126,25 @@ emitIODecl (Output w str)
   | otherwise = ["uint32_t* " ++ str ++ ";"]
 emitIODecl other = []
 
+-- Emit RAM declaration
+emitRAMDecl :: Net -> Code
+emitRAMDecl net =
+  let id = netInstId net in
+    case netPrim net of
+      RAM init aw dw
+        | dw <= 64 ->
+           [typeOf dw ++ " array" ++ show id ++
+                         "[" ++ show (2^aw) ++ "];"]
+        | otherwise ->
+           ["uint32_t array" ++ show id ++ "[" ++ show (2^aw) ++ "]" ++
+                         "[" ++ show (numChunks dw) ++ "];"]
+      
+      other -> []
+
 -- Emit C++ variable declarations for a given net
 emitDecls :: Net -> Code
 emitDecls net =
+  emitRAMDecl net ++
   emitIODecl (netPrim net) ++
      [ emitDecl (netPrim net) (netInstId net, n) w
      | (n, w) <- zip [0..] (netOutputWidths net) ]
@@ -152,6 +168,17 @@ emitInit wire i w
             emitInitBU wire (i `shiftR` 32) (c+1) (n-1)
       where lower = i .&. 0xffffffff
 
+-- Emit C++ RAM initialisation code
+emitInitRAM :: InstId -> Maybe String -> Width -> Width -> Code
+emitInitRAM id Nothing aw dw = []
+emitInitRAM id (Just file) aw dw
+  | dw <= 64 =
+      [ "initRAM<" ++ typeOf dw ++ ">(" ++ show file ++ ", array"
+     ++ show id ++ ", " ++ show (2^aw) ++ ");"]
+  | otherwise =
+      [ "initRAMBU<" ++ show (numChunks dw) ++ ">("
+     ++ show file ++ ", array" ++ show id ++ ", " ++ show (2^aw) ++ ");"]
+
 -- Emit C++ variable initialisation code for given net
 emitInits :: Net -> Code
 emitInits net =
@@ -159,6 +186,7 @@ emitInits net =
     Const w i      -> emitInit (netInstId net, 0) i w
     Register i w   -> emitInit (netInstId net, 0) i w
     RegisterEn i w -> emitInit (netInstId net, 0) i w
+    RAM init aw dw -> emitInitRAM (netInstId net) init aw dw
     other          -> []
 
 -- Create header file containing externs
@@ -604,6 +632,30 @@ emitCopyEn net en inp w =
   ++ emitCopy net inp w
   ++ " }"
 
+emitRAMUpdate :: Net -> Width -> Width -> String
+emitRAMUpdate net aw dw 
+  | aw > 64 = error "C++ generator: RAM address width must be <= 64"
+  | dw <= 64 =
+          "if (" ++ emitInput (netInputs net !! 2) ++ ") "
+       ++ "array" ++ show (netInstId net)
+       ++ "[" ++ emitInput (netInputs net !! 0) ++ "]"
+       ++ " = " ++ emitInput (netInputs net !! 1) ++ ";"
+  | otherwise =
+          "if (" ++ emitInput (netInputs net !! 2) ++ ") "
+       ++ "copyBU(" ++ emitInput (netInputs net !! 1) ++ ", array"
+       ++ show (netInstId net) ++ "["
+       ++ emitInput (netInputs net !! 0) ++ "]" ++ show dw ++ ");"
+
+emitRAMLookup :: Net -> Width -> Width -> String
+emitRAMLookup net aw dw 
+  | dw <= 64 =
+           emitWire (netInstId net, 0) ++ " = "
+       ++ "array" ++ show (netInstId net)
+       ++ "[" ++ emitInput (netInputs net !! 0) ++ "];"
+  | otherwise =
+          "copyBU(array[" ++ emitInput (netInputs net !! 0) ++ "], "
+       ++ emitWire (netInstId net, 0) ++ ";"
+
 emitDisplay :: Net -> [DisplayArg] -> String
 emitDisplay net args =
      "if ("
@@ -637,6 +689,8 @@ emitUpdates net =
     Register i w   -> [emitCopy net (netInputs net !! 0) w]
     RegisterEn i w -> [emitCopyEn net (netInputs net !! 0)
                          (netInputs net !! 1) w]
+    RAM init aw dw -> [emitRAMUpdate net aw dw,
+                       emitRAMLookup net aw dw]
     other          -> []
 
 emitInst :: Net -> Code
@@ -660,6 +714,7 @@ emitInst net =
     LessThanEq w       -> [emitCmpInst "<=" "leBU" net w]
     Register i w       -> []
     RegisterEn i w     -> []
+    RAM init aw dw     -> []
     ReplicateBit w     -> [emitReplicateInst w net]
     ZeroExtend wi wo   -> [emitZeroExtendInst net wi wo]
     SignExtend wi wo   -> [emitSignExtendInst net wi wo]
@@ -750,12 +805,18 @@ writeMakefile params = do
     , "ifndef BLARNEY_ROOT"
     , "$(error Please set BLARNEY_ROOT)"
     , "endif"
-    , "main: $(patsubst %.cpp,%.o,$(wildcard *.cpp))"
+    , "main: $(patsubst %.cpp,%.o,$(wildcard *.cpp)) BitVec.o"
     , if numThreads params <= 1 then
         "\t$(CC) *.o -o main"
       else
         "\t$(CC) *.o -lpthread -o main"
+    , "BitVec.o:"
+    , "\t$(CC) -c -O2 -I $(BLARNEY_ROOT)/C " ++
+      "$(BLARNEY_ROOT)/C/BitVec.cpp -o BitVec.o"
     , "%.o: %.cpp"
     , "\t$(CC) -O -I $(BLARNEY_ROOT)/C -c $< -o $@"
+    , ".PHONY: clean"
+    , "clean:"
+    , "\trm -f *.o main"
     ]
   hClose h

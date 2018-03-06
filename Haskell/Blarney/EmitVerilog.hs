@@ -70,6 +70,22 @@ hWriteVerilog h netlist = do
       emit "reg "
       emitDeclInitHelper width wire init
 
+    emitRAMDecl initFile aw dw id = do
+      -- RAM output
+      emitWireDecl dw (id, 0)
+      -- Register array
+      emit "reg ["
+      emit (show (dw-1) ++ ":0] array" ++ show id)
+      emit ("[" ++ show ((2^aw)-1) ++ ":0];\n")
+      -- Address register
+      emit ("reg [" ++ show (aw-1) ++ ":0] addr" ++ show id ++ ";\n")
+      -- Initialisation
+      case initFile of
+        Nothing  -> return ()
+        Just str -> do
+          emit "initial "
+          emit ("$readmemh(" ++ show str ++ ", array" ++ show id ++ ");\n")
+
     emitDecl net =
       let wire = (netInstId net, 0) in
         case netPrim net of
@@ -91,10 +107,11 @@ hWriteVerilog h netlist = do
           LessThanEq w       -> emitWireDecl 1 wire
           Register i w       -> emitRegInitDecl w wire i
           RegisterEn i w     -> emitRegInitDecl w wire i
+          RAM i aw dw        -> emitRAMDecl i aw dw (netInstId net)
           ReplicateBit w     -> emitWireDecl w wire
           ZeroExtend wi wo   -> emitWireDecl wo wire
           SignExtend wi wo   -> emitWireDecl wo wire
-          SelectBits w hi lo -> emitWireDecl (hi-lo) wire
+          SelectBits w hi lo -> emitWireDecl (1+hi-lo) wire
           Concat aw bw       -> emitWireDecl (aw+bw) wire
           Mux w              -> emitWireDecl w wire
           CountOnes w        -> emitWireDecl w wire
@@ -242,6 +259,12 @@ hWriteVerilog h netlist = do
       emit s
       emit ";\n"
 
+    emitRAMInst net = do
+      let id = netInstId net
+      emit "assign "
+      emitWire (id, 0)
+      emit (" = array" ++ show id ++ "[addr" ++ show id ++ "];\n")
+
     emitInst net =
       case netPrim net of
         Const w i          -> return ()
@@ -262,6 +285,7 @@ hWriteVerilog h netlist = do
         LessThanEq w       -> emitInfixOpInst "<=" net
         Register i w       -> return ()
         RegisterEn i w     -> return ()
+        RAM i aw dw        -> emitRAMInst net
         ReplicateBit w     -> emitReplicateInst w net
         ZeroExtend wi wo   -> emitZeroExtendInst net wi wo
         SignExtend wi wo   -> emitSignExtendInst net wi wo
@@ -291,6 +315,19 @@ hWriteVerilog h netlist = do
           emit " <= "
           emitInput (netInputs net !! 1)
           emit ";\n"
+        RAM init aw dw -> do
+          let id = netInstId net
+          emit "if ("
+          emitInput (netInputs net !! 2)
+          emit " == 1) "
+          emit ("array" ++ show id ++ "[")
+          emitInput (netInputs net !! 0)
+          emit "] <= "
+          emitInput (netInputs net !! 1)
+          emit ";\n"
+          emit ("addr" ++ show id ++ " <= ")
+          emitInput (netInputs net !! 0)
+          emit ";\n"
         Display args -> do
           emit "if ("
           emitInput (netInputs net !! 0)
@@ -305,7 +342,7 @@ hWriteVerilog h netlist = do
           emit " == 1) $finish;\n"
         other -> return ()
 
-    emitDisplayFormat [] = emit "\\n\""
+    emitDisplayFormat [] = emit "\""
     emitDisplayFormat (DisplayArgString s : args) = do
       emit "%s"
       emitDisplayFormat args

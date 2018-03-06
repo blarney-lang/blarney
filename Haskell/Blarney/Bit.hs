@@ -25,6 +25,8 @@ module Blarney.Bit
   , countOnes    -- Population count
   , reg          -- Register
   , regEn        -- Register with enable
+  , ram          -- RAM
+  , ramInit      -- RAM with initial contents
   , (#)          -- Bit concatenation
   , bit          -- Bit selection
   , bits         -- Bit range selection
@@ -193,6 +195,27 @@ regEn :: Bit n -> Bit 1 -> Bit n -> Bit n
 regEn init en a =
     Bit (makePrim1 (RegisterEn (getInit (unbit init)) w) [unbit en, unbit a] w)
   where w = width init
+
+-- RAM primitive
+-- (Reads new data on write)
+ramPrim :: (KnownNat a, KnownNat d) =>
+           Maybe String -> (Bit a, Bit d, Bit 1) -> Bit d
+ramPrim init (addrIn, dataIn, weIn) = result
+  where
+    result = Bit (makePrim1 (RAM init aw dw)
+                    [unbit addrIn, unbit dataIn, unbit weIn] dw)
+    aw     = fromInteger (natVal addrIn)
+    dw     = fromInteger (natVal dataIn)
+
+-- Uninitialised RAM
+-- (Reads new data on write)
+ram :: (KnownNat a, KnownNat d) => (Bit a, Bit d, Bit 1) -> Bit d
+ram = ramPrim Nothing
+
+-- Initilaised RAM
+-- (Reads new data on write)
+ramInit :: (KnownNat a, KnownNat d) => String -> (Bit a, Bit d, Bit 1) -> Bit d
+ramInit init = ramPrim (Just init)
 
 -- Concatenation
 (#) :: Bit n -> Bit m -> Bit (n+m)

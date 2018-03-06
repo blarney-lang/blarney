@@ -53,6 +53,9 @@ data Prim =
     -- Stateful
   | Register Integer InputWidth
   | RegisterEn Integer InputWidth
+  | RAM { ramInitFile  :: Maybe String
+        , ramAddrWidth :: Width
+        , ramDataWidth :: Width }
     -- Width adjustment
   | ReplicateBit OutputWidth
   | ZeroExtend InputWidth OutputWidth
@@ -70,7 +73,7 @@ data Prim =
     -- Simulation-time I/O
   | Display [DisplayArg]
   | Finish
-    -- Custom
+    -- Custom combinatorial component
     -- (component name, input names, output names/widths, parameters)
   | Custom String [String] [(String, Int)] [Param]
   deriving Show

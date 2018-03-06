@@ -37,6 +37,7 @@ isLeaf net =
   case netPrim net of
     Register i w   -> True
     RegisterEn i w -> True
+    RAM i aw dw    -> True
     Const i w      -> True
     Input w s      -> True
     other          -> False
@@ -76,6 +77,7 @@ getRoot netArray net =
   case netPrim net of
     Register i w   -> map (lookup . fst) (netInputs net)
     RegisterEn i w -> map (lookup . fst) (netInputs net)
+    RAM i aw dw    -> map (lookup . fst) (netInputs net)
     Output w str   -> [net]
     Display args   -> [net]
     Finish         -> [net]
@@ -118,6 +120,7 @@ getStateVars net =
   case netPrim net of
     Register i w   -> [((netInstId net, 0), w)]
     RegisterEn i w -> [((netInstId net, 0), w)]
+    RAM init aw dw -> [((netInstId net, 0), dw)]
     other          -> []
 
 sequentialise :: [Net] -> [Net]
