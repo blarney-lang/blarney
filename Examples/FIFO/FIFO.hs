@@ -16,10 +16,10 @@ data FIFO a =
 makeFIFO :: Bits a => RTL (FIFO a)
 makeFIFO = do
   -- Register holding the one element
-  reg :: Reg a <- makeReg (unpack 0)
+  reg :: Reg a <- makeReg
 
   -- Register defining whether or not FIFO is full
-  full :: Reg (Bit 1) <- makeReg 0
+  full :: Reg (Bit 1) <- makeRegInit 0
 
   -- Methods
   let notFull = val full .==. 0
@@ -41,7 +41,7 @@ makeFIFO = do
 top :: RTL ()
 top = do
   -- Counter
-  timer :: Reg (Bit 8) <- makeReg 0
+  timer :: Reg (Bit 8) <- makeRegInit 0
   timer <== val timer + 1
 
   -- Instantiate a FIFO

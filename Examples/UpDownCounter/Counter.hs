@@ -10,11 +10,11 @@ data Counter n =
 makeCounter :: KnownNat n => RTL (Counter n)
 makeCounter = do
   -- State
-  count :: Reg (Bit n) <- makeReg 0
+  count :: Reg (Bit n) <- makeRegInit 0
 
   -- Wires
-  incWire :: Wire (Bit 1) <- makeWire 0
-  decWire :: Wire (Bit 1) <- makeWire 0
+  incWire :: Wire (Bit 1) <- makeWireDefault 0
+  decWire :: Wire (Bit 1) <- makeWireDefault 0
 
   -- Increment
   when (val incWire .&. inv (val decWire)) $ do

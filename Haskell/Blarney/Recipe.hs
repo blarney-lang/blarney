@@ -58,7 +58,7 @@ run go (If c r)     = do
   done <- run (go .&. c) r
   return (done .|. (go .&. inv c))
 run go (While c r)  = do
-  ready <- makeWire 0
+  ready <- makeWire
   done <- run (val ready .&. c) r
   ready <== go .|. done
   return (val ready .&. inv c)

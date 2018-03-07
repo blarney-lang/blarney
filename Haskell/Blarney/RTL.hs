@@ -138,9 +138,9 @@ instance IfThenElse (Bit 1) (RTL ()) where
        local (cond .&. c, as) a
        local (inv cond .&. c, as) a
 
--- Create register
-makeReg :: Bits a => a -> RTL (Reg a)
-makeReg init =
+-- Create register with initial value
+makeRegInit :: Bits a => a -> RTL (Reg a)
+makeRegInit init =
   do v <- fresh
      (cond, assignMap) <- ask
      let as = findWithDefault [] v assignMap
@@ -153,9 +153,13 @@ makeReg init =
      let out = unpack (regEn (pack init) en inp)
      return (Reg v out)
 
--- Create Wire
-makeWire :: Bits a => a -> RTL (Wire a)
-makeWire def =
+-- Create register
+makeReg :: Bits a => RTL (Reg a)
+makeReg = makeRegInit (unpack 0)
+
+-- Create wire with given default
+makeWireDefault :: Bits a => a -> RTL (Wire a)
+makeWireDefault def =
   do v <- fresh
      (cond, assignMap) <- ask
      let w = unbitWidth (unbit (pack def))
@@ -165,6 +169,10 @@ makeWire def =
      let out = select ([(b, bit w p) | (b, _, p) <- as] ++
                           [(none, pack def)])
      return (Wire v (unpack out))
+
+-- Create wire
+makeWire :: Bits a => RTL (Wire a)
+makeWire = makeWireDefault (unpack 0)
 
 -- RTL finish statements
 finish :: RTL ()

@@ -12,9 +12,9 @@ data RAM a d =
 makeRAM :: (Bits a, Bits d) => RTL (RAM a d)
 makeRAM = do
   -- Address bus and data bus and write-enable
-  addrBus :: Wire a <- makeWire (unpack 0)
-  dataBus :: Wire d <- makeWire (unpack 0)
-  writeEn :: Wire (Bit 1) <- makeWire 0
+  addrBus :: Wire a <- makeWire
+  dataBus :: Wire d <- makeWire
+  writeEn :: Wire (Bit 1) <- makeWireDefault 0
 
   -- RAM primitive
   let output = unpack (ram (pack (val addrBus),
@@ -40,7 +40,7 @@ top = do
   ram :: RAM (Bit 8) (Bit 4) <- makeRAM
 
   -- Counter
-  i :: Reg (Bit 8) <- makeReg 0
+  i :: Reg (Bit 8) <- makeRegInit 0
 
   -- Simple test sequence
   let testSeq =

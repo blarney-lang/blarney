@@ -16,13 +16,13 @@ update me neighbours =
 top :: Integer -> Int -> Int -> RTL ()
 top t w h = do
   -- North and east borders (initialised hot)
-  north <- replicateM w (makeReg 0xff0000)
-  east  <- replicateM (h-2) (makeReg 0xff0000)
+  north <- replicateM w (makeRegInit 0xff0000)
+  east  <- replicateM (h-2) (makeRegInit 0xff0000)
   -- South and west borders (initialised cold)
-  south <- replicateM w (makeReg 0x2a0000)
-  west  <- replicateM (h-2) (makeReg 0x2a0000)
+  south <- replicateM w (makeRegInit 0x2a0000)
+  west  <- replicateM (h-2) (makeRegInit 0x2a0000)
   -- Remaining cells
-  cells <- replicateM (h-2) (replicateM (w-2) (makeReg 0))
+  cells <- replicateM (h-2) (replicateM (w-2) (makeRegInit 0))
   -- Overall grid
   let grid = [north]
           ++ transpose ([east] ++ transpose cells ++ [west])
@@ -30,7 +30,7 @@ top t w h = do
   -- Mesh
   mesh update grid
   -- Count time steps
-  timer :: Reg (Bit 32) <- makeReg 0
+  timer :: Reg (Bit 32) <- makeRegInit 0
   timer <== val timer + 1
   -- Termination
   when (val timer .==. fromInteger t) $ do

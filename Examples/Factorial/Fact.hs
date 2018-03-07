@@ -3,8 +3,8 @@ import Blarney
 fact :: RTL ()
 fact = do
   -- State
-  n   :: Reg (Bit 32) <- makeReg 0
-  acc :: Reg (Bit 32) <- makeReg 0
+  n   :: Reg (Bit 32) <- makeRegInit 0
+  acc :: Reg (Bit 32) <- makeRegInit 0
 
   -- Compute factorial of 10
   let recipe =

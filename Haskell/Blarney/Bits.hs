@@ -12,6 +12,9 @@ class KnownNat (SizeOf a) => Bits a where
   pack :: a -> Bit (SizeOf a)
   unpack :: Bit (SizeOf a) -> a
 
+sizeOf :: Bits a => a -> Int
+sizeOf a = fromInteger (natVal (pack a))
+
 instance KnownNat n => Bits (Bit (n :: Nat)) where
   type SizeOf (Bit n) = n
   pack = id
