@@ -1,24 +1,19 @@
-{-# LANGUAGE GADTs #-}
-
 import Blarney
 import Network
-import Data.Bits (shiftL)
 
 -- This is a general ASP-finding engine,
 -- but for the purposes of testing, let's define:
 #define numVertices 15
 #define numNeighbours 57
 #define LogMaxNeighbours 16
-
-#if 0
-#define LogMaxVertices 12
-#define LogMaxVerticesPlusOne 13
-#define MaxVertices 4096
-#else
 #define LogMaxVertices 4
 #define LogMaxVerticesPlusOne 5
 #define MaxVertices 32
-#endif
+
+-- FIXME: these defines expose a bug in the simulator!
+-- #define LogMaxVertices 12
+-- #define LogMaxVerticesPlusOne 13
+-- #define MaxVertices 4096
 
 -- Types
 type NeighbourId = Bit LogMaxNeighbours
@@ -136,7 +131,7 @@ makeASPEngine = do
         Seq [
           Do [
             do {
-              depth <== 0;
+              depth <== 1;
               active <== 0;
               sumPaths <== 0;
             }
@@ -189,7 +184,7 @@ makeASPEngine = do
           ],
           -- Finished!
           Do [
-            display "Diameter = " (val depth - 1),
+            display "Sum = " (val sumPaths),
             finish
           ]
         ]

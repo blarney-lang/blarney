@@ -11,7 +11,7 @@ if [ -z "$1" ]; then
 fi
 
 
-EXTS="-XScopedTypeVariables -XDataKinds -XTypeOperators"
+EXTS="-XScopedTypeVariables -XDataKinds -XTypeOperators -XTypeFamilies"
 INC="$BLARNEY_ROOT/Haskell"
 
 ghc -O $EXTS -i$INC --make $@

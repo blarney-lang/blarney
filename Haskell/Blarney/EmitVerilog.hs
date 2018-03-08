@@ -132,6 +132,7 @@ hWriteVerilog h netlist = do
           emit (", output wire [" ++ show (w-1) ++ ":0] " ++ s ++ "\n")
         other -> return ()
 
+    emitAssignConst :: Width -> Integer -> Net -> IO ()
     emitAssignConst w i net = do
       emit "assign "
       emitWire (netInstId net, 0)
