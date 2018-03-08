@@ -174,6 +174,22 @@ makeWireDefault def =
 makeWire :: Bits a => RTL (Wire a)
 makeWire = makeWireDefault (unpack 0)
 
+-- A DReg holds the assigned value only for one cycle.
+-- At all other times, it has the given default value.
+makeDReg :: Bits a => a -> RTL (Reg a)
+makeDReg defaultVal = do
+  -- Create wire with default value
+  w :: Wire a <- makeWireDefault defaultVal
+
+  -- Register the output of the wire
+  r :: Reg a <- makeRegInit defaultVal
+
+  -- Always assign to the register
+  r <== val w
+
+  -- Write to wire and read from reg
+  return (Reg { regId = wireId w, regVal = regVal r })
+
 -- RTL finish statements
 finish :: RTL ()
 finish = do
