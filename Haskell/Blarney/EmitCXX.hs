@@ -669,21 +669,23 @@ emitDisplay net args =
   ++ ");"
   where
     emitDisplayFormat [] = "\\n\""
-    emitDisplayFormat (DisplayArgString s : args) = do
+    emitDisplayFormat (DisplayArgString s : args) =
       "%s" ++  emitDisplayFormat args
-    emitDisplayFormat (DisplayArgBit w : args) = do
-      "%d" ++ emitDisplayFormat args
+    emitDisplayFormat (DisplayArgBit w : args)
+      | w <= 64 = "%d" ++ emitDisplayFormat args
+      | otherwise = "%s" ++ emitDisplayFormat args
 
     emitDisplayArgs [] _ = ""
-    emitDisplayArgs (DisplayArgString s : args) wires = do
+    emitDisplayArgs (DisplayArgString s : args) wires =
          ("\"" ++ s ++ "\"")
       ++ (if null args then "" else ",")
       ++ emitDisplayArgs args wires
-    emitDisplayArgs (DisplayArgBit w : args) (wire:wires) = do
-         emitInput wire
+    emitDisplayArgs (DisplayArgBit w : args) (wire:wires) =
+         (if w <= 64 then emitInput wire
+                     else "hexStringBU(" ++ emitInput wire ++ ","
+                            ++ show w ++ ")")
       ++ (if null args then "" else ",")
       ++ emitDisplayArgs args wires
-
 
 emitUpdates :: Net -> Code
 emitUpdates net =

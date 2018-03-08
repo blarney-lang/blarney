@@ -1,43 +1,10 @@
 import Blarney
 
--- RAM interface
-data RAM a d =
-  RAM {
-    load     :: a -> RTL ()
-  , store    :: a -> d -> RTL ()
-  , out      :: d
-  }
-
--- RAM module
-makeRAM :: (Bits a, Bits d) => RTL (RAM a d)
-makeRAM = do
-  -- Address bus and data bus and write-enable
-  addrBus :: Wire a <- makeWire
-  dataBus :: Wire d <- makeWire
-  writeEn :: Wire (Bit 1) <- makeWireDefault 0
-
-  -- RAM primitive
-  let output = unpack (ram (pack (val addrBus),
-                         pack (val dataBus),
-                           val writeEn))
-
-  -- Methods
-  let load a = do
-        addrBus <== a
-
-  let store a d = do
-        addrBus <== a
-        dataBus <== d
-        writeEn <== 1
-
-  -- Return interface
-  return (RAM load store output)
-
 -- Top-level module
 top :: RTL ()
 top = do
   -- RAM
-  ram :: RAM (Bit 8) (Bit 4) <- makeRAM
+  ram :: RAM (Bit 8) (Bit 128) <- makeRAM
 
   -- Counter
   i :: Reg (Bit 8) <- makeRegInit 0
@@ -47,7 +14,7 @@ top = do
         Seq [
           While (val i .<. 100) $
             Do [
-              store ram (val i) (lower (val i)),
+              store ram (val i) (1 .<<. zeroExtend (val i)),
               i <== val i + 1
             ],
           Do [ i <== 0 ],

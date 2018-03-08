@@ -314,6 +314,9 @@ inline void copyBU(BU a, BU r, uint32_t w)
   memcpy(r, a, numChunks * sizeof(Chunk));
 }
 
+// Print
+char* hexStringBU(BU a, uint32_t w);
+
 // Initialise RAM
 template <typename T> inline void initRAM(
   const char* filename, T* ram, unsigned size)

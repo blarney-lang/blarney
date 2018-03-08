@@ -196,5 +196,5 @@ makeASPEngine = do
 
 main :: IO ()
 main = do
-  genHexFiles "n1.edges" "/tmp/asp/"
   netlist makeASPEngine >>= writeCXX "/tmp/asp/"
+  genHexFiles "n1.edges" "/tmp/asp/"

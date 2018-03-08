@@ -3,6 +3,9 @@
 #include <stdlib.h>
 #include "BitVec.h"
 
+inline uint32_t shr(uint32_t x, uint32_t y) { return y >= 32 ? 0 : x >> y; }
+inline uint32_t shl(uint32_t x, uint32_t y) { return y >= 32 ? 0 : x << y; }
+
 // Shift left core
 void leftCoreBU(BU a, uint64_t i, BU r, uint32_t w, uint32_t numChunks)
 {
@@ -15,7 +18,7 @@ void leftCoreBU(BU a, uint64_t i, BU r, uint32_t w, uint32_t numChunks)
       r[i] = (a[i-chunkShift] << bitShift);
     else if (i > chunkShift)
       r[i] = (a[i-chunkShift] << bitShift) |
-             (a[i-chunkShift-1] >> (ChunkSize-bitShift));
+             shr(a[i-chunkShift-1], ChunkSize-bitShift);
     else
       r[i] = 0;
   }
@@ -34,7 +37,7 @@ void rightCoreBU(BU a, uint64_t i, BU r, uint32_t w, uint32_t numChunks)
       r[i] = (a[i+chunkShift] >> bitShift);
     else if ((i+chunkShift) < (numChunks-1))
       r[i] = (a[i+chunkShift] >> bitShift) |
-             (a[i+chunkShift+1] << (ChunkSize-bitShift));
+             shl(a[i+chunkShift+1], ChunkSize-bitShift);
     else
       r[i] = 0;
   }
@@ -109,6 +112,22 @@ void signExtCoreBU(BU a, BU r, uint32_t aw, uint32_t rw,
   Chunk ext = sign ? ~0 : 0;
   for (uint32_t i = aChunks; i < rChunks; i++) r[i] = ext;
   r[rChunks-1] = fitMSCU(r[rChunks-1], rw);
+}
+
+// Convert to hex string
+char* hexStringBU(BU a, uint32_t w)
+{
+  static char bufferA[8192];
+  static char bufferB[8192];
+  char* pA = bufferA;
+  char* pB = bufferB;
+  sprintf(pA, "0x");
+  uint32_t numChunks = (w+ChunkSize-1)/ChunkSize;
+  for (int i = numChunks-1; i >= 0; i--) {
+    snprintf(pB, 8192, "%s%08x", pA, a[i]);
+    char* tmp = pA; pA = pB; pB = tmp;
+  }
+  return pA;
 }
 
 // Golden model & testing
