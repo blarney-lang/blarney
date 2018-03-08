@@ -644,7 +644,7 @@ emitRAMUpdate net aw dw
           "if (" ++ emitInput (netInputs net !! 2) ++ ") "
        ++ "copyBU(" ++ emitInput (netInputs net !! 1) ++ ", array"
        ++ show (netInstId net) ++ "["
-       ++ emitInput (netInputs net !! 0) ++ "]" ++ show dw ++ ");"
+       ++ emitInput (netInputs net !! 0) ++ "]," ++ show dw ++ ");"
 
 emitRAMLookup :: Net -> Width -> Width -> String
 emitRAMLookup net aw dw 
@@ -653,8 +653,10 @@ emitRAMLookup net aw dw
        ++ "array" ++ show (netInstId net)
        ++ "[" ++ emitInput (netInputs net !! 0) ++ "];"
   | otherwise =
-          "copyBU(array[" ++ emitInput (netInputs net !! 0) ++ "], "
-       ++ emitWire (netInstId net, 0) ++ ";"
+          "copyBU(array" ++ show (netInstId net) ++ "["
+       ++ emitInput (netInputs net !! 0) ++ "], "
+       ++ emitWire (netInstId net, 0) ++ ","
+       ++ show dw ++ ");"
 
 emitDisplay :: Net -> [DisplayArg] -> String
 emitDisplay net args =

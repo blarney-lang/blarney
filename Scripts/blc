@@ -11,7 +11,7 @@ if [ -z "$1" ]; then
 fi
 
 
-EXTS="-XScopedTypeVariables -XDataKinds"
+EXTS="-XScopedTypeVariables -XDataKinds -XTypeOperators"
 INC="$BLARNEY_ROOT/Haskell"
 
-ghc -O $EXTS -i$INC --make $1
+ghc -O $EXTS -i$INC --make $@

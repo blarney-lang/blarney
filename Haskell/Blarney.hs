@@ -8,6 +8,7 @@ module Blarney
   , module Blarney.EmitNetlist
   , module Blarney.EmitCXX
   , module Blarney.Recipe
+  , module Blarney.RAM
   , module Control.Monad
   , module GHC.TypeLits
   ) where
@@ -21,5 +22,6 @@ import Blarney.EmitVerilog
 import Blarney.EmitNetlist
 import Blarney.EmitCXX
 import Blarney.Recipe
+import Blarney.RAM
 import Control.Monad hiding (when)
 import GHC.TypeLits

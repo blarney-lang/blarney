@@ -1,5 +1,5 @@
 Fact:
-	blc ASP.hs
+	blc ASPEngine.hs -cpp
 
 clean:
-	rm -f *.o *.hi ASP
+	rm -f *.o *.hi ASPEngine neighbours.hex state.hex

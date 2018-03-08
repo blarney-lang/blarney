@@ -35,6 +35,7 @@ module Blarney.Bit
   , upper        -- Extract most significant bits
   , lower        -- Extract least significant bits
   , input        -- External input
+  , widthOf      -- Determine width of bit vector from type
   ) where
 
 import Blarney.Unbit
@@ -281,3 +282,9 @@ input str = out
   where
     out = Bit (makePrim1 (Input w str) [] w)
     w   = fromInteger (natVal out)
+
+
+-- Determine width of bit vector from type
+widthOf :: KnownNat n => Bit n -> Int
+widthOf v = fromInteger (natVal v)
+

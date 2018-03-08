@@ -124,6 +124,9 @@ when cond a = do
   (c, as) <- ask
   local (cond .&. c, as) a
 
+whenNot :: Bit 1 -> RTL () -> RTL ()
+whenNot cond a = Blarney.RTL.when (inv cond) a
+
 -- RTL if/then/else
 class IfThenElse b a where
   ifThenElse :: b -> a -> a -> a

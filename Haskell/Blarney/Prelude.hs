@@ -2,7 +2,8 @@
 
 -- Prelude of commonly-used components and combinators
 module Blarney.Prelude
-  ( tree
+  ( tree1
+  , tree
   , orList
   , andList
   , sumList
