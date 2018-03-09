@@ -1,19 +1,17 @@
 import Blarney
 import Network
 
--- This is a general ASP-finding engine,
--- but for the purposes of testing, let's define:
-#define numVertices 15
-#define numNeighbours 57
-#define LogMaxNeighbours 16
-#define LogMaxVertices 4
-#define LogMaxVerticesPlusOne 5
-#define MaxVertices 32
+-- These parameters are for a 4096 node engine with up to 2^17 edges
+#define LogMaxNeighbours      17
+#define LogMaxVertices        12
+#define LogMaxVerticesPlusOne 13
+#define MaxVertices           4096
 
--- For a 4096 node engine:
--- #define LogMaxVertices 12
--- #define LogMaxVerticesPlusOne 13
--- #define MaxVertices 128
+-- This is a general ASP-finding engine,
+-- but for the purposes of testing,
+-- let's assume the n5 network:
+#define numVertices   3487
+#define numNeighbours 119385
 
 -- Types
 type NeighbourId = Bit LogMaxNeighbours
@@ -111,9 +109,6 @@ makeASPEngine = do
   -- Control path
   -- ============
 
-  -- Current depth of memoised iterative deepening
-  depth :: Reg VertexId <- makeReg
-
   -- Number of vertices completed
   completed :: Reg VertexId <- makeReg
 
@@ -131,7 +126,6 @@ makeASPEngine = do
         Seq [
           Do [
             do {
-              depth <== 1;
               active <== 0;
               sumPaths <== 0;
             }
@@ -175,12 +169,9 @@ makeASPEngine = do
                 ]
               ]
             ],
-            -- Increment depth and switch buffers
+            -- Switch buffers
             Do [
-              do {
-                depth <== val depth + 1;
-                active <== inv (val active);
-              }
+              active <== inv (val active)
             ]
           ],
           -- Finished!
@@ -198,4 +189,4 @@ makeASPEngine = do
 main :: IO ()
 main = do
   netlist makeASPEngine >>= writeCXX "/tmp/asp/"
-  genHexFiles "n1.edges" "/tmp/asp/"
+  genHexFiles "n5.edges" "/tmp/asp/"
