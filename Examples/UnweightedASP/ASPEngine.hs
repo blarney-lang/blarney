@@ -94,7 +94,7 @@ makeASPEngine = do
                 acc <== 0;
                 store stateMem (inv (val active) # val src) accNew;
                 src <== val src + 1;
-                popCountIn <== val acc .&. inv (out stateMem);
+                popCountIn <== accNew;
                 popCountGo <== 1;
               };
               when (inv stall') (acc <== accNew);
@@ -167,9 +167,10 @@ makeASPEngine = do
                 While (val numResps .>. 0) $ Do [
                   when countDone $ do {
                     numResps <== val numResps - 1;
-                    sumPaths <== val sumPaths + zeroExtend count
-                                              * zeroExtend (val depth);
-                    when (count .==. 0) (completed <== val completed + 1);
+                    sumPaths <== val sumPaths +
+                      zeroExtend (numVertices - count);
+                    when (count .==. numVertices) $
+                      completed <== val completed + 1;
                   }
                 ]
               ]
@@ -184,7 +185,7 @@ makeASPEngine = do
           ],
           -- Finished!
           Do [
-            display "Sum = " (val sumPaths),
+            display "Sum = n*(n-1)+" (val sumPaths),
             finish
           ]
         ]
