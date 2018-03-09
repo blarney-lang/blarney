@@ -114,22 +114,6 @@ void signExtCoreBU(BU a, BU r, uint32_t aw, uint32_t rw,
   r[rChunks-1] = fitMSCU(r[rChunks-1], rw);
 }
 
-// Convert to hex string
-char* hexStringBU(BU a, uint32_t w)
-{
-  static char bufferA[8192];
-  static char bufferB[8192];
-  char* pA = bufferA;
-  char* pB = bufferB;
-  sprintf(pA, "0x");
-  uint32_t numChunks = (w+ChunkSize-1)/ChunkSize;
-  for (int i = numChunks-1; i >= 0; i--) {
-    snprintf(pB, 8192, "%s%08x", pA, a[i]);
-    char* tmp = pA; pA = pB; pB = tmp;
-  }
-  return pA;
-}
-
 // Golden model & testing
 // ======================
 

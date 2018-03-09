@@ -457,6 +457,12 @@ emitSelectBitsInst net w hi lo
       ++ ") & "
       ++ mask (1+hi-lo)
       ++ ";"
+  | hi == lo =
+         emitWire (netInstId net, 0)
+      ++ " = getBitBU("
+      ++ emitInput (netInputs net !! 0)
+      ++ ","
+      ++ show lo ++ ");"
   | (hi-lo) < 64 =
         "{ uint64_t _tmp = fromShiftedBU("
       ++ emitInput (netInputs net !! 0)
@@ -662,30 +668,19 @@ emitDisplay :: Net -> [DisplayArg] -> String
 emitDisplay net args =
      "if ("
   ++ emitInput (netInputs net !! 0)
-  ++ ") printf(\""
-  ++ emitDisplayFormat args
-  ++ ","
-  ++ emitDisplayArgs args (tail (netInputs net))
-  ++ ");"
+  ++ ") { "
+  ++ emitDisp args (tail (netInputs net))
+  ++ "}"
   where
-    emitDisplayFormat [] = "\\n\""
-    emitDisplayFormat (DisplayArgString s : args) =
-      "%s" ++  emitDisplayFormat args
-    emitDisplayFormat (DisplayArgBit w : args)
-      | w <= 64 = "%d" ++ emitDisplayFormat args
-      | otherwise = "%s" ++ emitDisplayFormat args
-
-    emitDisplayArgs [] _ = ""
-    emitDisplayArgs (DisplayArgString s : args) wires =
-         ("\"" ++ s ++ "\"")
-      ++ (if null args then "" else ",")
-      ++ emitDisplayArgs args wires
-    emitDisplayArgs (DisplayArgBit w : args) (wire:wires) =
-         (if w <= 64 then emitInput wire
-                     else "hexStringBU(" ++ emitInput wire ++ ","
-                            ++ show w ++ ")")
-      ++ (if null args then "" else ",")
-      ++ emitDisplayArgs args wires
+    emitDisp [] [] = "printf(\"\\n\");"
+    emitDisp (DisplayArgString s : args) inps =
+         "printf(\"%s\", " ++ show s ++ ");"
+      ++ emitDisp args inps
+    emitDisp (DisplayArgBit w : args) (inp:inps)
+      | w <= 64   = "printf(\"0x%x\", " ++ emitInput inp ++ "); "
+                 ++ emitDisp args inps
+      | otherwise = "printBU(" ++ emitInput inp ++ "); "
+                 ++ emitDisp args inps
 
 emitUpdates :: Net -> Code
 emitUpdates net =

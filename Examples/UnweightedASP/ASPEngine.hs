@@ -10,10 +10,10 @@ import Network
 #define LogMaxVerticesPlusOne 5
 #define MaxVertices 32
 
--- FIXME: these defines expose a bug in the simulator!
+-- For a 4096 node engine:
 -- #define LogMaxVertices 12
 -- #define LogMaxVerticesPlusOne 13
--- #define MaxVertices 4096
+-- #define MaxVertices 128
 
 -- Types
 type NeighbourId = Bit LogMaxNeighbours

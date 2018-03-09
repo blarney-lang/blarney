@@ -94,7 +94,7 @@ inline uint8_t getBitBU(BU a, uint32_t i)
 {
   uint32_t c = i/ChunkSize;
   uint32_t sel = 1 << (i%ChunkSize);
-  return a[c] & sel ? 1 : 0;
+  return (a[c] & sel) ? 1 : 0;
 }
 
 // Convert to 64 bits
@@ -302,8 +302,8 @@ inline void signExtBU(BU a, BU r, uint32_t aw, uint32_t rw)
 inline void replicateBU(uint8_t bit, BU r, uint32_t w)
 {
   uint32_t numChunks = (w+ChunkSize-1)/ChunkSize;
-  Chunk ones = ~0;
-  for (uint32_t i = 0; i < numChunks; i++) r[i] = ones;
+  Chunk val = bit == 0 ? 0 : ~0;
+  for (uint32_t i = 0; i < numChunks; i++) r[i] = val;
   r[numChunks-1] = fitMSCU(r[numChunks-1], w);
 }
 
@@ -314,8 +314,13 @@ inline void copyBU(BU a, BU r, uint32_t w)
   memcpy(r, a, numChunks * sizeof(Chunk));
 }
 
-// Print
-char* hexStringBU(BU a, uint32_t w);
+// Print hex string
+inline void printBU(BU a, uint32_t w)
+{
+  uint32_t numChunks = (w+ChunkSize-1)/ChunkSize;
+  printf("0x");
+  for (int i = numChunks-1; i >= 0; i--) printf("%08x", a[i]);
+}
 
 // Initialise RAM
 template <typename T> inline void initRAM(
