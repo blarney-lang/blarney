@@ -11,6 +11,7 @@ data RAM a d =
     load     :: a -> RTL ()
   , store    :: a -> d -> RTL ()
   , out      :: d
+  , out'     :: d
   }
 
 -- RAM module
@@ -23,9 +24,10 @@ makeRAMCore init = do
 
   -- RAM primitive
   let ramPrim = case init of { Nothing -> ram ; Just str -> ramInit str }
-  let output = unpack (ramPrim (pack (val addrBus),
-                                  pack (val dataBus),
-                                    val writeEn))
+  let output = ramPrim (pack (val addrBus),
+                          pack (val dataBus),
+                            val writeEn)
+  let output' = reg 0 output
 
   -- Methods
   let load a = do
@@ -37,7 +39,7 @@ makeRAMCore init = do
         writeEn <== 1
 
   -- Return interface
-  return (RAM load store output)
+  return (RAM load store (unpack output) (unpack output'))
 
 makeRAMInit :: (Bits a, Bits d) => String -> RTL (RAM a d)
 makeRAMInit init = makeRAMCore (Just init)

@@ -2,16 +2,28 @@ import Blarney
 import Network
 
 -- These parameters are for a 4096 node engine with up to 2^17 edges
-#define LogMaxNeighbours      17
-#define LogMaxVertices        12
-#define LogMaxVerticesPlusOne 13
-#define MaxVertices           4096
+-- #define LogMaxNeighbours      17
+-- #define LogMaxVertices        12
+-- #define LogMaxVerticesPlusOne 13
+-- #define MaxVertices           4096
+
+-- These parameters are for a 2048 node engine with up to 2^16 edges
+#define LogMaxNeighbours      16
+#define LogMaxVertices        11
+#define LogMaxVerticesPlusOne 12
+#define MaxVertices           2048
 
 -- This is a general ASP-finding engine,
 -- but for the purposes of testing,
 -- let's assume the n5 network:
-#define numVertices   3487
-#define numNeighbours 119385
+-- #define numVertices   3487
+-- #define numNeighbours 119385
+
+-- This is a general ASP-finding engine,
+-- but for the purposes of testing,
+-- let's assume the n4 network:
+#define numVertices   1628
+#define numNeighbours 55034
 
 -- Types
 type NeighbourId = Bit LogMaxNeighbours
@@ -63,9 +75,8 @@ makeASPEngine = do
   popCountIn :: Reg VertexState <- makeReg
 
   -- Stall wires for fetch-accumulate pipeline
-  stall :: Wire (Bit 1) <- makeWireDefault 0
-  let stall' = reg 0 (val stall)
-  let stall'' = reg 0 stall'
+  stallWire :: Wire (Bit 1) <- makeWireDefault 0
+  let stall = scanl (flip reg) (val stallWire) (replicate 4 0)
 
   -- Accumulator for unioning states
   acc :: Reg VertexState <- makeReg
@@ -76,26 +87,32 @@ makeASPEngine = do
           -- Stage 1: fetch next neighbour
           do {
             load neighboursMem (val i); 
-            whenNot (val stall) (i <== val i + 1);
+            i <== (stall!!0) ? (val i - 1, val i + 1)
           },
+
+          -- Delay
+          return (),
 
           -- Stage 2: fetch state of neighbour
-          whenNot stall' $ do {
-            when (val src .==. out neighboursMem) (stall <== 1);
-            load stateMem (val active # out neighboursMem);
+          whenNot (stall!!1 .|. stall!!2) $ do {
+            when (val src .==. out' neighboursMem) (stallWire <== 1);
+            load stateMem (val active # out' neighboursMem);
           },
 
+          -- Delay
+          return (),
+
           -- Stage 3: update accumulator
-          let accNew = val acc .|. out stateMem in
-            whenNot stall'' $ do {
-              when stall' $ do {
+          let accNew = val acc .|. out' stateMem in
+            whenNot (stall!!3 .|. stall!!4) $ do {
+              when (stall!!2) $ do {
                 acc <== 0;
                 store stateMem (inv (val active) # val src) accNew;
                 src <== val src + 1;
                 popCountIn <== accNew;
                 popCountGo <== 1;
               };
-              when (inv stall') (acc <== accNew);
+              when (inv (stall!!2)) (acc <== accNew);
             }
         ]
 
@@ -137,7 +154,7 @@ makeASPEngine = do
               Seq [
                 Do [
                   do {
-                    numReqs <== numNeighbours + numVertices;
+                    numReqs <== numNeighbours + (numVertices .<<. 1);
                     src <== 0;
                     acc <== 0;
                     i <== 0;
@@ -182,11 +199,15 @@ makeASPEngine = do
         ]
 
   -- Compile the recipe
-  run (reg 1 0) controlPath 
+  done <- run (reg 1 0) controlPath 
+
+  -- Outputs
+  output "sum" (val sumPaths)
+  output "done" done
 
   return ()
 
 main :: IO ()
 main = do
-  netlist makeASPEngine >>= writeCXX "/tmp/asp/"
-  genHexFiles "n5.edges" "/tmp/asp/"
+  netlist makeASPEngine >>= writeVerilog "/tmp/asp.v"
+  genHexFiles "n4.edges" "/tmp/"
