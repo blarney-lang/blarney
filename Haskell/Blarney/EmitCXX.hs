@@ -183,11 +183,12 @@ emitInitRAM id (Just file) aw dw
 emitInits :: Net -> Code
 emitInits net =
   case netPrim net of
-    Const w i      -> emitInit (netInstId net, 0) i w
-    Register i w   -> emitInit (netInstId net, 0) i w
-    RegisterEn i w -> emitInit (netInstId net, 0) i w
-    RAM init aw dw -> emitInitRAM (netInstId net) init aw dw
-    other          -> []
+    Const w i              -> emitInit (netInstId net, 0) i w
+    Register i w           -> emitInit (netInstId net, 0) i w
+    RegisterEn i w         -> emitInit (netInstId net, 0) i w
+    RAM init aw dw         -> emitInitRAM (netInstId net) init aw dw
+    TrueDualRAM init aw dw -> emitInitRAM (netInstId net) init aw dw
+    other                  -> []
 
 -- Create header file containing externs
 writeGlobalsHeader :: String -> [Net] -> IO ()
@@ -638,31 +639,43 @@ emitCopyEn net en inp w =
   ++ emitCopy net inp w
   ++ " }"
 
-emitRAMUpdate :: Net -> Width -> Width -> String
-emitRAMUpdate net aw dw 
+emitRAMUpdate :: Net -> Width -> Width -> Int -> String
+emitRAMUpdate net aw dw port
   | aw > 64 = error "C++ generator: RAM address width must be <= 64"
   | dw <= 64 =
-          "if (" ++ emitInput (netInputs net !! 2) ++ ") "
+          -- Update array
+          "if (" ++ emitInput (netInputs net !! (base+2)) ++ ") { "
        ++ "array" ++ show (netInstId net)
-       ++ "[" ++ emitInput (netInputs net !! 0) ++ "]"
-       ++ " = " ++ emitInput (netInputs net !! 1) ++ ";"
+       ++ "[" ++ emitInput (netInputs net !! base) ++ "]"
+       ++ " = " ++ emitInput (netInputs net !! (base+1)) ++ "; "
+          -- Update RAM output
+       ++ emitWire (netInstId net, port) ++ " = "
+       ++ emitInput (netInputs net !! (base+1))
+       ++ "; }\n"
   | otherwise =
-          "if (" ++ emitInput (netInputs net !! 2) ++ ") "
-       ++ "copyBU(" ++ emitInput (netInputs net !! 1) ++ ", array"
+          -- Update array
+          "if (" ++ emitInput (netInputs net !! (base+2)) ++ ") { "
+       ++ "copyBU(" ++ emitInput (netInputs net !! (base+1)) ++ ", array"
        ++ show (netInstId net) ++ "["
-       ++ emitInput (netInputs net !! 0) ++ "]," ++ show dw ++ ");"
+       ++ emitInput (netInputs net !! base) ++ "]," ++ show dw ++ "); "
+          -- Update RAM output
+       ++ "copyBU(" ++ emitInput (netInputs net !! (base+1)) ++ ", "
+       ++ emitWire (netInstId net, port) ++ ","
+       ++ show dw ++ "); }\n"
+  where base = 3*port
 
-emitRAMLookup :: Net -> Width -> Width -> String
-emitRAMLookup net aw dw 
+emitRAMLookup :: Net -> Width -> Width -> Int -> String
+emitRAMLookup net aw dw port
   | dw <= 64 =
-           emitWire (netInstId net, 0) ++ " = "
+           emitWire (netInstId net, port) ++ " = "
        ++ "array" ++ show (netInstId net)
-       ++ "[" ++ emitInput (netInputs net !! 0) ++ "];"
+       ++ "[" ++ emitInput (netInputs net !! base) ++ "];"
   | otherwise =
           "copyBU(array" ++ show (netInstId net) ++ "["
-       ++ emitInput (netInputs net !! 0) ++ "], "
-       ++ emitWire (netInstId net, 0) ++ ","
+       ++ emitInput (netInputs net !! base) ++ "], "
+       ++ emitWire (netInstId net, port) ++ ","
        ++ show dw ++ ");"
+  where base = 3*port
 
 emitDisplay :: Net -> [DisplayArg] -> String
 emitDisplay net args =
@@ -685,12 +698,16 @@ emitDisplay net args =
 emitUpdates :: Net -> Code
 emitUpdates net =
   case netPrim net of
-    Register i w   -> [emitCopy net (netInputs net !! 0) w]
-    RegisterEn i w -> [emitCopyEn net (netInputs net !! 0)
-                         (netInputs net !! 1) w]
-    RAM init aw dw -> [emitRAMUpdate net aw dw,
-                       emitRAMLookup net aw dw]
-    other          -> []
+    Register i w           -> [emitCopy net (netInputs net !! 0) w]
+    RegisterEn i w         -> [emitCopyEn net (netInputs net !! 0)
+                                              (netInputs net !! 1) w]
+    RAM init aw dw         -> [emitRAMLookup net aw dw 0,
+                               emitRAMUpdate net aw dw 0]
+    TrueDualRAM init aw dw -> [emitRAMLookup net aw dw 0,
+                               emitRAMLookup net aw dw 1,
+                               emitRAMUpdate net aw dw 0,
+                               emitRAMUpdate net aw dw 1]
+    other                 -> []
 
 emitInst :: Net -> Code
 emitInst net =

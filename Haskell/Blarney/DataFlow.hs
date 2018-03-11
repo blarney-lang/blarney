@@ -35,12 +35,13 @@ considered as leaves.
 isLeaf :: Net -> Bool
 isLeaf net = 
   case netPrim net of
-    Register i w   -> True
-    RegisterEn i w -> True
-    RAM i aw dw    -> True
-    Const i w      -> True
-    Input w s      -> True
-    other          -> False
+    Register i w         -> True
+    RegisterEn i w       -> True
+    RAM i aw dw          -> True
+    TrueDualRAM i aw dw  -> True
+    Const i w            -> True
+    Input w s            -> True
+    other                -> False
 
 -- Post-order traversal (netlist represented as an array)
 postOrder :: Array InstId Net -> [Net] -> [Net]
@@ -75,13 +76,14 @@ postOrder nets roots =
 getRoot :: Array InstId Net -> Net -> [Net]
 getRoot netArray net =
   case netPrim net of
-    Register i w   -> map (lookup . fst) (netInputs net)
-    RegisterEn i w -> map (lookup . fst) (netInputs net)
-    RAM i aw dw    -> map (lookup . fst) (netInputs net)
-    Output w str   -> [net]
-    Display args   -> [net]
-    Finish         -> [net]
-    other          -> []
+    Register i w          -> map (lookup . fst) (netInputs net)
+    RegisterEn i w        -> map (lookup . fst) (netInputs net)
+    RAM i aw dw           -> map (lookup . fst) (netInputs net)
+    TrueDualRAM i aw dw   -> map (lookup . fst) (netInputs net)
+    Output w str          -> [net]
+    Display args          -> [net]
+    Finish                -> [net]
+    other                 -> []
   where lookup i = netArray A.! i
 
 -- Convert netlist to array representation
@@ -118,10 +120,12 @@ that parallel register updates can be performed sequentially
 getStateVars :: Net -> [(WireId, Width)]
 getStateVars net =
   case netPrim net of
-    Register i w   -> [((netInstId net, 0), w)]
-    RegisterEn i w -> [((netInstId net, 0), w)]
-    RAM init aw dw -> [((netInstId net, 0), dw)]
-    other          -> []
+    Register i w           -> [((netInstId net, 0), w)]
+    RegisterEn i w         -> [((netInstId net, 0), w)]
+    RAM init aw dw         -> [((netInstId net, 0), dw)]
+    TrueDualRAM init aw dw -> [((netInstId net, 0), dw),
+                               ((netInstId net, 1), dw)]
+    other                  -> []
 
 sequentialise :: [Net] -> [Net]
 sequentialise nets = intro (length nets) M.empty nets

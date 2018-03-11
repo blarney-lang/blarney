@@ -56,6 +56,9 @@ data Prim =
   | RAM { ramInitFile  :: Maybe String
         , ramAddrWidth :: Width
         , ramDataWidth :: Width }
+  | TrueDualRAM { ramInitFile  :: Maybe String
+                , ramAddrWidth :: Width
+                , ramDataWidth :: Width }
     -- Width adjustment
   | ReplicateBit OutputWidth
   | ZeroExtend InputWidth OutputWidth

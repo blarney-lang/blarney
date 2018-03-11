@@ -7,6 +7,7 @@ module Blarney.EmitVerilog
 
 import Blarney.Unbit
 import System.IO
+import Control.Monad
 
 printVerilog :: [Net] -> IO ()
 printVerilog = hWriteVerilog stdout
@@ -66,19 +67,22 @@ hWriteVerilog h netlist = do
       emit "wire "
       emitDeclInitHelper width wire init
 
+    emitRegDecl width wire = do
+      emit "reg "
+      emitDeclHelper width wire
+
     emitRegInitDecl width wire init = do
       emit "reg "
       emitDeclInitHelper width wire init
 
-    emitRAMDecl initFile aw dw id = do
+    emitRAMDecl initFile numPorts aw dw id = do
       -- RAM output
-      emitWireDecl dw (id, 0)
+      forM_ [0..numPorts-1] $ \p ->
+        emitRegDecl dw (id, p)
       -- Register array
       emit "reg ["
       emit (show (dw-1) ++ ":0] array" ++ show id)
       emit ("[" ++ show ((2^aw)-1) ++ ":0];\n")
-      -- Address register
-      emit ("reg [" ++ show (aw-1) ++ ":0] addr" ++ show id ++ ";\n")
       -- Initialisation
       case initFile of
         Nothing  -> return ()
@@ -89,38 +93,39 @@ hWriteVerilog h netlist = do
     emitDecl net =
       let wire = (netInstId net, 0) in
         case netPrim net of
-          Const w i          -> emitWireInitDecl w wire i
-          Add w              -> emitWireDecl w wire
-          Sub w              -> emitWireDecl w wire
-          Mul w              -> emitWireDecl w wire
-          Div w              -> emitWireDecl w wire
-          Mod w              -> emitWireDecl w wire
-          Not w              -> emitWireDecl w wire
-          And w              -> emitWireDecl w wire
-          Or  w              -> emitWireDecl w wire
-          Xor w              -> emitWireDecl w wire
-          ShiftLeft w        -> emitWireDecl w wire
-          ShiftRight w       -> emitWireDecl w wire
-          Equal w            -> emitWireDecl 1 wire
-          NotEqual w         -> emitWireDecl 1 wire
-          LessThan w         -> emitWireDecl 1 wire
-          LessThanEq w       -> emitWireDecl 1 wire
-          Register i w       -> emitRegInitDecl w wire i
-          RegisterEn i w     -> emitRegInitDecl w wire i
-          RAM i aw dw        -> emitRAMDecl i aw dw (netInstId net)
-          ReplicateBit w     -> emitWireDecl w wire
-          ZeroExtend wi wo   -> emitWireDecl wo wire
-          SignExtend wi wo   -> emitWireDecl wo wire
-          SelectBits w hi lo -> emitWireDecl (1+hi-lo) wire
-          Concat aw bw       -> emitWireDecl (aw+bw) wire
-          Mux w              -> emitWireDecl w wire
-          CountOnes w        -> emitWireDecl w wire
-          Identity w         -> emitWireDecl w wire
-          Display args       -> return ()
-          Finish             -> return ()
-          Input w s          -> emitWireDecl w wire
-          Output w s         -> return ()
-          Custom p is os ps  -> 
+          Const w i           -> emitWireInitDecl w wire i
+          Add w               -> emitWireDecl w wire
+          Sub w               -> emitWireDecl w wire
+          Mul w               -> emitWireDecl w wire
+          Div w               -> emitWireDecl w wire
+          Mod w               -> emitWireDecl w wire
+          Not w               -> emitWireDecl w wire
+          And w               -> emitWireDecl w wire
+          Or  w               -> emitWireDecl w wire
+          Xor w               -> emitWireDecl w wire
+          ShiftLeft w         -> emitWireDecl w wire
+          ShiftRight w        -> emitWireDecl w wire
+          Equal w             -> emitWireDecl 1 wire
+          NotEqual w          -> emitWireDecl 1 wire
+          LessThan w          -> emitWireDecl 1 wire
+          LessThanEq w        -> emitWireDecl 1 wire
+          Register i w        -> emitRegInitDecl w wire i
+          RegisterEn i w      -> emitRegInitDecl w wire i
+          RAM i aw dw         -> emitRAMDecl i 1 aw dw (netInstId net)
+          TrueDualRAM i aw dw -> emitRAMDecl i 2 aw dw (netInstId net)
+          ReplicateBit w      -> emitWireDecl w wire
+          ZeroExtend wi wo    -> emitWireDecl wo wire
+          SignExtend wi wo    -> emitWireDecl wo wire
+          SelectBits w hi lo  -> emitWireDecl (1+hi-lo) wire
+          Concat aw bw        -> emitWireDecl (aw+bw) wire
+          Mux w               -> emitWireDecl w wire
+          CountOnes w         -> emitWireDecl w wire
+          Identity w          -> emitWireDecl w wire
+          Display args        -> return ()
+          Finish              -> return ()
+          Input w s           -> emitWireDecl w wire
+          Output w s          -> return ()
+          Custom p is os ps   -> 
             sequence_ [ emitWireDecl w (netInstId net, n)
                       | ((o, w), n) <- zip os [0..] ]
 
@@ -260,47 +265,65 @@ hWriteVerilog h netlist = do
       emit s
       emit ";\n"
 
-    emitRAMInst net = do
-      let id = netInstId net
-      emit "assign "
-      emitWire (id, 0)
-      emit (" = array" ++ show id ++ "[addr" ++ show id ++ "];\n")
-
     emitInst net =
       case netPrim net of
-        Const w i          -> return ()
-        Add w              -> emitInfixOpInst "+" net
-        Sub w              -> emitInfixOpInst "-" net
-        Mul w              -> emitInfixOpInst "*" net
-        Div w              -> emitInfixOpInst "/" net
-        Mod w              -> emitInfixOpInst "%" net
-        Not w              -> emitPrefixOpInst "~" net
-        And w              -> emitInfixOpInst "&" net
-        Or  w              -> emitInfixOpInst "|" net
-        Xor w              -> emitInfixOpInst "^" net
-        ShiftLeft w        -> emitInfixOpInst "<<" net
-        ShiftRight w       -> emitInfixOpInst ">>" net
-        Equal w            -> emitInfixOpInst "==" net
-        NotEqual w         -> emitInfixOpInst "!=" net
-        LessThan w         -> emitInfixOpInst "<" net
-        LessThanEq w       -> emitInfixOpInst "<=" net
-        Register i w       -> return ()
-        RegisterEn i w     -> return ()
-        RAM i aw dw        -> emitRAMInst net
-        ReplicateBit w     -> emitReplicateInst w net
-        ZeroExtend wi wo   -> emitZeroExtendInst net wi wo
-        SignExtend wi wo   -> emitSignExtendInst net wi wo
-        SelectBits w hi lo -> emitSelectBitsInst net hi lo
-        Concat aw bw       -> emitConcatInst net
-        Mux w              -> emitMuxInst net
-        CountOnes w        -> emitPrefixOpInst "$countones" net
-        Identity w         -> emitPrefixOpInst "" net
-        Display args       -> return ()
-        Finish             -> return ()
-        Input w s          -> emitInputInst net s
-        Output w s         -> emitOutputInst net s
-        Custom p is os ps  -> emitCustomInst net p is os ps
+        Const w i           -> return ()
+        Add w               -> emitInfixOpInst "+" net
+        Sub w               -> emitInfixOpInst "-" net
+        Mul w               -> emitInfixOpInst "*" net
+        Div w               -> emitInfixOpInst "/" net
+        Mod w               -> emitInfixOpInst "%" net
+        Not w               -> emitPrefixOpInst "~" net
+        And w               -> emitInfixOpInst "&" net
+        Or  w               -> emitInfixOpInst "|" net
+        Xor w               -> emitInfixOpInst "^" net
+        ShiftLeft w         -> emitInfixOpInst "<<" net
+        ShiftRight w        -> emitInfixOpInst ">>" net
+        Equal w             -> emitInfixOpInst "==" net
+        NotEqual w          -> emitInfixOpInst "!=" net
+        LessThan w          -> emitInfixOpInst "<" net
+        LessThanEq w        -> emitInfixOpInst "<=" net
+        Register i w        -> return ()
+        RegisterEn i w      -> return ()
+        RAM i aw dw         -> return ()
+        TrueDualRAM i aw dw -> return ()
+        ReplicateBit w      -> emitReplicateInst w net
+        ZeroExtend wi wo    -> emitZeroExtendInst net wi wo
+        SignExtend wi wo    -> emitSignExtendInst net wi wo
+        SelectBits w hi lo  -> emitSelectBitsInst net hi lo
+        Concat aw bw        -> emitConcatInst net
+        Mux w               -> emitMuxInst net
+        CountOnes w         -> emitPrefixOpInst "$countones" net
+        Identity w          -> emitPrefixOpInst "" net
+        Display args        -> return ()
+        Finish              -> return ()
+        Input w s           -> emitInputInst net s
+        Output w s          -> emitOutputInst net s
+        Custom p is os ps   -> emitCustomInst net p is os ps
  
+    emitRAMUpdate net ports =
+      forM_ ports $ \p -> do
+        let base = p*3
+        let id = netInstId net
+        emit "if ("
+        emitInput (netInputs net !! (base+2))
+        emit " == 1) begin "
+        emit ("array" ++ show id ++ "[")
+        emitInput (netInputs net !! base)
+        emit "] <= "
+        emitInput (netInputs net !! (base+1))
+        emit "; "
+        emitWire (id, p)
+        emit " <= "
+        emitInput (netInputs net !! (base+1))
+        emit "; end\n"
+        emit "else "
+        emitWire (id, p)
+        emit " <= "
+        emit ("array" ++ show id ++ "[")
+        emitInput (netInputs net !! base)
+        emit "];\n"
+
     emitAlways net =
       case netPrim net of
         Register init w -> do
@@ -316,19 +339,8 @@ hWriteVerilog h netlist = do
           emit " <= "
           emitInput (netInputs net !! 1)
           emit ";\n"
-        RAM init aw dw -> do
-          let id = netInstId net
-          emit "if ("
-          emitInput (netInputs net !! 2)
-          emit " == 1) "
-          emit ("array" ++ show id ++ "[")
-          emitInput (netInputs net !! 0)
-          emit "] <= "
-          emitInput (netInputs net !! 1)
-          emit ";\n"
-          emit ("addr" ++ show id ++ " <= ")
-          emitInput (netInputs net !! 0)
-          emit ";\n"
+        RAM init aw dw -> emitRAMUpdate net [0]
+        TrueDualRAM init aw dw -> emitRAMUpdate net [0, 1]
         Display args -> do
           emit "if ("
           emitInput (netInputs net !! 0)

@@ -34,4 +34,4 @@ top = do
 
 -- Main function
 main :: IO ()
-main = netlist top >>= writeCXX "/tmp/ram"
+main = netlist top >>= writeVerilog "/tmp/ram.v"

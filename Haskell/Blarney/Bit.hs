@@ -2,40 +2,42 @@
 {-# LANGUAGE DataKinds, KindSignatures, TypeOperators, TypeFamilies, GADTs #-}
 
 module Blarney.Bit
-  ( Bit(..)      -- "Bit n" is a bit vector of n bits
-  , replicateBit -- Replicate bit to produce bit vector
-  , low          -- Bit vector of all 0's
-  , high         -- Bit vector of all 1's
-  , inv          -- Bitwise invert
-  , (.&.)        -- Bitwise and
-  , (.|.)        -- Bitwise or
-  , (.^.)        -- Bitwise xor
-  , mux          -- Mux
-  , (.==.)       -- Equality
-  , (.!=.)       -- Disequality
-  , (.<.)        -- Less than
-  , (.>.)        -- Greater than
-  , (.<=.)       -- Less than or equal
-  , (.>=.)       -- Greater than or equal
-  , (.+.)        -- Add
-  , (.-.)        -- Subtract
-  , (.*.)        -- Multiply
-  , (.<<.)       -- Shift left
-  , (.>>.)       -- Shift right
-  , countOnes    -- Population count
-  , reg          -- Register
-  , regEn        -- Register with enable
-  , ram          -- RAM
-  , ramInit      -- RAM with initial contents
-  , (#)          -- Bit concatenation
-  , bit          -- Bit selection
-  , bits         -- Bit range selection
-  , zeroExtend   -- Zero extend
-  , signExtend   -- Sign extend
-  , upper        -- Extract most significant bits
-  , lower        -- Extract least significant bits
-  , input        -- External input
-  , widthOf      -- Determine width of bit vector from type
+  ( Bit(..)          -- "Bit n" is a bit vector of n bits
+  , replicateBit     -- Replicate bit to produce bit vector
+  , low              -- Bit vector of all 0's
+  , high             -- Bit vector of all 1's
+  , inv              -- Bitwise invert
+  , (.&.)            -- Bitwise and
+  , (.|.)            -- Bitwise or
+  , (.^.)            -- Bitwise xor
+  , mux              -- Mux
+  , (.==.)           -- Equality
+  , (.!=.)           -- Disequality
+  , (.<.)            -- Less than
+  , (.>.)            -- Greater than
+  , (.<=.)           -- Less than or equal
+  , (.>=.)           -- Greater than or equal
+  , (.+.)            -- Add
+  , (.-.)            -- Subtract
+  , (.*.)            -- Multiply
+  , (.<<.)           -- Shift left
+  , (.>>.)           -- Shift right
+  , countOnes        -- Population count
+  , reg              -- Register
+  , regEn            -- Register with enable
+  , ram              -- RAM
+  , ramInit          -- RAM with initial contents
+  , ramTrueDual      -- True dual-port RAM
+  , ramTrueDualInit  -- True dual-port RAM with initial contents
+  , (#)              -- Bit concatenation
+  , bit              -- Bit selection
+  , bits             -- Bit range selection
+  , zeroExtend       -- Zero extend
+  , signExtend       -- Sign extend
+  , upper            -- Extract most significant bits
+  , lower            -- Extract least significant bits
+  , input            -- External input
+  , widthOf          -- Determine width of bit vector from type
   ) where
 
 import Blarney.Unbit
@@ -217,6 +219,43 @@ ram = ramPrim Nothing
 -- (Reads new data on write)
 ramInit :: (KnownNat a, KnownNat d) => String -> (Bit a, Bit d, Bit 1) -> Bit d
 ramInit init = ramPrim (Just init)
+
+-- True dual-port RAM primitive
+-- (Reads new data on write)
+-- (When read-address == write-address on different ports, read old data)
+ramTrueDualPrim :: (KnownNat a, KnownNat d) =>
+                   Maybe String
+                -> (Bit a, Bit d, Bit 1)
+                -> (Bit a, Bit d, Bit 1)
+                -> (Bit d, Bit d)
+ramTrueDualPrim init (addrInA, dataInA, weInA)
+                     (addrInB, dataInB, weInB) =
+    (Bit (outs!!0), Bit (outs!!1))
+  where
+    outs = makePrim (TrueDualRAM init aw dw)
+             [unbit addrInA, unbit dataInA, unbit weInA,
+              unbit addrInB, unbit dataInB, unbit weInB] [dw, dw]
+    aw   = fromInteger (natVal addrInA)
+    dw   = fromInteger (natVal dataInA)
+
+-- Uninitialised true dual-port RAM
+-- (Reads new data on write)
+-- (When read-address == write-address on different ports, read old data)
+ramTrueDual :: (KnownNat a, KnownNat d) =>
+               (Bit a, Bit d, Bit 1)
+            -> (Bit a, Bit d, Bit 1)
+            -> (Bit d, Bit d)
+ramTrueDual = ramTrueDualPrim Nothing
+
+-- Initilaised true dual-port RAM
+-- (Reads new data on write)
+-- (When read-address == write-address on different ports, read old data)
+ramTrueDualInit :: (KnownNat a, KnownNat d) =>
+                   String 
+                -> (Bit a, Bit d, Bit 1)
+                -> (Bit a, Bit d, Bit 1)
+                -> (Bit d, Bit d)
+ramTrueDualInit init = ramTrueDualPrim (Just init)
 
 -- Concatenation
 (#) :: Bit n -> Bit m -> Bit (n+m)

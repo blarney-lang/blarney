@@ -1,4 +1,4 @@
-Fact:
+ASPEngine: ASPEngine.hs
 	blc ASPEngine.hs -cpp
 
 clean:
