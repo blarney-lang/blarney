@@ -7,6 +7,7 @@ module Blarney.EmitVerilog
 
 import Blarney.Unbit
 import System.IO
+import Data.Maybe
 import Control.Monad
 
 printVerilog :: [Net] -> IO ()
@@ -76,19 +77,8 @@ hWriteVerilog h netlist = do
       emitDeclInitHelper width wire init
 
     emitRAMDecl initFile numPorts aw dw id = do
-      -- RAM output
       forM_ [0..numPorts-1] $ \p ->
-        emitRegDecl dw (id, p)
-      -- Register array
-      emit "reg ["
-      emit (show (dw-1) ++ ":0] array" ++ show id)
-      emit ("[" ++ show ((2^aw)-1) ++ ":0];\n")
-      -- Initialisation
-      case initFile of
-        Nothing  -> return ()
-        Just str -> do
-          emit "initial "
-          emit ("$readmemh(" ++ show str ++ ", array" ++ show id ++ ");\n")
+        emitWireDecl dw (id, p)
 
     emitDecl net =
       let wire = (netInstId net, 0) in
@@ -265,6 +255,36 @@ hWriteVerilog h netlist = do
       emit s
       emit ";\n"
 
+    emitRAMInst net i aw dw = do
+      let initFile = fromMaybe "UNUSED" i
+      emit "BlockRAM#(\n"
+      emit (".INIT_FILE(" ++ show initFile ++ "),\n")
+      emit (".ADDR_WIDTH(" ++ show aw ++ "),\n")
+      emit (".DATA_WIDTH(" ++ show dw ++ "))\n")
+      emit ("ram" ++ show (netInstId net) ++ " (\n")
+      emit ".CLK(clock),\n"
+      emit ".DI(" >> emitInput (netInputs net !! 1) >> emit "),\n"
+      emit ".ADDR(" >> emitInput (netInputs net !! 0) >> emit "),\n"
+      emit ".WE(" >> emitInput (netInputs net !! 2) >> emit "),\n"
+      emit ".DO(" >> emitWire (netInstId net, 0) >> emit "));\n"
+
+    emitTrueDualRAMInst net i aw dw = do
+      let initFile = fromMaybe "UNUSED" i
+      emit "BlockRAMTrueDual#(\n"
+      emit (".INIT_FILE(" ++ show initFile ++ "),\n")
+      emit (".ADDR_WIDTH(" ++ show aw ++ "),\n")
+      emit (".DATA_WIDTH(" ++ show dw ++ "))\n")
+      emit ("ram" ++ show (netInstId net) ++ " (\n")
+      emit ".CLK(clock),\n"
+      emit ".DI_A(" >> emitInput (netInputs net !! 1) >> emit "),\n"
+      emit ".ADDR_A(" >> emitInput (netInputs net !! 0) >> emit "),\n"
+      emit ".WE_A(" >> emitInput (netInputs net !! 2) >> emit "),\n"
+      emit ".DO_A(" >> emitWire (netInstId net, 0) >> emit "),\n"
+      emit ".DI_B(" >> emitInput (netInputs net !! 4) >> emit "),\n"
+      emit ".ADDR_B(" >> emitInput (netInputs net !! 3) >> emit "),\n"
+      emit ".WE_B(" >> emitInput (netInputs net !! 5) >> emit "),\n"
+      emit ".DO_B(" >> emitWire (netInstId net, 4) >> emit "));\n"
+
     emitInst net =
       case netPrim net of
         Const w i           -> return ()
@@ -285,8 +305,8 @@ hWriteVerilog h netlist = do
         LessThanEq w        -> emitInfixOpInst "<=" net
         Register i w        -> return ()
         RegisterEn i w      -> return ()
-        RAM i aw dw         -> return ()
-        TrueDualRAM i aw dw -> return ()
+        RAM i aw dw         -> emitRAMInst net i aw dw
+        TrueDualRAM i aw dw -> emitTrueDualRAMInst net i aw dw
         ReplicateBit w      -> emitReplicateInst w net
         ZeroExtend wi wo    -> emitZeroExtendInst net wi wo
         SignExtend wi wo    -> emitSignExtendInst net wi wo
@@ -301,29 +321,6 @@ hWriteVerilog h netlist = do
         Output w s          -> emitOutputInst net s
         Custom p is os ps   -> emitCustomInst net p is os ps
  
-    emitRAMUpdate net ports =
-      forM_ ports $ \p -> do
-        let base = p*3
-        let id = netInstId net
-        emit "if ("
-        emitInput (netInputs net !! (base+2))
-        emit " == 1) begin "
-        emit ("array" ++ show id ++ "[")
-        emitInput (netInputs net !! base)
-        emit "] <= "
-        emitInput (netInputs net !! (base+1))
-        emit "; "
-        emitWire (id, p)
-        emit " <= "
-        emitInput (netInputs net !! (base+1))
-        emit "; end\n"
-        emit "else "
-        emitWire (id, p)
-        emit " <= "
-        emit ("array" ++ show id ++ "[")
-        emitInput (netInputs net !! base)
-        emit "];\n"
-
     emitAlways net =
       case netPrim net of
         Register init w -> do
@@ -339,8 +336,6 @@ hWriteVerilog h netlist = do
           emit " <= "
           emitInput (netInputs net !! 1)
           emit ";\n"
-        RAM init aw dw -> emitRAMUpdate net [0]
-        TrueDualRAM init aw dw -> emitRAMUpdate net [0, 1]
         Display args -> do
           emit "if ("
           emitInput (netInputs net !! 0)

@@ -2,28 +2,16 @@ import Blarney
 import Network
 
 -- These parameters are for a 4096 node engine with up to 2^17 edges
--- #define LogMaxNeighbours      17
--- #define LogMaxVertices        12
--- #define LogMaxVerticesPlusOne 13
--- #define MaxVertices           4096
-
--- These parameters are for a 2048 node engine with up to 2^16 edges
-#define LogMaxNeighbours      16
-#define LogMaxVertices        11
-#define LogMaxVerticesPlusOne 12
-#define MaxVertices           2048
+#define LogMaxNeighbours      17
+#define LogMaxVertices        12
+#define LogMaxVerticesPlusOne 13
+#define MaxVertices           4096
 
 -- This is a general ASP-finding engine,
 -- but for the purposes of testing,
 -- let's assume the n5 network:
--- #define numVertices   3487
--- #define numNeighbours 119385
-
--- This is a general ASP-finding engine,
--- but for the purposes of testing,
--- let's assume the n4 network:
-#define numVertices   1628
-#define numNeighbours 55034
+#define numVertices   3487
+#define numNeighbours 119385
 
 -- Types
 type NeighbourId = Bit LogMaxNeighbours
@@ -210,4 +198,4 @@ makeASPEngine = do
 main :: IO ()
 main = do
   netlist makeASPEngine >>= writeVerilog "/tmp/asp.v"
-  genHexFiles "n4.edges" "/tmp/"
+  genHexFiles "n5.edges" "/tmp/"

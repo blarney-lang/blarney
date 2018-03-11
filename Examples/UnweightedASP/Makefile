@@ -1,4 +1,5 @@
-ASPEngine: ASPEngine.hs
+.PHONY: all
+all:
 	blc ASPEngine.hs -cpp
 
 clean:
