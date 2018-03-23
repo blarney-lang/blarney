@@ -129,17 +129,19 @@ emitIODecl other = []
 -- Emit RAM declaration
 emitRAMDecl :: Net -> Code
 emitRAMDecl net =
-  let id = netInstId net in
-    case netPrim net of
-      RAM init aw dw
-        | dw <= 64 ->
+  case netPrim net of
+    RAM init aw dw -> ram init aw dw
+    TrueDualRAM init aw dw -> ram init aw dw
+    other -> []
+  where
+    id = netInstId net
+    ram init aw dw
+        | dw <= 64 =
            [typeOf dw ++ " array" ++ show id ++
                          "[" ++ show (2^aw) ++ "];"]
-        | otherwise ->
+        | otherwise =
            ["uint32_t array" ++ show id ++ "[" ++ show (2^aw) ++ "]" ++
                          "[" ++ show (numChunks dw) ++ "];"]
-      
-      other -> []
 
 -- Emit C++ variable declarations for a given net
 emitDecls :: Net -> Code
@@ -712,38 +714,39 @@ emitUpdates net =
 emitInst :: Net -> Code
 emitInst net =
   case netPrim net of
-    Const w i          -> []
-    Add w              -> [emitInfixOpInst "+" "addBU" net w True]
-    Sub w              -> [emitInfixOpInst "-" "subBU" net w True]
-    Mul w              -> [emitInfixOpInst "*" "mulBU" net w True]
-    Div w              -> [emitInfixOpInst "/" "divBU" net w False]
-    Mod w              -> [emitInfixOpInst "%" "modBU" net w False]
-    Not w              -> [emitPrefixOpInst "~" "notBU" net w True]
-    And w              -> [emitInfixOpInst "&" "andBU" net w False]
-    Or  w              -> [emitInfixOpInst "|" "orBU" net w False]
-    Xor w              -> [emitInfixOpInst "^" "xorBU" net w False]
-    ShiftLeft w        -> [emitInfixOpInst "<<" "leftBU" net w True]
-    ShiftRight w       -> [emitInfixOpInst ">>" "rightBU" net w False]
-    Equal w            -> [emitCmpInst "==" "eqBU" net w]
-    NotEqual w         -> [emitCmpInst "!=" "neqBU" net w]
-    LessThan w         -> [emitCmpInst "<" "ltBU" net w]
-    LessThanEq w       -> [emitCmpInst "<=" "leBU" net w]
-    Register i w       -> []
-    RegisterEn i w     -> []
-    RAM init aw dw     -> []
-    ReplicateBit w     -> [emitReplicateInst w net]
-    ZeroExtend wi wo   -> [emitZeroExtendInst net wi wo]
-    SignExtend wi wo   -> [emitSignExtendInst net wi wo]
-    SelectBits w hi lo -> [emitSelectBitsInst net w hi lo]
-    Concat aw bw       -> [emitConcatInst net aw bw]
-    Mux w              -> [emitMuxInst net]
-    CountOnes w        -> [emitCountOnes net (2^(w-1))]
-    Identity w         -> [emitIdentityInst net]
-    Display args       -> [emitDisplay net args]
-    Finish             -> [emitFinish net]
-    Input w str        -> [emitInputPrim str net w]
-    Output w str       -> [emitOutputPrim str net]
-    Custom p is os ps  -> []
+    Const w i              -> []
+    Add w                  -> [emitInfixOpInst "+" "addBU" net w True]
+    Sub w                  -> [emitInfixOpInst "-" "subBU" net w True]
+    Mul w                  -> [emitInfixOpInst "*" "mulBU" net w True]
+    Div w                  -> [emitInfixOpInst "/" "divBU" net w False]
+    Mod w                  -> [emitInfixOpInst "%" "modBU" net w False]
+    Not w                  -> [emitPrefixOpInst "~" "notBU" net w True]
+    And w                  -> [emitInfixOpInst "&" "andBU" net w False]
+    Or  w                  -> [emitInfixOpInst "|" "orBU" net w False]
+    Xor w                  -> [emitInfixOpInst "^" "xorBU" net w False]
+    ShiftLeft w            -> [emitInfixOpInst "<<" "leftBU" net w True]
+    ShiftRight w           -> [emitInfixOpInst ">>" "rightBU" net w False]
+    Equal w                -> [emitCmpInst "==" "eqBU" net w]
+    NotEqual w             -> [emitCmpInst "!=" "neqBU" net w]
+    LessThan w             -> [emitCmpInst "<" "ltBU" net w]
+    LessThanEq w           -> [emitCmpInst "<=" "leBU" net w]
+    Register i w           -> []
+    RegisterEn i w         -> []
+    RAM init aw dw         -> []
+    TrueDualRAM init aw dw -> []
+    ReplicateBit w         -> [emitReplicateInst w net]
+    ZeroExtend wi wo       -> [emitZeroExtendInst net wi wo]
+    SignExtend wi wo       -> [emitSignExtendInst net wi wo]
+    SelectBits w hi lo     -> [emitSelectBitsInst net w hi lo]
+    Concat aw bw           -> [emitConcatInst net aw bw]
+    Mux w                  -> [emitMuxInst net]
+    CountOnes w            -> [emitCountOnes net (2^(w-1))]
+    Identity w             -> [emitIdentityInst net]
+    Display args           -> [emitDisplay net args]
+    Finish                 -> [emitFinish net]
+    Input w str            -> [emitInputPrim str net w]
+    Output w str           -> [emitOutputPrim str net]
+    Custom p is os ps      -> []
 
 writeMain :: CXXGenParams -> IO ()
 writeMain params

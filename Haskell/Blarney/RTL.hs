@@ -12,7 +12,7 @@ import Blarney.Unbit
 import Blarney.Prelude
 import Blarney.Format
 import qualified Blarney.JList as JL
-import Control.Monad
+import Control.Monad hiding (when)
 import GHC.TypeLits
 import Data.IORef
 import Data.IntMap (IntMap, findWithDefault, fromListWith)
@@ -99,10 +99,21 @@ class Var v where
   (<==) :: Bits a => v a -> a -> RTL ()
 
 -- Register variables
-data Reg a = Reg { regId :: VarId, regVal :: a }
+data Reg a =
+  Reg {
+    regId  :: VarId
+  , regVal :: a
+  }
 
 -- Wire variables
-data Wire a = Wire { wireId :: VarId, wireVal :: a }
+data Wire a =
+  Wire {
+    wireId  :: VarId
+  , wireVal :: a
+  , val'    :: a
+  , active  :: Bit 1
+  , active' :: Bit 1
+  }
 
 -- Register assignment
 instance Var Reg where
@@ -141,6 +152,17 @@ instance IfThenElse (Bit 1) (RTL ()) where
        local (cond .&. c, as) a
        local (inv cond .&. c, as) a
 
+-- RTL switch statement
+switch :: Bits a => a -> [(a, RTL ())] -> RTL ()
+switch subject alts =
+  forM_ alts $ \(lhs, rhs) ->
+    when (pack subject .==. pack lhs) rhs
+
+-- Operator for switch statement alternatives
+infixl 0 -->
+(-->) :: a -> RTL () -> (a, RTL ())
+lhs --> rhs = (lhs, rhs)
+
 -- Create register with initial value
 makeRegInit :: Bits a => a -> RTL (Reg a)
 makeRegInit init =
@@ -168,10 +190,11 @@ makeWireDefault def =
      let w = unbitWidth (unbit (pack def))
      let bit w p = Bit (p { unbitWidth = w })
      let as = findWithDefault [] v assignMap
-     let none = inv (orList [b | (b, _, p) <- as])
+     let some = orList [b | (b, _, p) <- as]
+     let none = inv some
      let out = select ([(b, bit w p) | (b, _, p) <- as] ++
                           [(none, pack def)])
-     return (Wire v (unpack out))
+     return (Wire v (unpack out) (unpack (reg 0 out)) some (reg 0 some))
 
 -- Create wire
 makeWire :: Bits a => RTL (Wire a)

@@ -90,30 +90,36 @@ a .^. b = Bit (makePrim1 (Xor wa) [unbit a, unbit b] wa)
   where wa = width a
 
 -- Equality
+infix 4 .==.
 (.==.) :: Bit n -> Bit n -> Bit 1
 a .==. b = Bit (makePrim1 (Equal wa) [unbit a, unbit b] 1)
   where wa = width a
 
 -- Disequality
+infix 4 .!=.
 (.!=.) :: Bit n -> Bit n -> Bit 1
 a .!=. b = Bit (makePrim1 (NotEqual wa) [unbit a, unbit b] 1)
   where wa = width a
 
 -- Less than
+infix 4 .<.
 (.<.) :: Bit n -> Bit n -> Bit 1
 a .<. b = Bit (makePrim1 (LessThan wa) [unbit a, unbit b] 1)
   where wa = width a
 
 -- Less than or equal
+infix 4 .<=.
 (.<=.) :: Bit n -> Bit n -> Bit 1
 a .<=. b = Bit (makePrim1 (LessThanEq wa) [unbit a, unbit b] 1)
   where wa = width a
 
 -- Greater than
+infix 4 .>.
 (.>.) :: Bit n -> Bit n -> Bit 1
 a .>. b = b .<. a
 
 -- Greater than or equal
+infix 4 .>=.
 (.>=.) :: Bit n -> Bit n -> Bit 1
 a .>=. b = b .<=. a
 
@@ -280,7 +286,7 @@ bits a (hi, lo) = result
   where
     result = Bit (makePrim1 p [unbit a] wr)
     wr = fromInteger (natVal result)
-    p = if lo > hi || (hi-lo) /= wr then
+    p = if lo > hi || (hi+1-lo) /= wr then
           error "Blarney.Bit.bits: sub-range does not match bit width"
         else
           SelectBits (width a) hi lo

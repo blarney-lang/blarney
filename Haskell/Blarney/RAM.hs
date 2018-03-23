@@ -4,6 +4,7 @@ module Blarney.RAM where
 import Blarney.RTL
 import Blarney.Bits
 import Blarney.Bit
+import Blarney.Prelude
 
 -- RAM interface
 data RAM a d =
@@ -102,3 +103,60 @@ makeTrueDualRAMInit init = makeTrueDualRAMCore (Just init)
 makeTrueDualRAM :: (Bits a, Bits d) => RTL (RAM a d, RAM a d)
 makeTrueDualRAM = makeTrueDualRAMCore Nothing
 
+-- Dual port RAM module
+-- (One port used for reading and the other for writing)
+makeDualRAMCore :: (Bits a, Bits d) => Maybe String -> RTL (RAM a d)
+makeDualRAMCore init = do
+  -- Create true dual port RAM
+  (portA :: RAM a d, portB :: RAM a d) <- makeTrueDualRAMCore init
+
+  -- Methods
+  let loadA a = load portA a
+
+  let storeB a d = store portB a d
+
+  -- Return interface
+  return (RAM loadA storeB (out portA) (out' portA))
+
+makeDualRAMInit :: (Bits a, Bits d) => String -> RTL (RAM a d)
+makeDualRAMInit init = makeDualRAMCore (Just init)
+
+makeDualRAM :: (Bits a, Bits d) => RTL (RAM a d)
+makeDualRAM = makeDualRAMCore Nothing
+
+-- Dual port RAM module with pass-through
+-- (Read and write to same address yields new data)
+makeDualRAMPassthroughCore :: (Bits a, Bits d) => Maybe String -> RTL (RAM a d)
+makeDualRAMPassthroughCore init = do
+  -- Create dual port RAM
+  ram :: RAM a d <- makeDualRAMCore init
+
+  -- Details of lastest load and store
+  la :: Wire a <- makeWire
+  sa :: Wire a <- makeWire
+  sd :: Wire d <- makeWire
+
+  -- Methods
+  let loadMethod a = do
+        load ram a
+        la <== a
+
+  let storeMethod a d = do
+        store ram a d
+        sa <== a
+        sd <== d
+
+  let outMethod =
+        (active' la .&. active' sa .&.
+           (pack (val' la) .==. pack (val' sa))) ?
+              (val' sd, out ram)
+
+  let outMethod' = unpack (reg 0 (pack outMethod))
+
+  return (RAM loadMethod storeMethod outMethod outMethod')
+
+makeDualRAMPassthroughInit :: (Bits a, Bits d) => String -> RTL (RAM a d)
+makeDualRAMPassthroughInit init = makeDualRAMPassthroughCore (Just init)
+
+makeDualRAMPassthrough :: (Bits a, Bits d) => RTL (RAM a d)
+makeDualRAMPassthrough = makeDualRAMPassthroughCore Nothing

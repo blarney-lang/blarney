@@ -9,6 +9,7 @@ module Blarney.Prelude
   , sumList
   , select
   , (?)
+  , (!)
   ) where
 
 import Blarney.Bit
@@ -45,3 +46,8 @@ select alts = orList [replicateBit sel .&. val | (sel, val) <- alts]
 -- Mux
 (?) :: Bits a => Bit 1 -> (a, a) -> a
 c ? (a, b) = unpack (mux c (pack a) (pack b))
+
+-- Reverse function application
+infixl 9 !
+(!) :: a -> (a -> b) -> b
+x!f = f x
