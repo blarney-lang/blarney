@@ -4,6 +4,7 @@ module Blarney.Partition
   ( partition
   ) where
 
+import Prelude
 import Blarney.Unbit
 import Blarney.DataFlow
 

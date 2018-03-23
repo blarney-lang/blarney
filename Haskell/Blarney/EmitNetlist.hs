@@ -3,6 +3,7 @@ module Blarney.EmitNetlist
   , writeNetlist
   ) where
 
+import Prelude
 import Blarney.Unbit
 import System.IO
 

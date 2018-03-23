@@ -4,6 +4,7 @@
 
 module Blarney.Bits where
 
+import Prelude
 import Blarney.Bit
 import GHC.TypeLits
 

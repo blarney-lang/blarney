@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds, ScopedTypeVariables #-}
 module Blarney.RAM where
 
+import Prelude
 import Blarney.RTL
 import Blarney.Bits
 import Blarney.Bit

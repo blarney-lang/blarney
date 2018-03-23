@@ -5,6 +5,8 @@
 
 module Blarney.Unbit where
 
+import Prelude
+
 -- For join lists
 import qualified Blarney.JList as JL
 

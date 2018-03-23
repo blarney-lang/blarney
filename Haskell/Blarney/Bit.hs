@@ -46,6 +46,7 @@ module Blarney.Bit
 import Blarney.Unbit
 import Blarney.Util
 import GHC.TypeLits
+import Prelude
 
 -- Phantom type wrapping an untyped bit vector, capturing the bit width
 newtype Bit (n :: Nat) = Bit { unbit :: Unbit }

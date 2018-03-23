@@ -8,6 +8,7 @@ module Blarney.EmitCXX
   , writeCXXMulti
   ) where
 
+import Prelude
 import Blarney.Unbit
 import Blarney.DataFlow
 import Blarney.Partition

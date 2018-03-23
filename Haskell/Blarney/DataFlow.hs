@@ -8,6 +8,7 @@ module Blarney.DataFlow
   , sequentialise
   ) where
 
+import Prelude
 import Blarney.Unbit
 import qualified Blarney.JList as JL
 import qualified Data.IntSet as IS

@@ -12,6 +12,7 @@ module Blarney.Prelude
   , (!)
   ) where
 
+import Prelude
 import Blarney.Bit
 import Blarney.Bits
 import GHC.TypeLits

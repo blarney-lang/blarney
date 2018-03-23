@@ -5,6 +5,7 @@ module Blarney.EmitVerilog
   , writeVerilog
   ) where
 
+import Prelude
 import Blarney.Unbit
 import System.IO
 import Data.Maybe

@@ -5,6 +5,7 @@ module Blarney.Recipe
   , run
   ) where
 
+import Prelude
 import Blarney.Bit
 import Blarney.Prelude
 import Blarney.RTL

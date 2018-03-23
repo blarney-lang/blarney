@@ -2,6 +2,7 @@
 
 module Blarney.Format where
 
+import Prelude
 import Blarney.Unbit
 import Blarney.Bit
 

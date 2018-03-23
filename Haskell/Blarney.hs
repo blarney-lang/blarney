@@ -11,6 +11,8 @@ module Blarney
   , module Blarney.RAM
   , module Control.Monad
   , module GHC.TypeLits
+  , module P
+  , (.)
   ) where
 
 import Blarney.Bit
@@ -25,3 +27,9 @@ import Blarney.Recipe
 import Blarney.RAM
 import Control.Monad hiding (when)
 import GHC.TypeLits
+import Prelude as P hiding ((.))
+
+-- Reverse function application
+infixl 9 .
+(.) :: a -> (a -> b) -> b
+x.f = f x
