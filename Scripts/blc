@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 if [ -z "$BLARNEY_ROOT" ]; then
   echo "Please set BLARNEY_ROOT"
@@ -12,6 +12,8 @@ fi
 
 
 EXTS="-XScopedTypeVariables -XDataKinds -XTypeOperators -XTypeFamilies"
+EXTS="$EXTS -XBinaryLiterals"
 INC="$BLARNEY_ROOT/Haskell"
+MACROS="$BLARNEY_ROOT/Haskell/Blarney/Macros.h"
 
-ghc -O $EXTS -i$INC --make $@
+ghc -cpp -optP"-include$MACROS" -O $EXTS -i$INC --make $@

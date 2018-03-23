@@ -26,7 +26,7 @@ popCount go vec = (done, count)
   where
     n       = widthOf count
     done    = foldr reg go (replicate n 0)
-    count   = tree1 add [zeroExtend (bit vec i) | i <- [0..2^n-1]]
+    count   = tree1 add [zeroExtend (getBit i vec) | i <- [0..2^n-1]]
     add a b = reg 0 (a+b)
 
 -- Average shortest path engine

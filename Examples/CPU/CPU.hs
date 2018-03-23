@@ -16,27 +16,27 @@ type RegId = Bit 2
 
 -- Extract opcode
 opcode :: Instr -> Bit 2
-opcode instr = bits instr (1,0)
+opcode instr = instr!bits(1,0)
 
 -- Extract register A
 rA :: Instr -> RegId
-rA instr = bits instr (5,4)
+rA instr = instr!bits(5,4)
 
 -- Extract register B
 rB :: Instr -> RegId
-rB instr = bits instr (3,2)
+rB instr = instr!bits(3,2)
 
 -- Extract destination register
 rD :: Instr -> RegId
-rD instr = bits instr (7,6)
+rD instr = instr!bits(7,6)
 
 -- Extract immediate
 imm :: Instr -> Bit 4
-imm instr = bits instr (5,2)
+imm instr = instr!bits(5,2)
 
 -- Extract branch offset
 offset :: Instr -> Bit 4
-offset instr = bits instr (7,4)
+offset instr = instr!bits(7,4)
 
 -- CPU
 makeCPU :: RTL ()

@@ -3,6 +3,7 @@
 
 module Blarney.Bit
   ( Bit(..)          -- "Bit n" is a bit vector of n bits
+  , __               -- Bottom
   , replicateBit     -- Replicate bit to produce bit vector
   , low              -- Bit vector of all 0's
   , high             -- Bit vector of all 1's
@@ -30,8 +31,10 @@ module Blarney.Bit
   , ramTrueDual      -- True dual-port RAM
   , ramTrueDualInit  -- True dual-port RAM with initial contents
   , (#)              -- Bit concatenation
-  , bit              -- Bit selection
-  , bits             -- Bit range selection
+  , getBit           -- Bit selection
+  , getBits          -- Bit range selection
+  , tbit             -- Bit selection (type-level indices)
+  , tbits            -- Bit range selection (type=level indices)
   , zeroExtend       -- Zero extend
   , signExtend       -- Sign extend
   , upper            -- Extract most significant bits
@@ -50,6 +53,10 @@ newtype Bit (n :: Nat) = Bit { unbit :: Unbit }
 -- Extract width from bit vector
 width :: Bit n -> Int
 width = unbitWidth . unbit
+
+-- Bottom
+__ :: a
+__ = error "bottom"
 
 -- Replicate bit
 replicateBit :: KnownNat n => Bit 1 -> Bit n
@@ -271,8 +278,8 @@ a # b = Bit (makePrim1 (Concat wa wb) [unbit a, unbit b] (wa+wb))
     wb = width b
 
 -- Bit selection
-bit :: Bit n -> Int -> Bit 1
-bit a i = Bit (makePrim1 p [unbit a] 1)
+getBit :: Int -> Bit n -> Bit 1
+getBit i a = Bit (makePrim1 p [unbit a] 1)
   where
     p = if i >= width a then
           error ("Blarney.Bit.bit: index " ++ show i ++
@@ -280,9 +287,13 @@ bit a i = Bit (makePrim1 p [unbit a] 1)
         else
           SelectBits (width a) i i
 
+-- Bit selection using type-level number
+tbit :: (KnownNat i, KnownNat n, (i+1) <= n) => nat i -> Bit n -> Bit 1
+tbit i a = getBit (fromInteger $ natVal i) a
+
 -- Sub-range selection
-bits :: (KnownNat m, m <= n) => Bit n -> (Int, Int) -> Bit m
-bits a (hi, lo) = result
+getBits :: (KnownNat m, m <= n) => (Int, Int) -> Bit n -> Bit m
+getBits (hi, lo) a = result
   where
     result = Bit (makePrim1 p [unbit a] wr)
     wr = fromInteger (natVal result)
@@ -290,6 +301,13 @@ bits a (hi, lo) = result
           error "Blarney.Bit.bits: sub-range does not match bit width"
         else
           SelectBits (width a) hi lo
+
+-- Bit selection using type-level number
+tbits :: (KnownNat n, KnownNat m, KnownNat hi, KnownNat lo,
+            (lo+m) ~ (hi+1), (hi+1) <= n, m <= n) =>
+         (nat hi, nat lo) -> Bit n -> Bit m
+tbits (hi, lo) a = getBits (fromInteger $ natVal hi,
+                            fromInteger $ natVal lo) a
 
 -- Zero extend
 zeroExtend :: (KnownNat m, n <= m) => Bit n -> Bit m
