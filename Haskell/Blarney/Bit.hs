@@ -34,11 +34,12 @@ module Blarney.Bit
   , getBit           -- Bit selection
   , getBits          -- Bit range selection
   , tbit             -- Bit selection (type-level indices)
-  , tbits            -- Bit range selection (type=level indices)
+  , tbits            -- Bit range selection (type-level indices)
   , zeroExtend       -- Zero extend
   , signExtend       -- Sign extend
   , upper            -- Extract most significant bits
   , lower            -- Extract least significant bits
+  , split            -- Split bit vector
   , input            -- External input
   , widthOf          -- Determine width of bit vector from type
   ) where
@@ -340,13 +341,21 @@ lower a = result
      wa     = width a
      wr     = fromInteger (natVal result)
 
+-- Split bit vector
+split :: KnownNat n => Bit (n+m) -> (Bit n, Bit m)
+split a = (a0, a1)
+  where
+    wa = width a
+    w0 = fromInteger (natVal a0)
+    a0 = Bit (makePrim1 (SelectBits wa (wa-1) (wa-w0)) [unbit a] w0)
+    a1 = Bit (makePrim1 (SelectBits wa (w0-1) 0) [unbit a] (wa-w0))
+
 -- External input
 input :: KnownNat n => String -> Bit n
 input str = out
   where
     out = Bit (makePrim1 (Input w str) [] w)
     w   = fromInteger (natVal out)
-
 
 -- Determine width of bit vector from type
 widthOf :: KnownNat n => Bit n -> Int

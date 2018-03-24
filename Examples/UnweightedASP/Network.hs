@@ -2,6 +2,7 @@
 
 module Network where
 
+import Prelude
 import Text.Printf
 import Data.IntMap (IntMap, empty, insertWith, keys, toList)
 import Data.Bits
