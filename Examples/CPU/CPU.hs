@@ -8,6 +8,7 @@
 -- NNNNNN11  | Halt
 
 import Blarney
+import Blarney.RAM
 
 -- Instructions
 type Instr = Bit 8
@@ -96,7 +97,7 @@ makeCPU = do
   -- ===============
   
   -- Latch instruction
-  instr <== instrMem!out'
+  instr <== instrMem.out'
 
   -- Register forwarding logic
   let forward rS other =

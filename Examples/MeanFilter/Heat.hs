@@ -41,4 +41,4 @@ top t w h = do
 
 -- Main function
 main :: IO ()
-main = netlist (top 100000 128 128) >>= writeCXX "/tmp/heat"
+main = netlist (top 50000 256 256) >>= writeCXX "/tmp/heat"

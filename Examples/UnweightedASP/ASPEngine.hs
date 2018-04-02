@@ -1,5 +1,6 @@
-import Blarney
 import Network
+import Blarney
+import Blarney.RAM
 
 -- These parameters are for a 4096 node engine with up to 2^17 edges
 #define LogMaxNeighbours      17

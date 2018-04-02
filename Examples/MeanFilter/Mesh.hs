@@ -2,8 +2,9 @@
 
 module Mesh where
 
-import Blarney
+import Prelude
 import Data.List
+import qualified Blarney as B
 
 type Mesh a = [[a]]
 
@@ -37,5 +38,5 @@ below = transpose . right . transpose
 trim :: Mesh a -> Mesh a
 trim = map tail . map init . tail . init
 
-mesh :: Bits a => (Reg a -> [a] -> RTL ()) -> Mesh (Reg a) -> RTL ()
-mesh f m = uncurry f `onM_` trim (merge (,) m (map val `on` neighbours m))
+mesh :: B.Bits a => (B.Reg a -> [a] -> B.RTL ()) -> Mesh (B.Reg a) -> B.RTL ()
+mesh f m = uncurry f `onM_` trim (merge (,) m (map B.val `on` neighbours m))

@@ -11,6 +11,7 @@ import Blarney.Bits
 import Blarney.Unbit
 import Blarney.Prelude
 import Blarney.Format
+import Blarney.IfThenElse
 import qualified Blarney.JList as JL
 import Control.Monad hiding (when)
 import GHC.TypeLits
@@ -138,19 +139,15 @@ when cond a = do
 whenNot :: Bit 1 -> RTL () -> RTL ()
 whenNot cond a = Blarney.RTL.when (inv cond) a
 
--- RTL if/then/else
-class IfThenElse b a where
-  ifThenElse :: b -> a -> a -> a
+ifThenElseRTL :: Bit 1 -> RTL () -> RTL () -> RTL ()
+ifThenElseRTL c a b =
+  do (cond, as) <- ask
+     local (cond .&. c, as) a
+     local (cond .&. inv c, as) b
 
-instance IfThenElse Bool a where
-  ifThenElse False a b = b
-  ifThenElse True a b = a
-
+-- Overloaded if/then/else
 instance IfThenElse (Bit 1) (RTL ()) where
-  ifThenElse c a b =
-    do (cond, as) <- ask
-       local (cond .&. c, as) a
-       local (inv cond .&. c, as) a
+  ifThenElse = ifThenElseRTL
 
 -- RTL switch statement
 switch :: Bits a => a -> [(a, RTL ())] -> RTL ()
@@ -233,7 +230,7 @@ instance DisplayType (RTL a) where
      return (error "Return value of 'display' should be ignored")
 
 instance (FShow b, DisplayType a) => DisplayType (b -> a) where
-  displayType x b = displayType (x <> fshow b)
+  displayType x b = displayType (x <.> fshow b)
 
 display :: DisplayType a => a
 display = displayType (Format [])

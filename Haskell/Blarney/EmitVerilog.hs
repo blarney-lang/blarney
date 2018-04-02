@@ -7,6 +7,7 @@ module Blarney.EmitVerilog
 
 import Prelude
 import Blarney.Unbit
+import Blarney.IfThenElse
 import System.IO
 import Data.Maybe
 import Control.Monad

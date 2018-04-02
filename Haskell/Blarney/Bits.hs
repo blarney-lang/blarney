@@ -9,6 +9,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE FlexibleContexts     #-}
 {-# LANGUAGE ConstraintKinds      #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 
 module Blarney.Bits where
 
@@ -24,11 +25,13 @@ class BitsClass a where
 
   -- Defaults
   type SizeOf a  =  GSizeOf (Rep a)
-  default pack   :: (Generic a, GBitsClass (Rep a))
-                 => a -> Bit (GSizeOf (Rep a))
+  default pack   :: (Generic a, GBitsClass (Rep a),
+                     GSizeOf (Rep a) ~ SizeOf a)
+                 => a -> Bit (SizeOf a)
   pack a         =  gpack (from a) 
-  default unpack :: (Generic a, GBitsClass (Rep a))
-                 => Bit (GSizeOf (Rep a)) -> a
+  default unpack :: (Generic a, GBitsClass (Rep a),
+                     GSizeOf (Rep a) ~ SizeOf a)
+                 => Bit (SizeOf a) -> a
   unpack a       =  to (gunpack a)
 
 type Bits a = (BitsClass a, KnownNat (SizeOf a))

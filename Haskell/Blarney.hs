@@ -8,7 +8,7 @@ module Blarney
   , module Blarney.EmitNetlist
   , module Blarney.EmitCXX
   , module Blarney.Recipe
-  , module Blarney.RAM
+  , module Blarney.IfThenElse
   , module Control.Monad
   , module GHC.TypeLits
   , module P
@@ -24,7 +24,7 @@ import Blarney.EmitVerilog
 import Blarney.EmitNetlist
 import Blarney.EmitCXX
 import Blarney.Recipe
-import Blarney.RAM
+import Blarney.IfThenElse
 import Control.Monad hiding (when)
 import GHC.TypeLits
 import Prelude as P hiding ((.))

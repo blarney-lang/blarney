@@ -10,6 +10,7 @@ import Blarney.Bit
 import Blarney.Prelude
 import Blarney.RTL
 import Blarney.Bits
+import Blarney.IfThenElse
 import Data.Maybe
 
 infixl 1 :=

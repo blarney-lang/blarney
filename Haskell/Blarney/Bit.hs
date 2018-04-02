@@ -1,5 +1,10 @@
 -- For type-level naturals
-{-# LANGUAGE DataKinds, KindSignatures, TypeOperators, TypeFamilies, GADTs #-}
+{-# LANGUAGE DataKinds      #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE TypeOperators  #-}
+{-# LANGUAGE TypeFamilies   #-}
+{-# LANGUAGE GADTs          #-}
+{-# LANGUAGE Rank2Types     #-}
 
 module Blarney.Bit
   ( Bit(..)          -- "Bit n" is a bit vector of n bits
@@ -42,10 +47,13 @@ module Blarney.Bit
   , split            -- Split bit vector
   , input            -- External input
   , widthOf          -- Determine width of bit vector from type
+  , liftNat          -- Lift integer value to type-level natural
   ) where
 
 import Blarney.Unbit
 import Blarney.Util
+import Blarney.IfThenElse
+import Data.Proxy
 import GHC.TypeLits
 import Prelude
 
@@ -361,3 +369,9 @@ input str = out
 widthOf :: KnownNat n => Bit n -> Int
 widthOf v = fromInteger (natVal v)
 
+-- Lift integer value to type-level natural
+liftNat :: Int -> (forall n. KnownNat n => Proxy n -> a) -> a
+liftNat nat k =
+  case someNatVal (toInteger nat) of
+    Just (SomeNat (x :: Proxy n)) -> do
+      k x

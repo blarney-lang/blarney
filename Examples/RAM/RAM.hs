@@ -1,4 +1,5 @@
 import Blarney
+import Blarney.RAM
 
 -- Top-level module
 top :: RTL ()

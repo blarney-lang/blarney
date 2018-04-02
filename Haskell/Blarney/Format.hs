@@ -15,8 +15,8 @@ newtype Format = Format [FormatItem]
 emptyFormat :: Format
 emptyFormat = Format []
 
-(<>) :: Format -> Format -> Format
-Format a <> Format b = Format (a ++ b)
+(<.>) :: Format -> Format -> Format
+Format a <.> Format b = Format (a ++ b)
 
 class FormatType a where
   formatType :: Format -> a
@@ -25,14 +25,14 @@ instance FormatType Format where
   formatType f = f
 
 instance FormatType a => FormatType (String -> a) where
-  formatType f s = formatType (f <> Format [FormatString s])
+  formatType f s = formatType (f <.> Format [FormatString s])
 
 instance FormatType a => FormatType (Bit n -> a) where
-  formatType f b = formatType (f <> Format [FormatBit (unbitWidth ub) ub])
+  formatType f b = formatType (f <.> Format [FormatBit (unbitWidth ub) ub])
     where ub = unbit b
 
 instance FormatType a => FormatType (Format -> a) where
-  formatType f f' = formatType (f <> f')
+  formatType f f' = formatType (f <.> f')
 
 format :: FormatType a => a
 format = formatType emptyFormat

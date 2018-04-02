@@ -1,4 +1,6 @@
-{-# LANGUAGE DataKinds, KindSignatures, TypeOperators, TypeFamilies #-}
+{-# LANGUAGE DataKinds         #-}
+{-# LANGUAGE KindSignatures    #-}
+{-# LANGUAGE TypeOperators     #-}
 
 -- Prelude of commonly-used components and combinators
 module Blarney.Prelude
@@ -8,13 +10,14 @@ module Blarney.Prelude
   , andList
   , sumList
   , select
+  , index
   , (?)
-  , (!)
   ) where
 
 import Prelude
 import Blarney.Bit
 import Blarney.Bits
+import Blarney.IfThenElse
 import GHC.TypeLits
 
 -- Parallel reduce for a commutative an associative operator
@@ -28,27 +31,27 @@ tree1 f (x:y:ys) = tree1 f (ys ++ [f x y])
 tree :: (a -> a -> a) -> a -> [a] -> a
 tree f z xs = if null xs then z else tree1 f xs
 
--- Tree of bitwise-and
-andList :: KnownNat n => [Bit n] -> Bit n
-andList = tree (.&.) high
-
--- Tree of bitwise-or
-orList :: KnownNat n => [Bit n] -> Bit n
-orList = tree (.|.) low
-
 -- Adder tree
 sumList :: KnownNat n => [Bit n] -> Bit n
 sumList = tree (.+.) low
 
+-- Tree of bitwise-and
+andList :: Bits a => [a] -> a
+andList = unpack . tree (.&.) high . map pack
+
+-- Tree of bitwise-or
+orList :: Bits a => [a] -> a
+orList = unpack . tree (.|.) low . map pack
+
 -- One-hot select
-select :: KnownNat n => [(Bit 1, Bit n)] -> Bit n
-select alts = orList [replicateBit sel .&. val | (sel, val) <- alts]
+select :: Bits a => [(Bit 1, a)] -> a
+select alts =
+  unpack (orList [replicateBit sel .&. pack val | (sel, val) <- alts])
+
+-- Index a list
+index :: (KnownNat n, Bits a) => Bit n -> [a] -> a
+index i xs = select [(i .==. fromInteger j, x) | (j, x) <- zip [0..] xs]
 
 -- Mux
 (?) :: Bits a => Bit 1 -> (a, a) -> a
 c ? (a, b) = unpack (mux c (pack a) (pack b))
-
--- Reverse function application
-infixl 9 !
-(!) :: a -> (a -> b) -> b
-x!f = f x

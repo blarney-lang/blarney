@@ -13,6 +13,7 @@ fi
 
 EXTS="-XScopedTypeVariables -XDataKinds -XTypeOperators -XTypeFamilies"
 EXTS="$EXTS -XBinaryLiterals -XNoImplicitPrelude -XFlexibleContexts"
+EXTS="$EXTS -XRebindableSyntax "
 INC="$BLARNEY_ROOT/Haskell"
 MACROS="$BLARNEY_ROOT/Haskell/Blarney/Macros.h"
 

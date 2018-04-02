@@ -12,6 +12,7 @@ import Prelude
 import Blarney.Unbit
 import Blarney.DataFlow
 import Blarney.Partition
+import Blarney.IfThenElse
 import System.IO
 import System.Process
 import Data.Bits
