@@ -9,7 +9,7 @@ type Graph = IntMap [Vertex]
 
 -- Sets
 
-type MaxVertices = 2048
+type MaxVertices = 1628
 
 type Set = Bit MaxVertices
 
@@ -20,7 +20,7 @@ singleton :: Vertex -> Set
 singleton v = fromInteger (2 ^ toInteger v)
 
 size :: Set -> Bit 32
-size = zeroExtend . countOnes
+size = zeroExtend `o` countOnes
 
 union :: Set -> Set -> Set
 union = (.|.)
@@ -70,6 +70,6 @@ compile g = do
 
 -- Main function
 main :: IO ()
-main = readFile "n1.edges"
-   >>= netlist . compile . parseNetwork
+main = readFile "n4.edges"
+   >>= netlist `o` compile `o` parseNetwork
    >>= writeCXX "/tmp/asp"

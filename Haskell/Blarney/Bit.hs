@@ -200,7 +200,7 @@ a .>>. b = Bit (makePrim1 (ShiftRight wa) [unbit a, unbit b] wa)
   where wa = width a
 
 -- Shift right
-countOnes :: Bit (2^n) -> Bit (n+1)
+countOnes :: Bit n -> Bit (Log2 n + 1)
 countOnes a = Bit (makePrim1 (CountOnes wr) [unbit a] wr)
   where wr = log2 (width a) + 1
 

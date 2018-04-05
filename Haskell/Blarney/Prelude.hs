@@ -12,6 +12,7 @@ module Blarney.Prelude
   , select
   , index
   , (?)
+  , o
   ) where
 
 import Prelude
@@ -55,3 +56,9 @@ index i xs = select [(i .==. fromInteger j, x) | (j, x) <- zip [0..] xs]
 -- Mux
 (?) :: Bits a => Bit 1 -> (a, a) -> a
 c ? (a, b) = unpack (mux c (pack a) (pack b))
+
+-- Function composition
+infixr 9 `o`
+o :: (a -> b) -> (c -> a) -> c -> b
+(f `o` g) x = f (g x)
+
