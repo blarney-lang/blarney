@@ -10,11 +10,16 @@ if [ -z "$1" ]; then
   exit 1
 fi
 
+GHC="ghc --make"
+if [ `basename $0` == "blci" ]; then
+  GHC="ghci"
+fi
 
 EXTS="-XScopedTypeVariables -XDataKinds -XTypeOperators -XTypeFamilies"
 EXTS="$EXTS -XBinaryLiterals -XNoImplicitPrelude -XFlexibleContexts"
-EXTS="$EXTS -XRebindableSyntax "
+EXTS="$EXTS -XRebindableSyntax -XPartialTypeSignatures"
+WARN="-Wno-partial-type-signatures"
 INC="$BLARNEY_ROOT/Haskell"
 MACROS="$BLARNEY_ROOT/Haskell/Blarney/Macros.h"
 
-ghc -cpp -optP"-include$MACROS" -O $EXTS -i$INC --make $@
+$GHC $WARN -cpp -optP"-include$MACROS" -O $EXTS -i$INC $@

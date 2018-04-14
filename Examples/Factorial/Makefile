@@ -1,4 +1,5 @@
-Fact: Fact.hs
+.PHONY: all
+all: Fact.hs
 	blc Fact.hs
 
 clean:

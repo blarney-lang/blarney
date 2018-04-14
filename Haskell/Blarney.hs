@@ -27,7 +27,7 @@ import Blarney.Recipe
 import Blarney.IfThenElse
 import Control.Monad hiding (when)
 import GHC.TypeLits
-import Prelude as P hiding ((.))
+import Prelude as P hiding ((.), (<>))
 
 -- Reverse function application
 infixl 9 .

@@ -1,4 +1,3 @@
-{-# LANGUAGE DataKinds, ScopedTypeVariables #-}
 module Blarney.RAM where
 
 import Prelude
@@ -10,10 +9,11 @@ import Blarney.Prelude
 -- RAM interface
 data RAM a d =
   RAM {
-    load     :: a -> RTL ()
-  , store    :: a -> d -> RTL ()
-  , out      :: d
-  , out'     :: d
+    load :: a -> RTL ()
+  , store :: a -> d -> RTL ()
+  , out :: d
+  , out' :: d
+  , writeEn :: Bit 1
   }
 
 -- RAM module
@@ -41,7 +41,7 @@ makeRAMCore init = do
         writeEn <== 1
 
   -- Return interface
-  return (RAM load store (unpack output) (unpack output'))
+  return (RAM load store (unpack output) (unpack output') (val writeEn))
 
 makeRAMInit :: (Bits a, Bits d) => String -> RTL (RAM a d)
 makeRAMInit init = makeRAMCore (Just init)
@@ -95,8 +95,8 @@ makeTrueDualRAMCore init = do
         writeEnB <== 1
 
   -- Return interface
-  return (RAM loadA storeA (unpack outA) (unpack outA'),
-          RAM loadB storeB (unpack outB) (unpack outB'))
+  return (RAM loadA storeA (unpack outA) (unpack outA') (val writeEnA),
+          RAM loadB storeB (unpack outB) (unpack outB') (val writeEnB))
 
 makeTrueDualRAMInit :: (Bits a, Bits d) => String -> RTL (RAM a d, RAM a d)
 makeTrueDualRAMInit init = makeTrueDualRAMCore (Just init)
@@ -117,7 +117,7 @@ makeDualRAMCore init = do
   let storeB a d = store portB a d
 
   -- Return interface
-  return (RAM loadA storeB (out portA) (out' portA))
+  return (RAM loadA storeB (out portA) (out' portA) (writeEn portB))
 
 makeDualRAMInit :: (Bits a, Bits d) => String -> RTL (RAM a d)
 makeDualRAMInit init = makeDualRAMCore (Just init)
@@ -149,12 +149,12 @@ makeDualRAMPassthroughCore init = do
 
   let outMethod =
         (active' la .&. active' sa .&.
-           (pack (val' la) .==. pack (val' sa))) ?
+           (val' la .==. val' sa)) ?
               (val' sd, out ram)
 
   let outMethod' = unpack (reg 0 (pack outMethod))
 
-  return (RAM loadMethod storeMethod outMethod outMethod')
+  return (RAM loadMethod storeMethod outMethod outMethod' (writeEn ram))
 
 makeDualRAMPassthroughInit :: (Bits a, Bits d) => String -> RTL (RAM a d)
 makeDualRAMPassthroughInit init = makeDualRAMPassthroughCore (Just init)

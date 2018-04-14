@@ -2,6 +2,7 @@
 all:
 	blc ASPEngine.hs -cpp
 	blc ASPDirect.hs -cpp
+	blc ASPStream.hs -cpp
 
 clean:
-	rm -f *.o *.hi ASPEngine ASPDirect
+	rm -f *.o *.hi ASPEngine ASPDirect ASPStream

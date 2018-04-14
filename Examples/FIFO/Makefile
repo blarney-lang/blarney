@@ -1,4 +1,5 @@
-Fact:
+.PHONEY: all
+all:
 	blc FIFO.hs
 
 clean:

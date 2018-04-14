@@ -10,9 +10,9 @@ fact = do
   let recipe =
         Seq [
           n := 10,
-          While (val n .>. 0) $ Par [
-              n := val n - 1,
-              acc := val acc + val n
+          While (n.val .>. 0) $ Par [
+              n := n.val - 1,
+              acc := acc.val + n.val
           ]
         ]
        
@@ -24,7 +24,7 @@ fact = do
 
   -- Display result and terminate simulation
   when done $ do
-    display "fact(10) = " (val acc)
+    display "fact(10) = " (acc.val)
     finish
 
   return ()

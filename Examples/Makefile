@@ -15,3 +15,4 @@ clean:
 	make -C UpDownCounter clean
 	make -C RAM clean
 	make -C CPU clean
+	make -C Queue clean

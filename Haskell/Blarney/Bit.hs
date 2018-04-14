@@ -17,8 +17,8 @@ module Blarney.Bit
   , (.|.)            -- Bitwise or
   , (.^.)            -- Bitwise xor
   , mux              -- Mux
-  , (.==.)           -- Equality
-  , (.!=.)           -- Disequality
+  , eq               -- Equality
+  , neq              -- Disequality
   , (.<.)            -- Less than
   , (.>.)            -- Greater than
   , (.<=.)           -- Less than or equal
@@ -56,6 +56,7 @@ import Blarney.IfThenElse
 import Data.Proxy
 import GHC.TypeLits
 import Prelude
+import qualified Data.Bits as B
 
 -- Phantom type wrapping an untyped bit vector, capturing the bit width
 newtype Bit (n :: Nat) = Bit { unbit :: Unbit }
@@ -107,15 +108,13 @@ a .^. b = Bit (makePrim1 (Xor wa) [unbit a, unbit b] wa)
   where wa = width a
 
 -- Equality
-infix 4 .==.
-(.==.) :: Bit n -> Bit n -> Bit 1
-a .==. b = Bit (makePrim1 (Equal wa) [unbit a, unbit b] 1)
+eq :: Bit n -> Bit n -> Bit 1
+a `eq` b = Bit (makePrim1 (Equal wa) [unbit a, unbit b] 1)
   where wa = width a
 
 -- Disequality
-infix 4 .!=.
-(.!=.) :: Bit n -> Bit n -> Bit 1
-a .!=. b = Bit (makePrim1 (NotEqual wa) [unbit a, unbit b] 1)
+neq :: Bit n -> Bit n -> Bit 1
+a `neq` b = Bit (makePrim1 (NotEqual wa) [unbit a, unbit b] 1)
   where wa = width a
 
 -- Less than
@@ -170,7 +169,7 @@ instance KnownNat n => Num (Bit n) where
   (*)           = (.*.)
   negate a      = inv a .+. 1
   abs           = id
-  signum a      = mux (a .==. 0) 0 1
+  signum a      = mux (a `eq` 0) 0 1
   fromInteger i = result
    where
      result     = Bit (makePrim1 (Const w i) [] w)
@@ -211,10 +210,20 @@ reg init a = Bit (makePrim1 (Register (getInit (unbit init)) w) [unbit a] w)
 
 -- Determine initialiser
 getInit :: Unbit -> Integer
-getInit a =
-  case unbitPrim a of
-    Const _ i -> i
-    other -> error "Register initialiser must be a constant"
+getInit = eval
+  where
+    eval a = 
+      case unbitPrim a of
+        Const _ i -> i
+        Concat wx wy ->
+          let x = eval (unbitInputs a !! 0)
+              y = eval (unbitInputs a !! 1)
+          in  x `B.shiftL` wy + y
+        SelectBits w hi lo ->
+          let x    = eval (unbitInputs a !! 0)
+              mask = (1 `B.shiftL` hi) - 1
+          in  (x B..&. mask) `B.shiftR` lo
+        other -> error "Register initialiser must be a constant"
 
 -- Register with enable
 regEn :: Bit n -> Bit 1 -> Bit n -> Bit n

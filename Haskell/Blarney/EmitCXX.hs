@@ -494,7 +494,7 @@ emitConcatInst :: Net -> Width -> Width -> String
 emitConcatInst net aw bw
   | (aw+bw) <= 64 =
          emitWire (netInstId net, 0)
-      ++ " = ("
+      ++ " = ((uint64_t) "
       ++ emitInput (netInputs net !! 0)
       ++ " << " ++ show bw
       ++ ") | "
@@ -694,7 +694,9 @@ emitDisplay net args =
          "printf(\"%s\", " ++ show s ++ ");"
       ++ emitDisp args inps
     emitDisp (DisplayArgBit w : args) (inp:inps)
-      | w <= 64   = "printf(\"0x%x\", " ++ emitInput inp ++ "); "
+      | w <= 32   = "printf(\"0x%x\", " ++ emitInput inp ++ "); "
+                 ++ emitDisp args inps
+      | w <= 64   = "printf(\"0x%lx\", " ++ emitInput inp ++ "); "
                  ++ emitDisp args inps
       | otherwise = "printBU(" ++ emitInput inp ++ "); "
                  ++ emitDisp args inps

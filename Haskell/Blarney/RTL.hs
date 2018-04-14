@@ -3,7 +3,15 @@
       TypeFamilies, RebindableSyntax, MultiParamTypeClasses,
         FlexibleContexts, ScopedTypeVariables, FlexibleInstances #-}
 
-module Blarney.RTL where
+module Blarney.RTL (
+  RTL,
+  Var(..), DisplayType(..),
+  Reg(..), makeReg, makeRegInit, makeDReg,
+  Wire(..), makeWire, makeWireDefault,
+  when, whenNot, switch, (-->),
+  finish, display, output,
+  netlist
+) where
 
 import Prelude
 import Blarney.Bit
@@ -153,7 +161,7 @@ instance IfThenElse (Bit 1) (RTL ()) where
 switch :: Bits a => a -> [(a, RTL ())] -> RTL ()
 switch subject alts =
   forM_ alts $ \(lhs, rhs) ->
-    when (pack subject .==. pack lhs) rhs
+    when (pack subject `eq` pack lhs) rhs
 
 -- Operator for switch statement alternatives
 infixl 0 -->
