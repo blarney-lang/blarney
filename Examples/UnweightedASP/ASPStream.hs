@@ -111,6 +111,10 @@ makeASPEngine = do
   -- Sum of all shortest paths found so far
   sumPaths :: Reg (Bit 32) <- makeReg
 
+  -- Timer
+  timer :: Reg (Bit 32) <- makeRegInit 0
+  timer <== timer.val + 1
+
   -- Feed the pipeline until all vertices reach all other vertices
   let control =
         Seq [
@@ -135,7 +139,7 @@ makeASPEngine = do
           ],
           -- Finished!
           Do [
-            display "Sum = n*(n-1)+" (sumPaths.val),
+            display "Sum = n*(n-1)+" (sumPaths.val) ", cycles = " (timer.val),
             finish
           ]
         ]

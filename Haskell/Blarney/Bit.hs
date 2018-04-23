@@ -48,6 +48,7 @@ module Blarney.Bit
   , input            -- External input
   , widthOf          -- Determine width of bit vector from type
   , liftNat          -- Lift integer value to type-level natural
+  , fromList         -- Create bit vector from list of bits
   ) where
 
 import Blarney.Unbit
@@ -384,3 +385,18 @@ liftNat nat k =
   case someNatVal (toInteger nat) of
     Just (SomeNat (x :: Proxy n)) -> do
       k x
+
+-- Convert list of bits to bit vector
+fromList :: KnownNat n => [Bit 1] -> Bit n
+fromList [] = error "fromList: applied to empty list"
+fromList (x:xs)
+  | length (x:xs) == n = result
+  | otherwise =
+     error ("fromList: bit vector width mismatch: " ++ show (n, length (x:xs)))
+  where
+    n       = widthOf result
+    result  = Bit (snd $ join (x:xs))
+    join [x] = (1, unbit x)
+    join (x:xs) = 
+      let (n, y) = join xs in
+        (n+1, makePrim1 (Concat n 1) [y, unbit x] (n+1))
