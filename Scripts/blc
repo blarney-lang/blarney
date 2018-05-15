@@ -20,6 +20,7 @@ EXTS="$EXTS -XBinaryLiterals -XNoImplicitPrelude -XFlexibleContexts"
 EXTS="$EXTS -XRebindableSyntax -XPartialTypeSignatures"
 WARN="-Wno-partial-type-signatures"
 INC="$BLARNEY_ROOT/Haskell"
+INC_H="$BLARNEY_ROOT/Haskell/Blarney/"
 MACROS="$BLARNEY_ROOT/Haskell/Blarney/Macros.h"
 
-$GHC $WARN -cpp -optP"-include$MACROS" -O $EXTS -i$INC $@
+$GHC $WARN -cpp -I$INC_H -optP"-include$MACROS" -O $EXTS -i$INC $@

@@ -4,4 +4,4 @@ all:
 	blc Spec.hs
 
 clean:
-	rm -f *.o *.hi CPU
+	rm -f *.o *.hi CPU Spec

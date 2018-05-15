@@ -12,6 +12,8 @@ import Blarney.RAM
 import Blarney.RegFile
 import Blarney.BitPat
 
+#include "BitPat.h"
+
 makeCPUSpec :: RTL ()
 makeCPUSpec = do
   -- Instruction memory
@@ -48,10 +50,10 @@ makeCPUSpec = do
   -- Instruction dispatch
   match (instrMem!(pc.val))
     [
-      pv(2) <> pv(4)          <> pn(2,0b01) ==> li,
-      pv(2) <> pv(2) <> pv(2) <> pn(2,0b01) ==> add,
-      pv(4) <>          pv(2) <> pn(2,0b10) ==> bnz,
-      pv(6) <>                   pn(2,0b11) ==> halt
+      Var(2) <> Var(4)           <> Lit(2,0b01) ==> li,
+      Var(2) <> Var(2) <> Var(2) <> Lit(2,0b01) ==> add,
+      Var(4) <>           Var(2) <> Lit(2,0b10) ==> bnz,
+      Var(6) <>                     Lit(2,0b11) ==> halt
     ]
 
 main :: IO ()
