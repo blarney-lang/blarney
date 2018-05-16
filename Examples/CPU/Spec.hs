@@ -11,16 +11,12 @@ import Blarney
 import Blarney.RAM
 import Blarney.RegFile
 import Blarney.BitPat
-
 #include "BitPat.h"
 
 makeCPUSpec :: RTL ()
 makeCPUSpec = do
   -- Instruction memory
-  -- TODO implement makeRegArray -- Verilog array of regs
-  -- instead of makeRegFile?
-  --instrMem :: RAM (Bit 8) (Bit 8) <- makeRAMInit "instrs.hex"
-  instrMem :: RegFile (Bit 5) (Bit 8) <- makeRegFile
+  instrMem :: RAM (Bit 5) (Bit 8) <- makeRAMInit "instrs.hex"
 
   -- Register file
   regFile :: RegFile (Bit 2) (Bit 8) <- makeRegFile
@@ -28,15 +24,21 @@ makeCPUSpec = do
   -- Program counter
   pc :: Reg (Bit 5) <- makeRegInit 0
 
+  -- Are we fetching (1) or executing (0)
+  fetch :: Reg (Bit 1) <- makeRegInit 1
+
   -- Load immediate instruction
   let li rd imm = do
         update regFile rd (zeroExtend imm)
         pc <== pc.val + 1
+        display "rf[" rd "] := " imm
 
   -- Add instruction
   let add rd rs0 rs1 = do
-        update regFile rd (regFile!rs0 + regFile!rs1)
+        let sum = regFile!rs0 + regFile!rs1
+        update regFile rd sum
         pc <== pc.val + 1
+        display "rf[" rd "] := " sum
 
   -- Branch instruction
   let bnz offset rs = do
@@ -47,14 +49,21 @@ makeCPUSpec = do
   -- Halt instruction
   let halt imm = finish
 
-  -- Instruction dispatch
-  match (instrMem!(pc.val))
-    [
-      Var(2) <> Var(4)           <> Lit(2,0b01) ==> li,
-      Var(2) <> Var(2) <> Var(2) <> Lit(2,0b01) ==> add,
-      Var(4) <>           Var(2) <> Lit(2,0b10) ==> bnz,
-      Var(6) <>                     Lit(2,0b11) ==> halt
-    ]
+  -- Fetch
+  when (fetch.val) $ do
+    load instrMem (pc.val)
+    fetch <== 0
+
+  -- Execute
+  when (fetch.val.inv) $ do
+    match (instrMem.out)
+      [
+        Var(2) <> Var(4)           <> Lit(2,0b00) ==> li,
+        Var(2) <> Var(2) <> Var(2) <> Lit(2,0b01) ==> add,
+        Var(4) <>           Var(2) <> Lit(2,0b10) ==> bnz,
+        Var(6) <>                     Lit(2,0b11) ==> halt
+      ]
+    fetch <== 1
 
 main :: IO ()
-main = return ()
+main = netlist makeCPUSpec >>= writeCXX "/tmp/spec"

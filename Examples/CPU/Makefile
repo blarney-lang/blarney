@@ -1,6 +1,6 @@
 .PHONY: all
 all:
-	#blc CPU.hs
+	blc CPU.hs
 	blc Spec.hs
 
 clean:
