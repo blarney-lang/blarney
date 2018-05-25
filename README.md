@@ -9,10 +9,10 @@ requires GHC 8.4.1 or later.
 
 ## Example 1: Two-sort
 
-Sorting makes for a good introduction to Blarney.  Let's start with
-perhaps the simplest kind of sorter possible: one that sorts just two
-inputs.  Given a pair of 8-bit values, the function `twoSort` returns
-the sorted pair.
+Sorting makes for a good introduction to the library.  Let's start
+with perhaps the simplest kind of sorter possible: one that sorts just
+two inputs.  Given a pair of 8-bit values, the function `twoSort`
+returns the sorted pair.
 
 ```hs
 import Blarney
@@ -156,9 +156,33 @@ core](https://pdfs.semanticscholar.org/de30/22efc5aec833d7b52bd4770a382fea729bba
 -- one of the classic Lava papers -- for a more in-depth exploration
 of sorting circuits in Haskell.
 
-## Example 3: Basic RTL
+## Example 3: Bit-width polymorphism
 
-So far, we have only seen the `display` and `finish` actions of the
+For simplicity, we've made our sorter specific to lists of 8-bit
+values.  We can make it generic to any bit-width by redefining
+`twoSort` as
+
+```hs
+twoSort :: KnownNat n => (Bit n, Bit n) -> (Bit n, Bit n)
+twoSort (a, b) = a .<. b ? ((a, b), (b, a))
+```
+
+The `KnownNat n` constraint is Haskell's way of saying that it must be
+possible to convert the type-level number `n` to a value-level number.
+This constraint appears almost any time a bit-vector with polymorphic
+width occurs.  And since it is satisfiable for any type-level number,
+it doesn't really carry any useful information.  Therefore, we
+recommend the use of *partial type signatures* in GHC to avoid having
+to write `KnownNat` constraints:
+
+```hs
+twoSort :: _ => (Bit n, Bit n) -> (Bit n, Bit n)
+twoSort (a, b) = a .<. b ? ((a, b), (b, a))
+```
+
+## Example 4: Basic RTL
+
+So far, we've only seen the `display` and `finish` actions of the
 RTL monad.  The RTL monad also supports creation and assignment of
 registers.  To illustrate, here is a piece of RTL that creates a
 4-bit `cycleCount` register, increments it on each cycle, stopping
@@ -218,4 +242,5 @@ cycleCount = 0xa
 Finished
 ```
 
-## Lots to come!
+
+## More to come!
