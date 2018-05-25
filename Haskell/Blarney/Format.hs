@@ -51,3 +51,10 @@ instance FShow Format where
 
 instance (FShow a, FShow b) => FShow (a, b) where
   fshow (a, b) = format "(" (fshow a) "," (fshow b) ")"
+
+instance FShow [Bit n] where
+  fshow xs = format "[" <.> list xs <.> format "]"
+    where
+      list [] = emptyFormat
+      list [x] = fshow x
+      list (x:xs) = fshow x <.> format "," <.> list xs

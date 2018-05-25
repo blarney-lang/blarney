@@ -6,6 +6,7 @@ module Blarney.EmitCXX
   , writeCXXWith
   , writeCXX
   , writeCXXMulti
+  , generateCXX
   ) where
 
 import Prelude
@@ -16,6 +17,7 @@ import Blarney.IfThenElse
 import System.IO
 import System.Process
 import Data.Bits
+import Blarney.RTL
 import qualified Data.IntSet as IS
 
 -- Parameters for C++ generator
@@ -64,6 +66,10 @@ writeCXXWith params netlistIn = do
 
   -- Emit makefile
   writeMakefile params
+
+-- Compile to netlist and then write C++
+generateCXX :: RTL () -> String -> IO ()
+generateCXX top dir = netlist top >>= writeCXX dir
 
 -- List of lines of code
 type Code = [String]

@@ -1,3 +1,3 @@
 -- For easy type-safe bit-vector indexing
-#define bit(i)      (tbit (__ :: nat i))
-#define bits(hi,lo) (tbits (__ :: nat hi, __ :: nat lo))
+#define bit(i)      (typedGetBit (__ :: nat i))
+#define bits(hi,lo) (typedGetBits (__ :: nat hi, __ :: nat lo))

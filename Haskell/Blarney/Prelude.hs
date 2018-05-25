@@ -73,6 +73,7 @@ index :: (KnownNat n, Bits a) => Bit n -> [a] -> a
 index i xs = select [(i .==. fromInteger j, x) | (j, x) <- zip [0..] xs]
 
 -- Mux
+infixl 3 ?
 (?) :: Bits a => Bit 1 -> (a, a) -> a
 c ? (a, b) = unpack (mux c (pack a) (pack b))
 

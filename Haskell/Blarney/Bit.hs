@@ -38,8 +38,8 @@ module Blarney.Bit
   , (#)              -- Bit concatenation
   , getBit           -- Bit selection
   , getBits          -- Bit range selection
-  , tbit             -- Bit selection (type-level indices)
-  , tbits            -- Bit range selection (type-level indices)
+  , typedGetBit      -- Bit selection (type-level indices)
+  , typedGetBits     -- Bit range selection (type-level indices)
   , zeroExtend       -- Zero extend
   , signExtend       -- Sign extend
   , upper            -- Extract most significant bits
@@ -308,8 +308,8 @@ getBit i a = Bit (makePrim1 p [unbit a] 1)
           SelectBits (width a) i i
 
 -- Bit selection using type-level number
-tbit :: (KnownNat i, KnownNat n, (i+1) <= n) => nat i -> Bit n -> Bit 1
-tbit i a = getBit (fromInteger $ natVal i) a
+typedGetBit :: (KnownNat i, KnownNat n, (i+1) <= n) => nat i -> Bit n -> Bit 1
+typedGetBit i a = getBit (fromInteger $ natVal i) a
 
 -- Sub-range selection
 getBits :: (KnownNat m, m <= n) => (Int, Int) -> Bit n -> Bit m
@@ -323,10 +323,10 @@ getBits (hi, lo) a = result
           SelectBits (width a) hi lo
 
 -- Bit selection using type-level number
-tbits :: (KnownNat n, KnownNat m, KnownNat hi, KnownNat lo,
-            (lo+m) ~ (hi+1), (hi+1) <= n, m <= n) =>
-         (nat hi, nat lo) -> Bit n -> Bit m
-tbits (hi, lo) a = getBits (fromInteger $ natVal hi,
+typedGetBits :: (KnownNat n, KnownNat m, KnownNat hi, KnownNat lo,
+                  (lo+m) ~ (hi+1), (hi+1) <= n, m <= n) =>
+                (nat hi, nat lo) -> Bit n -> Bit m
+typedGetBits (hi, lo) a = getBits (fromInteger $ natVal hi,
                             fromInteger $ natVal lo) a
 
 -- Zero extend
