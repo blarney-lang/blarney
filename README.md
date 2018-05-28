@@ -256,18 +256,18 @@ data Queue a =
   , notFull  :: Bit 1        -- Is there any space in the queue?
   , enq      :: a -> RTL ()  -- Insert an element
   , deq      :: RTL ()       -- Remove the first element
-  , canDeq   :: Bit 1        -- Guard on the deq method
+  , canDeq   :: Bit 1        -- Guard on the deq and first methods
   , first    :: a            -- View the first element
   }
 ```
 
 The type `Queue a` represents a queue holding elements of type `a`,
-adnd provides a range of standard functions on queues.  The `enq`
-should only be called the queue is `notFull` and the `deq` method
-should only be called when `canDeq` is true.  Similarly, the `first`
-element of the queue is only valid when `canDeq` is true.  Below, we
-demonstrate the simplest possible implementation of a one-element
-queue.
+and provides a range of standard functions on queues.  The `enq`
+method should only be called when `notFull` is true and the `deq`
+method should only be called when `canDeq` is true.  Similarly, the
+`first` element of the queue is only valid when `canDeq` is true.
+Below, we demonstrate the simplest possible implementation of a
+one-element queue.
 
 ```hs
 -- Simple one-element queue implementation
@@ -292,16 +292,16 @@ makeSimpleQueue = do
   return (Queue notEmpty notFull enq deq canDeq first)
 ```
 
-The following simple test bench illustrates how the queue can be used.
+The following simple test bench illustrates how to use a queue.
 
 ```hs
 -- Small test bench for queues
 top :: RTL ()
 top = do
-  -- Instantiate a queue
+  -- Instantiate a queue if 8-bit values
   queue :: Queue (Bit 8) <- makeSimpleQueue
 
-  -- Create a count register
+  -- Create an 8-bit count register
   count :: Reg (Bit 8) <- makeRegInit 0
   count <== count.val + 1
 
