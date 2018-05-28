@@ -7,6 +7,16 @@ primitives.  It can be viewed as a modern variant of
 that supports a variety of hardware description styles.  Blarney
 requires GHC 8.4.1 or later.
 
+## Contents
+
+* [Example 1: Two-sort](#example-1-two-sort)
+* [Example 2: Bubble sort](#example-2-bubble-sort)
+* [Example 3: Bit-width polymorphism](#example-3-bit-width-polymorphism)
+* [Example 4: Basic RTL](#example-4-basic-rtl)
+* [Example 5: Queues](#example-5-queues)
+* [Example 6: Wires](#example-6-wires)
+* [Example 7: Recipes](#example-7-recipes)
+
 ## Example 1: Two-sort
 
 Sorting makes for a good introduction to the library.  Let's start
@@ -85,7 +95,7 @@ twoSort (0x2,0x1) = (0x1,0x2)
 
 It looks like `twoSort` is working!
 
-As well as generating C++ for simulation, Blarney suppoerts generation
+As well as generating C++ for simulation, Blarney supports generation
 of synthesisable Verilog.  Instead of calling `generateCXX` we simply
 call `generateVerilog`.
 
@@ -442,19 +452,19 @@ top = do
   counter :: Counter 4 <- mkCounter
 
   -- Sample test sequence
-  test =
-    Seq [
-      Block $ do
-        counter.inc
-    , Block $ do
-        counter.inc
-    , Block $ do
-        counter.inc
-        counter.dec
-    , Block $ do
-        display "counter = " (counter.output)
-        finish
-    ]
+  let test =
+        Seq [
+          Block $ do
+            counter.inc
+        , Block $ do
+            counter.inc
+        , Block $ do
+            counter.inc
+            counter.dec
+        , Block $ do
+            display "counter = " (counter.output)
+            finish
+        ]
 
   runOnce test
 ```
