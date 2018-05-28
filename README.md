@@ -242,5 +242,135 @@ cycleCount = 0xa
 Finished
 ```
 
+## Example 5: Queues
+
+Queues (also known as FIFOs) are very commonly used abstraction in
+hardware design.  Blarney provides a wide range of different queue
+implementations, all of which implement the following interface.
+
+```hs
+-- Queue interface
+data Queue a =
+  Queue {
+    notEmpty :: Bit 1        -- Is the queue non-empty?
+  , notFull  :: Bit 1        -- Is there any space in the queue?
+  , enq      :: a -> RTL ()  -- Insert an element
+  , deq      :: RTL ()       -- Remove the first element
+  , canDeq   :: Bit 1        -- Guard on the deq method
+  , first    :: a            -- View the first element
+  }
+```
+
+The type `Queue a` represents a queue holding elements of type `a`,
+adnd provides a range of standard functions on queues.  The `enq`
+should only be called the queue is `notFull` and the `deq` method
+should only be called when `canDeq` is true.  Similarly, the `first`
+element of the queue is only valid when `canDeq` is true.  Below, we
+demonstrate the simplest possible implementation of a one-element
+queue.
+
+```hs
+-- Simple one-element queue implementation
+makeSimpleQueue :: Bits a => RTL (Queue a)
+makeSimpleQueue = do
+  -- Register holding the one element
+  reg :: Reg a <- makeReg
+
+  -- Register defining whether or not queue is full
+  full :: Reg (Bit 1) <- makeRegInit 0
+
+  -- Methods
+  let notFull  = full.val .==. 0
+  let notEmpty = full.val .==. 1
+  let enq a    = do reg <== a
+                    full <== 1
+  let deq      = full <== 0
+  let canDeq   = full.val .==. 1
+  let first    = reg.val
+
+  -- Return interface
+  return (Queue notEmpty notFull enq deq canDeq first)
+```
+
+The following simple test bench illustrates how the queue can be used.
+
+```hs
+-- Small test bench for queues
+top :: RTL ()
+top = do
+  -- Instantiate a queue
+  queue :: Queue (Bit 8) <- makeSimpleQueue
+
+  -- Create a count register
+  count :: Reg (Bit 8) <- makeRegInit 0
+  count <== count.val + 1
+
+  -- Writer side
+  when (queue.notFull) $ do
+    enq queue (count.val)
+    display "Enqueued " (count.val)
+
+  -- Reader side
+  when (queue.canDeq) $ do
+    deq queue
+    display "Dequeued " (queue.first)
+
+  -- Terminate after 100 cycles
+  when (count.val .==. 100) finish
+```
+
+## Example 6: Wires
+
+*Wires* are a feature of the RTL monad that offer a way for separate
+RTL blocks to communicate *within the same clock cycle*.  Whereas
+assignment to a register becomes visible on the clock cycle after the
+assigment occurs, assignment to a wire is visible on the same cycle as
+the assignment.  If no assignment is made to a wire on a particular
+cycle, then the wire emits its *default value* on that cycle.  When
+multiple assignments to the same wire occur on the same cycle, the
+wire emits the bitwise disjunction of all the assigned values.
+
+To illustrate, let's implement an *n*-bit counter module that supports
+increment and decerement operations.
+
+```hs
+-- Interface for a n-bit counter
+data Counter n =
+  Counter {
+    inc    :: RTL ()
+  , dec    :: RTL ()
+  , output :: Bit n
+  }
+```
+
+We'd like the counter to support *parallel calls* to `inc` and `dec`.
+That is, if `inc` and `dec` are called on the same cycle then the
+counter's `output` is unchanged.  We'll achieve this using wires.
+
+```hs
+makeCounter :: _ => RTL (Counter n)
+makeCounter = do
+  -- State
+  count :: Reg (Bit n) <- makeRegInit 0
+
+  -- Wires
+  incWire :: Wire (Bit 1) <- makeWireDefault 0
+  decWire :: Wire (Bit 1) <- makeWireDefault 0
+
+  -- Increment
+  when (incWire.val .&. decWire.val.inv) $ do
+    count <== count.val + 1
+
+  -- Decrement
+  when (incWire.val.inv .&. decWire.val) $ do
+    count <== count.val - 1
+
+  -- Interface
+  let inc    = incWire <== 1
+  let dec    = decWire <== 1
+  let output = count.val
+
+  return (Counter inc dec output)
+```
 
 ## More to come!
