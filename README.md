@@ -85,6 +85,15 @@ twoSort (0x2,0x1) = (0x1,0x2)
 
 It looks like `twoSort` is working!
 
+As well as generating C++ for simulation, Blarney suppoerts generation
+of synthesisable Verilog.  Instead of calling `generateCXX` we simply
+call `generateVerilog`.
+
+```hs
+main :: IO ()
+main = generateVerilog top "/tmp/twoSort.v"
+```
+
 ## Example 2: Bubble sort
 
 We can build a general *N*-element sorter by connecting together

@@ -3,11 +3,13 @@
 module Blarney.EmitVerilog
   ( printVerilog
   , writeVerilog
+  , generateVerilog
   ) where
 
 import Prelude
 import Blarney.Unbit
 import Blarney.IfThenElse
+import Blarney.RTL
 import System.IO
 import Data.Maybe
 import Control.Monad
@@ -20,6 +22,9 @@ writeVerilog filename netlist = do
   h <- openFile filename WriteMode
   hWriteVerilog h netlist
   hClose h
+
+generateVerilog :: String -> RTL () -> IO ()
+generateVerilog filename top = netlist top >>= writeVerilog filename
 
 hWriteVerilog :: Handle -> [Net] -> IO ()
 hWriteVerilog h netlist = do
