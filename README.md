@@ -373,4 +373,86 @@ makeCounter = do
   return (Counter inc dec output)
 ```
 
+## Example 7: Recipes
+
+State machines are a very common way of defining the control-path of a
+hardware core.  They are often written by case-switching on the
+current state and manually setting the next state.  Quite often
+however, they can be expressed more neatly as a `Recipe`.
+
+```hs
+data Recipe = 
+    Skip                   -- Do nothing (in zero cycles)
+  | Tick                   -- Do nothing (in one cycle)
+  | Block (RTL ())         -- Perform RTL block (in one cycle)
+  | Seq [Recipe]           -- Execute recipes in sequence
+  | Par [Recipe]           -- Fork-join parallelism
+  | If (Bit 1) Recipe      -- Conditional recipe
+  | While (Bit 1) Recipe   -- Loop
+```
+
+To illustrate, here is a small state machine that computes the
+factorial of 10.
+
+```hs
+fact :: RTL ()
+fact = do
+  -- State
+  n   :: Reg (Bit 32) <- makeRegInit 0
+  acc :: Reg (Bit 32) <- makeRegInit 0
+
+  -- Compute factorial of 10
+  let recipe =
+        Seq [
+          Block $ do
+            n <== 10
+        , While (n.val .>. 0) $ Block $ do
+            n <== n.val - 1
+            acc <== acc.val + n.val
+        , Block $ do
+            display "fact(10) = " (acc.val)
+            finish
+        ]
+       
+  runOnce recipe 
+```
+
+Blarney provides a very lightweight compiler for the `Recipe`
+language (under 100 lines of code), which we invoke above through the
+call to `runOnce`.
+
+A very commoon use of recipes is to define test sequences.  For
+example, here is a sample test sequence for the `Counter` module
+defined earlier.
+
+```hs
+-- Test-bench for a counter
+top :: RTL ()
+top = do
+  -- Instantiate an 4-bit counter
+  counter :: Counter 4 <- mkCounter
+
+  -- Sample test sequence
+  test =
+    Seq [
+      Block $ do
+        counter.inc
+    , Block $ do
+        counter.inc
+    , Block $ do
+        counter.inc
+        counter.dec
+    , Block $ do
+        display "counter = " (counter.output)
+        finish
+    ]
+
+  runOnce test
+```
+
+Here, we increment `counter` on the first cycle, and then again on the
+second cycle.  On the third cycle, we both increment and decrement it
+in parallel.  On the fourth cycle, we display the value and terminate
+the simulator.
+
 ## More to come!
