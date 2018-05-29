@@ -888,7 +888,7 @@ that maps a given bit-vector to the bit at index `i` of that vector.
 to  a function that maps a given bit-vector to bits `hi` down to `lo`
 of that vector.
 
-To illustrate, Here's an example of using the `bits(hi,lo)` macro to
+To illustrate, here's an example of using the `bits(hi,lo)` macro to
 select the upper four bits of a byte.
 
 ```hs
