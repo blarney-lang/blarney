@@ -15,10 +15,10 @@ import Blarney.BitPat
 
 makeCPUSpec :: RTL ()
 makeCPUSpec = do
-  -- Instruction memory
+  -- Instruction memory (containing 32 instructions)
   instrMem :: RAM (Bit 5) (Bit 8) <- makeRAMInit "instrs.hex"
 
-  -- Register file
+  -- Register file (containing 4 registers)
   regFile :: RegFile (Bit 2) (Bit 8) <- makeRegFile
 
   -- Program counter

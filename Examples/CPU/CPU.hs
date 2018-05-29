@@ -140,4 +140,4 @@ makeCPU = do
 
 -- Main function
 main :: IO ()
-main = netlist makeCPU >>= writeCXX "/tmp/cpu"
+main = generateCXX makeCPU "/tmp/cpu"

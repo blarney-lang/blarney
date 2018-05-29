@@ -1,13 +1,15 @@
 # Blarney
 
 Blarney is a Haskell library for hardware description that builds a
-range of HDL features on top of a small set of core circuit
+range of HDL abstractions on top of a small set of core circuit
 primitives.  It can be viewed as a modern variant of
 [Lava](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.110.5587&rep=rep1&type=pdf)
 that supports a variety of hardware description styles.  Blarney
-requires GHC 8.4.1 or later.
+requires GHC 8.4.1 or later and we hope to make a release sometime in 2018.
 
 ## Contents
+
+Examples:
 
 * [Example 1: Two-sort](#example-1-two-sort)
 * [Example 2: Bubble sort](#example-2-bubble-sort)
@@ -19,6 +21,11 @@ requires GHC 8.4.1 or later.
 * [Example 8: Block RAMs](#example-8-block-rams)
 * [Example 9: Streams](#example-9-streams)
 * [Example 10: Bit-string pattern matching](#example-10-bit-string-pattern-matching)
+* [Example 11: Tiny 8-bit CPU](#example-11-tiny-8-bit-cpu)
+
+APIs:
+
+* [API 1: Blarney primitives](#api-1-blarney-primitives)
 
 ## Example 1: Two-sort
 
@@ -35,7 +42,7 @@ twoSort (a, b) = a .<. b ? ((a, b), (b, a))
 ```
 
 This definition makes use of two [Blarney
-primitives](a-blarney-primitives).  The first is the unsigned
+primitives](api-1-blarney-primitives).  The first is the unsigned
 comparison operator
 
 ```hs
@@ -521,6 +528,23 @@ top = do
   runOnce test
 ```
 
+Somewhat-related to block RAMs are *register files*.  The difference
+is that a register file allows the value at an address to be
+determined *within* a clock cycle.  It also allows any number of reads
+and writes to be performed within the same cycle.  Register files have
+the following interface.
+
+```hs
+data RegFile a d =
+  RegFile {
+    (!)    :: a -> d              -- Read
+  , update :: a -> d -> RTL ()    -- Write
+  }
+```
+
+Unlike block RAMs, register files (especially large ones) do not
+always map efficiently onto hardware, so use with care!
+
 ## Example 9: Streams
 
 Streams are another commonly-used abstraction in hardware description.
@@ -598,7 +622,7 @@ addi imm rs1 rd =
 -- Instruction dispatch
 top :: RTL ()
 top = do
-  -- Sample instruction
+  -- Sample RISC-V add instruction
   let instr :: Bit 32 = 0b00000000000100010000000110110011
 
   -- Dispatch
@@ -638,7 +662,7 @@ sw imm rs2 rs1 = display "sw " rs2 ", " rs1 "[" imm "]"
 
 top :: RTL ()
 top = do
-  -- Sample instruction
+  -- Sample RISC-V store-word instruction
   let instr :: Bit 32 = 0b10000000000100010010000010100011
 
   -- Dispatch
@@ -658,4 +682,211 @@ passed to the right-hand-side function.  Scattered immediates appear
 *a lot* in the RISC-V specification.  Thanks to Jon Woodruff for
 suggesting this feature!
 
-## More to come!
+## Example 11: Tiny 8-bit CPU
+
+As a way of briging together a number of the ideas introduced above,
+let's define a very simple, non-pipelined 8-bit CPU with the following
+ISA.
+
+  Opcode     | Meaning
+  ---------- | ---------
+  `ZZNNNN00` | Write value `0000NNNN` to register `ZZ`
+  `ZZXXYY01` | Add register `XX` to register `YY` and store in register `ZZ`
+  `NNNNYY10` | Branch back by `NNNN` instructions if register `YY` is non-zero
+  `NNNNNN11` | Halt
+
+To begin, let's consider a non-pipelined implementation of this ISA,
+which has a CPI (cycles-per-instruction) of two: one cycle is used to
+fetch the next instruction, and one cycle is used to execute it.  The
+CPU will execute the program defined in the file `instrs.hex`.
+
+```hs
+-- Instructions
+type Instr = Bit 8
+
+-- Register identifiers
+type RegId = Bit 2
+
+-- Tiny 8-bit CPU
+makeTinyCPU :: RTL ()
+makeTinyCPU = do
+  -- Instruction memory
+  instrMem :: RAM (Bit 8) Instr <- makeRAMInit "instrs.hex"
+
+  -- Register file (containing 4 registers)
+  regFile :: RegFile RegId (Bit 8) <- makeRegFile
+
+  -- Program counter
+  pc :: Reg (Bit 8) <- makeRegInit 0
+
+  -- Are we fetching (1) or executing (0)
+  fetch :: Reg (Bit 1) <- makeRegInit 1
+
+  -- Load immediate instruction
+  let li rd imm = do
+        update regFile rd (zeroExtend imm)
+        pc <== pc.val + 1
+        display "rf[" rd "] := " imm
+
+  -- Add instruction
+  let add rd rs0 rs1 = do
+        let sum = regFile!rs0 + regFile!rs1
+        update regFile rd sum
+        pc <== pc.val + 1
+        display "rf[" rd "] := " sum
+
+  -- Branch instruction
+  let bnz offset rs = do
+        if regFile!rs .==. 0
+          then pc <== pc.val + 1
+          else pc <== pc.val - zeroExtend offset
+
+  -- Halt instruction
+  let halt imm = finish
+
+  -- Fetch
+  when (fetch.val) $ do
+    load instrMem (pc.val)
+    fetch <== 0
+
+  -- Execute
+  when (fetch.val.inv) $ do
+    match (instrMem.out)
+      [
+        Var(2) <> Var(4)           <> Lit(2,0b00) ==> li,
+        Var(2) <> Var(2) <> Var(2) <> Lit(2,0b01) ==> add,
+        Var(4) <>           Var(2) <> Lit(2,0b10) ==> bnz,
+        Var(6) <>                     Lit(2,0b11) ==> halt
+      ]
+    fetch <== 1
+```
+
+Let's now look at a 3-stage pipeline implemention of the `Tiny` ISA.
+Unfortunately, it's a bit too long to give the code listing here, so
+we provide a
+[link](https://github.com/POETSII/blarney/blob/master/Examples/CPU/CPU.hs)
+instead.  Although the ISA is very simple, it does (intentionally!)
+contain a few challenges for a pipelined implementation, namely
+*control hazards* (due to the branch instruction) and *data hazards*
+(due to the add instruction).
+
+## API 1: Blarney primitives
+
+Here is the list of primitives provided by Blarney.
+
+```hs
+-- Bit-vector containing n bits
+newtype Bit (n :: Nat)
+
+-- Determine width of bit vector from type
+widthOf :: KnownNat n => Bit n -> Int
+
+-- Bit replication
+replicateBit :: KnownNat n => Bit 1 -> Bit n   -- Replication
+low          :: KnownNat n => Bit n            -- All 0's
+high         :: KnownNat n => Bit n            -- All 1's
+
+-- Bitwise operators
+inv   :: Bit n -> Bit n            -- Bitwise not
+(.&.) :: Bit n -> Bit n -> Bit n   -- Bitwise and
+(.|.) :: Bit n -> Bit n -> Bit n   -- Bitwise or
+(.^.) :: Bit n -> Bit n -> Bit n   -- Bitwise xor
+
+-- Comparison operators
+eq     :: Bit n -> Bit n -> Bit 1   -- Equality
+neq    :: Bit n -> Bit n -> Bit 1   -- Disequality
+(.<.)  :: Bit n -> Bit n -> Bit 1   -- Less than
+(.<=.) :: Bit n -> Bit n -> Bit 1   -- Less than or equal
+(.>.)  :: Bit n -> Bit n -> Bit 1   -- Greated than
+(.>=.) :: Bit n -> Bit n -> Bit 1   -- Greater than or equal
+
+-- Arithmetic operators
+(.+.) :: Bit n -> Bit n -> Bit n    -- Addition
+(.-.) :: Bit n -> Bit n -> Bit n    -- Subtraction
+(.*.) :: Bit n -> Bit n -> Bit n    -- Multiplication
+
+-- Num instance
+instance KnownNat n => Num (Bit n) where
+  (+)         :: Bit n -> Bit n -> Bit n  -- Addition
+  (-)         :: Bit n -> Bit n -> Bit n  -- Subtraction
+  (*)         :: Bit n -> Bit n -> Bit n  -- Multiplication
+  negate      :: Bit n -> Bit n           -- Two's complement
+  abs         :: Bit n -> Bit n           -- Identity function
+  signum      :: Bit n -> Bit n           -- If > 0 then 1 else 0
+  fromInteger :: Integer -> Bit n         -- Convert from integer
+
+-- Fractional instance
+instance KnownNat n => Fractional (Bit n) where
+  (/) :: Bit n -> Bit n -> Bit n   -- Division
+
+-- Modulus division
+(%) :: Bit n -> Bit n -> Bit n
+
+-- Muxing and shifting
+mux       :: Bit 1 -> Bit n -> Bit n -> Bit n   -- Multiplexer
+(.<<.)    :: Bit n -> Bit n -> Bit n            -- Shift left
+(.>>.)    :: Bit n -> Bit n -> Bit n            -- Shift right
+countOnes :: Bit n -> Bit (Log2 n + 1)          -- Population count
+
+-- Bit-vector resizing
+(#)        :: Bit n -> Bit m -> Bit (n+m)                -- Concatenation
+zeroExtend :: (KnownNat m, n <= m) => Bit n -> Bit m     -- Zero extension
+signExtend :: (KnownNat m, n <= m) => Bit n -> Bit m     -- Sign extension
+upper      :: (KnownNat m, m <= n) => Bit n -> Bit m     -- Extract MSBs
+lower      :: (KnownNat m, m <= n) => Bit n -> Bit m     -- Extract LSBs
+split      :: KnownNat n => Bit (n+m) -> (Bit n, Bit m)  -- Split bit vector
+
+-- I/O
+input :: KnownNat n => String -> Bit n  -- External input
+
+-- Registers
+reg   :: Bit n -> Bit n -> Bit n            -- Plain register
+regEn :: Bit n -> Bit 1 -> Bit n -> Bit n   -- Register with write-enable
+
+-- RAM primitives
+-- (Read new data on write)
+ram     :: (KnownNat a, KnownNat d) =>
+           (Bit a, Bit d, Bit 1) -> Bit d
+ramInit :: (KnownNat a, KnownNat d) =>
+           String -> (Bit a, Bit d, Bit 1) -> Bit d
+
+-- True dual-port RAM primitives
+-- (Reads new data on write)
+-- (When read-address == write-address on different ports, read old data)
+ramTrueDual     :: (KnownNat a, KnownNat d) =>
+                   (Bit a, Bit d, Bit 1)
+                -> (Bit a, Bit d, Bit 1)
+                -> (Bit d, Bit d)
+ramTrueDualInit :: (KnownNat a, KnownNat d) =>
+                   String 
+                -> (Bit a, Bit d, Bit 1)
+                -> (Bit a, Bit d, Bit 1)
+                -> (Bit d, Bit d)
+```
+
+Blarney also provides the following untyped bit-selection functions,
+i.e.  where the selection indices are values rather than types,
+meaning the width mismatches will not be caught by the type checker,
+but by a (probably unhelpful) error-message at circuit-generation
+time.
+
+```hs
+-- Untyped bit selection
+getBit :: Int -> Bit n -> Bit 1
+
+-- Untyped sub-range selection
+getBits :: (KnownNat m, m <= n) => (Int, Int) -> Bit n -> Bit m
+```
+
+Where possible, we recommended the following type-safe bit-selection
+*macros* instead:
+
+  * Macro `bit(i)`, where `i` is a type-level number, expands to a function
+that maps a given bit-vector to the bit at index `i` of that vector.
+
+  * Macro `bits(hi,lo)`, where `hi` and `lo` are type-level numbers, expands
+to  a function that maps a given bit-vector to bits `hi` down to `lo`
+of that vector.
+
+We use macros here for purely syntacic reasons: passing types to
+functions in Haskell is a bit verbose.
