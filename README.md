@@ -623,11 +623,11 @@ the type signatures of `add` and `addi` are omitted, then they will be
 inferred by the type checker.
 
 Our second library, `BitScan`, is more powerfull but at the cost of
-being dynamically typed rather than statically typed.  This means you
-get an error at circuit-generation time, and any error message may not
-be as helpful as the corresponding one provided by `BitPat`.  To
-illustrate `BitScan`, let's add the RISC-V `sw` (store-word)
-instruction to our decoder:
+being dynamically typed rather than statically typed.  This means that
+any error will be displayed at circuit-generation time rather than
+compile-time, and the error message may not be as helpful as the
+corresponding one provided by `BitPat`.  To illustrate `BitScan`,
+let's add the RISC-V `sw` (store-word) instruction to our decoder:
 
 ```hs
 import Blarney.BitScan
@@ -651,10 +651,11 @@ top = do
 ```
 
 The nice thing about this decoder is that the *scattered immediate*
-field `imm` is automatically assembled by the library.  That is, the
-`imm[11:5]` part of the immediate is combined with the `imm[4:0]` part
-to give the final 12-bit immediate value passed to the right-hand-side
-function.  Scattered immediates appear *a lot* in the RISC-V
-specification, so thanks to Jon Woodruff for suggesting this feature!
+field `imm` in the `sw` instruction is automatically assembled by the
+library.  That is, the `imm[11:5]` part of the immediate is combined
+with the `imm[4:0]` part to give the final 12-bit immediate value
+passed to the right-hand-side function.  Scattered immediates appear
+*a lot* in the RISC-V specification.  Thanks to Jon Woodruff for
+suggesting this feature!
 
 ## More to come!
