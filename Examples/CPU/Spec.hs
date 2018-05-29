@@ -11,7 +11,7 @@ import Blarney
 import Blarney.RAM
 import Blarney.RegFile
 import Blarney.BitPat
-#include "BitPat.h"
+#include <BitPat.h>
 
 makeCPUSpec :: RTL ()
 makeCPUSpec = do

@@ -477,7 +477,7 @@ simulator.
 ## Example 8: Block RAMs
 
 Blarney provides [a variety of block RAM modules]() commonly supported
-on FPGAs.  They are all based on the following interface.
+on FPGAs.  They are all based around the following interface.
 
 ```hs
 -- Block RAM interface
@@ -522,9 +522,9 @@ top = do
 
 Streams are another commonly-used abstraction in hardware description.
 They are often used to implement hardware modules that consume data at
-a *variable rate* that may depend on internal details of the module
-that the implementer does not wish to expose.  In Blarney, streams are
-captured by the following interface.
+a *variable rate*, depending on internal details of the module that
+the implementer does not wish to (or is unable to) expose.  In
+Blarney, streams are captured by the following interface.
 
 ```hs
 type Stream a = Get a
@@ -557,9 +557,8 @@ two streams into one using a given binary function.
 ```hs
 zipWithS :: (Bits a, Bits b, Bits c)
          => (a -> b -> c)
-         -> Stream a -> Stream b
-         -> RTL (Stream c)
-zipWithS f xs ys = do
+         -> Stream a -> Stream b -> RTL (Stream c)
+ripWithS f xs ys = do
   -- Output buffer
   buffer :: Queue c <- makeQueue
 
@@ -571,5 +570,88 @@ zipWithS f xs ys = do
   return (buffer.toStream)
 ```
 
+## Example 10: Bit-string pattern matching
+
+Recent work on specifying and implementing ISAs led us to develop two
+libraries for doing bit-string pattern matching.  The first, `BitPat`,
+is based on the paper [Type-safe pattern
+combinators](https://core.ac.uk/download/pdf/50525461.pdf) and let's
+us define an instruction decoder for a tiny subset of RISC-V as
+follows.
+
+```hs
+import Blarney.BitPat
+
+-- Semantics of add instruction
+add :: Bit 5 -> Bit 5 -> Bit 5 -> RTL ()
+add rs2 rs1 rd =
+  display "add r" (rd.val) ", r" (rs1.val) ", r" (rs1.val)
+
+-- Semantics of addi instruction
+addi :: Bit 12 -> Bit 5 -> Bit 5 -> RTL ()
+addi imm rs1 rd =
+  display "add r" (rd.val) ", r" (rs1.val) ", " (imm.val)
+
+-- Instruction dispatch
+top :: RTL ()
+top = do
+  -- Sample instruction
+  let instr :: Bit 32 = 0b00000000000100010000000110110011
+
+  -- Dispatch
+  match instr
+    [
+      Lit(7,0) <> Var(5) <> Var(5) <> Lit(3,0) <> Var(5) <> Lit(7,0b0110011) ==> add,
+      Var(12)            <> Var(5) <> Lit(3,0) <> Var(5) <> Lit(7,0b0010011) ==> addi
+    ]
+```
+
+Here, the `match` function represents a case expression with a case
+subject and a list of case alternatives.  Each case alternative
+contains a pattern on the left-hand-side and a function on the
+right-hand-side.  In a pattern, the macro `Lit(n,x)` matches an
+`n`-bit string containing the value `x`, whereas `Var(n)` matches an
+`n`-bit string and passes it as an argument to the right-hand-side
+function.  The `<>` combinator composes patterns sequentially.  To use
+the `Lit` and `Var` macros, one needs to `#include <BitPat.h>`.
+
+The `BitPat` library provides strong static typing.  For example, if
+the type signatures of `add` and `addi` are omitted, then they will be
+inferred by the type checker.
+
+Our second library, `BitScan`, is more powerfull but at the cost of
+being dynamically typed rather than statically typed.  This means you
+get an error at circuit-generation time, and any error message may not
+be as helpful as the corresponding one provided by `BitPat`.  To
+illustrate `BitScan`, let's add the RISC-V `sw` (store-word)
+instruction to our decoder:
+
+```hs
+import Blarney.BitScan
+
+-- Semantics of store-word instruciton
+sw :: Bit 12 -> Bit 5 -> Bit 5 -> RTL ()
+sw imm rs2 rs1 = display "sw " rs2 ", " rs1 "[" imm "]"
+
+top :: RTL ()
+top = do
+  -- Sample instruction
+  let instr :: Bit 32 = 0b10000000000100010010000010100011
+
+  -- Dispatch
+  match instr
+    [
+      "0000000   rs2[4:0]  rs1[4:0] 000 rd[4:0]  0110011" ==> add,
+      "          imm[11:0] rs1[4:0] 000 rd[4:0]  0010011" ==> addi,
+      "imm[11:5] rs2[4:0]  rs1[4:0] 010 imm[4:0] 0100011" ==> sw
+    ]
+```
+
+The nice thing about this decoder is that the *scattered immediate*
+field `imm` is automatically assembled by the library.  That is, the
+`imm[11:5]` part of the immediate is combined with the `imm[4:0]` part
+to give the final 12-bit immediate value passed to the right-hand-side
+function.  Scattered immediates appear *a lot* in the RISC-V
+specification, so thanks to Jon Woodruff for suggesting this feature!
 
 ## More to come!
