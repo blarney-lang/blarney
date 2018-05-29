@@ -26,6 +26,7 @@ Examples:
 APIs:
 
 * [API 1: Blarney primitives](#api-1-blarney-primitives)
+* [API 2: Bit selection](#api-2-bit-selection)
 
 ## Example 1: Two-sort
 
@@ -864,11 +865,12 @@ ramTrueDualInit :: (KnownNat a, KnownNat d) =>
                 -> (Bit d, Bit d)
 ```
 
-Blarney also provides the following untyped bit-selection functions,
-i.e.  where the selection indices are values rather than types,
-meaning the width mismatches will not be caught by the type checker,
-but by a (probably unhelpful) error-message at circuit-generation
-time.
+## API 2: Bit selection
+
+Blarney provides the following untyped bit-selection functions, i.e.
+where the selection indices are values rather than types, meaning the
+width mismatches will not be caught by the type checker, but by a
+(probably unhelpful) error-message at circuit-generation time.
 
 ```hs
 -- Untyped bit selection
