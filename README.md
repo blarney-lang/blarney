@@ -16,6 +16,9 @@ requires GHC 8.4.1 or later.
 * [Example 5: Queues](#example-5-queues)
 * [Example 6: Wires](#example-6-wires)
 * [Example 7: Recipes](#example-7-recipes)
+* [Example 8: Block RAMs](#example-8-block-rams)
+* [Example 9: Streams](#example-9-streams)
+* [Example 10: Bit-string pattern matching](#example-10-bit-string-pattern-matching)
 
 ## Example 1: Two-sort
 
