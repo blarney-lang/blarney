@@ -264,8 +264,8 @@ Finished
 ## Example 5: Queues
 
 Queues (also known as FIFOs) are very commonly used abstraction in
-hardware design.  Blarney provides a wide range of different queue
-implementations, all of which implement the following interface.
+hardware design.  Blarney provides [a range of different queue
+implementations](), all of which implement the following interface.
 
 ```hs
 -- Queue interface
@@ -317,7 +317,7 @@ The following simple test bench illustrates how to use a queue.
 -- Small test bench for queues
 top :: RTL ()
 top = do
-  -- Instantiate a queue if 8-bit values
+  -- Instantiate a queue of 8-bit values
   queue :: Queue (Bit 8) <- makeSimpleQueue
 
   -- Create an 8-bit count register
@@ -436,12 +436,12 @@ fact = do
   runOnce recipe 
 ```
 
-Blarney provides a very lightweight compiler for the `Recipe`
-language (under 100 lines of code), which we invoke above through the
-call to `runOnce`.
+Blarney provides a lightweight compiler for the `Recipe` language
+(under 100 lines of code), which we invoke above through the call to
+`runOnce`.
 
-A very commoon use of recipes is to define test sequences.  For
-example, here is a sample test sequence for the `Counter` module
+A very common use of recipes is to define test sequences.  For
+example, here is a simple test sequence for the `Counter` module
 defined earlier.
 
 ```hs
@@ -449,7 +449,7 @@ defined earlier.
 top :: RTL ()
 top = do
   -- Instantiate an 4-bit counter
-  counter :: Counter 4 <- mkCounter
+  counter :: Counter 4 <- makeCounter
 
   -- Sample test sequence
   let test =
@@ -470,8 +470,106 @@ top = do
 ```
 
 Here, we increment `counter` on the first cycle, and then again on the
-second cycle.  On the third cycle, we both increment and decrement it
-in parallel.  On the fourth cycle, we display the value and terminate
-the simulator.
+second.  On the third cycle, we both increment and decrement it in
+parallel.  On the fourth cycle, we display the value and terminate the
+simulator.
+
+## Example 8: Block RAMs
+
+Blarney provides [a variety of block RAM modules]() commonly supported
+on FPGAs.  They are all based on the following interface.
+
+```hs
+-- Block RAM interface
+data RAM a d =
+  RAM {
+    load    :: a -> RTL ()
+  , store   :: a -> d -> RTL ()
+  , out     :: d
+  }
+```
+
+When a `load` is issued for a given address, the value at that address
+appears on `out` on the next clock cycle.  When a `store` is issued,
+the value is written to the RAM on the current cycle, and the written
+value appears on `out` on the next cycle.  A `load` and `store` to the
+same `RAM` interface should not be issued on the same cycle.  To
+illustrate, here is a test bench that creates a block RAM and performs
+a `store` followed by a `load`.
+
+```hs
+top :: RTL ()
+top = do
+  -- Instantiate a 256 element RAM of 5-bit values
+  ram :: RAM (Bit 8) (Bit 5) <- makeRAM
+
+  -- Write 10 to ram[0] and read it back again
+  let test =
+        Seq [
+          Block $ do
+            store ram 0 10
+        , Block $ do
+            load ram 0
+        , Block $ do
+            display "Got " (ram.out)
+            finish
+        ]
+
+  runOnce test
+```
+
+## Example 9: Streams
+
+Streams are another commonly-used abstraction in hardware description.
+They are often used to implement hardware modules that consume data at
+a *variable rate* that may depend on internal details of the module
+that the implementer does not wish to expose.  In Blarney, streams are
+captured by the following interface.
+
+```hs
+type Stream a = Get a
+
+data Get a =
+  Get {
+    get    :: RTL ()
+  , canGet :: Bit 1
+  , value  :: a
+  }
+```
+
+Streams are closely related to queues.  Indeed, any queue can be
+converted to a stream:
+
+```hs
+-- Convert a queue to a stream
+toStream :: Queue a -> Stream a
+toStream q =
+  Get {
+    get    = q.deq
+  , canGet = q.canDeq
+  , value  = q.first
+  }
+```
+
+As an example, here's a higher-order stream combinator that combines
+two streams into one using a given binary function.
+
+```hs
+zipWithS :: (Bits a, Bits b, Bits c)
+         => (a -> b -> c)
+         -> Stream a -> Stream b
+         -> RTL (Stream c)
+zipWithS f xs ys = do
+  -- Output buffer
+  buffer :: Queue c <- makeQueue
+
+  when (xs.canGet .&. ys.canGet .&. buffer.notFull) $ do
+    xs.get
+    ys.get
+    enq buffer (f (xs.value) (ys.value))
+
+  return (buffer.toStream)
+```
+
 
 ## More to come!
