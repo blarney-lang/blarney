@@ -5,7 +5,7 @@ range of HDL abstractions on top of a small set of core circuit
 primitives.  It can be viewed as a modern variant of
 [Lava](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.110.5587&rep=rep1&type=pdf)
 that supports a variety of hardware description styles.  Blarney
-requires GHC 8.4.1 or later and we hope to make a release sometime in 2018.
+requires GHC 8.4.1 or later.
 
 ## Contents
 
@@ -25,7 +25,7 @@ Examples:
 
 APIs:
 
-* [API 1: Blarney primitives](#api-1-blarney-primitives)
+* [API 1: Primitives](#api-1-primitives)
 * [API 2: Bit selection](#api-2-bit-selection)
 
 ## Example 1: Two-sort
@@ -43,7 +43,7 @@ twoSort (a, b) = a .<. b ? ((a, b), (b, a))
 ```
 
 This definition makes use of two [Blarney
-primitives](api-1-blarney-primitives).  The first is the unsigned
+primitives](api-1-primitives).  The first is the unsigned
 comparison operator
 
 ```hs
@@ -709,8 +709,8 @@ type Instr = Bit 8
 type RegId = Bit 2
 
 -- Tiny 8-bit CPU
-makeTinyCPU :: RTL ()
-makeTinyCPU = do
+makeCPU :: RTL ()
+makeCPU = do
   -- Instruction memory
   instrMem :: RAM (Bit 8) Instr <- makeRAMInit "instrs.hex"
 
@@ -762,18 +762,17 @@ makeTinyCPU = do
     fetch <== 1
 ```
 
-Let's now look at a 3-stage pipeline implemention of the `Tiny` ISA.
+Let's now look at a 3-stage pipeline implemention of the same ISA.
 Unfortunately, it's a bit too long to give the code listing here, so
 we provide a
 [link](https://github.com/POETSII/blarney/blob/master/Examples/CPU/CPU.hs)
-instead.  Although the ISA is very simple, it does (intentionally!)
+instead.  Although the ISA is very simple, it does
 contain a few challenges for a pipelined implementation, namely
 *control hazards* (due to the branch instruction) and *data hazards*
-(due to the add instruction).
+(due to the add instruction).  We resolve data hazards using *register
+forwarding* and control hazards using a *pipeline flush*.
 
-## API 1: Blarney primitives
-
-Here is the list of primitives provided by Blarney.
+## API 1: Primitives
 
 ```hs
 -- Bit-vector containing n bits
@@ -894,9 +893,9 @@ To illustrate, here's an example of using the `bits(hi,lo)` macro to
 select the upper four bits of a byte.
 
 ```hs
--- Extract upper 4 bits of byte
-upper4 :: Bit 8 -> Bit 4
-upper4 x = x.bits(7,4)
+-- Extract upper 4 bits of a byte
+upperNibble :: Bit 8 -> Bit 4
+upperNibble x = x.bits(7,4)
 ```
 
 We use macros here for purely syntacic reasons: passing types to
