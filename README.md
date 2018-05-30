@@ -27,6 +27,7 @@ APIs:
 
 * [API 1: Primitives](#api-1-primitives)
 * [API 2: Bit selection](#api-2-bit-selection)
+* [API 3: Prelude](#api-3-prelude)
 
 ## Example 1: Two-sort
 
@@ -405,10 +406,11 @@ makeCounter = do
 
 ## Example 7: Recipes
 
-State machines are a very common way of defining the control-path of a
-hardware core.  They are often written by case-switching on the
-current state and manually setting the next state.  Quite often
-however, they can be expressed more neatly as a `Recipe`.
+State machines are a common way of defining the control-path of a
+circuit.  They are typically expressed by doing case-analysis of the
+current-state and manually setting the next-state.  Quite often
+however, they can be expressed more neatly as a `Recipe` -- a simple
+imperative language with various control-flow statements.
 
 ```hs
 data Recipe = 
@@ -634,24 +636,26 @@ top = do
     ]
 ```
 
-Here, the `match` function represents a case expression with a case
+Here, the `match` function represents a case statement with a case
 subject and a list of case alternatives.  Each case alternative
 contains a pattern on the left-hand-side and a function on the
 right-hand-side.  In a pattern, the macro `Lit(n,x)` matches an
-`n`-bit string containing the value `x`, whereas `Var(n)` matches an
-`n`-bit string and passes it as an argument to the right-hand-side
-function.  The `<>` combinator composes patterns sequentially.  To use
-the `Lit` and `Var` macros, one needs to `#include <BitPat.h>`.
+`n`-bit string containing the value `x`, whereas `Var(n)` matches
+*any* `n`-bit string and passes it as an argument to the
+right-hand-side function.  The `<>` combinator composes patterns
+sequentially.  To use the `Lit` and `Var` macros, one needs to
+`#include <BitPat.h>`.
 
 The `BitPat` library provides strong static typing.  For example, if
 the type signatures of `add` and `addi` are omitted, then they will be
 inferred by the type checker.
 
 Our second library, `BitScan`, is more powerfull but at the cost of
-being dynamically typed rather than statically typed.  This means that
-any error will be displayed at circuit-generation time rather than
-compile-time, and the error message may not be as helpful as the
-corresponding one provided by `BitPat`.  To illustrate `BitScan`,
+being dynamically typed rather than statically typed.  This means we
+loose type-inference of the right-hand-side function, and any width
+error will be displayed at circuit-generation time rather than
+compile-time.  In addition, the error message may not be as helpful as
+the corresponding one provided by `BitPat`.  To illustrate `BitScan`,
 let's add the RISC-V `sw` (store-word) instruction to our decoder:
 
 ```hs
@@ -686,8 +690,7 @@ suggesting this feature!
 ## Example 11: Tiny 8-bit CPU
 
 As a way of briging together a number of the ideas introduced above,
-let's define a very simple, non-pipelined 8-bit CPU with the following
-ISA.
+let's define a very simple, 8-bit CPU with the following ISA.
 
   Opcode     | Meaning
   ---------- | ---------
@@ -711,7 +714,7 @@ type RegId = Bit 2
 -- Tiny 8-bit CPU
 makeCPU :: RTL ()
 makeCPU = do
-  -- Instruction memory
+  -- Instruction memory (containing 256 instructions)
   instrMem :: RAM (Bit 8) Instr <- makeRAMInit "instrs.hex"
 
   -- Register file (containing 4 registers)
@@ -720,7 +723,7 @@ makeCPU = do
   -- Program counter
   pc :: Reg (Bit 8) <- makeRegInit 0
 
-  -- Are we fetching (1) or executing (0)
+  -- Are we fetching (1) or executing (0)?
   fetch :: Reg (Bit 1) <- makeRegInit 1
 
   -- Load immediate instruction
@@ -762,15 +765,15 @@ makeCPU = do
     fetch <== 1
 ```
 
-Let's now look at a 3-stage pipeline implemention of the same ISA.
-Unfortunately, it's a bit too long to give the code listing here, so
-we provide a
+Let's now look at a 3-stage pipeline implemention of the same ISA that
+has a CPI much closer to 1.  Unfortunately, it's a bit too long to
+in-line the code listing here, so we provide a
 [link](https://github.com/POETSII/blarney/blob/master/Examples/CPU/CPU.hs)
-instead.  Although the ISA is very simple, it does
-contain a few challenges for a pipelined implementation, namely
-*control hazards* (due to the branch instruction) and *data hazards*
-(due to the add instruction).  We resolve data hazards using *register
-forwarding* and control hazards using a *pipeline flush*.
+instead.  Although the ISA is very simple, it does contain a few
+challenges for a pipelined implementation, namely *control hazards*
+(due to the branch instruction) and *data hazards* (due to the add
+instruction).  We resolve data hazards using *register forwarding* and
+control hazards using a *pipeline flush*.
 
 ## API 1: Primitives
 
@@ -899,4 +902,40 @@ upperNibble x = x.bits(7,4)
 ```
 
 We use macros here for purely syntacic reasons: passing types to
-functions in Haskell is a bit verbose.  
+functions in Haskell is a bit clunky.  
+
+## API 3: Prelude
+
+```hs
+-- Equality
+(.==.) :: Bits a => a -> a -> Bit 1
+
+-- Disequality
+(.!=.) :: Bits a => a -> a -> Bit 1
+
+-- Ternary conditional operator
+(?) :: Bits a => Bit 1 -> (a, a) -> a
+
+-- One-hot select
+select :: Bits a => [(Bit 1, a)] -> a
+
+-- Index a list
+index :: (KnownNat n, Bits a) => Bit n -> [a] -> a
+
+-- Parallel reduce for a commutative an associative operator
+-- Input list must be non-empty
+tree1 :: (a -> a -> a) -> [a] -> a
+
+-- Like 'tree1', but input list may be empty,
+-- in which case the zero element is returned
+tree :: (a -> a -> a) -> a -> [a] -> a
+
+-- Adder tree
+sumList :: KnownNat n => [Bit n] -> Bit n
+
+-- Tree of bitwise-and
+andList :: Bits a => [a] -> a
+
+-- Tree of bitwise-or
+orList :: Bits a => [a] -> a
+```
