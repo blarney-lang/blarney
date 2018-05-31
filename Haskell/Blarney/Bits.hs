@@ -95,3 +95,11 @@ instance (Bits a, Bits b) => BitsClass (a, b)
 instance (Bits a, Bits b, Bits c) => BitsClass (a, b, c)
 
 instance (Bits a, Bits b, Bits c, Bits d) => BitsClass (a, b, c, d)
+
+instance (Bits a, Bits b, Bits c, Bits d, Bits e) => BitsClass (a, b, c, d, e)
+
+instance (Bits a, Bits b, Bits c, Bits d,
+          Bits e, Bits f) => BitsClass (a, b, c, d, e, f)
+
+instance (Bits a, Bits b, Bits c, Bits d,
+          Bits e, Bits f, Bits g) => BitsClass (a, b, c, d, e, f, g)
