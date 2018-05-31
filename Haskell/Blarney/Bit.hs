@@ -38,6 +38,7 @@ module Blarney.Bit
   , (#)              -- Bit concatenation
   , getBit           -- Bit selection
   , getBits          -- Bit range selection
+  , unsafeGetBits    -- Bit range selection
   , typedGetBit      -- Bit selection (type-level indices)
   , typedGetBits     -- Bit range selection (type-level indices)
   , zeroExtend       -- Zero extend
@@ -321,6 +322,14 @@ getBits (hi, lo) a = result
           error "Blarney.Bit.bits: sub-range does not match bit width"
         else
           SelectBits (width a) hi lo
+
+
+-- Sub-range selection
+unsafeGetBits :: (Int, Int) -> Bit n -> Bit m
+unsafeGetBits (hi, lo) a = Bit (makePrim1 p [unbit a] wr)
+  where
+    wr = hi+1-lo
+    p  = SelectBits (width a) hi lo
 
 -- Bit selection using type-level number
 typedGetBits :: (KnownNat n, KnownNat m, KnownNat hi, KnownNat lo,
