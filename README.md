@@ -200,9 +200,9 @@ twoSort (a, b) = a .<. b ? ((a, b), (b, a))
 
 The `KnownNat n` constraint is Haskell's way of saying that it must be
 possible to convert the type-level number `n` to a value-level number.
-This constraint appears almost any time a bit-vector with polymorphic
-width occurs.  And since it is satisfiable for any type-level number,
-it doesn't really carry any useful information.  Therefore, we
+This constraint often appears when a bit-vector with polymorphic
+width is used.  It is satisfiable for any type-level number, so
+doesn't really carry any useful information.  Therefore, we
 recommend the use of *partial type signatures* in GHC to avoid having
 to write `KnownNat` constraints:
 
@@ -829,7 +829,9 @@ instance KnownNat n => Fractional (Bit n) where
 mux       :: Bit 1 -> Bit n -> Bit n -> Bit n   -- Multiplexer
 (.<<.)    :: Bit n -> Bit n -> Bit n            -- Shift left
 (.>>.)    :: Bit n -> Bit n -> Bit n            -- Shift right
-countOnes :: Bit n -> Bit (Log2 n + 1)          -- Population count
+
+-- Population count
+countOnes :: Bit n -> Bit (Log2 n + 1)
 
 -- Bit-vector resizing
 (#)        :: Bit n -> Bit m -> Bit (n+m)                -- Concatenation
@@ -879,11 +881,10 @@ width mismatches will not be caught by the type checker, but by a
 getBit :: Int -> Bit n -> Bit 1
 
 -- Untyped sub-range selection
-getBits :: (KnownNat m, m <= n) => (Int, Int) -> Bit n -> Bit m
+getBits :: KnownNat m => (Int, Int) -> Bit n -> Bit m
 ```
 
-Where possible, we recommended the following type-safe bit-selection
-*macros* instead:
+We recommended the following type-safe bit-selection *macros* instead:
 
   * Macro `bit(i)`, where `i` is a type-level number, expands to a function
 that maps a given bit-vector to the bit at index `i` of that vector.

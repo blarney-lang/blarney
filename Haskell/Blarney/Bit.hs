@@ -313,7 +313,7 @@ typedGetBit :: (KnownNat i, KnownNat n, (i+1) <= n) => nat i -> Bit n -> Bit 1
 typedGetBit i a = getBit (fromInteger $ natVal i) a
 
 -- Sub-range selection
-getBits :: (KnownNat m, m <= n) => (Int, Int) -> Bit n -> Bit m
+getBits :: KnownNat m => (Int, Int) -> Bit n -> Bit m
 getBits (hi, lo) a = result
   where
     result = Bit (makePrim1 p [unbit a] wr)

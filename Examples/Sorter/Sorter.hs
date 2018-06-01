@@ -29,4 +29,4 @@ top = do
   finish
 
 main :: IO ()
-main = netlist top >>= generateCXX "/tmp/sort/"
+main = generateCXX top "/tmp/sort/"
