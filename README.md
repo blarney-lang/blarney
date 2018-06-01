@@ -989,7 +989,7 @@ orList :: Bits a => [a] -> a
 
 ## API 5: RTL
 
-```cpp
+```hs
 -- The RTL monad
 newtype RTL a
 
