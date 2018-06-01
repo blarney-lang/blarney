@@ -1005,6 +1005,18 @@ class Var v where
   val :: Bits a => v a -> a
   (<==) :: Bits a => v a -> a -> RTL ()
 
+-- Create register
+makeReg     :: Bits a => RTL (Reg a)
+makeRegInit :: Bits a => a -> RTL (Reg a)
+
+-- Create wire
+makeWire        :: Bits a => RTL (Wire a)
+makeWireDefault :: Bits a => a -> RTL (Wire a)
+
+-- A DReg holds the assigned value only for one cycle.
+-- At all other times, it has the given default value.
+makeDReg :: Bits a => a -> RTL (Reg a)
+
 -- Extra wire functions
 val'    :: Wire a -> a       -- Registered output of wire
 active  :: Wire a -> Bit 1   -- Is wire being assigned on this cycle?
@@ -1023,18 +1035,6 @@ switch :: Bits a => a -> [(a, RTL ())] -> RTL ()
 
 -- For neat construction of case alternatives
 (-->)  :: a -> RTL () -> (a, RTL ())
-
--- Create register
-makeReg     :: Bits a => RTL (Reg a)
-makeRegInit :: Bits a => a -> RTL (Reg a)
-
--- Create wire
-makeWire        :: Bits a => RTL (Wire a)
-makeWireDefault :: Bits a => a -> RTL (Wire a)
-
--- A DReg holds the assigned value only for one cycle.
--- At all other times, it has the given default value.
-makeDReg :: Bits a => a -> RTL (Reg a)
 
 -- RTL finish statements
 finish :: RTL ()
