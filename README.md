@@ -60,7 +60,8 @@ The second is the ternary conditional operator
 
 which is polymorphic in the return type `a`.  The constraint `Bits a`
 requires that the type `a` can be converted to a bit-vector and back
-again -- akin to a type class for binary serialisation.
+again -- akin to a type class for binary serialisation.  (See
+[here](#api-3-bits-class) for details about the `Bits` class.)
 
 To check that our circuit works, let's create a simple *test bench*
 that applies some sample inputs to `twoSort` and displays the outputs.
