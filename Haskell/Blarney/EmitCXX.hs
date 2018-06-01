@@ -704,7 +704,8 @@ emitDisplay net args =
                  ++ emitDisp args inps
       | w <= 64   = "printf(\"0x%lx\", " ++ emitInput inp ++ "); "
                  ++ emitDisp args inps
-      | otherwise = "printBU(" ++ emitInput inp ++ "); "
+      | otherwise = "printBU(" ++ emitInput inp ++ ", "
+                 ++ show w ++ "); "
                  ++ emitDisp args inps
 
 emitUpdates :: Net -> Code

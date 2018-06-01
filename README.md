@@ -907,7 +907,7 @@ we have a simple data type for memory requests:
 data MemReq =
   MemReq {
     memOp   :: Bit 1    -- Is it a load or a store request?
-    memAddr :: Bit 32   -- 32-bit address
+  , memAddr :: Bit 32   -- 32-bit address
   , memData :: Bit 32   -- 32-bit data for stores
   }
   deriving Generic
