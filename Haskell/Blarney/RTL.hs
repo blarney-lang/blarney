@@ -178,17 +178,16 @@ makeRegInit init =
      let w = unbitWidth (unbit (pack init))
      let bit w p = Bit (p { unbitWidth = w })
      let inp = case as of
-                 [(b, _, p)] -> bit w p
-                 other -> select [(b, bit w p) | (b, _, p) <- as]
-     let out = unpack (regEn (pack init) en inp)
+                 [(b, _, p)] -> unpack (bit w p)
+                 other -> select [(b, unpack (bit w p)) | (b, _, p) <- as]
+     let out = registerEn init en inp
      return (Reg v out)
 
 -- Create register
 makeReg :: Bits a => RTL (Reg a)
-makeReg = makeRegInit (unpack 0)
+makeReg = makeRegInit zero
 
 -- Create wire with given default
-makeWireDefault :: Bits a => a -> RTL (Wire a)
 makeWireDefault def =
   do v <- fresh
      (cond, assignMap) <- ask
@@ -197,13 +196,13 @@ makeWireDefault def =
      let as = findWithDefault [] v assignMap
      let some = orList [b | (b, _, p) <- as]
      let none = inv some
-     let out = select ([(b, bit w p) | (b, _, p) <- as] ++
-                          [(none, pack def)])
-     return (Wire v (unpack out) (unpack (reg 0 out)) some (reg 0 some))
+     let out = select ([(b, unpack (bit w p)) | (b, _, p) <- as] ++
+                          [(none, def)])
+     return (Wire v out (register zero out) some (reg 0 some))
 
 -- Create wire
 makeWire :: Bits a => RTL (Wire a)
-makeWire = makeWireDefault (unpack 0)
+makeWire = makeWireDefault zero
 
 -- A DReg holds the assigned value only for one cycle.
 -- At all other times, it has the given default value.

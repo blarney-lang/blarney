@@ -14,7 +14,7 @@ data RegFile a d =
   , update :: a -> d -> RTL ()
   }
 
-makeRegFile :: forall a d. (Bits a, Bits d) => RTL (RegFile a d)
+makeRegFile :: forall a d. (Bits a, Bits d, _) => RTL (RegFile a d)
 makeRegFile = do
   -- Create list of registers
   regs :: [Reg d] <- replicateM (2 ^ sizeOf (__ :: a)) makeReg

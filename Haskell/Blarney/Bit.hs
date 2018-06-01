@@ -9,9 +9,7 @@
 module Blarney.Bit
   ( Bit(..)          -- "Bit n" is a bit vector of n bits
   , __               -- Bottom
-  , replicateBit     -- Replicate bit to produce bit vector
-  , low              -- Bit vector of all 0's
-  , high             -- Bit vector of all 1's
+  , repBit           -- Replicate bit to produce bit vector
   , inv              -- Bitwise invert
   , (.&.)            -- Bitwise and
   , (.|.)            -- Bitwise or
@@ -31,10 +29,8 @@ module Blarney.Bit
   , countOnes        -- Population count
   , reg              -- Register
   , regEn            -- Register with enable
-  , ram              -- RAM
-  , ramInit          -- RAM with initial contents
-  , ramTrueDual      -- True dual-port RAM
-  , ramTrueDualInit  -- True dual-port RAM with initial contents
+  , ramPrim          -- True dual-port RAM primitive
+  , ramTrueDualPrim  -- True dual-port RAM primitive
   , (#)              -- Bit concatenation
   , getBit           -- Bit selection
   , getBits          -- Bit range selection
@@ -72,19 +68,11 @@ __ :: a
 __ = error "bottom"
 
 -- Replicate bit
-replicateBit :: KnownNat n => Bit 1 -> Bit n
-replicateBit a = result
+repBit :: KnownNat n => Bit 1 -> Bit n
+repBit a = result
   where
     n = fromInteger (natVal result)
     result = Bit (makePrim1 (ReplicateBit n) [unbit a] n)
-
--- All 0's
-low :: KnownNat n => Bit n
-low = replicateBit 0
-
--- All 1's
-high :: KnownNat n => Bit n
-high = replicateBit 1
 
 -- Bitwise invert
 inv :: Bit n -> Bit n
@@ -225,7 +213,11 @@ getInit = eval
           let x    = eval (unbitInputs a !! 0)
               mask = (1 `B.shiftL` hi) - 1
           in  (x B..&. mask) `B.shiftR` lo
-        other -> error "Register initialiser must be a constant"
+        ReplicateBit w ->
+          let b = eval (unbitInputs a !! 0)
+          in  b * ((2^w) - 1)
+        other -> error $ "Register initialiser must be a constant: " ++
+                         (show other)
 
 -- Register with enable
 regEn :: Bit n -> Bit 1 -> Bit n -> Bit n
@@ -233,63 +225,32 @@ regEn init en a =
     Bit (makePrim1 (RegisterEn (getInit (unbit init)) w) [unbit en, unbit a] w)
   where w = width init
 
--- RAM primitive
+-- RAM primitive (for internal use only)
 -- (Reads new data on write)
-ramPrim :: (KnownNat a, KnownNat d) =>
-           Maybe String -> (Bit a, Bit d, Bit 1) -> Bit d
-ramPrim init (addrIn, dataIn, weIn) = result
+ramPrim :: Int -> Maybe String -> (Bit a, Bit d, Bit 1) -> Bit d
+ramPrim dataWidth init (addrIn, dataIn, weIn) = result
   where
     result = Bit (makePrim1 (RAM init aw dw)
                     [unbit addrIn, unbit dataIn, unbit weIn] dw)
-    aw     = fromInteger (natVal addrIn)
-    dw     = fromInteger (natVal dataIn)
+    aw     = width addrIn
+    dw     = dataWidth
 
--- Uninitialised RAM
--- (Reads new data on write)
-ram :: (KnownNat a, KnownNat d) => (Bit a, Bit d, Bit 1) -> Bit d
-ram = ramPrim Nothing
-
--- Initilaised RAM
--- (Reads new data on write)
-ramInit :: (KnownNat a, KnownNat d) => String -> (Bit a, Bit d, Bit 1) -> Bit d
-ramInit init = ramPrim (Just init)
-
--- True dual-port RAM primitive
+-- True dual-port RAM primitive (for internal use only)
 -- (Reads new data on write)
 -- (When read-address == write-address on different ports, read old data)
-ramTrueDualPrim :: (KnownNat a, KnownNat d) =>
-                   Maybe String
+ramTrueDualPrim :: Int -> Maybe String
                 -> (Bit a, Bit d, Bit 1)
                 -> (Bit a, Bit d, Bit 1)
                 -> (Bit d, Bit d)
-ramTrueDualPrim init (addrInA, dataInA, weInA)
-                     (addrInB, dataInB, weInB) =
+ramTrueDualPrim dataWidth init (addrInA, dataInA, weInA)
+                               (addrInB, dataInB, weInB) =
     (Bit (outs!!0), Bit (outs!!1))
   where
     outs = makePrim (TrueDualRAM init aw dw)
              [unbit addrInA, unbit dataInA, unbit weInA,
               unbit addrInB, unbit dataInB, unbit weInB] [dw, dw]
-    aw   = fromInteger (natVal addrInA)
-    dw   = fromInteger (natVal dataInA)
-
--- Uninitialised true dual-port RAM
--- (Reads new data on write)
--- (When read-address == write-address on different ports, read old data)
-ramTrueDual :: (KnownNat a, KnownNat d) =>
-               (Bit a, Bit d, Bit 1)
-            -> (Bit a, Bit d, Bit 1)
-            -> (Bit d, Bit d)
-ramTrueDual = ramTrueDualPrim Nothing
-
--- Initilaised true dual-port RAM
--- (Reads new data on write)
--- (When read-address == write-address on different ports, read old data)
-ramTrueDualInit :: (KnownNat a, KnownNat d) =>
-                   String 
-                -> (Bit a, Bit d, Bit 1)
-                -> (Bit a, Bit d, Bit 1)
-                -> (Bit d, Bit d)
-ramTrueDualInit init = ramTrueDualPrim (Just init)
+    aw   = width addrInA
+    dw   = dataWidth
 
 -- Concatenation
 (#) :: Bit n -> Bit m -> Bit (n+m)

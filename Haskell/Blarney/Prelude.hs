@@ -15,6 +15,13 @@ module Blarney.Prelude
   , o
   , (.==.)
   , (.!=.)
+  , zero
+  , register
+  , registerEn
+  , ram
+  , ramInit
+  , ramTrueDual
+  , ramTrueDualInit
   ) where
 
 import Prelude
@@ -43,15 +50,17 @@ tree f z xs = if null xs then z else tree1 f xs
 
 -- Adder tree
 sumList :: KnownNat n => [Bit n] -> Bit n
-sumList = tree (.+.) low
+sumList = tree (.+.) zero
 
 -- Tree of bitwise-and
 andList :: Bits a => [a] -> a
-andList = unpack . tree (.&.) high . map pack
+andList = tree and ones
+  where and a b = unpack (pack a .&. pack b)
 
 -- Tree of bitwise-or
 orList :: Bits a => [a] -> a
-orList = unpack . tree (.|.) low . map pack
+orList = tree or zero
+  where or a b = unpack (pack a .|. pack b)
 
 -- Tree with specified branching factor
 treeB1 :: Int -> ([a] -> a) -> [a] -> a
@@ -66,7 +75,7 @@ treeB b f z xs = if null xs then z else treeB1 b f xs
 -- One-hot select
 select :: Bits a => [(Bit 1, a)] -> a
 select alts =
-  unpack (orList [replicateBit sel .&. pack val | (sel, val) <- alts])
+  orList [sel ? (val, zero) | (sel, val) <- alts]
 
 -- Index a list
 index :: (KnownNat n, Bits a) => Bit n -> [a] -> a
@@ -91,3 +100,61 @@ a .==. b = pack a `eq` pack b
 infix 4 .!=.
 (.!=.) :: Bits a => a -> a -> Bit 1
 a .!=. b = pack a `neq` pack b
+
+-- All 0's
+zero :: Bits a => a
+zero = replicateBit 0
+
+-- All 1's
+ones :: Bits a => a
+ones = replicateBit 0
+
+-- Register
+register :: Bits a => a -> a -> a
+register init a = unpack (reg (pack init) (pack a))
+
+-- Register with enable
+registerEn :: Bits a => a -> Bit 1 -> a -> a
+registerEn init en a =
+  unpack (regEn (pack init) en (pack a))
+
+-- Uninitialised RAM
+-- (Reads new data on write)
+ram :: (Bits a, Bits d) => (a, d, Bit 1) -> d
+ram (a, d, en) = 
+  unpack (ramPrim (sizeOf d) Nothing (pack a, pack d, en))
+
+-- Initilaised RAM
+-- (Reads new data on write)
+ramInit :: (Bits a, Bits d) => String -> (a, d, Bit 1) -> d
+ramInit init (a, d, en) =
+  unpack (ramPrim (sizeOf d) (Just init) (pack a, pack d, en))
+
+-- Uninitialised true dual-port RAM
+-- (Reads new data on write)
+-- (When read-address == write-address on different ports, read old data)
+ramTrueDual :: (Bits a, Bits d) =>
+               (a, d, Bit 1)
+            -> (a, d, Bit 1)
+            -> (d, d)
+ramTrueDual (a0, d0, en0)
+            (a1, d1, en1) = (unpack o0, unpack o1)
+  where
+    (o0, o1) = ramTrueDualPrim (sizeOf d0) Nothing
+                 (pack a0, pack d0, en0)
+                 (pack a1, pack d1, en1)
+
+-- Initilaised true dual-port RAM
+-- (Reads new data on write)
+-- (When read-address == write-address on different ports, read old data)
+ramTrueDualInit :: (Bits a, Bits d) =>
+                   String
+                -> (a, d, Bit 1)
+                -> (a, d, Bit 1)
+                -> (d, d)
+ramTrueDualInit init (a0, d0, en0)
+                     (a1, d1, en1) = (unpack o0, unpack o1)
+  where
+    (o0, o1) = ramTrueDualPrim (sizeOf d0) (Just init)
+                 (pack a0, pack d0, en0)
+                 (pack a1, pack d1, en1)

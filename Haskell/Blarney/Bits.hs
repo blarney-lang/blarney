@@ -18,46 +18,52 @@ import Blarney.Bit
 import GHC.TypeLits
 import GHC.Generics
 
-class BitsClass a where
+class Bits a where
   type SizeOf a :: Nat
-  sizeOf :: a -> Int
-  pack   :: a -> Bit (SizeOf a)
-  unpack :: Bit (SizeOf a) -> a
+  replicateBit  :: Bit 1 -> a
+  sizeOf        :: a -> Int
+  pack          :: a -> Bit (SizeOf a)
+  unpack        :: Bit (SizeOf a) -> a
 
   -- Defaults
-  type SizeOf a  =  GSizeOf (Rep a)
-  default sizeOf :: (Generic a, GBitsClass (Rep a),
-                     GSizeOf (Rep a) ~ SizeOf a)
-                 => a -> Int
-  sizeOf a       = gsizeOf(from a)
-  default pack   :: (Generic a, GBitsClass (Rep a),
-                     GSizeOf (Rep a) ~ SizeOf a)
-                 => a -> Bit (SizeOf a)
-  pack a         =  gpack (from a) 
-  default unpack :: (Generic a, GBitsClass (Rep a),
-                     GSizeOf (Rep a) ~ SizeOf a)
-                 => Bit (SizeOf a) -> a
-  unpack a       =  to (gunpack a)
+  type SizeOf a        =  GSizeOf (Rep a)
+  default replicateBit :: (Generic a, GBits (Rep a),
+                           GSizeOf (Rep a) ~ SizeOf a)
+                       => Bit 1 -> a
+  replicateBit b       =  to (greplicateBit b)
+  default sizeOf       :: (Generic a, GBits (Rep a),
+                           GSizeOf (Rep a) ~ SizeOf a)
+                       => a -> Int
+  sizeOf a             =  gsizeOf (from a)
+  default pack         :: (Generic a, GBits (Rep a),
+                           GSizeOf (Rep a) ~ SizeOf a)
+                       => a -> Bit (SizeOf a)
+  pack a               =  gpack (from a) 
+  default unpack       :: (Generic a, GBits (Rep a),
+                           GSizeOf (Rep a) ~ SizeOf a)
+                       => Bit (SizeOf a) -> a
+  unpack a             =  to (gunpack a)
 
-type Bits a = (BitsClass a, KnownNat (SizeOf a))
-
--- Generic deriving for BitsClass
+-- Generic deriving for Bits
 -- ==============================
 
-class GBitsClass f where
+class GBits f where
   type GSizeOf f :: Nat
-  gsizeOf :: f a -> Int
-  gpack   :: f a -> Bit (GSizeOf f)
-  gunpack :: Bit (GSizeOf f) -> f a
+  greplicateBit  :: Bit 1 -> f a
+  gsizeOf        :: f a -> Int
+  gpack          :: f a -> Bit (GSizeOf f)
+  gunpack        :: Bit (GSizeOf f) -> f a
 
-instance GBitsClass U1 where
+instance GBits U1 where
   type GSizeOf U1 = 0
+  greplicateBit b = U1
   gsizeOf U1 = 0
   gpack U1 = 0
   gunpack bs = U1
 
-instance (GBitsClass a, GBitsClass b) => GBitsClass (a :*: b) where
+instance (GBits a, GBits b) => GBits (a :*: b) where
   type GSizeOf (a :*: b) = GSizeOf a + GSizeOf b
+  greplicateBit b = greplicateBit b :*: greplicateBit b
   gsizeOf (a :*: b) = gsizeOf a + gsizeOf b
   gpack (a :*: b) = gpack a # gpack b
   gunpack bs = a :*: b
@@ -67,14 +73,16 @@ instance (GBitsClass a, GBitsClass b) => GBitsClass (a :*: b) where
       wa = gsizeOf a
       wb = gsizeOf b
 
-instance GBitsClass a => GBitsClass (M1 i c a) where
+instance GBits a => GBits (M1 i c a) where
   type GSizeOf (M1 i c a) = GSizeOf a
+  greplicateBit b = M1 (greplicateBit b)
   gpack (M1 x) = gpack x
   gsizeOf (M1 x) = gsizeOf x
   gunpack x = M1 (gunpack x)
 
-instance BitsClass a => GBitsClass (K1 i a) where
+instance Bits a => GBits (K1 i a) where
   type GSizeOf (K1 i a) = SizeOf a
+  greplicateBit b = K1 (replicateBit b)
   gsizeOf (K1 x) = sizeOf x
   gpack (K1 x) = pack x
   gunpack x = K1 (unpack x)
@@ -82,24 +90,25 @@ instance BitsClass a => GBitsClass (K1 i a) where
 -- Standard instances
 -- ==================
 
-instance KnownNat n => BitsClass (Bit n) where
+instance KnownNat n => Bits (Bit n) where
   type SizeOf (Bit n) = n
+  replicateBit = repBit
   sizeOf = widthOf
   pack = id
   unpack = id
 
-instance BitsClass ()
+instance Bits ()
 
-instance (Bits a, Bits b) => BitsClass (a, b)
+instance (Bits a, Bits b) => Bits (a, b)
 
-instance (Bits a, Bits b, Bits c) => BitsClass (a, b, c)
+instance (Bits a, Bits b, Bits c) => Bits (a, b, c)
 
-instance (Bits a, Bits b, Bits c, Bits d) => BitsClass (a, b, c, d)
+instance (Bits a, Bits b, Bits c, Bits d) => Bits (a, b, c, d)
 
-instance (Bits a, Bits b, Bits c, Bits d, Bits e) => BitsClass (a, b, c, d, e)
-
-instance (Bits a, Bits b, Bits c, Bits d,
-          Bits e, Bits f) => BitsClass (a, b, c, d, e, f)
+instance (Bits a, Bits b, Bits c, Bits d, Bits e) => Bits (a, b, c, d, e)
 
 instance (Bits a, Bits b, Bits c, Bits d,
-          Bits e, Bits f, Bits g) => BitsClass (a, b, c, d, e, f, g)
+          Bits e, Bits f) => Bits (a, b, c, d, e, f)
+
+instance (Bits a, Bits b, Bits c, Bits d,
+          Bits e, Bits f, Bits g) => Bits (a, b, c, d, e, f, g)

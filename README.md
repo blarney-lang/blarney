@@ -25,9 +25,10 @@ Examples:
 
 APIs:
 
-* [API 1: Primitives](#api-1-primitives)
+* [API 1: Bit vectors](#api-1-bit-vectors)
 * [API 2: Bit selection](#api-2-bit-selection)
-* [API 3: Prelude](#api-3-prelude)
+* [API 3: Bits class](#api-3-bits-class)
+* [API 4: Prelude](#api-4-prelude)
 
 ## Example 1: Two-sort
 
@@ -43,9 +44,8 @@ twoSort :: (Bit 8, Bit 8) -> (Bit 8, Bit 8)
 twoSort (a, b) = a .<. b ? ((a, b), (b, a))
 ```
 
-This definition makes use of two [Blarney
-primitives](api-1-primitives).  The first is the unsigned
-comparison operator
+This definition makes use of two Blarney functions.  The first is the
+unsigned comparison operator
 
 ```hs
 (.<.) :: Bit n -> Bit n -> Bit 1
@@ -181,8 +181,7 @@ produced at the bottom.  Each `+` denotes a two-sorter that takes
 inputs from the top and the left, and produces the smaller value to
 the bottom and the larger value to the right.
 
-Check out [The design and verification of a
-sorter
+Check out [The design and verification of a sorter
 core](https://pdfs.semanticscholar.org/de30/22efc5aec833d7b52bd4770a382fea729bba.pdf)
 -- one of the classic Lava papers -- for a more in-depth exploration
 of sorting circuits in Haskell.
@@ -775,7 +774,7 @@ challenges for a pipelined implementation, namely *control hazards*
 instruction).  We resolve data hazards using *register forwarding* and
 control hazards using a *pipeline flush*.
 
-## API 1: Primitives
+## API 1: Bit vectors
 
 ```hs
 -- Bit-vector containing n bits
@@ -847,26 +846,6 @@ input :: KnownNat n => String -> Bit n  -- External input
 -- Registers
 reg   :: Bit n -> Bit n -> Bit n            -- Plain register
 regEn :: Bit n -> Bit 1 -> Bit n -> Bit n   -- Register with write-enable
-
--- RAM primitives
--- (Read new data on write)
-ram     :: (KnownNat a, KnownNat d) =>
-           (Bit a, Bit d, Bit 1) -> Bit d
-ramInit :: (KnownNat a, KnownNat d) =>
-           String -> (Bit a, Bit d, Bit 1) -> Bit d
-
--- True dual-port RAM primitives
--- (Reads new data on write)
--- (When read-address == write-address on different ports, read old data)
-ramTrueDual     :: (KnownNat a, KnownNat d) =>
-                   (Bit a, Bit d, Bit 1)
-                -> (Bit a, Bit d, Bit 1)
-                -> (Bit d, Bit d)
-ramTrueDualInit :: (KnownNat a, KnownNat d) =>
-                   String 
-                -> (Bit a, Bit d, Bit 1)
-                -> (Bit a, Bit d, Bit 1)
-                -> (Bit d, Bit d)
 ```
 
 ## API 2: Bit selection
@@ -905,7 +884,44 @@ upperNibble x = x.bits(7,4)
 We use macros here for purely syntacic reasons: passing types to
 functions in Haskell is a bit clunky.  
 
-## API 3: Prelude
+## API 3: Bits class
+
+Any type in the `Bits` class can be represented in hardware, e.g.
+stored in a wire, a register, or a RAM.
+
+```hs
+class Bits a where
+  type SizeOf a :: Nat
+  replicateBit  :: Bit 1 -> a
+  sizeOf        :: a -> Int
+  pack          :: a -> Bit (SizeOf a)
+  unpack        :: Bit (SizeOf a) -> a
+```
+
+The `Bits` class supports *automatic deriving*.  For example, suppose
+we have a simple data type for memory requests:
+
+```hs
+data MemReq =
+  MemReq {
+    isStore   :: Bit 1    -- Is it a load or a store request?
+    addr      :: Bit 32   -- 32-bit address
+  , storeData :: Bit 32   -- 32-bit data for stores
+  }
+  deriving Generic
+```
+
+To make this type a member of the `Bits` class, we simply write:
+
+```hs
+instance Bits MemReq
+```
+
+The automatic deriving mechanism for `Bits` does not support *sum
+types* (there is no way to convert a bit-vector to a sum type using
+the circuit primitives provided Blarney).
+
+## API 4: Prelude
 
 ```hs
 -- Equality
@@ -922,6 +938,34 @@ select :: Bits a => [(Bit 1, a)] -> a
 
 -- Index a list
 index :: (KnownNat n, Bits a) => Bit n -> [a] -> a
+
+-- All 0's
+zero :: Bits a => a
+
+-- All 1's
+ones :: Bits a => a
+
+-- Register
+register   :: Bits a => a -> a -> a
+registerEn :: Bits a => a -> Bit 1 -> a -> a
+
+-- RAM primitives
+-- (Read new data on write)
+ram     :: (Bits a, Bits d) => (a, d, Bit 1) -> d
+ramInit :: (Bits a, Bits d) => String -> (a, d, Bit 1) -> d
+
+-- True dual-port RAM primitives
+-- (Reads new data on write)
+-- (When read-address == write-address on different ports, read old data)
+ramTrueDual     :: (Bits a, Bits d) =>
+                   (a, d, Bit 1)
+                -> (a, d, Bit 1)
+                -> (d, d)
+ramTrueDualInit :: (Bits a, Bits d) =>
+                   String 
+                -> (a, d, Bit 1)
+                -> (a, d, Bit 1)
+                -> (d, d)
 
 -- Parallel reduce for a commutative an associative operator
 -- Input list must be non-empty

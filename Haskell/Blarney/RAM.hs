@@ -25,11 +25,13 @@ makeRAMCore init = do
   writeEn :: Wire (Bit 1) <- makeWireDefault 0
 
   -- RAM primitive
-  let ramPrim = case init of { Nothing -> ram ; Just str -> ramInit str }
-  let output = ramPrim (pack (val addrBus),
-                          pack (val dataBus),
-                            val writeEn)
-  let output' = reg 0 output
+  let ramPrimitive = case init of
+        Nothing  -> ram
+        Just str -> ramInit str
+
+  -- RAM output
+  let output = ramPrimitive (val addrBus, val dataBus, val writeEn)
+  let output' = register zero output
 
   -- Methods
   let load a = do
@@ -41,7 +43,7 @@ makeRAMCore init = do
         writeEn <== 1
 
   -- Return interface
-  return (RAM load store (unpack output) (unpack output') (val writeEn))
+  return (RAM load store output output' (val writeEn))
 
 makeRAMInit :: (Bits a, Bits d) => String -> RTL (RAM a d)
 makeRAMInit init = makeRAMCore (Just init)
@@ -63,19 +65,16 @@ makeTrueDualRAMCore init = do
   writeEnB :: Wire (Bit 1) <- makeWireDefault 0
 
   -- RAM primitive
-  let ramPrim = case init of
+  let ramPrimitive = case init of
         Nothing  -> ramTrueDual
         Just str -> ramTrueDualInit str
  
-  let (outA, outB) = ramPrim (pack (val addrBusA),
-                                pack (val dataBusA),
-                                  val writeEnA)
-                             (pack (val addrBusB),
-                                pack (val dataBusB),
-                                  val writeEnB)
+  -- RAM output
+  let (outA, outB) = ramPrimitive (val addrBusA, val dataBusA, val writeEnA)
+                                  (val addrBusB, val dataBusB, val writeEnB)
 
-  let outA' = reg 0 outA
-  let outB' = reg 0 outB
+  let outA' = register zero outA
+  let outB' = register zero outB
 
   -- Methods
   let loadA a = do
@@ -95,8 +94,8 @@ makeTrueDualRAMCore init = do
         writeEnB <== 1
 
   -- Return interface
-  return (RAM loadA storeA (unpack outA) (unpack outA') (val writeEnA),
-          RAM loadB storeB (unpack outB) (unpack outB') (val writeEnB))
+  return (RAM loadA storeA outA outA' (val writeEnA),
+          RAM loadB storeB outB outB' (val writeEnB))
 
 makeTrueDualRAMInit :: (Bits a, Bits d) => String -> RTL (RAM a d, RAM a d)
 makeTrueDualRAMInit init = makeTrueDualRAMCore (Just init)
@@ -152,7 +151,7 @@ makeDualRAMPassthroughCore init = do
            (val' la .==. val' sa)) ?
               (val' sd, out ram)
 
-  let outMethod' = unpack (reg 0 (pack outMethod))
+  let outMethod' = register zero outMethod
 
   return (RAM loadMethod storeMethod outMethod outMethod' (writeEn ram))
 
