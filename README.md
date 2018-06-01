@@ -906,9 +906,9 @@ we have a simple data type for memory requests:
 ```hs
 data MemReq =
   MemReq {
-    isStore   :: Bit 1    -- Is it a load or a store request?
-    addr      :: Bit 32   -- 32-bit address
-  , storeData :: Bit 32   -- 32-bit data for stores
+    memOp   :: Bit 1    -- Is it a load or a store request?
+    memAddr :: Bit 32   -- 32-bit address
+  , memData :: Bit 32   -- 32-bit data for stores
   }
   deriving Generic
 ```
