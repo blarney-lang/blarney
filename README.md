@@ -29,6 +29,7 @@ APIs:
 * [API 2: Bit selection](#api-2-bit-selection)
 * [API 3: Bits class](#api-3-bits-class)
 * [API 4: Prelude](#api-4-prelude)
+* [API 5: RTL](#api-5-rtl)
 
 ## Example 1: Two-sort
 
@@ -984,4 +985,66 @@ andList :: Bits a => [a] -> a
 
 -- Tree of bitwise-or
 orList :: Bits a => [a] -> a
+```
+
+## API 5: RTL
+
+```cpp
+-- The RTL monad
+newtype RTL a
+
+-- Register variables
+data Reg a
+
+-- Wire variables
+data Wire a
+
+-- Mutable variables
+-- (Reg and Wire are both instances of this)
+class Var v where
+  val :: Bits a => v a -> a
+  (<==) :: Bits a => v a -> a -> RTL ()
+
+-- Extra wire functions
+val'    :: Wire a -> a       -- Registered output of wire
+active  :: Wire a -> Bit 1   -- Is wire being assigned on this cycle?
+active' :: Wire a -> Bit 1   -- Registed value of active
+
+-- RTL conditionals
+when    :: Bit 1 -> RTL () -> RTL ()
+whenNot :: Bit 1 -> RTL () -> RTL ()
+
+-- For rebindable syntax
+-- (Haskell's if-then-else maps to this)
+ifThenElseRTL :: Bit 1 -> RTL () -> RTL () -> RTL ()
+
+-- RTL switch statement
+switch :: Bits a => a -> [(a, RTL ())] -> RTL ()
+
+-- For neat construction of case alternatives
+(-->)  :: a -> RTL () -> (a, RTL ())
+
+-- Create register
+makeReg     :: Bits a => RTL (Reg a)
+makeRegInit :: Bits a => a -> RTL (Reg a)
+
+-- Create wire
+makeWire        :: Bits a => RTL (Wire a)
+makeWireDefault :: Bits a => a -> RTL (Wire a)
+
+-- A DReg holds the assigned value only for one cycle.
+-- At all other times, it has the given default value.
+makeDReg :: Bits a => a -> RTL (Reg a)
+
+-- RTL finish statements
+finish :: RTL ()
+
+-- RTL display statements
+display :: DisplayType a => a
+
+-- Declare external output
+output :: String -> Bit n -> RTL ()
+
+-- Convert RTL monad to a netlist
+netlist :: RTL () -> IO [Net]
 ```
