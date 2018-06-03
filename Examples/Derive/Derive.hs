@@ -12,12 +12,13 @@ data MemReq =
   deriving Generic
 
 instance Bits MemReq
+instance FShow MemReq
 
 -- Top-level module
 top :: RTL ()
 top = do
   let req = MemReq { memOp = 0, memAddr = 100, memData = 0 }
-  display "req = " (req.pack)
+  display "req = " req
   finish
 
 -- Main function

@@ -1,10 +1,22 @@
-{-# LANGUAGE FlexibleInstances, TypeSynonymInstances #-}
+{-# LANGUAGE DefaultSignatures    #-}
+{-# LANGUAGE DeriveGeneric        #-}
+{-# LANGUAGE TypeOperators        #-}
+{-# LANGUAGE FlexibleContexts     #-}
+{-# LANGUAGE DataKinds            #-}
+{-# LANGUAGE KindSignatures       #-}
+{-# LANGUAGE TypeOperators        #-}
+{-# LANGUAGE TypeFamilies         #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE FlexibleContexts     #-}
+{-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE ConstraintKinds      #-}
 
 module Blarney.Format where
 
 import Prelude
 import Blarney.Unbit
 import Blarney.Bit
+import GHC.Generics
 
 data FormatItem = 
     FormatBit Int Unbit
@@ -37,14 +49,20 @@ instance FormatType a => FormatType (Format -> a) where
 format :: FormatType a => a
 format = formatType emptyFormat
 
+-- FShow
+
 class FShow a where
   fshow :: a -> Format
+
   fshowList :: [a] -> Format
   fshowList xs = format "[" <.> list xs <.> format "]"
     where
       list [] = emptyFormat
       list [x] = fshow x
       list (x:xs) = fshow x <.> format "," <.> list xs
+
+  default fshow :: (Generic a, GFShow (Rep a)) => a -> Format
+  fshow x = gfshow False (from x)
 
 instance FShow Char where
   fshow c = format [c]
@@ -61,3 +79,33 @@ instance FShow a => FShow [a] where
 
 instance (FShow a, FShow b) => FShow (a, b) where
   fshow (a, b) = format "(" (fshow a) "," (fshow b) ")"
+
+-- Generic deriving for FShow
+
+class GFShow f where
+  -- First argument: are we showing a record constructor?
+  gfshow :: Bool -> f a -> Format
+
+instance GFShow U1 where
+  gfshow rec U1 = emptyFormat
+
+instance (GFShow a, GFShow b) => GFShow (a :*: b) where
+  gfshow rec (a :*: b) = gfshow rec a <.> format sep <.> gfshow rec b
+    where sep = case rec of { False -> " "; True -> ", " }
+
+instance (GFShow a, Selector c) => GFShow (M1 S c a) where
+  gfshow rec y@(M1 x)
+    | null (selName y) = format "(" <.> gfshow False x <.> format ")"
+    | otherwise = format (selName y) <.> format " = " <.> gfshow False x
+
+instance (GFShow a) => GFShow (M1 D c a) where
+  gfshow rec (M1 x) = gfshow rec x
+
+instance (GFShow a, Constructor c) => GFShow (M1 C c a) where
+  gfshow rec y@(M1 x)
+    | conIsRecord y = format (conName y)
+                  <.> format " { " <.> gfshow True x <.> format " }"
+    | otherwise = format (conName y) <.> format " " <.> gfshow False x
+
+instance FShow a => GFShow (K1 i a) where
+  gfshow rec (K1 x) = fshow x
