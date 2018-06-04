@@ -19,52 +19,41 @@ import Blarney.Bit
 import GHC.Generics
 import Data.Monoid
 
-data FormatItem = 
-    FormatBit Int Unbit
-  | FormatString String
-
-newtype Format = Format [FormatItem]
-
-emptyFormat :: Format
-emptyFormat = Format []
-
-appendFormat :: Format -> Format -> Format
-appendFormat (Format a) (Format b) = Format (a ++ b)
-
-str :: String -> Format
-str s = Format [FormatString s]
-
-bv :: Bit n -> Format
-bv b = Format [FormatBit (unbitWidth ub) ub]
-  where ub = unbit b
-
-instance Semigroup Format where
-  (<>) = appendFormat
-
-instance Monoid Format where
-  mempty = emptyFormat
-
 -- FShow
 
 class FShow a where
   fshow :: a -> Format
 
   fshowList :: [a] -> Format
-  fshowList xs = str "[" <> list xs <> str "]"
+  fshowList xs = fshow "[" <> list xs <> fshow "]"
     where
-      list [] = emptyFormat
+      list [] = mempty
       list [x] = fshow x
-      list (x:xs) = fshow x <> str "," <> list xs
+      list (x:xs) = fshow x <> fshow "," <> list xs
 
   default fshow :: (Generic a, GFShow (Rep a)) => a -> Format
   fshow x = gfshow False (from x)
 
+data FormatItem = 
+    FormatBit Int Unbit
+  | FormatString String
+
+newtype Format = Format [FormatItem]
+
+
+instance Semigroup Format where
+  Format a <> Format b = Format (a ++ b)
+
+instance Monoid Format where
+  mempty = Format []
+
 instance FShow Char where
-  fshow c = str [c]
-  fshowList cs = str cs
+  fshow c = Format [FormatString [c]]
+  fshowList cs = Format [FormatString cs]
 
 instance FShow (Bit n) where
-  fshow = bv
+  fshow b = Format [FormatBit (unbitWidth ub) ub]
+    where ub = unbit b
 
 instance FShow Format where
   fshow f = f
@@ -73,7 +62,7 @@ instance FShow a => FShow [a] where
   fshow = fshowList
 
 instance (FShow a, FShow b) => FShow (a, b) where
-  fshow (a, b) = str "(" <> fshow a <> str "," <> fshow b <> str ")"
+  fshow (a, b) = fshow "(" <> fshow a <> fshow "," <> fshow b <> fshow ")"
 
 -- Generic deriving for FShow
 
@@ -82,25 +71,25 @@ class GFShow f where
   gfshow :: Bool -> f a -> Format
 
 instance GFShow U1 where
-  gfshow rec U1 = emptyFormat
+  gfshow rec U1 = mempty
 
 instance (GFShow a, GFShow b) => GFShow (a :*: b) where
-  gfshow rec (a :*: b) = gfshow rec a <> str sep <> gfshow rec b
+  gfshow rec (a :*: b) = gfshow rec a <> fshow sep <> gfshow rec b
     where sep = case rec of { False -> " "; True -> ", " }
 
 instance (GFShow a, Selector c) => GFShow (M1 S c a) where
   gfshow rec y@(M1 x)
-    | null (selName y) = str "(" <> gfshow False x <> str ")"
-    | otherwise = str (selName y) <> str " = " <> gfshow False x
+    | null (selName y) = fshow "(" <> gfshow False x <> fshow ")"
+    | otherwise = fshow (selName y) <> fshow " = " <> gfshow False x
 
 instance (GFShow a) => GFShow (M1 D c a) where
   gfshow rec (M1 x) = gfshow rec x
 
 instance (GFShow a, Constructor c) => GFShow (M1 C c a) where
   gfshow rec y@(M1 x)
-    | conIsRecord y = str (conName y)
-                   <> str " { " <> gfshow True x <> str " }"
-    | otherwise = str (conName y) <> str " " <> gfshow False x
+    | conIsRecord y = fshow (conName y)
+                   <> fshow " { " <> gfshow True x <> fshow " }"
+    | otherwise = fshow (conName y) <> fshow " " <> gfshow False x
 
 instance FShow a => GFShow (K1 i a) where
   gfshow rec (K1 x) = fshow x

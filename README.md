@@ -931,7 +931,8 @@ Any type in the `FShow` class can be passed as an argument to the
 
 ```hs
 class FShow a where
-  fshow :: a -> Format
+  fshow     :: a -> Format
+  fshowList :: [a] -> Format     -- Has default definition
 
 -- Abstract data type for things that can be displayed
 newtype Format
@@ -939,8 +940,10 @@ newtype Format
 -- Format constructors
 mempty :: Format                         -- Empty (from Monoid class)
 (<>)   :: Format -> Format -> Format     -- Append (from Monoid class)
-str    :: String -> Format               -- Lift string to a Format
-bv     :: Bit n -> Format                -- Lift Bit n to a Format
+
+-- Primitive instances
+instance FShow Char
+instance FShow (Bit n)
 ```
 
 As an example, here is the `FShow` instance for pairs.
@@ -948,23 +951,12 @@ As an example, here is the `FShow` instance for pairs.
 ```hs
 -- Example instance: displaying pairs
 instance (FShow a, FShow b) => FShow (a, b) where
-  fshow (a, b) = str "(" <> fshow a <> str "," <> fshow b <> str ")"
+  fshow (a, b) = fshow "(" <> fshow a <> fshow "," <> fshow b <> fshow ")"
 ```
 
-The `FShow` class supports *automatic deriving*.  For example, suppose
-we have a simple data type for memory requests:
-
-```hs
-data MemReq =
-  MemReq {
-    memOp   :: Bit 1    -- Is it a load or a store request?
-  , memAddr :: Bit 32   -- 32-bit address
-  , memData :: Bit 32   -- 32-bit data for stores
-  }
-  deriving Generic
-```
-
-To make this type a member of the `FShow` class, we simply write:
+The `FShow` class supports *automatic deriving*.  For example, to make
+the user defined type `MemReq` an instance of `FShow`, we can simply
+write:
 
 ```hs
 instance FShow MemReq
