@@ -5,7 +5,7 @@
 
 module Blarney.RTL (
   RTL,
-  Var(..), DisplayType(..),
+  Var(..), Displayable(..),
   Reg(..), makeReg, makeRegInit, makeDReg,
   Wire(..), makeWire, makeWireDefault,
   when, whenNot, switch, (-->),
@@ -227,20 +227,20 @@ finish = do
   writeFinish cond
 
 -- RTL display statements
-class DisplayType a where
-  displayType :: Format -> a
+class Displayable a where
+  disp :: Format -> a
 
-instance DisplayType (RTL a) where
-  displayType x = do
+instance Displayable (RTL a) where
+  disp x = do
      (cond, as) <- ask
      writeDisplay (cond, x)
      return (error "Return value of 'display' should be ignored")
 
-instance (FShow b, DisplayType a) => DisplayType (b -> a) where
-  displayType x b = displayType (x <.> fshow b)
+instance (FShow b, Displayable a) => Displayable (b -> a) where
+  disp x b = disp (x <> fshow b)
 
-display :: DisplayType a => a
-display = displayType (Format [])
+display :: Displayable a => a
+display = disp (Format [])
 
 -- RTL output statements
 output :: String -> Bit n -> RTL ()

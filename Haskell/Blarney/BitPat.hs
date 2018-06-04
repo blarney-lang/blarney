@@ -26,9 +26,9 @@ varBP :: BP n (Bit n -> t) t
 varBP = one
 
 -- Sequentially combine bit patterns
-infixl 9 <>
-(<>) :: KnownNat n0 => BP n0 t0 t1 -> BP n1 t1 t2 -> BP (n0+n1) t0 t2
-p0 <> p1 = \n -> 
+infixl 9 <#>
+(<#>) :: KnownNat n0 => BP n0 t0 t1 -> BP n1 t1 t2 -> BP (n0+n1) t0 t2
+p0 <#> p1 = \n -> 
   let (upper, lower) = split n in app (p0 upper) (p1 lower)
 
 -- Pattern plus right-hand-side

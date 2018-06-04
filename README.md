@@ -28,8 +28,9 @@ APIs:
 * [API 1: Bit vectors](#api-1-bit-vectors)
 * [API 2: Bit selection](#api-2-bit-selection)
 * [API 3: Bits class](#api-3-bits-class)
-* [API 4: Prelude](#api-4-prelude)
-* [API 5: RTL](#api-5-rtl)
+* [API 4: FShow class](#api-4-fshow-class)
+* [API 5: Prelude](#api-5-prelude)
+* [API 6: RTL](#api-6-rtl)
 
 ## Example 1: Two-sort
 
@@ -632,8 +633,8 @@ top = do
   -- Dispatch
   match instr
     [
-      Lit(7,0) <> Var(5) <> Var(5) <> Lit(3,0) <> Var(5) <> Lit(7,0b0110011) ==> add,
-      Var(12)            <> Var(5) <> Lit(3,0) <> Var(5) <> Lit(7,0b0010011) ==> addi
+      Lit(7,0) <#> Var(5) <#> Var(5) <#> Lit(3,0) <#> Var(5) <#> Lit(7,0b0110011) ==> add,
+      Var(12)             <#> Var(5) <#> Lit(3,0) <#> Var(5) <#> Lit(7,0b0010011) ==> addi
     ]
 ```
 
@@ -643,7 +644,7 @@ contains a pattern on the left-hand-side and a function on the
 right-hand-side.  In a pattern, the macro `Lit(n,x)` matches an
 `n`-bit string containing the value `x`, whereas `Var(n)` matches
 *any* `n`-bit string and passes it as an argument to the
-right-hand-side function.  The `<>` combinator composes patterns
+right-hand-side function.  The `<#>` combinator composes patterns
 sequentially.  To use the `Lit` and `Var` macros, one needs to
 `#include <BitPat.h>`.
 
@@ -923,7 +924,53 @@ The automatic deriving mechanism for `Bits` does not support *sum
 types* (there is no way to convert a bit-vector to a sum type using
 the circuit primitives provided Blarney).
 
-## API 4: Prelude
+## API 4: FShow class
+
+Any type in the `FShow` class can be passed as an argument to the
+`display` function.
+
+```hs
+class FShow a where
+  fshow :: a -> Format
+
+-- Abstract data type for things that can be displayed
+newtype Format
+
+-- Format constructors
+mempty :: Format                         -- Empty (from Monoid class)
+(<>)   :: Format -> Format -> Format     -- Append (from Monoid class)
+str    :: String -> Format               -- Lift string to a Format
+bv     :: Bit n -> Format                -- Lift Bit n to a Format
+```
+
+As an example, here is the `FShow` instance for pairs.
+
+```hs
+-- Example instance: displaying pairs
+instance (FShow a, FShow b) => FShow (a, b) where
+  fshow (a, b) = str "(" <> fshow a <> str "," <> fshow b <> str ")"
+```
+
+The `FShow` class supports *automatic deriving*.  For example, suppose
+we have a simple data type for memory requests:
+
+```hs
+data MemReq =
+  MemReq {
+    memOp   :: Bit 1    -- Is it a load or a store request?
+  , memAddr :: Bit 32   -- 32-bit address
+  , memData :: Bit 32   -- 32-bit data for stores
+  }
+  deriving Generic
+```
+
+To make this type a member of the `FShow` class, we simply write:
+
+```hs
+instance FShow MemReq
+```
+
+## API 5: Prelude
 
 ```hs
 -- Equality
@@ -969,14 +1016,6 @@ ramTrueDualInit :: (Bits a, Bits d) =>
                 -> (a, d, Bit 1)
                 -> (d, d)
 
--- Parallel reduce for a commutative an associative operator
--- Input list must be non-empty
-tree1 :: (a -> a -> a) -> [a] -> a
-
--- Like 'tree1', but input list may be empty,
--- in which case the zero element is returned
-tree :: (a -> a -> a) -> a -> [a] -> a
-
 -- Adder tree
 sumList :: KnownNat n => [Bit n] -> Bit n
 
@@ -987,7 +1026,7 @@ andList :: Bits a => [a] -> a
 orList :: Bits a => [a] -> a
 ```
 
-## API 5: RTL
+## API 6: RTL
 
 ```hs
 -- The RTL monad
@@ -1040,7 +1079,8 @@ switch :: Bits a => a -> [(a, RTL ())] -> RTL ()
 finish :: RTL ()
 
 -- RTL display statements
-display :: DisplayType a => a
+-- (Variadic function: args in FShow, result of type RTL ())
+display :: Displayable a => a
 
 -- Declare external output
 output :: String -> Bit n -> RTL ()

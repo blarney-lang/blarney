@@ -58,10 +58,10 @@ makeCPUSpec = do
   when (fetch.val.inv) $ do
     match (instrMem.out)
       [
-        Var(2) <> Var(4)           <> Lit(2,0b00) ==> li,
-        Var(2) <> Var(2) <> Var(2) <> Lit(2,0b01) ==> add,
-        Var(4) <>           Var(2) <> Lit(2,0b10) ==> bnz,
-        Var(6) <>                     Lit(2,0b11) ==> halt
+        Var(2) <#> Var(4)            <#> Lit(2,0b00) ==> li,
+        Var(2) <#> Var(2) <#> Var(2) <#> Lit(2,0b01) ==> add,
+        Var(4) <#>           Var(2)  <#> Lit(2,0b10) ==> bnz,
+        Var(6) <#>                       Lit(2,0b11) ==> halt
       ]
     fetch <== 1
 
