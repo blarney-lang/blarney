@@ -9,26 +9,17 @@ fact = do
   -- Compute factorial of 10
   let recipe =
         Seq [
-          n := 10,
-          While (n.val .>. 0) $ Par [
-              n := n.val - 1,
-              acc := acc.val + n.val
-          ]
+          RTL $ do
+            n <== 10
+        , While (n.val .>. 0) $ RTL $ do
+            n <== n.val - 1
+            acc <== acc.val + n.val
+        , RTL $ do
+            display "fact(10) = " (acc.val)
+            finish
         ]
        
-  -- Single cycle pulse
-  let pulse = reg 1 0
-
-  -- Trigger factorial recipe on pulse
-  done <- run pulse recipe
-
-  -- Display result and terminate simulation
-  when done $ do
-    display "fact(10) = " (acc.val)
-    finish
-
-  return ()
+  runOnce recipe
 
 main :: IO ()
-main = 
-  netlist fact >>= writeVerilog "/tmp/fact.v"
+main = generateCXX fact "/tmp/fact"

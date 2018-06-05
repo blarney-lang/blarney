@@ -419,7 +419,7 @@ imperative language with various control-flow statements.
 data Recipe = 
     Skip                   -- Do nothing (in zero cycles)
   | Tick                   -- Do nothing (in one cycle)
-  | Block (RTL ())         -- Perform RTL block (in one cycle)
+  | RTL (RTL ())           -- Perform RTL block (in one cycle)
   | Seq [Recipe]           -- Execute recipes in sequence
   | Par [Recipe]           -- Fork-join parallelism
   | If (Bit 1) Recipe      -- Conditional recipe
@@ -439,12 +439,12 @@ fact = do
   -- Compute factorial of 10
   let recipe =
         Seq [
-          Block $ do
+          RTL $ do
             n <== 10
-        , While (n.val .>. 0) $ Block $ do
+        , While (n.val .>. 0) $ RTL $ do
             n <== n.val - 1
             acc <== acc.val + n.val
-        , Block $ do
+        , RTL $ do
             display "fact(10) = " (acc.val)
             finish
         ]
@@ -470,14 +470,14 @@ top = do
   -- Sample test sequence
   let test =
         Seq [
-          Block $ do
+          RTL $ do
             counter.inc
-        , Block $ do
+        , RTL $ do
             counter.inc
-        , Block $ do
+        , RTL $ do
             counter.inc
             counter.dec
-        , Block $ do
+        , RTL $ do
             display "counter = " (counter.output)
             finish
         ]
@@ -522,11 +522,11 @@ top = do
   -- Write 10 to ram[0] and read it back again
   let test =
         Seq [
-          Block $ do
+          RTL $ do
             store ram 0 10
-        , Block $ do
+        , RTL $ do
             load ram 0
-        , Block $ do
+        , RTL $ do
             display "Got " (ram.out)
             finish
         ]

@@ -23,7 +23,7 @@ data Recipe where
   Wait  :: Bit 1 -> Recipe
   When  :: Bit 1 -> RTL () -> Recipe
   Do    :: [RTL ()] -> Recipe
-  Block :: RTL () -> Recipe
+  RTL   :: RTL () -> Recipe
   Seq   :: [Recipe] -> Recipe
   Par   :: [Recipe] -> Recipe
   If    :: Bit 1 -> Recipe -> Recipe
@@ -53,7 +53,7 @@ run go (Wait c)     = run go (While (inv c) Tick)
 run go (When c a)   = run go (Seq [Wait c, Do [a]])
 run go (Do [])      = return go
 run go (Do (a:as))  = when go a >> run (reg 0 go) (Do as)
-run go (Block b)    = run go (Do [b])
+run go (RTL b)      = run go (Do [b])
 run go (Seq [])     = return go
 run go (Seq (r:rs)) = do { done <- run go r; run done (Seq rs) }
 run go (Par rs)     = do
