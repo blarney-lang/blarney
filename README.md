@@ -280,7 +280,8 @@ Finished
 
 Queues (also known as FIFOs) are very commonly used abstraction in
 hardware design.  Blarney provides [a range of different queue
-implementations](), all of which implement the following interface.
+implementations](#api-7-queue-library),
+all of which implement the following interface.
 
 ```hs
 -- Queue interface
