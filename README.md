@@ -31,6 +31,7 @@ APIs:
 * [API 4: FShow class](#api-4-fshow-class)
 * [API 5: Prelude](#api-5-prelude)
 * [API 6: RTL](#api-6-rtl)
+* [API 7: Queue library](#api-7-queue-library)
 
 ## Example 1: Two-sort
 
@@ -287,10 +288,10 @@ data Queue a =
   Queue {
     notEmpty :: Bit 1        -- Is the queue non-empty?
   , notFull  :: Bit 1        -- Is there any space in the queue?
-  , enq      :: a -> RTL ()  -- Insert an element
-  , deq      :: RTL ()       -- Remove the first element
+  , enq      :: a -> RTL ()  -- Insert an element (assuming notFull)
+  , deq      :: RTL ()       -- Remove the first element (assuming canDeq)
   , canDeq   :: Bit 1        -- Guard on the deq and first methods
-  , first    :: a            -- View the first element
+  , first    :: a            -- View the first element (assuming canDeq)
   }
 ```
 
@@ -1070,4 +1071,59 @@ output :: String -> Bit n -> RTL ()
 
 -- Convert RTL monad to a netlist
 netlist :: RTL () -> IO [Net]
+```
+
+## API 7: Queue library
+
+The `Blarney.Queue` module defines several queue
+implementations, all implementing the interface:
+
+```hs
+data Queue a =
+  Queue {
+    notEmpty :: Bit 1        -- Is the queue non-empty?
+  , notFull  :: Bit 1        -- Is there any space in the queue?
+  , enq      :: a -> RTL ()  -- Insert an element (assuming notFull)
+  , deq      :: RTL ()       -- Remove the first element (assuming canDeq)
+  , canDeq   :: Bit 1        -- Guard on the deq and first methods
+  , first    :: a            -- View the first element (assuming canDeq)
+  }
+```
+
+**Two-element queue**:
+
+  * A full-throughput queue implemented using 2 registers.
+  * No combinatorial paths between sides.
+  * There's a mux on the enqueue path.
+
+```hs
+makeQueue :: Bits a => RTL (Queue a)
+```
+
+**Sized queue**:
+
+  * A full-throughput N-element queue implemented using 2 registers and a RAM.
+  * No combinatorial paths between sides.
+  * There's a mux on the  enqueue path.
+
+```hs
+makeSizedQueue :: Bits a => Int -> RTL (Queue a)
+```
+
+**Shift queue**:
+
+  * N-element queue implemented using a shift register.
+  * No muxes.
+  * Input element goes straight to a register and output element
+    comes straight from a register.
+  * N-cycle latency between enqueuing an element and being able to dequeue
+    it, where N is the queue capacity.
+
+```hs
+-- Full throughput but there's a combinatorial path between notFull and deq.
+makePipelineQueue :: Bits a => Int -> RTL (Queue a)
+
+-- No combinatorial paths between sides but max throughput = N/(N+1),
+-- where N is the queue capacity
+makeShiftQueue :: Bits a => Int -> RTL (Queue a)
 ```
