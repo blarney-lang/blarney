@@ -18,6 +18,7 @@ fi
 EXTS="-XScopedTypeVariables -XDataKinds -XTypeOperators -XTypeFamilies"
 EXTS="$EXTS -XBinaryLiterals -XNoImplicitPrelude -XFlexibleContexts"
 EXTS="$EXTS -XRebindableSyntax -XPartialTypeSignatures -XDeriveGeneric"
+EXTS="$EXTS -XDeriveAnyClass "
 WARN="-Wno-partial-type-signatures"
 INC="$BLARNEY_ROOT/Haskell"
 INC_H="$BLARNEY_ROOT/Haskell/Blarney/"

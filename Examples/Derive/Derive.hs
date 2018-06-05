@@ -9,10 +9,7 @@ data MemReq =
   , memAddr :: Bit 32   -- 32-bit address
   , memData :: Bit 32   -- 32-bit data for stores
   }
-  deriving Generic
-
-instance Bits MemReq
-instance FShow MemReq
+  deriving (Generic, Bits, FShow)
 
 -- Top-level module
 top :: RTL ()

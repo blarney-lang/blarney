@@ -901,7 +901,7 @@ class Bits a where
   unpack        :: Bit (SizeOf a) -> a
 ```
 
-The `Bits` class supports *automatic deriving*.  For example, suppose
+The `Bits` class supports *generic deriving*.  For example, suppose
 we have a simple data type for memory requests:
 
 ```hs
@@ -911,18 +911,14 @@ data MemReq =
   , memAddr :: Bit 32   -- 32-bit address
   , memData :: Bit 32   -- 32-bit data for stores
   }
-  deriving Generic
+  deriving (Generic, Bits)
 ```
 
-To make this type a member of the `Bits` class, we simply write:
-
-```hs
-instance Bits MemReq
-```
-
-The automatic deriving mechanism for `Bits` does not support *sum
-types* (there is no way to convert a bit-vector to a sum type using
-the circuit primitives provided Blarney).
+To make this type a member of the `Bits` class, we have suffixed it
+with `derving (Generic, Bits)`.  The generic deriving mechanism for
+`Bits` does not support *sum types* (there is no way to convert a
+bit-vector to a sum type using the circuit primitives provided
+Blarney).
 
 ## API 4: FShow class
 
@@ -946,7 +942,7 @@ instance FShow Char
 instance FShow (Bit n)
 ```
 
-As an example, here is the `FShow` instance for pairs.
+As an example, here is how the `FShow` instance for pairs is defined.
 
 ```hs
 -- Example instance: displaying pairs
@@ -954,13 +950,8 @@ instance (FShow a, FShow b) => FShow (a, b) where
   fshow (a, b) = fshow "(" <> fshow a <> fshow "," <> fshow b <> fshow ")"
 ```
 
-The `FShow` class supports *automatic deriving*.  For example, to make
-the user defined type `MemReq` an instance of `FShow`, we can simply
-write:
-
-```hs
-instance FShow MemReq
-```
+Like the `Bits` class, the `FShow` class supports *generic deriving*:
+just include `FShow` in the `deriving` clause for the data type.
 
 ## API 5: Prelude
 
