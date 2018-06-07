@@ -3,6 +3,7 @@ import Blarney
 import Blarney.RAM
 import Blarney.Queue
 import Blarney.Stream
+import Blarney.GetPut
 
 -- These parameters are for a 4096 node engine with up to 2^17 edges
 #define LogMaxNeighbours      17

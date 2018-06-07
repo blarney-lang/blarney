@@ -3,13 +3,7 @@ module Blarney.Stream where
 import Blarney
 import Blarney.Queue
 import Blarney.RAM
-
-data Get a =
-  Get {
-    get :: RTL ()
-  , canGet :: Bit 1
-  , value :: a
-  }
+import Blarney.GetPut
 
 type Stream a = Get a
 
