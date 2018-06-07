@@ -23,8 +23,8 @@ writeVerilog filename netlist = do
   hWriteVerilog h netlist
   hClose h
 
-generateVerilog :: String -> RTL () -> IO ()
-generateVerilog filename top = netlist top >>= writeVerilog filename
+generateVerilog :: RTL () -> String -> IO ()
+generateVerilog top filename = netlist top >>= writeVerilog filename
 
 hWriteVerilog :: Handle -> [Net] -> IO ()
 hWriteVerilog h netlist = do
