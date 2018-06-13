@@ -269,7 +269,6 @@ instance (GInterface a, GInterface b) => GInterface (a :*: b) where
     x1 <- ggetOutput s (t ++ "1")
     return (x0 :*: x1)
 
--- HERE
 instance (GInterface a, Selector c) => GInterface (M1 S c a) where
   gmakeInput s t = do
     let ctr :: M1 S c a _ = undefined
