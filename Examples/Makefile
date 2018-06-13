@@ -20,3 +20,4 @@ clean:
 	make -C Sorter clean
 	make -C BitScan clean
 	make -C Derive clean
+	make -C Interface clean

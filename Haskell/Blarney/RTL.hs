@@ -8,7 +8,7 @@ module Blarney.RTL (
   Var(..), Displayable(..),
   Reg(..), makeReg, makeRegInit, makeDReg,
   Wire(..), makeWire, makeWireDefault,
-  when, whenNot, switch, (-->),
+  when, whenNot, whenR, switch, (-->),
   finish, display, output,
   netlist
 ) where
@@ -146,6 +146,11 @@ when cond a = do
 
 whenNot :: Bit 1 -> RTL () -> RTL ()
 whenNot cond a = Blarney.RTL.when (inv cond) a
+
+whenR :: Bit 1 -> RTL a -> RTL a
+whenR cond a = do
+  (c, as) <- ask
+  local (cond .&. c, as) a
 
 ifThenElseRTL :: Bit 1 -> RTL () -> RTL () -> RTL ()
 ifThenElseRTL c a b =
