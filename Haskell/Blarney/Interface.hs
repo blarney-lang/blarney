@@ -61,10 +61,10 @@ instInput s a = Inst $ \r -> return ([(s, PinIn (unbit a))], ())
 
 instOutput :: KnownNat n => String -> Inst (Bit n)
 instOutput s = Inst $ \r ->
-  case lookup s r of
-    Nothing -> error ("instOutput: unknown output '" ++ s)
-    Just x -> let out = Bit x in
-                return ([(s, PinOut (natVal out))], out)
+  let out = case lookup s r of
+              Nothing -> error ("instOutput: unknown output '" ++ s ++ "'")
+              Just x -> Bit x
+  in  return ([(s, PinOut (natVal out))], out)
 
 liftRTL :: RTL a -> Inst a
 liftRTL rtl = Inst $ \r -> do
@@ -403,7 +403,9 @@ instance Interface a => Module (RTL a) where
     a <- rtl
     makeOutput "out" a
 
-  makeInstance s = lowerInst s (getOutput "out")
+  makeInstance s = lowerInst s $ do
+    a <- getOutput "out"
+    return a
 
 instance (Interface a, Interface b) => Module (a -> RTL b) where
   makeModule f = do
@@ -414,7 +416,8 @@ instance (Interface a, Interface b) => Module (a -> RTL b) where
   makeInstance s = \a ->
     lowerInst s $ do
       putInput "in" a
-      getOutput "out"
+      a <- getOutput "out"
+      return a
 
 instance (Interface a, Interface b, Interface c) =>
          Module (a -> b -> RTL c) where
