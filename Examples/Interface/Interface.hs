@@ -8,8 +8,8 @@ import Blarney.GetPut
 import GHC.Generics
 
 -- Module that increments each element in a stream
-incS :: Stream (Bit 8) -> RTL (Stream (Bit 8))
-incS xs = do
+makeIncS :: Stream (Bit 8) -> RTL (Stream (Bit 8))
+makeIncS xs = do
   -- Output buffer
   buffer <- makeQueue
 
@@ -19,10 +19,32 @@ incS xs = do
 
   -- Convert buffer to a stream
   return (buffer.toStream)
-  
+ 
+instIncS :: Stream (Bit 8) -> RTL (Stream (Bit 8))
+instIncS = makeInstance "incS"
+
+top :: RTL ()
+top = do
+  -- Input buffer
+  buffer <- makeQueue
+
+  -- Create an instance
+  out <- instIncS (buffer.toStream)
+
+  -- Fill input
+  when (buffer.notFull) $ do
+    enq buffer 100
+
+  -- Consume
+  when (out.canGet) $ do
+    out.get
+    display "Got " (out.value)
+ 
 -- Main function
 main :: IO ()
-main = generateVerilog (makeModule incS) "/tmp/interface.v"
+main = do
+  generateVerilog (makeModule makeIncS) "/tmp/inc.v"
+  generateVerilog top "/tmp/top.v"
 
 {-
 
