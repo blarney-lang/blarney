@@ -197,6 +197,31 @@ instance (Interface a, Interface b, Interface c) => Interface (a, b, c) where
     t2 <- getOutput (s ++ "_2")
     return (t0, t1, t2)
 
+instance (Interface a, Interface b, Interface c, Interface d) =>
+         Interface (a, b, c, d) where
+  makeInput s = do
+    t0 <- makeInput (s ++ "_0")
+    t1 <- makeInput (s ++ "_1")
+    t2 <- makeInput (s ++ "_2")
+    t3 <- makeInput (s ++ "_3")
+    return (t0, t1, t2, t3)
+  makeOutput s (a, b, c, d) = do
+    makeOutput (s ++ "_0") a
+    makeOutput (s ++ "_1") b
+    makeOutput (s ++ "_2") c
+    makeOutput (s ++ "_3") d
+  putInput s (a, b, c, d) = do
+    putInput (s ++ "_0") a
+    putInput (s ++ "_1") b
+    putInput (s ++ "_2") c
+    putInput (s ++ "_3") d
+  getOutput s = do
+    t0 <- getOutput (s ++ "_0")
+    t1 <- getOutput (s ++ "_1")
+    t2 <- getOutput (s ++ "_2")
+    t3 <- getOutput (s ++ "_3")
+    return (t0, t1, t2, t3)
+
 -- Function instances
 -- ==================
 
@@ -251,6 +276,34 @@ instance (Bits a, Bits b, Bits c,
   getOutput s = do
     f <- getOutput s
     return (\a b -> f (a, b))
+
+instance (Bits a, Bits b, Bits c, Bits d,
+          Interface a, Interface b, Interface c, Interface d) =>
+          Interface (a -> b -> c -> RTL d) where
+  makeInput s = do
+    f <- makeInput s
+    return (\a b c -> f (a, b, c))
+  makeOutput s f = do
+    makeOutput s (\(a, b, c) -> f a b c)
+  putInput s f = do
+    putInput s (\(a, b, c) -> f a b c)
+  getOutput s = do
+    f <- getOutput s
+    return (\a b c -> f (a, b, c))
+
+instance (Bits a, Bits b, Bits c, Bits d, Bits e, Interface a,
+          Interface b, Interface c, Interface d, Interface e) =>
+          Interface (a -> b -> c -> d -> RTL e) where
+  makeInput s = do
+    f <- makeInput s
+    return (\a b c d -> f (a, b, c, d))
+  makeOutput s f = do
+    makeOutput s (\(a, b, c, d) -> f a b c d)
+  putInput s f = do
+    putInput s (\(a, b, c, d) -> f a b c d)
+  getOutput s = do
+    f <- getOutput s
+    return (\a b c d -> f (a, b, c, d))
 
 -- Generic deriving
 -- ================
@@ -342,39 +395,38 @@ instance Interface a => GInterface (K1 i a) where
 -- modular compilation.
 
 class Module a where
-  makeMod  :: (String, Int) -> a -> RTL ()
-  --makeInst :: (String, Int) -> a -> a
+  makeModule :: a -> RTL ()
+  makeInstance :: String -> a
 
 instance Interface a => Module (RTL a) where
-  makeMod (s, n) rtl = do
+  makeModule rtl = do
     a <- rtl
-    makeOutput (s ++ "out") a
+    makeOutput "out" a
 
-instance (Interface a, Module b) => Module (a -> b) where
-  makeMod (s, n) f = do
-    a <- makeInput (s ++ "in" ++ concat [show n | n > 0])
-    makeMod (s, n+1) (f a)
+  makeInstance s = lowerInst s (getOutput "out")
 
-makeModule :: Module a => a -> RTL ()
-makeModule = makeMod ("", 0)
+instance (Interface a, Interface b) => Module (a -> RTL b) where
+  makeModule f = do
+    a <- makeInput "in"
+    b <- f a
+    makeOutput "out" b
 
--- instance Interface a => Module (RTL a) where
---   makeInst (s, n) rtl = do
---     putOutput (s ++ "out") rtl
+  makeInstance s = \a ->
+    lowerInst s $ do
+      putInput "in" a
+      getOutput "out"
 
---makeInstance :: Module a => String -> a -> a
+instance (Interface a, Interface b, Interface c) =>
+         Module (a -> b -> RTL c) where
+  makeModule f = makeModule (\(a, b) -> f a b)
+  makeInstance s = \a b -> makeInstance s (a, b)
 
+instance (Interface a, Interface b, Interface c, Interface d) =>
+         Module (a -> b -> c -> RTL d) where
+  makeModule f = makeModule (\(a, b, c) -> f a b c)
+  makeInstance s = \a b c -> makeInstance s (a, b, c)
 
-
-{-
-
-  out <- makeInstance "incS" incS inp
-
-
-  makeIncS
-
-  instIncS = makeInstance "incS" makeIncS
-
-
-
--}
+instance (Interface a, Interface b, Interface c, Interface d, Interface e) =>
+         Module (a -> b -> c -> d -> RTL e) where
+  makeModule f = makeModule (\(a, b, c, d) -> f a b c d)
+  makeInstance s = \a b c d -> makeInstance s (a, b, c, d)
