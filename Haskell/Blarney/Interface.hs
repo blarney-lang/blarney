@@ -11,6 +11,7 @@
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE ConstraintKinds      #-} 
 {-# LANGUAGE ScopedTypeVariables  #-} 
+{-# LANGUAGE RecursiveDo          #-} 
 
 module Blarney.Interface where
 
@@ -22,6 +23,7 @@ import Blarney.Bits
 import Blarney.Prelude
 import Blarney.RTL
 import Control.Monad hiding (when)
+import Control.Monad.Fix
 import Prelude
 
 -- The 'instantiation' monad
@@ -68,6 +70,18 @@ liftRTL :: RTL a -> Inst a
 liftRTL rtl = Inst $ \r -> do
   res <- rtl
   return ([], res)
+
+lowerInst :: String -> Inst a -> RTL a
+lowerInst name inst = do
+    rec (w, a) <- runInst inst (custom w)
+    return a
+  where
+    custom w =
+      let inputs  = [(s, x) | (s, PinIn x) <- w]
+          outputs = [(s, fromInteger n) | (s, PinOut n) <- w]
+          prim    = Custom name (map fst inputs) outputs []
+      in  zip (map fst outputs)
+              (makePrim prim (map snd inputs) (map snd outputs))
 
 -- Interface class
 -- ===============
@@ -325,10 +339,11 @@ instance Interface a => GInterface (K1 i a) where
 -- ============
 --
 -- Any type in this class can be turned into a module when doing
--- module compilation.
+-- modular compilation.
 
 class Module a where
-  makeMod :: (String, Int) -> a -> RTL ()
+  makeMod  :: (String, Int) -> a -> RTL ()
+  --makeInst :: (String, Int) -> a -> a
 
 instance Interface a => Module (RTL a) where
   makeMod (s, n) rtl = do
@@ -342,3 +357,24 @@ instance (Interface a, Module b) => Module (a -> b) where
 
 makeModule :: Module a => a -> RTL ()
 makeModule = makeMod ("", 0)
+
+-- instance Interface a => Module (RTL a) where
+--   makeInst (s, n) rtl = do
+--     putOutput (s ++ "out") rtl
+
+--makeInstance :: Module a => String -> a -> a
+
+
+
+{-
+
+  out <- makeInstance "incS" incS inp
+
+
+  makeIncS
+
+  instIncS = makeInstance "incS" makeIncS
+
+
+
+-}

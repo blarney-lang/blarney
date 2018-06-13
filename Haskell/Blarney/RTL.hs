@@ -22,6 +22,7 @@ import Blarney.Format
 import Blarney.IfThenElse
 import qualified Blarney.JList as JL
 import Control.Monad hiding (when)
+import Control.Monad.Fix
 import GHC.TypeLits
 import Data.IORef
 import Data.IntMap (IntMap, findWithDefault, fromListWith)
@@ -69,6 +70,10 @@ instance Applicative RTL where
 
 instance Functor RTL where
   fmap = liftM
+
+instance MonadFix RTL where
+  mfix f = RTL $ \r s ->
+    let (s', w, a) = runRTL (f a) r s in (s', w, a)
 
 get :: RTL RTLS
 get = RTL (\r s -> (s, JL.Zero, s))
