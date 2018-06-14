@@ -112,7 +112,7 @@ instance Interface () where
   getOutput s = return ()
 
 instance KnownNat n => Interface (Bit n) where
-  makeInput s = return (input s)
+  makeInput = input
   makeOutput = output
   putInput = instInput
   getOutput = instOutput
@@ -134,7 +134,7 @@ instance (Bits a, Interface a) => Interface (RTL a) where
     -- Result wire is an output
     makeOutput (s ++ "_res") (val result)
     -- Enable wire is an input
-    let enable :: Bit 1 = input (s ++ "_en")
+    enable :: Bit 1 <- input (s ++ "_en")
     -- Execute RTL block when enable triggered
     when (enable) $ do
       r <- rtl

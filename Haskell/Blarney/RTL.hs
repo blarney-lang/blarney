@@ -9,7 +9,7 @@ module Blarney.RTL (
   Reg(..), makeReg, makeRegInit, makeDReg,
   Wire(..), makeWire, makeWireDefault,
   when, whenNot, whenR, switch, (-->),
-  finish, display, output,
+  finish, display, input, output,
   netlist
 ) where
 
@@ -43,6 +43,7 @@ data RTLAction =
   | RTLDisplay (Bit 1, Format)
   | RTLFinish (Bit 1)
   | RTLOutput (Width, String, Unbit)
+  | RTLInput (Width, String)
 
 -- The reader component is a bit defining the current condition and a
 -- list of all assigments made in the RTL block.  The list of
@@ -95,6 +96,10 @@ writeDisplay w = RTL (\r s -> (s, JL.One (RTLDisplay w), ()))
 
 writeFinish :: Bit 1 -> RTL ()
 writeFinish w = RTL (\r s -> (s, JL.One (RTLFinish w), ()))
+
+writeInput :: (Width, String) -> RTL ()
+writeInput w =
+  RTL (\r s -> (s, JL.One (RTLInput w), ()))
 
 writeOutput :: (Width, String, Unbit) -> RTL ()
 writeOutput w =
@@ -252,7 +257,15 @@ instance (FShow b, Displayable a) => Displayable (b -> a) where
 display :: Displayable a => a
 display = disp (Format [])
 
--- RTL output statements
+-- RTL external input declaration
+input :: KnownNat n => String -> RTL (Bit n)
+input str = do
+  let b = inputPrim str
+  let u = unbit b
+  writeInput (fromInteger (natVal b), str)
+  return b
+
+-- RTL external output declaration
 output :: String -> Bit n -> RTL ()
 output str v = do
   let u = unbit v
@@ -302,6 +315,18 @@ addOutputPrim (w, str, value) = do
             }
   addNet net
 
+-- Add input primitive to netlist
+addInputPrim :: (Width, String) -> Flatten ()
+addInputPrim (w, str) = do
+  id <- freshId
+  let net = Net {
+                netPrim = Input w str
+              , netInstId = id
+              , netInputs = []
+              , netOutputWidths = [w]
+            }
+  addNet net
+
 -- Convert RTL monad to a netlist
 netlist :: RTL () -> IO [Net]
 netlist rtl = do
@@ -315,6 +340,8 @@ netlist rtl = do
     disps = reverse [(go, items) | RTLDisplay (go, Format items) <- acts]
     fins  = [go | RTLFinish go <- acts]
     outs  = [out | RTLOutput out <- acts]
+    inps  = [out | RTLInput out <- acts]
     roots = do mapM_ addDisplayPrim disps
                mapM_ addFinishPrim fins
                mapM_ addOutputPrim outs
+               mapM_ addInputPrim inps

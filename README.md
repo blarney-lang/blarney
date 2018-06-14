@@ -848,9 +848,6 @@ upper      :: (KnownNat m, m <= n) => Bit n -> Bit m     -- Extract MSBs
 lower      :: (KnownNat m, m <= n) => Bit n -> Bit m     -- Extract LSBs
 split      :: KnownNat n => Bit (n+m) -> (Bit n, Bit m)  -- Split bit vector
 
--- I/O
-input :: KnownNat n => String -> Bit n  -- External input
-
 -- Registers
 reg   :: Bit n -> Bit n -> Bit n            -- Plain register
 regEn :: Bit n -> Bit 1 -> Bit n -> Bit n   -- Register with write-enable
@@ -1070,7 +1067,8 @@ finish :: RTL ()
 -- (Variadic function: args in FShow, result of type RTL ())
 display :: Displayable a => a
 
--- Declare external output
+-- Declare external input/output
+input :: String -> RTL (Bit n)
 output :: String -> Bit n -> RTL ()
 
 -- Convert RTL monad to a netlist

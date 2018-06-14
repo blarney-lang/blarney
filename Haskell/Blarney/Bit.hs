@@ -42,7 +42,7 @@ module Blarney.Bit
   , upper            -- Extract most significant bits
   , lower            -- Extract least significant bits
   , split            -- Split bit vector
-  , input            -- External input
+  , inputPrim        -- External input
   , widthOf          -- Determine width of bit vector from type
   , liftNat          -- Lift integer value to type-level natural
   , fromList         -- Create bit vector from list of bits
@@ -339,8 +339,8 @@ split a = (a0, a1)
     a1 = Bit (makePrim1 (SelectBits wa (wa-w0-1) 0) [unbit a] (wa-w0))
 
 -- External input
-input :: KnownNat n => String -> Bit n
-input str = out
+inputPrim :: KnownNat n => String -> Bit n
+inputPrim str = out
   where
     out = Bit (makePrim1 (Input w str) [] w)
     w   = fromInteger (natVal out)

@@ -12,6 +12,7 @@ import Blarney.RTL
 import Blarney.Interface
 import System.IO
 import Data.Maybe
+import Data.List
 import Control.Monad
 
 writeVerilog :: String -> String -> [Net] -> IO ()
@@ -29,7 +30,7 @@ hWriteVerilog :: Handle -> String -> [Net] -> IO ()
 hWriteVerilog h modName netlist = do
     emit ("module " ++ modName ++ "(\n")
     emit "  input wire clock\n"
-    mapM_ emitInputOutput netlist
+    emitInputOutputs (map netPrim netlist)
     emit ");\n"
     mapM_ emitDecl netlist
     mapM_ emitInst netlist
@@ -125,8 +126,13 @@ hWriteVerilog h modName netlist = do
             sequence_ [ emitWireDecl w (netInstId net, n)
                       | ((o, w), n) <- zip os [0..] ]
 
-    emitInputOutput net =
-      case netPrim net of
+    emitInputOutputs nets = mapM_ emitInputOutput (ins ++ outs)
+      where
+        ins = [Input w s | (w, s) <- nub [(w, s) | Input w s <- nets]]
+        outs = [Output w s | Output w s <- nets]
+
+    emitInputOutput prim =
+      case prim of
         Input w s ->
           emit (", input wire [" ++ show (w-1) ++ ":0] " ++ s ++ "\n")
         Output w s -> 
