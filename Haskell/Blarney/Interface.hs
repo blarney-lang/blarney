@@ -395,25 +395,25 @@ instance Interface a => GInterface (K1 i a) where
 -- modular compilation.
 
 class Module a where
-  makeModule :: a -> RTL ()
-  makeInstance :: String -> a
+  makeMod :: a -> RTL ()
+  makeInst :: String -> a
 
 instance Interface a => Module (RTL a) where
-  makeModule rtl = do
+  makeMod rtl = do
     a <- rtl
     makeOutput "out" a
 
-  makeInstance s = lowerInst s $ do
+  makeInst s = lowerInst s $ do
     a <- getOutput "out"
     return a
 
 instance (Interface a, Interface b) => Module (a -> RTL b) where
-  makeModule f = do
+  makeMod f = do
     a <- makeInput "in"
     b <- f a
     makeOutput "out" b
 
-  makeInstance s = \a ->
+  makeInst s = \a ->
     lowerInst s $ do
       putInput "in" a
       a <- getOutput "out"
@@ -421,15 +421,21 @@ instance (Interface a, Interface b) => Module (a -> RTL b) where
 
 instance (Interface a, Interface b, Interface c) =>
          Module (a -> b -> RTL c) where
-  makeModule f = makeModule (\(a, b) -> f a b)
-  makeInstance s = \a b -> makeInstance s (a, b)
+  makeMod f = makeMod (\(a, b) -> f a b)
+  makeInst s = \a b -> makeInst s (a, b)
 
 instance (Interface a, Interface b, Interface c, Interface d) =>
          Module (a -> b -> c -> RTL d) where
-  makeModule f = makeModule (\(a, b, c) -> f a b c)
-  makeInstance s = \a b c -> makeInstance s (a, b, c)
+  makeMod f = makeMod (\(a, b, c) -> f a b c)
+  makeInst s = \a b c -> makeInst s (a, b, c)
 
 instance (Interface a, Interface b, Interface c, Interface d, Interface e) =>
          Module (a -> b -> c -> d -> RTL e) where
-  makeModule f = makeModule (\(a, b, c, d) -> f a b c d)
-  makeInstance s = \a b c d -> makeInstance s (a, b, c, d)
+  makeMod f = makeMod (\(a, b, c, d) -> f a b c d)
+  makeInst s = \a b c d -> makeInst s (a, b, c, d)
+
+makeModule :: Module a => a -> RTL ()
+makeModule = makeMod
+
+instanceOf :: Module a => (a, String) -> a
+instanceOf (_, s) = makeInst s

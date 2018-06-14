@@ -71,25 +71,25 @@ class GFShow f where
   gfshow :: Bool -> f a -> Format
 
 instance GFShow U1 where
-  gfshow rec U1 = mempty
+  gfshow isRec U1 = mempty
 
 instance (GFShow a, GFShow b) => GFShow (a :*: b) where
-  gfshow rec (a :*: b) = gfshow rec a <> fshow sep <> gfshow rec b
-    where sep = case rec of { False -> " "; True -> ", " }
+  gfshow isRec (a :*: b) = gfshow isRec a <> fshow sep <> gfshow isRec b
+    where sep = case isRec of { False -> " "; True -> ", " }
 
 instance (GFShow a, Selector c) => GFShow (M1 S c a) where
-  gfshow rec y@(M1 x)
+  gfshow isRec y@(M1 x)
     | null (selName y) = fshow "(" <> gfshow False x <> fshow ")"
     | otherwise = fshow (selName y) <> fshow " = " <> gfshow False x
 
 instance (GFShow a) => GFShow (M1 D c a) where
-  gfshow rec (M1 x) = gfshow rec x
+  gfshow isRec (M1 x) = gfshow isRec x
 
 instance (GFShow a, Constructor c) => GFShow (M1 C c a) where
-  gfshow rec y@(M1 x)
+  gfshow isRec y@(M1 x)
     | conIsRecord y = fshow (conName y)
                    <> fshow " { " <> gfshow True x <> fshow " }"
     | otherwise = fshow (conName y) <> fshow " " <> gfshow False x
 
 instance FShow a => GFShow (K1 i a) where
-  gfshow rec (K1 x) = fshow x
+  gfshow isRec (K1 x) = fshow x

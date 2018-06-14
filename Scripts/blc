@@ -11,17 +11,20 @@ if [ -z "$1" ]; then
 fi
 
 GHC="ghc --make"
+OPT="-0"
 if [ `basename $0` == "blci" ]; then
   GHC="ghci"
+  OPT=""
 fi
 
 EXTS="-XScopedTypeVariables -XDataKinds -XTypeOperators -XTypeFamilies"
 EXTS="$EXTS -XBinaryLiterals -XNoImplicitPrelude -XFlexibleContexts"
 EXTS="$EXTS -XRebindableSyntax -XPartialTypeSignatures -XDeriveGeneric"
-EXTS="$EXTS -XDeriveAnyClass "
+EXTS="$EXTS -XDeriveAnyClass -XRecursiveDo "
 WARN="-Wno-partial-type-signatures"
+FLAGS="-fno-cse -fno-full-laziness"
 INC="$BLARNEY_ROOT/Haskell"
 INC_H="$BLARNEY_ROOT/Haskell/Blarney/"
 MACROS="$BLARNEY_ROOT/Haskell/Blarney/Macros.h"
 
-$GHC $WARN -cpp -I$INC_H -optP"-include$MACROS" -O $EXTS -i$INC $@
+$GHC $OPT $FLAGS $WARN -cpp -I$INC_H -optP"-include$MACROS" $EXTS -i$INC $@

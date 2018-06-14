@@ -1,8 +1,7 @@
 -- Emit netlist in Verilog format
 
 module Blarney.EmitVerilog
-  ( printVerilog
-  , writeVerilog
+  ( writeVerilog
   , generateVerilog
   ) where
 
@@ -10,25 +9,25 @@ import Prelude
 import Blarney.Unbit
 import Blarney.IfThenElse
 import Blarney.RTL
+import Blarney.Interface
 import System.IO
 import Data.Maybe
 import Control.Monad
 
-printVerilog :: [Net] -> IO ()
-printVerilog = hWriteVerilog stdout
-
-writeVerilog :: String -> [Net] -> IO ()
-writeVerilog filename netlist = do
-  h <- openFile filename WriteMode
-  hWriteVerilog h netlist
+writeVerilog :: String -> String -> [Net] -> IO ()
+writeVerilog fileName modName netlist = do
+  h <- openFile fileName WriteMode
+  hWriteVerilog h modName netlist
   hClose h
 
-generateVerilog :: RTL () -> String -> IO ()
-generateVerilog top filename = netlist top >>= writeVerilog filename
+generateVerilog :: Module a => a -> String -> IO ()
+generateVerilog top mod =
+  netlist (makeModule top) >>= writeVerilog fileName mod
+  where fileName = mod ++ ".v"
 
-hWriteVerilog :: Handle -> [Net] -> IO ()
-hWriteVerilog h netlist = do
-    emit "module top (\n"
+hWriteVerilog :: Handle -> String -> [Net] -> IO ()
+hWriteVerilog h modName netlist = do
+    emit ("module " ++ modName ++ "(\n")
     emit "  input wire clock\n"
     mapM_ emitInputOutput netlist
     emit ");\n"
@@ -234,12 +233,13 @@ hWriteVerilog h netlist = do
                     emit "(" >> emit val >> emit ")"
                     if i < numParams then emit ",\n" else return ()
                | (key :-> val, i) <- zip params [1..] ]
-      emit ("i" ++ show (netInstId net))
+      emit (name ++ "_" ++ show (netInstId net))
       let args = zip ins (netInputs net) ++
                    [ (o, (netInstId net, n))
                    | (o, n) <- zip (map fst outs) [0..] ]
       let numArgs = length args
-      emit "("
+      emit "(\n"
+      emit ".clock(clock),\n"
       if numArgs == 0
         then return ()
         else do
