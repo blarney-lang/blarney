@@ -203,7 +203,7 @@ twoSort (a, b) = a .<. b ? ((a, b), (b, a))
 
 The `KnownNat n` constraint is Haskell's way of saying that it must be
 possible to convert the type-level number `n` to a value-level number.
-This constraint often appears when a bit-vector with polymorphic
+This constraint often appears when a bit-vector of polymorphic
 width is used.  It is satisfiable for any type-level number, so
 doesn't really carry any useful information.  Therefore, we
 recommend the use of *partial type signatures* in GHC to avoid having
@@ -413,7 +413,7 @@ makeCounter = do
 State machines are a common way of defining the control-path of a
 circuit.  They are typically expressed by doing case-analysis of the
 current-state and manually setting the next-state.  Quite often
-however, they can be expressed more neatly as a `Recipe` -- a simple
+however, they can be expressed more neatly in a `Recipe` -- a simple
 imperative language with various control-flow statements.
 
 ```hs
@@ -616,6 +616,8 @@ follows.
 ```hs
 import Blarney.BitPat
 
+#include <BitPat.h>
+
 -- Semantics of add instruction
 add :: Bit 5 -> Bit 5 -> Bit 5 -> RTL ()
 add rs2 rs1 rd =
@@ -777,7 +779,8 @@ instead.  Although the ISA is very simple, it does contain a few
 challenges for a pipelined implementation, namely *control hazards*
 (due to the branch instruction) and *data hazards* (due to the add
 instruction).  We resolve data hazards using *register forwarding* and
-control hazards using a *pipeline flush*.
+control hazards by performing a *pipeline flush* when the branch is
+taken.
 
 ## API 1: Bit vectors
 
