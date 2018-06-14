@@ -11,7 +11,7 @@ if [ -z "$1" ]; then
 fi
 
 GHC="ghc --make"
-OPT="-0"
+OPT="-O"
 if [ `basename $0` == "blci" ]; then
   GHC="ghci"
   OPT=""
