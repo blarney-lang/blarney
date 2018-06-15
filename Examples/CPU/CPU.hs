@@ -140,4 +140,4 @@ makeCPU = do
 
 -- Main function
 main :: IO ()
-main = generateCXX makeCPU "/tmp/cpu"
+main = emitVerilogTop makeCPU "top" "/tmp/cpu"

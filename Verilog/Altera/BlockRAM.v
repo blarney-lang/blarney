@@ -105,7 +105,7 @@ module BlockRAMTrueDual (
   DI_B,      // Data in
   ADDR_B,    // Read address
   WE_B,      // Write enable
-  DO_B,      // Data out
+  DO_B       // Data out
   );
 
   parameter ADDR_WIDTH   = 1;

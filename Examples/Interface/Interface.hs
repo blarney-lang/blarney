@@ -44,5 +44,6 @@ top = do
 -- Main function
 main :: IO ()
 main = do
-  generateVerilog incS "incS"
-  generateVerilog top "top"
+  let dir = "/tmp/inc"
+  emitVerilogModule incS "incS" dir
+  emitVerilogTop top "top" dir

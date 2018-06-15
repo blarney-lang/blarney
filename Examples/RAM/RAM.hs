@@ -35,4 +35,4 @@ top = do
 
 -- Main function
 main :: IO ()
-main = netlist top >>= writeVerilog "/tmp/ram.v"
+main = emitVerilogTop top "top" "/tmp/ram/"

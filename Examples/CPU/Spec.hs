@@ -66,4 +66,4 @@ makeCPUSpec = do
     fetch <== 1
 
 main :: IO ()
-main = netlist makeCPUSpec >>= writeCXX "/tmp/spec"
+main = emitVerilogTop makeCPUSpec "top" "/tmp/spec"
