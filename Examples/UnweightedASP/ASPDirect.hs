@@ -70,6 +70,6 @@ compile g = do
 
 -- Main function
 main :: IO ()
-main = readFile "n4.edges"
-   >>= netlist `o` compile `o` parseNetwork
-   >>= writeCXX "/tmp/asp"
+main = do
+  net <- parseNetwork `fmap` readFile "n4.edges"
+  emitVerilogTop (compile net) "top" "/tmp/asp"

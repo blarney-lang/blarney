@@ -368,7 +368,7 @@ hWriteVerilog h modName netlist = do
       emit ".DI_B(" >> emitInput (netInputs net !! 4) >> emit "),\n"
       emit ".ADDR_B(" >> emitInput (netInputs net !! 3) >> emit "),\n"
       emit ".WE_B(" >> emitInput (netInputs net !! 5) >> emit "),\n"
-      emit ".DO_B(" >> emitWire (netInstId net, 4) >> emit "));\n"
+      emit ".DO_B(" >> emitWire (netInstId net, 1) >> emit "));\n"
 
     emitInst net =
       case netPrim net of

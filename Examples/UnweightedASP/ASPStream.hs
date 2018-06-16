@@ -156,5 +156,5 @@ makeASPEngine = do
 
 main :: IO ()
 main = do
-  netlist makeASPEngine >>= writeCXX "/tmp/asp"
+  emitVerilogTop makeASPEngine "top" "/tmp/asp"
   genHexFiles "n5.edges" "/tmp/asp/"

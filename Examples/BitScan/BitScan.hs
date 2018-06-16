@@ -26,4 +26,4 @@ top = do
 
 -- Main function
 main :: IO ()
-main = netlist top >>= writeCXX "/tmp/bitscan"
+main = emitVerilogTop top "top" "/tmp/bitscan"

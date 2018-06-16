@@ -22,4 +22,4 @@ fact = do
   runOnce recipe
 
 main :: IO ()
-main = generateCXX fact "/tmp/fact"
+main = emitVerilogTop fact "top" "/tmp/fact"

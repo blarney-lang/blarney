@@ -198,5 +198,5 @@ makeASPEngine = do
 
 main :: IO ()
 main = do
-  netlist makeASPEngine >>= writeVerilog "/tmp/asp.v"
-  genHexFiles "n5.edges" "/tmp/"
+  emitVerilogTop makeASPEngine "top" "/tmp/asp"
+  genHexFiles "n5.edges" "/tmp/asp/"

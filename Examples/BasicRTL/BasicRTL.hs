@@ -17,4 +17,4 @@ top = do
     finish
 
 main :: IO ()
-main = generateCXX top "/tmp/basic/"
+main = emitVerilogTop top "top" "/tmp/basic/"

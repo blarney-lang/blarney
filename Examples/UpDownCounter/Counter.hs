@@ -56,4 +56,4 @@ top = do
   return ()
 
 main :: IO ()
-main = netlist top >>= writeNetlist "/tmp/counter.net"
+main = emitVerilogTop top "top" "/tmp/counter"

@@ -20,4 +20,4 @@ top = do
 
 -- Main function
 main :: IO ()
-main = generateCXX top "/tmp/derive"
+main = emitVerilogTop top "top" "/tmp/derive"

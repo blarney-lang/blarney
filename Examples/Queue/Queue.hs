@@ -23,4 +23,4 @@ top = do
 
 -- Main function
 main :: IO ()
-main = netlist top >>= writeCXX "/tmp/queue"
+main = emitVerilogTop top "top" "/tmp/queue"
