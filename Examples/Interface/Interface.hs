@@ -27,7 +27,7 @@ top = do
   -- Input buffer
   buffer <- makeQueue
 
-  -- Create an instance
+  -- Create an instance of incS
   out <- instanceOf (incS, "incS") (buffer.toStream)
 
   -- Fill input
