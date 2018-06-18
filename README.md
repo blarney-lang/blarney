@@ -20,8 +20,9 @@ Examples:
 * [Example 7: Recipes](#example-7-recipes)
 * [Example 8: Block RAMs](#example-8-block-rams)
 * [Example 9: Streams](#example-9-streams)
-* [Example 10: Bit-string pattern matching](#example-10-bit-string-pattern-matching)
-* [Example 11: Tiny 8-bit CPU](#example-11-tiny-8-bit-cpu)
+* [Example 10: Modular compilation](#example-10-modular-compilation)
+* [Example 11: Bit-string pattern matching](#example-11-bit-string-pattern-matching)
+* [Example 12: Tiny 8-bit CPU](#example-12-tiny-8-bit-cpu)
 
 APIs:
 
@@ -84,7 +85,7 @@ simulator for this test bench, we write
 
 ```hs
 main :: IO ()
-main = generateCXX top "/tmp/twoSort/"
+main = emitVerilogTop top "top" "/tmp/twoSort/"
 ```
 
 Assuming the above code is in a file named `Sorter.hs`, it can be
@@ -95,30 +96,24 @@ compiled at the command-line using
 ```
 
 where `blc` stands for *Blarney compiler*.  This is just a script that
-invokes GHC with the appropriate compiler flags.  For it to work,
-the `BLARNEY_ROOT` environment variable needs to be set to the root of
-the repository, and `BLARNEY_ROOT/Scripts` must be in the `PATH`.
-Running the resulting executable will generate a C++ simulator in
-`/tmp/twoSort`, which can be built and run as follows.
+invokes GHC with the appropriate compiler flags.  (You can also use
+`blci` to get a REPL, and then invoke `main`).  For this to work, the
+`BLARNEY_ROOT` environment variable needs to be set to the root of the
+repository, and `BLARNEY_ROOT/Scripts` must be in your `PATH`.  Running
+the resulting executable will generate Verilog in `/tmp/twoSort`,
+which includes a makefile to build a Verilator simulator (`sudo
+apt-get install verilator`).  The simulator can be built and run as
+follows.
 
 ```sh
 > cd /tmp/twoSort
-> make -j 4
-> ./main
+> make
+> ./top
 twoSort (0x1,0x2) = (0x1,0x2)
 twoSort (0x2,0x1) = (0x1,0x2)
 ```
 
 It looks like `twoSort` is working!
-
-As well as generating C++ for simulation, Blarney supports generation
-of synthesisable Verilog.  Instead of calling `generateCXX` we simply
-call `generateVerilog`.
-
-```hs
-main :: IO ()
-main = generateVerilog top "/tmp/twoSort.v"
-```
 
 ## Example 2: Bubble sort
 
@@ -585,26 +580,113 @@ toStream q =
   }
 ```
 
-As an example, here's a higher-order stream combinator that combines
-two streams into one using a given binary function.
+As an example, here's a function that increments each value in the
+input stream to produce the output stream.
 
 ```hs
-zipWithS :: (Bits a, Bits b, Bits c)
-         => (a -> b -> c)
-         -> Stream a -> Stream b -> RTL (Stream c)
-ripWithS f xs ys = do
+incS :: Stream (Bit 8) -> RTL (Stream (Bit 8))
+incS xs = do
   -- Output buffer
-  buffer :: Queue c <- makeQueue
+  buffer <- makeQueue
 
-  when (xs.canGet .&. ys.canGet .&. buffer.notFull) $ do
+  -- Incrementer
+  when (xs.canGet .&. buffer.notFull) $ do
     xs.get
-    ys.get
-    enq buffer (f (xs.value) (ys.value))
+    enq buffer (xs.value + 1)
 
+  -- Convert buffer to a stream
   return (buffer.toStream)
 ```
 
-## Example 10: Bit-string pattern matching
+## Example 10: Modular compilation
+
+So far we've seen examples of top-level modules, i.e. modules with no
+inputs or outputs, being converted to Verilog.  In fact, any Blarney
+function whose inputs and outputs are members of the `Interface` class
+can be converted to Verilog (and the `Interface` class supports
+generic deriving).  To illustrate, we can convert the function `incS`
+into a Verilog module as follows.
+
+```hs
+main :: IO ()
+main = emitVerilogModule incS "incS" "/tmp/inc"
+```
+
+The generated Verilog module `/tmp/inc/incS.v` has the following
+interface:
+
+```sv
+module incS(
+  input  wire clock
+, output wire [0:0] in_get_en
+, input  wire [0:0] in_canGet
+, input  wire [7:0] in_value
+, input  wire [0:0] out_get_en
+, output wire [0:0] out_canGet
+, output wire [7:0] out_value
+);
+```
+
+Considering the definition of the `Stream` type, the correspondance
+between the Blarney and the Verilog is quite clear:
+
+Signal       | Description
+------       | -----------
+`in_get_en`  | Output asserted whenever the module consumes an element from the input stream.
+`in_canGet`  | Input signalling when there is data available in the input stream.
+`in_value`   | Input containing the next value in the input stream.
+`out_get_en` | Input signalling when the caller consumes an element from the output stream.
+`out_canGet` | Output asserted whenever there is data available in the output stream.
+`out_value`  | Output containing the next value in the output stream.
+
+It is also possible to instantiate a Verilog module inside a Blarney
+description.  In the following example, the Verilog module we
+instantiate is that which has itself been generated from the Blarney
+`incS` function.
+
+```hs
+top :: RTL ()
+top = do
+  -- Counter
+  count :: Reg (Bit 8) <- makeRegInit 0
+
+  -- Input buffer
+  buffer <- makeQueue
+
+  -- Create an instance of incS
+  out <- instanceOf (incS, "incS") (buffer.toStream)
+
+  -- Fill input
+  when (buffer.notFull) $ do
+    enq buffer (count.val)
+    count <== count.val + 1
+
+  -- Consume
+  when (out.canGet) $ do
+    out.get
+    display "Got " (out.value)
+    when (out.value .==. 100) finish
+```
+
+Using the following `main` function we can generate both the `incS`
+module and a top-level module that instantiates it.
+
+```hs
+main :: IO ()
+main = do
+  let dir = "/tmp/inc"
+  emitVerilogModule incS "incS" dir
+  emitVerilogTop top "top" dir
+```
+
+Using this approach, we can maintain the module hierarchy of a Blarney
+design whenever we generate Verilog, rather than having to flatten it
+to massive netlist.  This technique can also be used to instantaite
+any Verilog module within a Blarney design -- `instantiateOf (incS,
+"incS")` only uses the *type* of `incS` to determine how to
+instantiate it, not its actual definition.
+
+## Example 11: Bit-string pattern matching
 
 Recent work on specifying and implementing ISAs led us to develop two
 libraries for doing bit-string pattern matching.  The first, `BitPat`,
@@ -693,7 +775,7 @@ passed to the right-hand-side function.  Scattered immediates appear
 *a lot* in the RISC-V specification.  Thanks to Jon Woodruff for
 suggesting this feature!
 
-## Example 11: Tiny 8-bit CPU
+## Example 12: Tiny 8-bit CPU
 
 As a way of briging together a number of the ideas introduced above,
 let's define a very simple, 8-bit CPU with the following ISA.
