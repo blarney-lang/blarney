@@ -605,7 +605,8 @@ inputs or outputs, being converted to Verilog.  In fact, any Blarney
 function whose inputs and outputs are members of the `Interface` class
 can be converted to Verilog (and the `Interface` class supports
 generic deriving).  To illustrate, we can convert the function `incS`
-into a Verilog module as follows.
+(see [Example 9: Streams](#example-9-streams)) into a Verilog module
+as follows.
 
 ```hs
 main :: IO ()
@@ -640,9 +641,18 @@ Signal       | Description
 `out_value`  | Output containing the next value in the output stream.
 
 It is also possible to instantiate a Verilog module inside a Blarney
-description.  In the following example, the Verilog module we
-instantiate is that which has itself been generated from the Blarney
-`incS` function.
+description.  To illustrate, here is a function that creates an
+instance of the Verilog `incS` module shown above.
+
+```hs
+-- This function creates an instance of a Verilog module called "incS"
+makeIncS :: Stream (Bit 8) -> RTL (Stream (Bit 8))
+makeIncS = makeInstance "incS" 
+```
+
+Notice that interface of the Verilog module being instantiated is
+determined from the type signature.  Here's a sample top-level module
+that uses the `makeIncS` function:
 
 ```hs
 top :: RTL ()
@@ -654,7 +664,7 @@ top = do
   buffer <- makeQueue
 
   -- Create an instance of incS
-  out <- instanceOf (incS, "incS") (buffer.toStream)
+  out <- makeIncS (buffer.toStream)
 
   -- Fill input
   when (buffer.notFull) $ do

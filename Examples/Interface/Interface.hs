@@ -19,6 +19,10 @@ incS xs = do
   -- Convert buffer to a stream
   return (buffer.toStream)
 
+-- This function creates an instance of a Verilog module called "incS"
+makeIncS :: Stream (Bit 8) -> RTL (Stream (Bit 8))
+makeIncS = makeInstance "incS"
+
 top :: RTL ()
 top = do
   -- Counter
@@ -28,7 +32,7 @@ top = do
   buffer <- makeQueue
 
   -- Create an instance of incS
-  out <- instanceOf (incS, "incS") (buffer.toStream)
+  out <- makeIncS (buffer.toStream)
 
   -- Fill input
   when (buffer.notFull) $ do

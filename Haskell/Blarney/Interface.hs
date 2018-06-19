@@ -437,5 +437,8 @@ instance (Interface a, Interface b, Interface c, Interface d, Interface e) =>
 makeModule :: Module a => a -> RTL ()
 makeModule = makeMod
 
+makeInstance :: Module a => String -> a
+makeInstance = makeInst
+
 instanceOf :: Module a => (a, String) -> a
 instanceOf (_, s) = makeInst s
