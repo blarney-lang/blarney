@@ -692,9 +692,7 @@ main = do
 Using this approach, we can maintain the module hierarchy of a Blarney
 design whenever we generate Verilog, rather than having to flatten it
 to massive netlist.  This technique can also be used to instantaite
-any Verilog module within a Blarney design -- `instantiateOf (incS,
-"incS")` only uses the *type* of `incS` to determine how to
-instantiate it, not its actual definition.
+any Verilog module within a Blarney design.
 
 ## Example 11: Bit-string pattern matching
 
