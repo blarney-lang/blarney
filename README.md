@@ -605,7 +605,7 @@ inputs or outputs, being converted to Verilog.  In fact, any Blarney
 function whose inputs and outputs are members of the `Interface` class
 can be converted to Verilog (and the `Interface` class supports
 generic deriving).  To illustrate, we can convert the function `incS`
-(see [Example 9: Streams](#example-9-streams)) into a Verilog module
+(defined in [Example 9](#example-9-streams)) into a Verilog module
 as follows.
 
 ```hs
