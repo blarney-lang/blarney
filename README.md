@@ -200,11 +200,11 @@ twoSort (a, b) = a .<. b ? ((a, b), (b, a))
 
 The `KnownNat n` constraint is Haskell's way of saying that it must be
 possible to convert the type-level number `n` to a value-level number.
-This constraint often appears when a bit-vector of polymorphic
-width is used.  It is satisfiable for any type-level number, so
-doesn't really carry any useful information.  Therefore, we
-recommend the use of *partial type signatures* in GHC to avoid having
-to write `KnownNat` constraints:
+It is satisfiable for any type-level number `n`.  And since the
+definition of `Bit n` already requires `n` to be a type-level number,
+the `KnownNat` constraint doesn't really carry any new information.
+We recommend using the *partial type signatures* feature of GHC to
+avoid writing `KnownNat` constraints:
 
 ```hs
 twoSort :: _ => (Bit n, Bit n) -> (Bit n, Bit n)
