@@ -201,7 +201,7 @@ hWriteVerilog h modName netlist = do
           Output w s            -> return ()
           RegFileMake f aw dw i -> emitRegFileDecl f aw dw i
           RegFileRead w id      -> emitWireDecl w wire
-          RegFileWrite _        -> return ()
+          RegFileWrite _ _ _    -> return ()
           Custom p is os ps     -> 
             sequence_ [ emitWireDecl w (netInstId net, n)
                       | ((o, w), n) <- zip os [0..] ]
@@ -433,7 +433,7 @@ hWriteVerilog h modName netlist = do
         Output w s          -> emitOutputInst net s
         RegFileMake _ _ _ _ -> return ()
         RegFileRead w id    -> emitRegFileReadInst id net
-        RegFileWrite _      -> return ()
+        RegFileWrite _ _ _  -> return ()
         Custom p is os ps   -> emitCustomInst net p is os ps
  
     emitAlways net =
@@ -463,7 +463,7 @@ hWriteVerilog h modName netlist = do
           emit "if ("
           emitInput (netInputs net !! 0)
           emit " == 1) $finish;\n"
-        RegFileWrite id -> do
+        RegFileWrite aw dw id -> do
           emit "if ("
           emitInput (netInputs net !! 0)
           emit " == 1) "

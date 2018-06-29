@@ -81,7 +81,7 @@ data Prim =
     -- RegFile primitives
   | RegFileMake String InputWidth InputWidth RegFileId
   | RegFileRead OutputWidth RegFileId
-  | RegFileWrite RegFileId
+  | RegFileWrite InputWidth InputWidth RegFileId
     -- Simulation-time I/O
   | Display [DisplayArg]
   | Finish

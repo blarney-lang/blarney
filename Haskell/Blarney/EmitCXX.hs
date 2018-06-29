@@ -138,17 +138,19 @@ emitIODecl other = []
 emitRAMDecl :: Net -> Code
 emitRAMDecl net =
   case netPrim net of
-    RAM init aw dw -> ram init aw dw
-    TrueDualRAM init aw dw -> ram init aw dw
+    RAM init aw dw -> ram init aw dw ramName
+    TrueDualRAM init aw dw -> ram init aw dw ramName
+    RegFileMake init aw dw id -> ram init aw dw (regFileName id)
     other -> []
   where
-    id = netInstId net
-    ram init aw dw
+    ramName = "array" ++ show (netInstId net)
+    regFileName id = "regFile" ++ show id
+    ram init aw dw name
         | dw <= 64 =
-           [typeOf dw ++ " array" ++ show id ++
+           [typeOf dw ++ " " ++ name ++
                          "[" ++ show (2^aw) ++ "];"]
         | otherwise =
-           ["uint32_t array" ++ show id ++ "[" ++ show (2^aw) ++ "]" ++
+           ["uint32_t " ++ name ++ "[" ++ show (2^aw) ++ "]" ++
                          "[" ++ show (numChunks dw) ++ "];"]
 
 -- Emit C++ variable declarations for a given net
@@ -687,6 +689,36 @@ emitRAMLookup net aw dw port
        ++ show dw ++ ");"
   where base = 3*port
 
+emitRegFileWrite :: Net -> Width -> Width -> Int -> String
+emitRegFileWrite net aw dw id
+  | aw > 64 = error "C++ generator: RegFile address width must be <= 64"
+  | dw <= 64 =
+          -- Update array
+          "if (" ++ emitInput (netInputs net !! 0) ++ ") { "
+       ++ "regFile" ++ show id
+       ++ "[" ++ emitInput (netInputs net !! 1) ++ "]"
+       ++ " = " ++ emitInput (netInputs net !! 2) ++ "; "
+       ++ "}\n"
+  | otherwise =
+          -- Update array
+          "if (" ++ emitInput (netInputs net !! 0) ++ ") { "
+       ++ "copyBU(" ++ emitInput (netInputs net !! 1) ++ ", regFile"
+       ++ show id ++ "["
+       ++ emitInput (netInputs net !! 2) ++ "]," ++ show dw ++ "); "
+       ++ "); }\n"
+
+emitRegFileRead :: Net -> Width -> Int -> String
+emitRegFileRead net dw id
+  | dw <= 64 =
+           emitWire (netInstId net, 0) ++ " = "
+       ++ "regFile" ++ show id
+       ++ "[" ++ emitInput (netInputs net !! 0) ++ "];"
+  | otherwise =
+          "copyBU(regFile" ++ show id ++ "["
+       ++ emitInput (netInputs net !! 0) ++ "], "
+       ++ emitWire (netInstId net, 0) ++ ","
+       ++ show dw ++ ");"
+
 emitDisplay :: Net -> [DisplayArg] -> String
 emitDisplay net args =
      "if ("
@@ -720,7 +752,8 @@ emitUpdates net =
                                emitRAMLookup net aw dw 1,
                                emitRAMUpdate net aw dw 0,
                                emitRAMUpdate net aw dw 1]
-    other                 -> []
+    RegFileWrite aw dw id  -> [emitRegFileWrite net aw dw id]
+    other                  -> []
 
 emitInst :: Net -> Code
 emitInst net =
@@ -758,8 +791,9 @@ emitInst net =
     Input w str            -> [emitInputPrim str net w]
     Output w str           -> [emitOutputPrim str net]
     Custom p is os ps      -> []
-    other                  ->
-      error ("Unsupported in CXX backend: " ++ show other);
+    RegFileRead w id       -> [emitRegFileRead net w id]
+    RegFileMake i aw dw id -> []
+    RegFileWrite aw dw id  -> []
 
 writeMain :: CXXGenParams -> IO ()
 writeMain params

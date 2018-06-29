@@ -40,6 +40,7 @@ isLeaf net =
     RegisterEn i w       -> True
     RAM i aw dw          -> True
     TrueDualRAM i aw dw  -> True
+    RegFileRead w id     -> True
     Const i w            -> True
     Input w s            -> True
     other                -> False
@@ -77,14 +78,17 @@ postOrder nets roots =
 getRoot :: Array InstId Net -> Net -> [Net]
 getRoot netArray net =
   case netPrim net of
-    Register i w          -> map (lookup . fst) (netInputs net)
-    RegisterEn i w        -> map (lookup . fst) (netInputs net)
-    RAM i aw dw           -> map (lookup . fst) (netInputs net)
-    TrueDualRAM i aw dw   -> map (lookup . fst) (netInputs net)
-    Output w str          -> [net]
-    Display args          -> [net]
-    Finish                -> [net]
-    other                 -> []
+    Register i w           -> map (lookup . fst) (netInputs net)
+    RegisterEn i w         -> map (lookup . fst) (netInputs net)
+    RAM i aw dw            -> map (lookup . fst) (netInputs net)
+    TrueDualRAM i aw dw    -> map (lookup . fst) (netInputs net)
+    RegFileRead w id       -> map (lookup . fst) (netInputs net)
+    RegFileMake i aw dw id -> [net]
+    RegFileWrite _ _ _     -> [net]
+    Output w str           -> [net]
+    Display args           -> [net]
+    Finish                 -> [net]
+    other                  -> []
   where lookup i = netArray A.! i
 
 -- Convert netlist to array representation

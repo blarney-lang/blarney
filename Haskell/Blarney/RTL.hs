@@ -46,7 +46,7 @@ data RTLAction =
   | RTLOutput (Width, String, Unbit)
   | RTLInput (Width, String)
   | RTLRegFileCreate (String, VarId, Width, Width)
-  | RTLRegFileUpdate (VarId, Bit 1, Unbit, Unbit)
+  | RTLRegFileUpdate (VarId, Bit 1, Int, Int, Unbit, Unbit)
 
 -- The reader component is a bit defining the current condition and a
 -- list of all assigments made in the RTL block.  The list of
@@ -291,7 +291,7 @@ makeRegFileInit initFile = do
     , update = \a d -> do
         (cond, as) <- ask
         writeAction $
-          RTLRegFileUpdate (id, cond, unbit (pack a), unbit (pack d))
+          RTLRegFileUpdate (id, cond, aw, dw, unbit (pack a), unbit (pack d))
     }
 
 -- Uninitialised version
@@ -381,14 +381,14 @@ addRegFilePrim (initFile, regFileId, aw, dw) = do
   addNet net
 
 -- Add RegFile primitives to netlist
-addRegFileUpdatePrim :: (VarId, Bit 1, Unbit, Unbit) -> Flatten ()
-addRegFileUpdatePrim (regFileId, c, a, d) = do
+addRegFileUpdatePrim :: (VarId, Bit 1, Int, Int, Unbit, Unbit) -> Flatten ()
+addRegFileUpdatePrim (regFileId, c, aw, dw, a, d) = do
   cf <- flatten (unbit c)
   af <- flatten a
   df <- flatten d
   id <- freshId
   let net = Net {
-                netPrim = RegFileWrite regFileId
+                netPrim = RegFileWrite aw dw regFileId
               , netInstId = id
               , netInputs = [cf, af, df]
               , netOutputWidths = []
