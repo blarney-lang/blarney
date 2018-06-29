@@ -8,8 +8,8 @@ import Data.List
 type Temp = Bit 32
 
 -- Update cell using values of neighbours
-update :: Reg Temp -> [Temp] -> RTL ()
-update me neighbours =
+step :: Reg Temp -> [Temp] -> RTL ()
+step me neighbours =
   me <== sumList neighbours .>>. 2
 
 -- Top-level
@@ -28,7 +28,7 @@ top t w h = do
           ++ transpose ([east] ++ transpose cells ++ [west])
           ++ [south]
   -- Mesh
-  mesh update grid
+  mesh step grid
   -- Count time steps
   timer :: Reg (Bit 32) <- makeRegInit 0
   timer <== val timer + 1

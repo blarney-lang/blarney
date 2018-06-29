@@ -758,6 +758,8 @@ emitInst net =
     Input w str            -> [emitInputPrim str net w]
     Output w str           -> [emitOutputPrim str net]
     Custom p is os ps      -> []
+    other                  ->
+      error ("Unsupported in CXX backend: " ++ show other);
 
 writeMain :: CXXGenParams -> IO ()
 writeMain params

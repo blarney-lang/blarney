@@ -31,6 +31,7 @@ module Blarney.Bit
   , regEn            -- Register with enable
   , ramPrim          -- True dual-port RAM primitive
   , ramTrueDualPrim  -- True dual-port RAM primitive
+  , regFileReadPrim  -- Read from a register file
   , (#)              -- Bit concatenation
   , getBit           -- Bit selection
   , getBits          -- Bit range selection
@@ -251,6 +252,12 @@ ramTrueDualPrim dataWidth init (addrInA, dataInA, weInA)
               unbit addrInB, unbit dataInB, unbit weInB] [dw, dw]
     aw   = width addrInA
     dw   = dataWidth
+
+
+-- Read from register file
+regFileReadPrim :: RegFileId -> OutputWidth -> Bit a -> Bit d
+regFileReadPrim id dw addr =
+  Bit (makePrim1 (RegFileRead dw id) [unbit addr] dw)
 
 -- Concatenation
 (#) :: Bit n -> Bit m -> Bit (n+m)

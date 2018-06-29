@@ -8,6 +8,7 @@ module Blarney.RTL (
   Var(..), Displayable(..),
   Reg(..), makeReg, makeRegInit, makeDReg,
   Wire(..), makeWire, makeWireDefault,
+  RegFile(..), makeRegFile, makeRegFileInit,
   when, whenNot, whenR, switch, (-->),
   finish, display, input, output,
   netlist
@@ -44,6 +45,8 @@ data RTLAction =
   | RTLFinish (Bit 1)
   | RTLOutput (Width, String, Unbit)
   | RTLInput (Width, String)
+  | RTLRegFileCreate (String, VarId, Width, Width)
+  | RTLRegFileUpdate (VarId, Bit 1, Unbit, Unbit)
 
 -- The reader component is a bit defining the current condition and a
 -- list of all assigments made in the RTL block.  The list of
@@ -104,6 +107,10 @@ writeInput w =
 writeOutput :: (Width, String, Unbit) -> RTL ()
 writeOutput w =
   RTL (\r s -> (s, JL.One (RTLOutput w), ()))
+
+writeAction :: RTLAction -> RTL ()
+writeAction a =
+  RTL (\r s -> (s, JL.One a, ()))
 
 fresh :: RTL VarId
 fresh = do
@@ -257,6 +264,40 @@ instance (FShow b, Displayable a) => Displayable (b -> a) where
 display :: Displayable a => a
 display = disp (Format [])
 
+-- Register file
+data RegFile a d =
+  RegFile {
+    (!)    :: a -> d
+  , update :: a -> d -> RTL ()
+  }
+
+-- Create register file with initial contents
+makeRegFileInit :: forall a d. (Bits a, Bits d) => String -> RTL (RegFile a d)
+makeRegFileInit initFile = do
+  -- Create regsiter file identifier
+  id <- fresh
+
+  -- Determine widths of address/data bus
+  let aw = sizeOf (__ :: a)
+  let dw = sizeOf (__ :: d)
+
+  -- Record register file for netlist generation
+  writeAction $ RTLRegFileCreate (initFile, id, aw, dw)
+
+  return $
+    RegFile {
+      (!) = \a ->
+        unpack (regFileReadPrim id dw (pack a))
+    , update = \a d -> do
+        (cond, as) <- ask
+        writeAction $
+          RTLRegFileUpdate (id, cond, unbit (pack a), unbit (pack d))
+    }
+
+-- Uninitialised version
+makeRegFile :: forall a d. (Bits a, Bits d) => RTL (RegFile a d)
+makeRegFile = makeRegFileInit ""
+
 -- RTL external input declaration
 input :: KnownNat n => String -> RTL (Bit n)
 input str = do
@@ -327,6 +368,33 @@ addInputPrim (w, str) = do
             }
   addNet net
 
+-- Add RegFile primitives to netlist
+addRegFilePrim :: (String, VarId, Width, Width) -> Flatten ()
+addRegFilePrim (initFile, regFileId, aw, dw) = do
+  id <- freshId
+  let net = Net {
+                netPrim = RegFileMake initFile aw dw regFileId
+              , netInstId = id
+              , netInputs = []
+              , netOutputWidths = []
+            }
+  addNet net
+
+-- Add RegFile primitives to netlist
+addRegFileUpdatePrim :: (VarId, Bit 1, Unbit, Unbit) -> Flatten ()
+addRegFileUpdatePrim (regFileId, c, a, d) = do
+  cf <- flatten (unbit c)
+  af <- flatten a
+  df <- flatten d
+  id <- freshId
+  let net = Net {
+                netPrim = RegFileWrite regFileId
+              , netInstId = id
+              , netInputs = [cf, af, df]
+              , netOutputWidths = []
+            }
+  addNet net
+
 -- Convert RTL monad to a netlist
 netlist :: RTL () -> IO [Net]
 netlist rtl = do
@@ -341,7 +409,11 @@ netlist rtl = do
     fins  = [go | RTLFinish go <- acts]
     outs  = [out | RTLOutput out <- acts]
     inps  = [out | RTLInput out <- acts]
+    rfs   = [out | RTLRegFileCreate out <- acts]
+    rfus  = [out | RTLRegFileUpdate out <- acts]
     roots = do mapM_ addDisplayPrim disps
                mapM_ addFinishPrim fins
                mapM_ addOutputPrim outs
                mapM_ addInputPrim inps
+               mapM_ addRegFilePrim rfs
+               mapM_ addRegFileUpdatePrim rfus

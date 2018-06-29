@@ -29,6 +29,9 @@ type InputWidth = Int
 type OutputWidth = Int
 type BitIndex = Int
 
+-- Identifier for register file primitive
+type RegFileId = Int
+
 -- Primitive components
 data Prim =
     -- Constants
@@ -75,6 +78,10 @@ data Prim =
   | Mux OutputWidth
   | CountOnes OutputWidth
   | Identity OutputWidth
+    -- RegFile primitives
+  | RegFileMake String InputWidth InputWidth RegFileId
+  | RegFileRead OutputWidth RegFileId
+  | RegFileWrite RegFileId
     -- Simulation-time I/O
   | Display [DisplayArg]
   | Finish
