@@ -80,8 +80,7 @@ top = do
 
 This test bench is written using Blarney's RTL (register-transfer
 level) monad.  All statements in this monad are executed *in parallel*
-and *on every clock cycle*.   To generate a cycle-accurate C++
-simulator for this test bench, we write
+and *on every clock cycle*.   Let's turn it into Verilog:
 
 ```hs
 main :: IO ()
@@ -96,14 +95,13 @@ compiled at the command-line using
 ```
 
 where `blc` stands for *Blarney compiler*.  This is just a script that
-invokes GHC with the appropriate compiler flags.  (You can also use
-`blci` to get a REPL, and then invoke `main`).  For this to work, the
-`BLARNEY_ROOT` environment variable needs to be set to the root of the
-repository, and `BLARNEY_ROOT/Scripts` must be in your `PATH`.  Running
-the resulting executable will generate Verilog in `/tmp/twoSort`,
-which includes a makefile to build a Verilator simulator (`sudo
-apt-get install verilator`).  The simulator can be built and run as
-follows.
+invokes GHC with the appropriate compiler flags.  For this to work,
+the `BLARNEY_ROOT` environment variable needs to be set to the root of
+the repository, and `BLARNEY_ROOT/Scripts` must be in your `PATH`.
+Running the resulting executable will produce Verilog in the
+`/tmp/twoSort` directory, including a makefile to build a Verilator
+simulator (`sudo apt-get install verilator`).  The simulator can be
+built and run as follows.
 
 ```sh
 > cd /tmp/twoSort
@@ -114,6 +112,9 @@ twoSort (0x2,0x1) = (0x1,0x2)
 ```
 
 It looks like `twoSort` is working!
+
+(Note: Instead of using `blc`, you can use `blci` to get a REPL, and
+then invoke `main` to generate the Verilog).
 
 ## Example 2: Bubble sort
 
@@ -171,6 +172,7 @@ Inputs  -->+---+---.
            |   |   |   |
         -->+---+---+---+---.
            |   |   |   |   |
+           v   v   v   v   v
 
                 Outputs
 ```
