@@ -181,26 +181,31 @@ emitInit wire i w
       where lower = i .&. 0xffffffff
 
 -- Emit C++ RAM initialisation code
-emitInitRAM :: InstId -> Maybe String -> Width -> Width -> Code
+emitInitRAM :: String -> Maybe String -> Width -> Width -> Code
 emitInitRAM id Nothing aw dw = []
 emitInitRAM id (Just file) aw dw
   | dw <= 64 =
-      [ "initRAM<" ++ typeOf dw ++ ">(" ++ show file ++ ", array"
-     ++ show id ++ ", " ++ show (2^aw) ++ ");"]
+      [ "initRAM<" ++ typeOf dw ++ ">(" ++ show file ++ ", "
+     ++ id ++ ", " ++ show (2^aw) ++ ");"]
   | otherwise =
       [ "initRAMBU<" ++ show (numChunks dw) ++ ">("
-     ++ show file ++ ", array" ++ show id ++ ", " ++ show (2^aw) ++ ");"]
+     ++ show file ++ ", " ++ id ++ ", " ++ show (2^aw) ++ ");"]
 
 -- Emit C++ variable initialisation code for given net
 emitInits :: Net -> Code
 emitInits net =
   case netPrim net of
-    Const w i              -> emitInit (netInstId net, 0) i w
-    Register i w           -> emitInit (netInstId net, 0) i w
-    RegisterEn i w         -> emitInit (netInstId net, 0) i w
-    RAM init aw dw         -> emitInitRAM (netInstId net) init aw dw
-    TrueDualRAM init aw dw -> emitInitRAM (netInstId net) init aw dw
-    other                  -> []
+    Const w i               -> emitInit (netInstId net, 0) i w
+    Register i w            -> emitInit (netInstId net, 0) i w
+    RegisterEn i w          -> emitInit (netInstId net, 0) i w
+    RAM init aw dw          -> emitInitRAM ramName init aw dw
+    TrueDualRAM init aw dw  -> emitInitRAM ramName init aw dw
+    RegFileMake "" aw dw id -> []
+    RegFileMake i aw dw id  -> emitInitRAM (regFileName id) (Just i) aw dw
+    other                   -> []
+  where
+    ramName = "array" ++ show (netInstId net)
+    regFileName id = "regFile" ++ show id
 
 -- Create header file containing externs
 writeGlobalsHeader :: String -> [Net] -> IO ()
