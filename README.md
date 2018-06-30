@@ -31,8 +31,9 @@ APIs:
 * [API 3: Bits class](#api-3-bits-class)
 * [API 4: FShow class](#api-4-fshow-class)
 * [API 5: Prelude](#api-5-prelude)
-* [API 6: RTL](#api-6-rtl)
+* [API 6: RTL library](#api-6-rtl-library)
 * [API 7: Queue library](#api-7-queue-library)
+* [API 8: Block RAM library](#api-8-block-ram-library)
 
 ## Example 1: Two-sort
 
@@ -1103,7 +1104,7 @@ andList :: Bits a => [a] -> a
 orList :: Bits a => [a] -> a
 ```
 
-## API 6: RTL
+## API 6: RTL library
 
 ```hs
 -- The RTL monad
@@ -1137,6 +1138,17 @@ makeDReg :: Bits a => a -> RTL (Reg a)
 val'    :: Wire a -> a       -- Registered output of wire
 active  :: Wire a -> Bit 1   -- Is wire being assigned on this cycle?
 active' :: Wire a -> Bit 1   -- Registed value of active
+
+-- RegFile interface
+data RegFile a d =
+  RegFile {
+    (!)    :: a -> d              -- Read
+  , update :: a -> d -> RTL ()    -- Write
+  }
+
+-- Create register file
+makeRegFileInit :: forall a d. (Bits a, Bits d) => String -> RTL (RegFile a d)
+makeRegFile :: forall a d. (Bits a, Bits d) => RTL (RegFile a d)
 
 -- RTL conditionals
 when    :: Bit 1 -> RTL () -> RTL ()
@@ -1220,4 +1232,39 @@ makePipelineQueue :: Bits a => Int -> RTL (Queue a)
 -- No combinatorial paths between sides but max throughput = N/(N+1),
 -- where N is the queue capacity
 makeShiftQueue :: Bits a => Int -> RTL (Queue a)
+```
+
+## API 8: Block RAM library
+
+The `Blarney.RAM` module defines various block RAM implementations.
+
+```hs
+-- RAM interface
+data RAM a d =
+  RAM {
+    load  :: a -> RTL ()
+  , store :: a -> d -> RTL ()
+  , out   :: d
+  }
+
+-- RAM (one read/write port)
+makeRAMInit :: (Bits a, Bits d) => String -> RTL (RAM a d)
+makeRAM :: (Bits a, Bits d) => RTL (RAM a d)
+
+-- Dual port RAM (one read port, one write port)
+makeDualRAMInit :: (Bits a, Bits d) => String -> RTL (RAM a d)
+makeDualRAM :: (Bits a, Bits d) => RTL (RAM a d)
+
+-- True dual port RAM (two read/write ports)
+makeTrueDualRAMInit :: (Bits a, Bits d) => String -> RTL (RAM a d, RAM a d)
+makeTrueDualRAM :: (Bits a, Bits d) => RTL (RAM a d, RAM a d)
+
+-- Dual port RAM module with pass-through
+-- (Read and write to same address yields new data)
+makeDualRAMPassthroughInit :: (Bits a, Bits d) => String -> RTL (RAM a d)
+makeDualRAMPassthrough :: (Bits a, Bits d) => RTL (RAM a d)
+
+-- Extra RAM functions
+out'    :: RAM a d -> d        -- Registered output of RAM
+writeEn :: RAM a d -> Bit 1    -- Has a write been issued on current cycle?
 ```
