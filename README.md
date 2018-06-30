@@ -1249,20 +1249,20 @@ data RAM a d =
 
 -- RAM (one read/write port)
 makeRAMInit :: (Bits a, Bits d) => String -> RTL (RAM a d)
-makeRAM :: (Bits a, Bits d) => RTL (RAM a d)
+makeRAM     :: (Bits a, Bits d) => RTL (RAM a d)
 
 -- Dual port RAM (one read port, one write port)
 makeDualRAMInit :: (Bits a, Bits d) => String -> RTL (RAM a d)
-makeDualRAM :: (Bits a, Bits d) => RTL (RAM a d)
+makeDualRAM     :: (Bits a, Bits d) => RTL (RAM a d)
 
 -- True dual port RAM (two read/write ports)
 makeTrueDualRAMInit :: (Bits a, Bits d) => String -> RTL (RAM a d, RAM a d)
-makeTrueDualRAM :: (Bits a, Bits d) => RTL (RAM a d, RAM a d)
+makeTrueDualRAM     :: (Bits a, Bits d) => RTL (RAM a d, RAM a d)
 
 -- Dual port RAM module with pass-through
 -- (Read and write to same address yields new data)
 makeDualRAMPassthroughInit :: (Bits a, Bits d) => String -> RTL (RAM a d)
-makeDualRAMPassthrough :: (Bits a, Bits d) => RTL (RAM a d)
+makeDualRAMPassthrough     :: (Bits a, Bits d) => RTL (RAM a d)
 
 -- Extra RAM functions
 out'    :: RAM a d -> d        -- Registered output of RAM
