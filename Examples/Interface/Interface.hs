@@ -48,6 +48,6 @@ top = do
 -- Main function
 main :: IO ()
 main = do
-  let dir = "/tmp/inc"
+  let dir = "Interface-Verilog/"
   emitVerilogModule incS "incS" dir
   emitVerilogTop top "top" dir

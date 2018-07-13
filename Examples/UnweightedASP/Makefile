@@ -6,3 +6,4 @@ all:
 
 clean:
 	rm -f *.o *.hi ASPEngine ASPDirect ASPStream
+	rm -rf ASPEngine-Verilog ASPDirect-Verilog ASPStream-Verilog

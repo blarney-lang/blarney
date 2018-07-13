@@ -3,4 +3,4 @@ all:
 	blc BitScan.hs
 
 clean:
-	rm -f *.o *.hi BitScan
+	rm -rf *.o *.hi BitScan BitScan-Verilog

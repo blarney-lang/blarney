@@ -3,4 +3,4 @@ all:
 	blc Interface.hs
 
 clean:
-	rm -f *.o *.hi *.v Interface
+	rm -rf *.o *.hi *.v Interface Interface-Verilog

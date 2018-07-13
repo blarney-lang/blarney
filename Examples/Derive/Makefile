@@ -3,4 +3,4 @@ all:
 	blc Derive.hs
 
 clean:
-	rm -f *.o *.hi Derive
+	rm -rf *.o *.hi Derive Derive-Verilog

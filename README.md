@@ -114,8 +114,8 @@ twoSort (0x2,0x1) = (0x1,0x2)
 
 It looks like `twoSort` is working!
 
-(Note: Instead of using `blc`, you can use `blci` to get a REPL, and
-then invoke `main` to generate the Verilog).
+(Instead of using `blc`, you can use `blci` to get a REPL, and then
+invoke `main` to generate the Verilog).
 
 ## Example 2: Bubble sort
 

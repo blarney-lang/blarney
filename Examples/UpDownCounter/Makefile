@@ -2,4 +2,4 @@ Fact:
 	blc Counter.hs
 
 clean:
-	rm -f *.o *.hi Counter
+	rm -rf *.o *.hi Counter Counter-Verilog

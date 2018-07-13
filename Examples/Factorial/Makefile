@@ -3,4 +3,4 @@ all: Fact.hs
 	blc Fact.hs
 
 clean:
-	rm -f *.o *.hi Fact
+	rm -rf *.o *.hi Fact Fact-Verilog

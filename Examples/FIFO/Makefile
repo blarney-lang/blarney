@@ -3,4 +3,4 @@ all:
 	blc FIFO.hs
 
 clean:
-	rm -f *.o *.hi FIFO
+	rm -rf *.o *.hi FIFO FIFO-Verilog

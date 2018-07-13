@@ -24,6 +24,8 @@ top = do
       "imm[11:5] rs2[4:0]  rs1[4:0] 010 imm[4:0] 0100011" ==> sw
     ]
 
+  finish
+
 -- Main function
 main :: IO ()
-main = emitVerilogTop top "top" "/tmp/bitscan"
+main = emitVerilogTop top "top" "BitScan-Verilog/"

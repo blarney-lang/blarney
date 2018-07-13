@@ -3,4 +3,4 @@ all:
 	blc Queue.hs -cpp
 
 clean:
-	rm -f *.o *.hi Queue
+	rm -rf *.o *.hi Queue Queue-Verilog

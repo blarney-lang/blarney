@@ -10,6 +10,7 @@
 import Blarney
 import Blarney.RAM
 import Blarney.BitPat
+import System.Process
 
 #include <BitPat.h>
 
@@ -66,4 +67,7 @@ makeCPUSpec = do
     fetch <== 1
 
 main :: IO ()
-main = emitVerilogTop makeCPUSpec "top" "/tmp/spec"
+main = do
+  emitVerilogTop makeCPUSpec "top" "Spec-Verilog/"
+  system "cp instrs.hex Spec-Verilog/"
+  return ()

@@ -4,4 +4,4 @@ all:
 	blc Spec.hs
 
 clean:
-	rm -f *.o *.hi CPU Spec
+	rm -rf *.o *.hi CPU Spec CPU-Verilog Spec-Verilog

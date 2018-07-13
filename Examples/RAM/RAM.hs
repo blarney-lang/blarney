@@ -35,4 +35,4 @@ top = do
 
 -- Main function
 main :: IO ()
-main = emitVerilogTop top "top" "/tmp/ram/"
+main = emitVerilogTop top "top" "RAM-Verilog/"

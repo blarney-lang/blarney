@@ -2,4 +2,4 @@ ram:
 	blc RAM.hs
 
 clean:
-	rm -f *.o *.hi RAM
+	rm -rf *.o *.hi RAM RAM-Verilog

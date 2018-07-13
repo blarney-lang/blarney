@@ -41,4 +41,4 @@ top t w h = do
 
 -- Main function
 main :: IO ()
-main = emitVerilogTop (top 50000 64 64) "top" "/tmp/heat/"
+main = emitVerilogTop (top 5000 16 16) "top" "Heat-Verilog/"

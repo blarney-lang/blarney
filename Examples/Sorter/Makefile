@@ -3,4 +3,4 @@ all:
 	blc Sorter.hs
 
 clean:
-	rm -f *.o *.hi Sorter
+	rm -rf *.o *.hi Sorter Sorter-Verilog

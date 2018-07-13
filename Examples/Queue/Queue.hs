@@ -23,4 +23,4 @@ top = do
 
 -- Main function
 main :: IO ()
-main = emitVerilogTop top "top" "/tmp/queue"
+main = emitVerilogTop top "top" "Queue-Verilog"

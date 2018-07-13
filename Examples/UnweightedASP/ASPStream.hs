@@ -13,9 +13,9 @@ import Blarney.GetPut
 
 -- This is a general ASP-finding engine,
 -- but for the purposes of testing,
--- let's assume the n5 network:
-#define numVertices   3487
-#define numNeighbours 119385
+-- let's assume the n2 network:
+#define numVertices   87
+#define numNeighbours (numVertices + 808)
 
 -- Types
 type NeighbourId = Bit LogMaxNeighbours
@@ -156,5 +156,6 @@ makeASPEngine = do
 
 main :: IO ()
 main = do
-  emitVerilogTop makeASPEngine "top" "/tmp/asp"
-  genHexFiles "n5.edges" "/tmp/asp/"
+  let dir = "ASPStream-Verilog/"
+  emitVerilogTop makeASPEngine "top" dir
+  genHexFiles "n2.edges" dir

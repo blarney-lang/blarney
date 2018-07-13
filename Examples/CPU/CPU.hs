@@ -9,6 +9,7 @@
 
 import Blarney
 import Blarney.RAM
+import System.Process
 
 -- Instructions
 type Instr = Bit 8
@@ -140,4 +141,7 @@ makeCPU = do
 
 -- Main function
 main :: IO ()
-main = emitVerilogTop makeCPU "top" "/tmp/cpu"
+main = do
+  emitVerilogTop makeCPU "top" "CPU-Verilog/"
+  system "cp instrs.hex CPU-Verilog/"
+  return ()

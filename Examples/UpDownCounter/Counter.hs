@@ -56,4 +56,4 @@ top = do
   return ()
 
 main :: IO ()
-main = emitVerilogTop top "top" "/tmp/counter"
+main = emitVerilogTop top "top" "Counter-Verilog/"

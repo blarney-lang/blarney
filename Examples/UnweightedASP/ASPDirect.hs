@@ -1,15 +1,15 @@
 import Blarney
 import Network
-import Data.IntMap (IntMap, (!), keys)
+import qualified Data.IntMap as M
 
 -- Graphs
 
 type Vertex = Int 
-type Graph = IntMap [Vertex]
+type Graph = M.IntMap [Vertex]
 
 -- Sets
 
-type MaxVertices = 1628
+type MaxVertices = 87
 
 type Set = Bit MaxVertices
 
@@ -31,13 +31,13 @@ unions = foldr union empty
 -- Processing
 
 combine :: Graph -> (Vertex -> Set) -> Vertex -> Set
-combine g f v = unions (singleton v : map f (g!v))
+combine g f v = unions (singleton v : map f (g M.! v))
 
 initial :: Graph -> [Set]
-initial g = map singleton (keys g)
+initial g = map singleton (M.keys g)
 
 step :: Graph -> [Set] -> [Set]
-step g l = map (combine g (l !!)) (keys g)
+step g l = map (combine g (l !!)) (M.keys g)
 
 levels :: Graph -> [Set]
 levels g = outs
@@ -65,11 +65,11 @@ compile :: Graph -> RTL ()
 compile g = do
   let (done, diam, total) = ssp g
   when done $ do
-    display "Diameter = " (diam - 1)
+    display "Sum = " total
     finish
 
 -- Main function
 main :: IO ()
 main = do
-  net <- parseNetwork `fmap` readFile "n4.edges"
-  emitVerilogTop (compile net) "top" "/tmp/asp"
+  net <- parseNetwork `fmap` readFile "n2.edges"
+  emitVerilogTop (compile net) "top" "ASPDirect-Verilog/"

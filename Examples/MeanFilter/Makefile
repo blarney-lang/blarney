@@ -2,4 +2,4 @@ Fact:
 	blc Heat.hs
 
 clean:
-	rm -f *.o *.hi Heat
+	rm -rf *.o *.hi Heat Heat-Verilog
