@@ -183,7 +183,7 @@ uses, we can see that it actually has a more general type.
 (?)   :: Bits a => Bit 1 -> (a, a) -> a
 ```
 
-So '.<.' can be used on any type in the `Cmp` (comparator) class.
+So `.<.` can be used on any type in the `Cmp` (comparator) class.
 Similarly `?` can be used on any type in the `Bits` class (which
 allows serialisation to a bit vector and back again). So a more
 generic definition of `twoSort` would be:
