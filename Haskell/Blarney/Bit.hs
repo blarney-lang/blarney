@@ -15,12 +15,7 @@ module Blarney.Bit
   , (.|.)            -- Bitwise or
   , (.^.)            -- Bitwise xor
   , mux              -- Mux
-  , eq               -- Equality
-  , neq              -- Disequality
-  , (.<.)            -- Less than
-  , (.>.)            -- Greater than
-  , (.<=.)           -- Less than or equal
-  , (.>=.)           -- Greater than or equal
+  , Cmp(..)          -- Type class for comparison operators
   , (.+.)            -- Add
   , (.-.)            -- Subtract
   , (.*.)            -- Multiply
@@ -109,26 +104,46 @@ a `neq` b = Bit (makePrim1 (NotEqual wa) [unbit a, unbit b] 1)
   where wa = width a
 
 -- Less than
-infix 4 .<.
-(.<.) :: Bit n -> Bit n -> Bit 1
-a .<. b = Bit (makePrim1 (LessThan wa) [unbit a, unbit b] 1)
+lt :: Bit n -> Bit n -> Bit 1
+a `lt` b = Bit (makePrim1 (LessThan wa) [unbit a, unbit b] 1)
   where wa = width a
 
 -- Less than or equal
-infix 4 .<=.
-(.<=.) :: Bit n -> Bit n -> Bit 1
-a .<=. b = Bit (makePrim1 (LessThanEq wa) [unbit a, unbit b] 1)
+lte :: Bit n -> Bit n -> Bit 1
+a `lte` b = Bit (makePrim1 (LessThanEq wa) [unbit a, unbit b] 1)
   where wa = width a
 
 -- Greater than
-infix 4 .>.
-(.>.) :: Bit n -> Bit n -> Bit 1
-a .>. b = b .<. a
+gt :: Bit n -> Bit n -> Bit 1
+a `gt` b = b `lt` a
 
 -- Greater than or equal
+gte :: Bit n -> Bit n -> Bit 1
+a `gte` b = b `lte` a
+
+-- Comparison operators
+class Cmp a where
+  (.<.)  :: a -> a -> Bit 1
+  (.>.)  :: a -> a -> Bit 1
+  (.<=.) :: a -> a -> Bit 1
+  (.>=.) :: a -> a -> Bit 1
+  (.==.) :: a -> a -> Bit 1
+  (.!=.) :: a -> a -> Bit 1
+
+infix 4 .<.
+infix 4 .<=.
 infix 4 .>=.
-(.>=.) :: Bit n -> Bit n -> Bit 1
-a .>=. b = b .<=. a
+infix 4 .>.
+infix 4 .==.
+infix 4 .!=.
+
+instance Cmp (Bit n) where
+  (.<.)  = lt
+  (.>.)  = gt
+  (.<=.) = lte
+  (.>=.) = gte
+  (.==.) = eq
+  (.!=.) = neq
 
 -- Add
 infixl 6 .+.

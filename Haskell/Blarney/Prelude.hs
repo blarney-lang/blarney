@@ -13,8 +13,8 @@ module Blarney.Prelude
   , index
   , (?)
   , o
-  , (.==.)
-  , (.!=.)
+  , (===)
+  , (=!=)
   , zero
   , register
   , registerEn
@@ -92,14 +92,14 @@ o :: (a -> b) -> (c -> a) -> c -> b
 (f `o` g) x = f (g x)
 
 -- Equality
-infix 4 .==.
-(.==.) :: Bits a => a -> a -> Bit 1
-a .==. b = pack a `eq` pack b
+infix 4 ===
+(===) :: Bits a => a -> a -> Bit 1
+a === b = pack a .==. pack b
 
 -- Disequality
-infix 4 .!=.
-(.!=.) :: Bits a => a -> a -> Bit 1
-a .!=. b = pack a `neq` pack b
+infix 4 =!=
+(=!=) :: Bits a => a -> a -> Bit 1
+a =!= b = pack a .!=. pack b
 
 -- All 0's
 zero :: Bits a => a

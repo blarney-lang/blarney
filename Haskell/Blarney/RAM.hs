@@ -148,7 +148,7 @@ makeDualRAMPassthroughCore init = do
 
   let outMethod =
         (active' la .&. active' sa .&.
-           (val' la .==. val' sa)) ?
+           (val' la === val' sa)) ?
               (val' sd, out ram)
 
   let outMethod' = register zero outMethod

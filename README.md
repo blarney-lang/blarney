@@ -895,14 +895,6 @@ inv   :: Bit n -> Bit n            -- Bitwise not
 (.|.) :: Bit n -> Bit n -> Bit n   -- Bitwise or
 (.^.) :: Bit n -> Bit n -> Bit n   -- Bitwise xor
 
--- Comparison operators
-eq     :: Bit n -> Bit n -> Bit 1   -- Equality
-neq    :: Bit n -> Bit n -> Bit 1   -- Disequality
-(.<.)  :: Bit n -> Bit n -> Bit 1   -- Less than
-(.<=.) :: Bit n -> Bit n -> Bit 1   -- Less than or equal
-(.>.)  :: Bit n -> Bit n -> Bit 1   -- Greated than
-(.>=.) :: Bit n -> Bit n -> Bit 1   -- Greater than or equal
-
 -- Arithmetic operators
 (.+.) :: Bit n -> Bit n -> Bit n    -- Addition
 (.-.) :: Bit n -> Bit n -> Bit n    -- Subtraction
@@ -917,6 +909,18 @@ instance KnownNat n => Num (Bit n) where
   abs         :: Bit n -> Bit n           -- Identity function
   signum      :: Bit n -> Bit n           -- If > 0 then 1 else 0
   fromInteger :: Integer -> Bit n         -- Convert from integer
+
+-- Comparison class
+class Cmp a where
+  (.<.)  :: a -> a -> Bit 1   -- Less than
+  (.>.)  :: a -> a -> Bit 1   -- Greater than
+  (.<=.) :: a -> a -> Bit 1   -- Less than or equal
+  (.>=.) :: a -> a -> Bit 1   -- Greated than or equal
+  (.==.) :: a -> a -> Bit 1   -- Equal
+  (.!=.) :: a -> a -> Bit 1   -- Not equal
+
+-- Comparison instance
+instance Cmp (Bit n)
 
 -- Fractional instance
 instance KnownNat n => Fractional (Bit n) where
@@ -1051,11 +1055,11 @@ just include `FShow` in the `deriving` clause for the data type.
 ## API 5: Prelude
 
 ```hs
--- Equality
-(.==.) :: Bits a => a -> a -> Bit 1
+-- Raw equality
+(===) :: Bits a => a -> a -> Bit 1
 
--- Disequality
-(.!=.) :: Bits a => a -> a -> Bit 1
+-- Raw disequality
+(=!=) :: Bits a => a -> a -> Bit 1
 
 -- Ternary conditional operator
 (?) :: Bits a => Bit 1 -> (a, a) -> a

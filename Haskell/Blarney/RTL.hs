@@ -183,7 +183,7 @@ instance IfThenElse (Bit 1) (RTL ()) where
 switch :: Bits a => a -> [(a, RTL ())] -> RTL ()
 switch subject alts =
   forM_ alts $ \(lhs, rhs) ->
-    when (pack subject `eq` pack lhs) rhs
+    when (pack subject .==. pack lhs) rhs
 
 -- Operator for switch statement alternatives
 infixl 0 -->
