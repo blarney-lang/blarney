@@ -13,7 +13,7 @@ Examples:
 
 * [Example 1: Two-sort](#example-1-two-sort)
 * [Example 2: Bubble sort](#example-2-bubble-sort)
-* [Example 3: Bit-width polymorphism](#example-3-bit-width-polymorphism)
+* [Example 3: Polymorphism](#example-3-polymorphism)
 * [Example 4: Basic RTL](#example-4-basic-rtl)
 * [Example 5: Queues](#example-5-queues)
 * [Example 6: Wires](#example-6-wires)
@@ -49,27 +49,11 @@ twoSort :: (Bit 8, Bit 8) -> (Bit 8, Bit 8)
 twoSort (a, b) = a .<. b ? ((a, b), (b, a))
 ```
 
-This definition makes use of two Blarney functions.  The first is the
-unsigned comparison operator
-
-```hs
-(.<.) :: Bit n -> Bit n -> Bit 1
-```
-
-which is polymorphic in the width `n` of the bit-vectors being compared.
-The second is the ternary conditional operator
-
-```hs
-(?) :: Bits a => Bit 1 -> (a, a) -> a
-```
-
-which is polymorphic in the return type `a`.  The constraint `Bits a`
-requires that the type `a` can be converted to a bit-vector and back
-again -- akin to a type class for binary serialisation.  (See
-[here](#api-3-bits-class) for details about the `Bits` class.)
-
-To check that our circuit works, let's create a simple *test bench*
-that applies some sample inputs to `twoSort` and displays the outputs.
+This definition makes use of three Blarney constructs: the `Bit` type
+for bit vectors (parametised by the size of the vector); the unsigned
+comparison operator `.<.`; and the ternary conditional operator `?`.
+To check that it works, let's create a test bench that supplies some
+sample inputs and displays the outputs.
 
 ```hs
 top :: RTL ()
@@ -79,9 +63,9 @@ top = do
   finish
 ```
 
-This test bench is written using Blarney's RTL (register-transfer
-level) monad.  All statements in this monad are executed *in parallel*
-and *on every clock cycle*.   Let's turn it into Verilog:
+We use Blarney's RTL (register-transfer level) monad.  All statements
+in this monad are executed *in parallel* and *on every clock cycle*.
+Now let's generate some Verilog:
 
 ```hs
 main :: IO ()
@@ -96,9 +80,9 @@ compiled at the command-line using
 ```
 
 where `blc` stands for *Blarney compiler*.  This is just a script that
-invokes GHC with the appropriate compiler flags.  For this to work,
+invokes GHC with the appropriate compiler flags.  For it to work,
 the `BLARNEY_ROOT` environment variable needs to be set to the root of
-the repository, and `BLARNEY_ROOT/Scripts` must be in your `PATH`.
+the repository, and `BLARNEY_ROOT/Scripts` must be in the `PATH`.
 Running the resulting executable will produce Verilog in the
 `/tmp/twoSort` directory, including a makefile to build a Verilator
 simulator (`sudo apt-get install verilator`).  The simulator can be
@@ -112,7 +96,7 @@ twoSort (0x1,0x2) = (0x1,0x2)
 twoSort (0x2,0x1) = (0x1,0x2)
 ```
 
-It looks like `twoSort` is working!
+Looks like `twoSort` is working!
 
 (Instead of using `blc`, you can use `blci` to get a REPL, and then
 invoke `main` to generate the Verilog).
@@ -188,37 +172,39 @@ core](https://pdfs.semanticscholar.org/de30/22efc5aec833d7b52bd4770a382fea729bba
 -- one of the classic Lava papers -- for a more in-depth exploration
 of sorting circuits in Haskell.
 
-## Example 3: Bit-width polymorphism
+## Example 3: Polymorphism
 
 For simplicity, we've made our sorter specific to lists of 8-bit
-values.  We can make it generic to any bit-width by redefining
-`twoSort` as
+values.  But if we look at the types of the primitive functions it
+uses, we can see that it actually has a more general type.
 
 ```hs
-twoSort :: KnownNat n => (Bit n, Bit n) -> (Bit n, Bit n)
+(.<.) :: Cmp a  => a -> a -> Bit 1
+(?)   :: Bits a => Bit 1 -> (a, a) -> a
+```
+
+So '.<.' can be used on any type in the `Cmp` (comparator) class.
+Similarly `?` can be used on any type in the `Bits` class (which
+allows serialisation to a bit vector and back again). So a more
+generic definition of `twoSort` would be:
+
+```hs
+twoSort :: (Bits a, Cmp a) => (a, a) -> (a, a)
 twoSort (a, b) = a .<. b ? ((a, b), (b, a))
 ```
 
-The `KnownNat n` constraint is Haskell's way of saying that it must be
-possible to convert the type-level number `n` to a value-level number.
-It is satisfiable for any type-level number `n`.  And since the
-definition of `Bit n` already requires `n` to be a type-level number,
-the `KnownNat` constraint doesn't really carry any new information.
-We recommend using the *partial type signatures* feature of GHC to
-avoid writing `KnownNat` constraints:
+Indeed, this would be the type inferred by the Haskell compiler if no
+type signature was supplied.
 
-```hs
-twoSort :: _ => (Bit n, Bit n) -> (Bit n, Bit n)
-twoSort (a, b) = a .<. b ? ((a, b), (b, a))
-```
+For details about the `Bits` and `Cmp` classes, see
+[here](#api-3-bits-class) and [here](#api-1-bit-vectors) respectively.
 
 ## Example 4: Basic RTL
 
-So far, we've only seen the `display` and `finish` actions of the
-RTL monad.  The RTL monad also supports creation and assignment of
-registers.  To illustrate, here is a piece of RTL that creates a
-4-bit `cycleCount` register, increments it on each cycle, stopping
-when it reaches 10.
+So far, we've only seen the `display` and `finish` actions of the RTL
+monad.  It also supports creation and assignment of registers.  To
+illustrate, here is a piece of RTL that creates a 4-bit `cycleCount`
+register, increments it on each cycle, stopping when it reaches 10.
 
 ```hs
 top :: RTL ()
