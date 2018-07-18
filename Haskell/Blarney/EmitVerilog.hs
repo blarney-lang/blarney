@@ -66,7 +66,8 @@ emitVerilogTop top mod dir =
         mod ++ ": *.v *.cpp"
       , "\tverilator -cc " ++ mod ++ ".v " ++ "-exe "
                            ++ mod ++ ".cpp " ++ "-o " ++ mod
-                           ++ " -y $(BLARNEY_ROOT)/Verilog"
+                           ++ " -y $(BLARNEY_ROOT)/Verilog "
+                           ++ " -CFLAGS \"-include $(BLARNEY_ROOT)/C/FPOps.h\""
       , "\tmake -C obj_dir -j -f V" ++ mod ++ ".mk " ++ mod
       , "\tcp obj_dir/" ++ mod ++ " ."
       , "\trm -rf obj_dir"

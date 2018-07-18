@@ -21,3 +21,4 @@ clean:
 	make -C BitScan clean
 	make -C Derive clean
 	make -C Interface clean
+	make -C FloatingPoint clean

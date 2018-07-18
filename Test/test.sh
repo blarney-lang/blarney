@@ -1,6 +1,6 @@
 #!/bin/bash
 
-EXAMPLES=$(cat <<-END
+EXAMPLES=(
   BasicRTL
   CPU
   Factorial
@@ -14,7 +14,7 @@ EXAMPLES=$(cat <<-END
   Queue
   Sorter
   UpDownCounter
-END
+  FloatingPoint
 )
 
 RED='\033[0;31m'
@@ -25,7 +25,7 @@ if [ -z "$BLARNEY_ROOT" ]; then
   echo Please set BLARNEY_ROOT environment variable
 fi
 
-for E in $EXAMPLES; do
+for E in "${EXAMPLES[@]}"; do
   cd $BLARNEY_ROOT/Examples/$E
   make -s &> /dev/null
   if [ $? != 0 ]; then
