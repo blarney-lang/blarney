@@ -1,17 +1,17 @@
 // For simulation
 
-module FPSqrt32 (
-  input wire clock,         // Clock
-  input wire [0:0] in_0,    // "go" trigger
-  input wire [31:0] in_1,   // Operand A
-  output wire [0:0] out_0,  // "done" trigger
-  output wire [31:0] out_1  // Result
+module FPSqrt32#(parameter tokenWidth = 1) (
+  input wire clock,                    // Clock
+  input wire [tokenWidth-1:0] in_0,    // "go" trigger
+  input wire [31:0] in_1,              // Operand A
+  output wire [tokenWidth-1:0] out_0,  // "done" trigger
+  output wire [31:0] out_1             // Result
   );
 
 localparam latency = 28;
 
 integer i;
-reg trigger [latency-1:0];
+reg [tokenWidth-1:0] trigger [latency-1:0];
 reg [31:0] result [latency-1:0];
 assign out_0 = trigger[0];
 assign out_1 = result[0];

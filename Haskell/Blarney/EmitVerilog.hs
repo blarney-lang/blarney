@@ -326,28 +326,29 @@ hWriteVerilog h modName netlist = do
       if numParams == 0
         then return ()
         else do
-          emit "#("
+          emit "#(\n"
           sequence_
-               [ do emit "." >> emit key
+               [ do emit "  ." >> emit key
                     emit "(" >> emit val >> emit ")"
                     if i < numParams then emit ",\n" else return ()
                | (key :-> val, i) <- zip params [1..] ]
+          emit "\n)\n"
       emit (name ++ "_" ++ show (netInstId net))
       let args = zip ins (netInputs net) ++
                    [ (o, (netInstId net, n))
                    | (o, n) <- zip (map fst outs) [0..] ]
       let numArgs = length args
       emit "(\n"
-      emit ".clock(clock),\n"
+      emit "  .clock(clock),\n"
       if numArgs == 0
         then return ()
         else do
           sequence_
-             [ do emit "." >> emit name
+             [ do emit "  ." >> emit name
                   emit "(" >> emitWire wire >> emit ")"
                   if i < numArgs then emit ",\n" else return ()
              | ((name, wire), i) <- zip args [1..] ]
-      emit ");\n"
+      emit "\n);\n"
 
     emitOutputInst net s = do
       emit ("assign " ++ s ++ " = ")

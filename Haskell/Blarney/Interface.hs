@@ -71,15 +71,15 @@ liftRTL rtl = Inst $ \r -> do
   res <- rtl
   return ([], res)
 
-lowerInst :: String -> Inst a -> RTL a
-lowerInst name inst = do
+lowerInst :: String -> [Param] -> Inst a -> RTL a
+lowerInst name params inst = do
     rec (w, a) <- runInst inst (custom w)
     return a
   where
     custom w =
       let inputs  = [(s, x) | (s, PinIn x) <- w]
           outputs = [(s, fromInteger n) | (s, PinOut n) <- w]
-          prim    = Custom name (map fst inputs) outputs []
+          prim    = Custom name (map fst inputs) outputs params
       in  zip (map fst outputs)
               (makePrim prim (map snd inputs) (map snd outputs))
 
@@ -396,14 +396,14 @@ instance Interface a => GInterface (K1 i a) where
 
 class Module a where
   makeMod :: a -> RTL ()
-  makeInst :: String -> a
+  makeInst :: String -> [Param] -> a
 
 instance Interface a => Module (RTL a) where
   makeMod rtl = do
     a <- rtl
     makeOutput "out" a
 
-  makeInst s = lowerInst s $ do
+  makeInst s ps = lowerInst s ps $ do
     a <- getOutput "out"
     return a
 
@@ -413,8 +413,8 @@ instance (Interface a, Interface b) => Module (a -> RTL b) where
     b <- f a
     makeOutput "out" b
 
-  makeInst s = \a ->
-    lowerInst s $ do
+  makeInst s ps = \a ->
+    lowerInst s ps $ do
       putInput "in" a
       a <- getOutput "out"
       return a
@@ -422,23 +422,23 @@ instance (Interface a, Interface b) => Module (a -> RTL b) where
 instance (Interface a, Interface b, Interface c) =>
          Module (a -> b -> RTL c) where
   makeMod f = makeMod (\(a, b) -> f a b)
-  makeInst s = \a b -> makeInst s (a, b)
+  makeInst s ps = \a b -> makeInst s ps (a, b)
 
 instance (Interface a, Interface b, Interface c, Interface d) =>
          Module (a -> b -> c -> RTL d) where
   makeMod f = makeMod (\(a, b, c) -> f a b c)
-  makeInst s = \a b c -> makeInst s (a, b, c)
+  makeInst s ps = \a b c -> makeInst s ps (a, b, c)
 
 instance (Interface a, Interface b, Interface c, Interface d, Interface e) =>
          Module (a -> b -> c -> d -> RTL e) where
   makeMod f = makeMod (\(a, b, c, d) -> f a b c d)
-  makeInst s = \a b c d -> makeInst s (a, b, c, d)
+  makeInst s ps = \a b c d -> makeInst s ps (a, b, c, d)
 
 makeModule :: Module a => a -> RTL ()
 makeModule = makeMod
 
 makeInstance :: Module a => String -> a
-makeInstance = makeInst
+makeInstance s = makeInst s []
 
-instanceOf :: Module a => (a, String) -> a
-instanceOf (_, s) = makeInst s
+makeInstanceWithParams :: Module a => String -> [Param] -> a
+makeInstanceWithParams s ps = makeInst s ps
