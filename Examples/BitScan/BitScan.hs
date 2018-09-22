@@ -15,7 +15,7 @@ sw imm rs2 rs1 = display "sw " rs2 ", " rs1 "[" imm "]"
 
 top :: RTL ()
 top = do
-  let instr :: Bit 32 = 0b10000000000100010010000010100011
+  let instr :: Bit 32 = 0b1000000_00001_00010_010_00001_0100011
 
   match instr
     [

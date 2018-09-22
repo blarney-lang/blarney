@@ -5,7 +5,7 @@ range of HDL abstractions on top of a small set of core circuit
 primitives.  It can be viewed as a modern variant of
 [Lava](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.110.5587&rep=rep1&type=pdf)
 that supports a variety of hardware description styles.  Blarney
-requires GHC 8.4.1 or later.
+requires GHC 8.6.1 or later.
 
 ## Contents
 
@@ -219,7 +219,7 @@ top = do
   display "cycleCount = " (cycleCount.val)
 
   -- Terminate simulation when count reaches 10
-  when (cycleCount.val .==. 10) $ do
+  when (cycleCount.val .==. 10) do
     display "Finished"
     finish
 ```
@@ -325,12 +325,12 @@ top = do
   count <== count.val + 1
 
   -- Writer side
-  when (queue.notFull) $ do
+  when (queue.notFull) do
     enq queue (count.val)
     display "Enqueued " (count.val)
 
   -- Reader side
-  when (queue.canDeq) $ do
+  when (queue.canDeq) do
     deq queue
     display "Dequeued " (queue.first)
 
@@ -377,11 +377,11 @@ makeCounter = do
   decWire :: Wire (Bit 1) <- makeWireDefault 0
 
   -- Increment
-  when (incWire.val .&. decWire.val.inv) $ do
+  when (incWire.val .&. decWire.val.inv) do
     count <== count.val + 1
 
   -- Decrement
-  when (incWire.val.inv .&. decWire.val) $ do
+  when (incWire.val.inv .&. decWire.val) do
     count <== count.val - 1
 
   -- Interface
@@ -426,7 +426,7 @@ fact = do
         Seq [
           RTL $ do
             n <== 10
-        , While (n.val .>. 0) $ RTL $ do
+        , While (n.val .>. 0) $ RTL do
             n <== n.val - 1
             acc <== acc.val + n.val
         , RTL $ do
@@ -455,14 +455,14 @@ top = do
   -- Sample test sequence
   let test =
         Seq [
-          RTL $ do
+          RTL do
             counter.inc
-        , RTL $ do
+        , RTL do
             counter.inc
-        , RTL $ do
+        , RTL do
             counter.inc
             counter.dec
-        , RTL $ do
+        , RTL do
             display "counter = " (counter.output)
             finish
         ]
@@ -507,11 +507,11 @@ top = do
   -- Write 10 to ram[0] and read it back again
   let test =
         Seq [
-          RTL $ do
+          RTL do
             store ram 0 10
-        , RTL $ do
+        , RTL do
             load ram 0
-        , RTL $ do
+        , RTL do
             display "Got " (ram.out)
             finish
         ]
@@ -579,7 +579,7 @@ incS xs = do
   buffer <- makeQueue
 
   -- Incrementer
-  when (xs.canGet .&. buffer.notFull) $ do
+  when (xs.canGet .&. buffer.notFull) do
     xs.get
     enq buffer (xs.value + 1)
 
@@ -656,12 +656,12 @@ top = do
   out <- makeIncS (buffer.toStream)
 
   -- Fill input
-  when (buffer.notFull) $ do
+  when (buffer.notFull) do
     enq buffer (count.val)
     count <== count.val + 1
 
   -- Consume
-  when (out.canGet) $ do
+  when (out.canGet) do
     out.get
     display "Got " (out.value)
     when (out.value .==. 100) finish
@@ -711,7 +711,7 @@ addi imm rs1 rd =
 top :: RTL ()
 top = do
   -- Sample RISC-V add instruction
-  let instr :: Bit 32 = 0b00000000000100010000000110110011
+  let instr :: Bit 32 = 0b0000000_00001_00010_000_00011_0110011
 
   -- Dispatch
   match instr
@@ -753,7 +753,7 @@ sw imm rs2 rs1 = display "sw " rs2 ", " rs1 "[" imm "]"
 top :: RTL ()
 top = do
   -- Sample RISC-V store-word instruction
-  let instr :: Bit 32 = 0b10000000000100010010000010100011
+  let instr :: Bit 32 = 0b1000000_00001_00010_010_00001_0100011
 
   -- Dispatch
   match instr
@@ -834,12 +834,12 @@ makeCPU = do
   let halt imm = finish
 
   -- Fetch
-  when (fetch.val) $ do
+  when (fetch.val) do
     load instrMem (pc.val)
     fetch <== 0
 
   -- Execute
-  when (fetch.val.inv) $ do
+  when (fetch.val.inv) do
     match (instrMem.out)
       [
         Var(2) <#> Var(4)            <#> Lit(2,0b00) ==> li,

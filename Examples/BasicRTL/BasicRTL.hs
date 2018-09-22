@@ -12,7 +12,7 @@ top = do
   display "cycleCount = " (cycleCount.val)
 
   -- Terminate simulation when count reaches 10
-  when (cycleCount.val .==. 10) $ do
+  when (cycleCount.val .==. 10) do
     display "Finished"
     finish
 

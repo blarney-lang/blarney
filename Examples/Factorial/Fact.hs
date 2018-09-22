@@ -11,7 +11,7 @@ fact = do
         Seq [
           RTL $ do
             n <== 10
-        , While (n.val .>. 0) $ RTL $ do
+        , While (n.val .>. 0) $ RTL do
             n <== n.val - 1
             acc <== acc.val + n.val
         , RTL $ do
