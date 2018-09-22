@@ -424,12 +424,12 @@ fact = do
   -- Compute factorial of 10
   let recipe =
         Seq [
-          RTL $ do
+          RTL do
             n <== 10
         , While (n.val .>. 0) $ RTL do
             n <== n.val - 1
             acc <== acc.val + n.val
-        , RTL $ do
+        , RTL do
             display "fact(10) = " (acc.val)
             finish
         ]
