@@ -11,16 +11,28 @@
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE ConstraintKinds      #-}
 
-module Blarney.Format where
+{-|
+Module      : Blarney.FShow
+Description : For implementing display statements
+Copyright   : (c) Matthew Naylor, 2019
+License     : GPL-3
+Maintainer  : mattfn@gmail.com
 
-import Prelude
-import Blarney.Unbit
+Blarney's display statement can display values of any types in the
+FShow class.  The FShow class supports generic deriving.
+-}
+module Blarney.FShow where
+
+-- Blarney imports
+import Blarney.BV
 import Blarney.Bit
-import GHC.Generics
+
+-- Standard imports
+import Prelude
 import Data.Monoid
+import GHC.Generics
 
 -- FShow
-
 class FShow a where
   fshow :: a -> Format
 
@@ -34,16 +46,20 @@ class FShow a where
   default fshow :: (Generic a, GFShow (Rep a)) => a -> Format
   fshow x = gfshow False (from x)
 
-data FormatItem = 
-    FormatBit Int Unbit
-  | FormatString String
 
+-- | Format for displaying values in simulation
 newtype Format = Format [FormatItem]
 
+-- | Allow displaying of bit vectors and strings
+data FormatItem = 
+    FormatBit Int BV
+  | FormatString String
 
+-- | Format concatention
 instance Semigroup Format where
   Format a <> Format b = Format (a ++ b)
 
+-- | Empty format
 instance Monoid Format where
   mempty = Format []
 
@@ -52,8 +68,8 @@ instance FShow Char where
   fshowList cs = Format [FormatString cs]
 
 instance FShow (Bit n) where
-  fshow b = Format [FormatBit (unbitWidth ub) ub]
-    where ub = unbit b
+  fshow b = Format [FormatBit (bvWidth ub) ub]
+    where ub = toBV b
 
 instance FShow Format where
   fshow f = f
@@ -65,7 +81,6 @@ instance (FShow a, FShow b) => FShow (a, b) where
   fshow (a, b) = fshow "(" <> fshow a <> fshow "," <> fshow b <> fshow ")"
 
 -- Generic deriving for FShow
-
 class GFShow f where
   -- First argument: are we showing a record constructor?
   gfshow :: Bool -> f a -> Format

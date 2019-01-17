@@ -2,6 +2,13 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
+{-|
+Module      : Blarney.IfThenElse
+Description : Overloaded if/then/else
+Copyright   : (c) Matthew Naylor, 2019
+License     : GPL-3
+Maintainer  : mattfn@gmail.com
+-}
 module Blarney.IfThenElse where
 
 import Prelude
