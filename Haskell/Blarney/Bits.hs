@@ -15,7 +15,7 @@
 Module      : Blarney.Bits
 Description : Convert types to bit vectors and back
 Copyright   : (c) Matthew Naylor, 2019
-License     : GPL-3
+License     : MIT
 Maintainer  : mattfn@gmail.com
 
 Any type in the Bits class can be represented in hardware at runtime.

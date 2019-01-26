@@ -15,7 +15,7 @@
 Module      : Blarney.FShow
 Description : For implementing display statements
 Copyright   : (c) Matthew Naylor, 2019
-License     : GPL-3
+License     : MIT
 Maintainer  : mattfn@gmail.com
 
 Blarney's display statement can display values of any types in the

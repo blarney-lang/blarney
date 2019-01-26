@@ -2,10 +2,10 @@
 --
 -- Opcode    | Meaning
 -- ----------+--------------------------------------------------------
--- ZZNNNN00  | Write value 0000NNNN to register ZZ
--- ZZXXYY01  | Add register XX to register YY and store in register ZZ
--- NNNNYY10  | Branch back by NNNN instructions if YY is non-zero
--- NNNNNN11  | Halt
+-- 00ZZNNNN  | Write value 0000NNNN to register ZZ
+-- 01ZZXXYY  | Add register XX to register YY and store in register ZZ
+-- 10NNNNYY  | Branch back by NNNN instructions if YY is non-zero
+-- 11NNNNNN  | Halt
 
 import Blarney
 import Blarney.RAM
@@ -19,27 +19,27 @@ type RegId = Bit 2
 
 -- Extract opcode
 opcode :: Instr -> Bit 2
-opcode instr = instr.bits(1,0)
+opcode instr = range @7 @6 instr
 
 -- Extract register A
 rA :: Instr -> RegId
-rA instr = instr.bits(5,4)
+rA instr = range @3 @2 instr
 
 -- Extract register B
 rB :: Instr -> RegId
-rB instr = instr.bits(3,2)
+rB instr = range @1 @0 instr
 
 -- Extract destination register
 rD :: Instr -> RegId
-rD instr = instr.bits(7,6)
+rD instr = range @5 @4 instr
 
 -- Extract immediate
 imm :: Instr -> Bit 4
-imm instr = instr.bits(5,2)
+imm instr = range @3 @0 instr
 
 -- Extract branch offset
 offset :: Instr -> Bit 4
-offset instr = instr.bits(7,4)
+offset instr = range @5 @2 instr
 
 -- CPU
 makeCPU :: RTL ()
@@ -52,27 +52,27 @@ makeCPU = do
   regFileB :: RAM RegId (Bit 8) <- makeDualRAMPassthrough
 
   -- Instruction register
-  instr :: Reg (Bit 8) <- makeReg
+  instr :: Reg (Bit 8) <- makeRegU
 
   -- Instruction operand registers
-  opA :: Reg (Bit 8) <- makeReg
-  opB :: Reg (Bit 8) <- makeReg
+  opA :: Reg (Bit 8) <- makeRegU
+  opB :: Reg (Bit 8) <- makeRegU
 
   -- Program counter
-  pcNext :: Wire (Bit 8) <- makeWireDefault 0
+  pcNext :: Wire (Bit 8) <- makeWire 0
   let pc = reg 0 (pcNext.val)
 
   -- Index the instruction memory
   load instrMem (pcNext.val)
 
   -- Result of the execute stage
-  result :: Wire (Bit 8) <- makeWireDefault 0
+  result :: Wire (Bit 8) <- makeWire 0
 
   -- Wire to trigger a pipeline flush
-  flush :: Wire (Bit 1) <- makeWireDefault 0
+  flush :: Wire (Bit 1) <- makeWire 0
 
   -- Cycle counter
-  count :: Reg (Bit 32) <- makeReg
+  count :: Reg (Bit 32) <- makeRegU
   count <== count.val + 1
 
   -- Trigger for each pipeline stage
@@ -142,6 +142,6 @@ makeCPU = do
 -- Main function
 main :: IO ()
 main = do
-  emitVerilogTop makeCPU "top" "CPU-Verilog/"
+  writeVerilogTop makeCPU "top" "CPU-Verilog/"
   system "cp instrs.hex CPU-Verilog/"
   return ()

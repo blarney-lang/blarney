@@ -11,7 +11,7 @@
 Module      : Blarney.RTL
 Description : Register-transfer-level descriptions
 Copyright   : (c) Matthew Naylor, 2019
-License     : GPL-3
+License     : MIT
 Maintainer  : mattfn@gmail.com
 
 The module defines the RTL monad, supporting:
@@ -24,6 +24,7 @@ The module defines the RTL monad, supporting:
 module Blarney.RTL
   ( RTL             -- RTL monad (abstract)
   , when            -- RTL conditional block
+  , whenR           -- RTL conditional block (with return value)
   , ifThenElseRTL   -- RTL if/then/else statement
   , Var(..)         -- Mutable variables
   , Reg             -- Registers
@@ -41,8 +42,11 @@ module Blarney.RTL
   , (-->)           -- Operator for switch statement alternatives
   , Displayable     -- To support N-ary display statement
   , display         -- Display statement
+  , finish          -- Terminate simulator
   , input           -- Declare module input
   , output          -- Declare module output
+  , inputBV         -- Declare module input (untyped)
+  , outputBV        -- Declare module output (untyped)
   , RegFile(..)     -- Register file interface
   , makeRegFileInit -- Create initialised register file
   , makeRegFile     -- Create uninitialised register file
@@ -148,6 +152,12 @@ fresh = do
 -- |RTL conditional block
 when :: Bit 1 -> RTL () -> RTL ()
 when c a = do
+  r <- ask
+  local (r { cond = c .&. cond r }) a
+
+-- |RTL conditional block with return value
+whenR :: Bit 1 -> RTL a -> RTL a
+whenR c a = do
   r <- ask
   local (r { cond = c .&. cond r }) a
 
@@ -314,14 +324,24 @@ input str =
     do write (RTLInput (w, str))
        return inp
   where
-    inp = FromBV (inputBV w str)
+    inp = FromBV (inputPinBV w str)
     w = widthOf inp
+
+-- |RTL external input declaration (untyped)
+inputBV :: String -> Width -> RTL BV
+inputBV str w =
+    do write (RTLInput (w, str))
+       return (inputPinBV w str)
 
 -- |RTL external output declaration
 output :: String -> Bit n -> RTL ()
 output str out = do
   let bv = toBV out
   write (RTLOutput (bvWidth bv, str, bv))
+
+-- |RTL external output declaration (untyped)
+outputBV :: String -> BV -> RTL ()
+outputBV str bv = write (RTLOutput (bvWidth bv, str, bv))
 
 -- Register files
 -- ==============

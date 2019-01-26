@@ -6,7 +6,7 @@
 Module      : Blarney.IfThenElse
 Description : Overloaded if/then/else
 Copyright   : (c) Matthew Naylor, 2019
-License     : GPL-3
+License     : MIT
 Maintainer  : mattfn@gmail.com
 -}
 module Blarney.IfThenElse where

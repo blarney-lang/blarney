@@ -29,4 +29,4 @@ top = do
   finish
 
 main :: IO ()
-main = emitVerilogTop top "top" "Sorter-Verilog/"
+main = writeVerilogTop top "top" "Sorter-Verilog/"

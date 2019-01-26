@@ -6,7 +6,7 @@
 Module      : Blarney.Prelude
 Description : Commonly used HDL functions
 Copyright   : (c) Matthew Naylor, 2019
-License     : GPL-3
+License     : MIT
 Maintainer  : mattfn@gmail.com
 -}
 module Blarney.Prelude

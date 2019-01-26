@@ -3,7 +3,7 @@ import Blarney
 top :: RTL ()
 top = do
   -- Create a register
-  cycleCount :: Reg (Bit 4) <- makeRegInit 0
+  cycleCount :: Reg (Bit 4) <- makeReg 0
 
   -- Increment on every cycle
   cycleCount <== cycleCount.val + 1
@@ -17,4 +17,4 @@ top = do
     finish
 
 main :: IO ()
-main = emitVerilogTop top "top" "BasicRTL-Verilog/"
+main = writeVerilogTop top "top" "BasicRTL-Verilog/"

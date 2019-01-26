@@ -11,7 +11,6 @@ clean:
 	make -C Factorial clean
 	make -C FIFO clean
 	make -C MeanFilter clean
-	make -C UnweightedASP clean
 	make -C UpDownCounter clean
 	make -C RAM clean
 	make -C CPU clean
@@ -19,6 +18,6 @@ clean:
 	make -C BasicRTL clean
 	make -C Sorter clean
 	make -C BitScan clean
+	make -C BitPat clean
 	make -C Derive clean
 	make -C Interface clean
-	make -C FloatingPoint clean

@@ -1,7 +1,4 @@
--- Single-element FIFO
-
 import Blarney
-import GHC.Generics
 
 data MemReq =
   MemReq {
@@ -20,4 +17,4 @@ top = do
 
 -- Main function
 main :: IO ()
-main = emitVerilogTop top "top" "Derive-Verilog/"
+main = writeVerilogTop top "top" "Derive-Verilog/"

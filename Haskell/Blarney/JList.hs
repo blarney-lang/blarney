@@ -2,7 +2,7 @@
 Module      : Blarney.JList
 Description : Join lists
 Copyright   : (c) Matthew Naylor, 2019
-License     : GPL-3
+License     : MIT
 Maintainer  : mattfn@gmail.com
 
 A small library for join-lists, providing constant-time append.

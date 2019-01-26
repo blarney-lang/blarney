@@ -2,7 +2,7 @@
 Module      : Blarney.Util
 Description : Utility functions
 Copyright   : (c) Matthew Naylor, 2019
-License     : GPL-3 
+License     : MIT
 Maintainer  : mattfn@gmail.com
 
 A group of functions that I can't think of a better name for right now.

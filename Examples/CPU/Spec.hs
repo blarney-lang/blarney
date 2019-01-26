@@ -2,17 +2,15 @@
 --
 -- Opcode    | Meaning
 -- ----------+--------------------------------------------------------
--- ZZNNNN00  | Write value 0000NNNN to register ZZ
--- ZZXXYY01  | Add register XX to register YY and store in register ZZ
--- NNNNYY10  | Branch back by NNNN instructions if YY is non-zero
--- NNNNNN11  | Halt
+-- 00ZZNNNN  | Write value 0000NNNN to register ZZ
+-- 01ZZXXYY  | Add register XX to register YY and store in register ZZ
+-- 10NNNNYY  | Branch back by NNNN instructions if YY is non-zero
+-- 11NNNNNN  | Halt
 
 import Blarney
 import Blarney.RAM
 import Blarney.BitPat
 import System.Process
-
-#include <BitPat.h>
 
 makeCPUSpec :: RTL ()
 makeCPUSpec = do
@@ -23,10 +21,10 @@ makeCPUSpec = do
   regFile :: RegFile (Bit 2) (Bit 8) <- makeRegFile
 
   -- Program counter
-  pc :: Reg (Bit 5) <- makeRegInit 0
+  pc :: Reg (Bit 5) <- makeReg 0
 
   -- Are we fetching (1) or executing (0)
-  fetch :: Reg (Bit 1) <- makeRegInit 1
+  fetch :: Reg (Bit 1) <- makeReg 1
 
   -- Load immediate instruction
   let li rd imm = do
@@ -59,15 +57,15 @@ makeCPUSpec = do
   when (fetch.val.inv) $ do
     match (instrMem.out)
       [
-        Var(2) <#> Var(4)            <#> Lit(2,0b00) ==> li,
-        Var(2) <#> Var(2) <#> Var(2) <#> Lit(2,0b01) ==> add,
-        Var(4) <#>           Var(2)  <#> Lit(2,0b10) ==> bnz,
-        Var(6) <#>                       Lit(2,0b11) ==> halt
+        lit 0b00 <#> var @2 <#> var @4              ==>  li,
+        lit 0b01 <#> var @2 <#> var @2  <#> var @2  ==>  add,
+        lit 0b10 <#> var @4 <#> var @2              ==>  bnz,
+        lit 0b11 <#> var @6                         ==>  halt
       ]
     fetch <== 1
 
 main :: IO ()
 main = do
-  emitVerilogTop makeCPUSpec "top" "Spec-Verilog/"
+  writeVerilogTop makeCPUSpec "top" "Spec-Verilog/"
   system "cp instrs.hex Spec-Verilog/"
   return ()

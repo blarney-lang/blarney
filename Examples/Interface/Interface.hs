@@ -3,7 +3,6 @@
 import Blarney
 import Blarney.Queue
 import Blarney.Stream
-import Blarney.GetPut
 
 -- Module that increments each element in a stream
 incS :: Stream (Bit 8) -> RTL (Stream (Bit 8))
@@ -26,7 +25,7 @@ makeIncS = makeInstance "incS"
 top :: RTL ()
 top = do
   -- Counter
-  count :: Reg (Bit 8) <- makeRegInit 0
+  count :: Reg (Bit 8) <- makeReg 0
 
   -- Input buffer
   buffer <- makeQueue
@@ -49,5 +48,5 @@ top = do
 main :: IO ()
 main = do
   let dir = "Interface-Verilog/"
-  emitVerilogModule incS "incS" dir
-  emitVerilogTop top "top" dir
+  writeVerilogModule incS "incS" dir
+  writeVerilogTop top "top" dir

@@ -9,7 +9,7 @@
 Module      : Blarney.Bit
 Description : Typed bit vectors and circuit primitives
 Copyright   : (c) Matthew Naylor, 2019
-License     : GPL-3
+License     : MIT
 Maintainer  : mattfn@gmail.com
 
 This module provides size-typed bit vectors and circuit primitives,
@@ -241,3 +241,25 @@ regEn :: Bit n -> Bit 1 -> Bit n -> Bit n
 regEn init en a =
     FromBV $ regEnBV w (toBV init) (toBV en) (toBV a)
   where w = bvWidth (toBV init)
+
+-- |Lift integer value to type-level natural
+liftNat :: Int -> (forall n. KnownNat n => Proxy n -> a) -> a
+liftNat nat k =
+  case someNatVal (toInteger nat) of
+    Just (SomeNat (x :: Proxy n)) -> do
+      k x
+
+-- |Convert list of bits to bit vector
+bitListToBitVec :: KnownNat n => [Bit 1] -> Bit n
+bitListToBitVec [] = error "fromList: applied to empty list"
+bitListToBitVec (x:xs)
+  | length (x:xs) == n = result
+  | otherwise =
+     error ("fromList: bit vector width mismatch: " ++ show (n, length (x:xs)))
+  where
+    n       = widthOf result
+    result  = FromBV (snd $ join (x:xs))
+    join [x] = (1, toBV x)
+    join (x:xs) =
+      let (n, y) = join xs in
+        (n+1, concatBV y (toBV x))

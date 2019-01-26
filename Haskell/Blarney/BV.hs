@@ -5,7 +5,7 @@
 Module      : Blarney.BV
 Description : Untyped bit vectors and circuit primitives
 Copyright   : (c) Matthew Naylor, 2019
-License     : GPL-3
+License     : MIT
 Maintainer  : mattfn@gmail.com
 
 This module represents the core of the Blarney HDL, upon which all
@@ -70,7 +70,7 @@ module Blarney.BV
   , muxBV          -- :: BV -> (BV, BV) -> BV
   , countOnesBV    -- :: OutputWidth -> BV -> BV
   , idBV           -- :: BV -> BV
-  , inputBV        -- :: String -> BV
+  , inputPinBV     -- :: String -> BV
   , regBV          -- :: Width -> Integer -> BV -> BV
   , regEnBV        -- :: Width -> Integer -> BV -> BV -> BV
   , ramBV          -- :: OutputWidth -> Maybe String -> (BV, BV, BV) -> BV
@@ -180,13 +180,13 @@ data Prim =
   | RegisterEn Integer InputWidth
 
     -- |Single-port block RAM
-  | RAM { ramInitFile  :: Maybe String
-        , ramAddrWidth :: Width
-        , ramDataWidth :: Width }
+  | BRAM { ramInitFile  :: Maybe String
+         , ramAddrWidth :: Width
+         , ramDataWidth :: Width }
     -- |True dual-port block RAM
-  | TrueDualRAM { ramInitFile  :: Maybe String
-                , ramAddrWidth :: Width
-                , ramDataWidth :: Width }
+  | TrueDualBRAM { ramInitFile  :: Maybe String
+                 , ramAddrWidth :: Width
+                 , ramDataWidth :: Width }
 
     -- |Custom component
     -- (component name, input names, output names/widths, parameters)
@@ -470,9 +470,9 @@ idBV :: BV -> BV
 idBV a = makePrim1 (Identity w) [a] w
   where w = bvWidth a
 
--- |Identity function
-inputBV :: Width -> String -> BV
-inputBV w s = makePrim1 (Input w s) [] w
+-- |Input pin (named Verilog pin)
+inputPinBV :: Width -> String -> BV
+inputPinBV w s = makePrim1 (Input w s) [] w
 
 -- |Register of given width with initial value 
 regBV :: Width -> BV -> BV -> BV
@@ -480,7 +480,7 @@ regBV w i a = makePrim1 (Register (getInitBV i) w) [a] w
 
 -- |Register of given width with initial value and enable wire
 regEnBV :: Width -> BV -> BV -> BV -> BV
-regEnBV w i en a = makePrim1 (Register (getInitBV i) w) [en, a] w
+regEnBV w i en a = makePrim1 (RegisterEn (getInitBV i) w) [en, a] w
 
 -- |Single-port block RAM.
 -- Input: one triple (address, data, write-enable)
@@ -488,9 +488,9 @@ ramBV :: OutputWidth -> Maybe String -> (BV, BV, BV) -> BV
 ramBV dw initFile (addr, dataIn, weIn) =
     makePrim1 prim [addr, dataIn, weIn] dw
   where
-    prim = RAM { ramInitFile  = initFile
-               , ramAddrWidth = bvWidth addr
-               , ramDataWidth = dw }
+    prim = BRAM { ramInitFile  = initFile
+                , ramAddrWidth = bvWidth addr
+                , ramDataWidth = dw }
 
 -- |True dual-port block RAM.
 -- Input: two triples (address, data, write-enable)
@@ -502,9 +502,9 @@ dualRamBV dw initFile (addrA, dataInA, weInA) (addrB, dataInB, weInB) =
     (outs !! 0, outs !! 1)
   where
     outs = makePrim prim [addrA, dataInA, weInA, addrB, dataInB, weInB] [dw,dw]
-    prim = RAM { ramInitFile  = initFile
-               , ramAddrWidth = bvWidth addrA
-               , ramDataWidth = dw }
+    prim = TrueDualBRAM { ramInitFile  = initFile
+                        , ramAddrWidth = bvWidth addrA
+                        , ramDataWidth = dw }
 
 -- |Read from register file
 regFileReadBV :: RegFileId -> OutputWidth -> BV -> BV
@@ -519,6 +519,9 @@ getInitBV = eval
     eval a = 
       case bvPrim a of
         Const _ i -> i
+        ConstBits w One -> (2^w) - 1
+        ConstBits w Zero -> 0
+        ConstBits w DontCare -> 0  -- TODO: do better here
         Concat wx wy ->
           let x = eval (bvInputs a !! 0)
               y = eval (bvInputs a !! 1)
