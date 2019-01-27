@@ -13,7 +13,7 @@ module Blarney.Verilog
   , writeVerilogTop     -- Generate Verilog top-level module
   ) where
 
--- |Standard imports
+-- Standard imports
 import Prelude
 import Data.List
 import System.IO
@@ -21,7 +21,7 @@ import Data.Maybe
 import Control.Monad
 import System.Process
 
--- |Blarney imports
+-- Blarney imports
 import Blarney.BV
 import Blarney.RTL
 import Blarney.Util

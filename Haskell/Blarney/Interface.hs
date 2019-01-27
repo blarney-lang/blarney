@@ -37,14 +37,14 @@ module Blarney.Interface
   , makeInstanceWithParams  -- Allow synthesis-time Verilog parameters
   ) where
 
--- |Standard imports
+-- Standard imports
 import Prelude
 import GHC.TypeLits
 import Control.Monad.Fix
 import Control.Monad hiding (when)
 import GHC.Generics hiding (R)
 
--- |Blarney imports
+-- Blarney imports
 import Blarney.Bit
 import Blarney.BV
 import Blarney.Bits

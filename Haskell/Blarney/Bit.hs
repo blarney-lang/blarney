@@ -5,6 +5,7 @@
 {-# LANGUAGE Rank2Types          #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DataKinds           #-}
 
 {-|
 Module      : Blarney.Bit

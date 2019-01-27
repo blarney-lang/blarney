@@ -18,11 +18,11 @@ module Blarney.Recipe
   , runOnce
   ) where
 
--- |Standard imports
+-- Standard imports
 import Prelude
 import Data.Maybe
 
--- |Blarney imports
+-- Blarney imports
 import Blarney.Bit
 import Blarney.Prelude
 import Blarney.RTL
