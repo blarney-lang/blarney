@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE KindSignatures    #-}
 {-# LANGUAGE TypeOperators     #-}
+{-# LANGUAGE TypeFamilies      #-}
 
 {-|
 Module      : Blarney.Prelude

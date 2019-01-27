@@ -1,17 +1,18 @@
-{-# LANGUAGE DefaultSignatures    #-}
-{-# LANGUAGE DeriveGeneric        #-}
-{-# LANGUAGE TypeOperators        #-}
-{-# LANGUAGE FlexibleContexts     #-}
-{-# LANGUAGE DataKinds            #-} 
-{-# LANGUAGE KindSignatures       #-}
-{-# LANGUAGE TypeOperators        #-}
-{-# LANGUAGE TypeFamilies         #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE FlexibleContexts     #-}
-{-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE ConstraintKinds      #-} 
-{-# LANGUAGE ScopedTypeVariables  #-} 
-{-# LANGUAGE RecursiveDo          #-} 
+{-# LANGUAGE DefaultSignatures     #-}
+{-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE DataKinds             #-} 
+{-# LANGUAGE KindSignatures        #-}
+{-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE ConstraintKinds       #-} 
+{-# LANGUAGE ScopedTypeVariables   #-} 
+{-# LANGUAGE RecursiveDo           #-} 
+{-# LANGUAGE PartialTypeSignatures #-} 
 
 {-|
 Module      : Blarney.Interface

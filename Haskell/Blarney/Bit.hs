@@ -4,6 +4,7 @@
 {-# LANGUAGE GADTs               #-}
 {-# LANGUAGE Rank2Types          #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 {-|
 Module      : Blarney.Bit
