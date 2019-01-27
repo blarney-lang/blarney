@@ -6,6 +6,7 @@ Description : Library of various queue implementations
 Copyright   : (c) Matthew Naylor, 2019
 License     : MIT
 Maintainer  : mattfn@gmail.com
+Stability   : experimental
 -}
 module Blarney.Queue where
 

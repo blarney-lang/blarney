@@ -12,6 +12,7 @@ Description : Typed bit vectors and circuit primitives
 Copyright   : (c) Matthew Naylor, 2019
 License     : MIT
 Maintainer  : mattfn@gmail.com
+Stability   : experimental
 
 This module provides size-typed bit vectors and circuit primitives,
 on top of Blarney's untyped bit vectors and circuit primitives.

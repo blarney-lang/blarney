@@ -9,6 +9,7 @@ Description : Commonly used HDL functions
 Copyright   : (c) Matthew Naylor, 2019
 License     : MIT
 Maintainer  : mattfn@gmail.com
+Stability   : experimental
 -}
 module Blarney.Prelude
   ( tree1           -- Tree fold (for non-empty lists)

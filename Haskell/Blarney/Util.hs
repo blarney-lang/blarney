@@ -4,6 +4,7 @@ Description : Utility functions
 Copyright   : (c) Matthew Naylor, 2019
 License     : MIT
 Maintainer  : mattfn@gmail.com
+Stability   : experimental
 
 A group of functions that I can't think of a better name for right now.
 -}

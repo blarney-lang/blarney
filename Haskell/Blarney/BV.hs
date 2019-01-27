@@ -7,6 +7,7 @@ Description : Untyped bit vectors and circuit primitives
 Copyright   : (c) Matthew Naylor, 2019
 License     : MIT
 Maintainer  : mattfn@gmail.com
+Stability   : experimental
 
 This module represents the core of the Blarney HDL, upon which all
 hardware description features are built.  It provides untyped bit

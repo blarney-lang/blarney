@@ -6,6 +6,7 @@ Description : Bit-string pattern matching, similar to scanf
 Copyright   : (c) Matthew Naylor, 2019
 License     : MIT
 Maintainer  : mattfn@gmail.com
+Stability   : experimental
 
 Dynamically typed pattern matching on bit-strings, similar to scanf.
 Here's an instruction decoder for a tiny subset of RISC-V, written

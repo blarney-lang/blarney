@@ -7,6 +7,7 @@ Description : Basic imperative programming on top of RTL
 Copyright   : (c) Matthew Naylor, 2019
 License     : MIT
 Maintainer  : mattfn@gmail.com
+Stability   : experimental
 
 Recipe is a lightweight imperative language, aidingconcise
 definitions of complex state machines.

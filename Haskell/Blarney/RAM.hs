@@ -4,6 +4,7 @@ Description : Library of various block RAM components
 Copyright   : (c) Matthew Naylor, 2019
 License     : MIT
 Maintainer  : mattfn@gmail.com
+Stability   : experimental
 -}
 module Blarney.RAM 
   ( ram                 -- Block RAM primitive

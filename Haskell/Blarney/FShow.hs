@@ -17,6 +17,7 @@ Description : For implementing display statements
 Copyright   : (c) Matthew Naylor, 2019
 License     : MIT
 Maintainer  : mattfn@gmail.com
+Stability   : experimental
 
 Blarney's display statement can display values of any types in the
 FShow class.  The FShow class supports generic deriving.

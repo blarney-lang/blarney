@@ -13,6 +13,7 @@ Description : Register-transfer-level descriptions
 Copyright   : (c) Matthew Naylor, 2019
 License     : MIT
 Maintainer  : mattfn@gmail.com
+Stability   : experimental
 
 The module defines the RTL monad, supporting:
 

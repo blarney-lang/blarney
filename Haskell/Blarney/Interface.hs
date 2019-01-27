@@ -20,6 +20,7 @@ Description : Support for separate compilation
 Copyright   : (c) Matthew Naylor, 2019
 License     : MIT
 Maintainer  : mattfn@gmail.com
+Stability   : experimental
 
 Rather than flattening the entire design hierarchy down to a single
 netlist, we want to maintain the modular structure when generating

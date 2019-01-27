@@ -4,6 +4,7 @@ Description : Verilog generation
 Copyright   : (c) Matthew Naylor, 2019
 License     : MIT
 Maintainer  : mattfn@gmail.com
+Stability   : experimental
 
 Convert Blarney functions to Verilog modules.
 -}

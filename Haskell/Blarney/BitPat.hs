@@ -4,6 +4,7 @@ Description : Bit-string pattern matching combinators
 Copyright   : (c) Matthew Naylor, 2019
 License     : MIT
 Maintainer  : mattfn@gmail.com
+Stability   : experimental
 
 Inspired by Morten Rhiger's "Type-Safe Pattern Combinators".
 -}

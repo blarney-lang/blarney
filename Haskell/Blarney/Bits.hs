@@ -17,6 +17,7 @@ Description : Convert types to bit vectors and back
 Copyright   : (c) Matthew Naylor, 2019
 License     : MIT
 Maintainer  : mattfn@gmail.com
+Stability   : experimental
 
 Any type in the Bits class can be represented in hardware at runtime.
 For example, values of a type in the Bits class can be stored in a
