@@ -1,3 +1,6 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DataKinds           #-}
+
 {-|
 Module      : Blarney.RAM
 Description : Library of various block RAM components
@@ -22,10 +25,10 @@ module Blarney.RAM
   , makeDualRAMPassthroughInit -- Initialised pass-through dual-port block RAM 
   ) where
 
--- |Standard imports
+-- Standard imports
 import Prelude
 
--- |Blarney imports
+-- Blarney imports
 import Blarney.BV
 import Blarney.RTL
 import Blarney.Bit

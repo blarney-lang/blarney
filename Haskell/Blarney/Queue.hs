@@ -1,4 +1,7 @@
-{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE Rank2Types          #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE RebindableSyntax    #-}
 
 {-|
 Module      : Blarney.Queue
@@ -10,12 +13,12 @@ Stability   : experimental
 -}
 module Blarney.Queue where
 
--- |Blarney imports
+-- Blarney imports
 import Blarney
 import Blarney.RAM
 import Blarney.Util
 
--- |Standard imports
+-- Standard imports
 import Data.Proxy
 
 -- |Queue interface
