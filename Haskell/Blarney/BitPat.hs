@@ -1,3 +1,7 @@
+{-# LANGUAGE RankNTypes    #-}
+{-# LANGUAGE DataKinds     #-}
+{-# LANGUAGE TypeOperators #-}
+
 {-|
 Module      : Blarney.BitPat
 Description : Bit-string pattern matching combinators

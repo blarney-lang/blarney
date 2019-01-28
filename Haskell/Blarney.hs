@@ -1,3 +1,15 @@
+{-|
+Module      : Blarney
+Description : Hardware description in Haskell
+Copyright   : (c) Matthew Naylor, 2019
+License     : MIT
+Maintainer  : mattfn@gmail.com
+Stability   : experimental
+
+This is the top-level of library.  Note that we re-export the Prelude,
+claiming the '.' operator for reverse function application (field
+selection is common in hardware description).
+-}
 module Blarney
   ( module Blarney.Bit
   , module Blarney.Bits

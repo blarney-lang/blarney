@@ -111,7 +111,7 @@ makeSizedQueue logSize = do
     , first    = small.first
     }
 
--- |This one has no output buffer (not great for Fmax)
+-- |This one has no output buffer (low latency, but not great for Fmax)
 makeSizedQueueCore :: Bits a => Int -> RTL (Queue a)
 makeSizedQueueCore logSize =
   -- Lift size n to type-level address-width
@@ -163,15 +163,13 @@ makeSizedQueueCore logSize =
 {-|
 There are modes of operation for the shift queue (below):
 
-  1. Optimise throughput:
-       * full throughput
-       * but there's a combinatorial path between notFull and deq
+  1. Optimise throughput: full throughput, but there's a
+     combinatorial path between notFull and deq
 
-  2. Optimise Fmax:
-       * no combinatorial paths between sides
-       * but max throughput = N/(N+1), where N is the queue capacity
+  2. Optimise Fmax: no combinatorial paths between sides,
+     but max throughput = N/(N+1), where N is the queue capacity
 -}
-data ShiftQueueMode = OptFmax | OptThroughput deriving Eq;
+data ShiftQueueMode = OptFmax | OptThroughput deriving Eq
 
 {-|
 An N-element queue implemented using a shift register:

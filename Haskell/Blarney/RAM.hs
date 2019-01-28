@@ -10,10 +10,14 @@ Maintainer  : mattfn@gmail.com
 Stability   : experimental
 -}
 module Blarney.RAM 
-  ( ram                 -- Block RAM primitive
+  (
+    -- * Block RAM primitives
+    ram                 -- Block RAM primitive
   , ramInit             -- Initialised block RAM primitive
   , ramTrueDual         -- True dual-port block RAM primitive
   , ramTrueDualInit     -- Initialised true dual-port block RAM primitive
+
+    -- * RTL block RAM interface
   , RAM(..)             -- Block RAM interface
   , makeRAM             -- Block RAM
   , makeRAMInit         -- Initialised block RAM
@@ -34,7 +38,6 @@ import Blarney.RTL
 import Blarney.Bit
 import Blarney.Bits
 import Blarney.Prelude
-
 
 -- RAM primitive (for internal use only)
 -- (Reads new data on write)
@@ -145,13 +148,13 @@ makeRAMCore init = do
   -- Return interface
   return (RAM load store output output' (val writeEn))
 
--- |Create true dual-port block RAM 
--- (When read-address == write-address on different ports, read old data)
+-- |Create true dual-port block RAM.
+-- When read-address == write-address on different ports, read old data.
 makeTrueDualRAM :: (Bits a, Bits d) => RTL (RAM a d, RAM a d)
 makeTrueDualRAM = makeTrueDualRAMCore Nothing
 
--- |Create true dual-port block RAM with initial contents from hex file
--- (When read-address == write-address on different ports, read old data)
+-- |Create true dual-port block RAM with initial contents from hex file.
+-- When read-address == write-address on different ports, read old data.
 makeTrueDualRAMInit :: (Bits a, Bits d) => String -> RTL (RAM a d, RAM a d)
 makeTrueDualRAMInit init = makeTrueDualRAMCore (Just init)
 
@@ -202,17 +205,17 @@ makeTrueDualRAMCore init = do
           RAM loadB storeB outB outB' (val writeEnB))
 
 -- |Create uninitialised dual-port RAM.
--- (One port used for reading and the other for writing)
+-- One port used for reading and the other for writing.
 makeDualRAM :: (Bits a, Bits d) => RTL (RAM a d)
 makeDualRAM = makeDualRAMCore Nothing
 
--- |Create dual-port RAM with initial contents from hex file
--- (One port used for reading and the other for writing)
+-- |Create dual-port RAM with initial contents from hex file.
+-- One port used for reading and the other for writing.
 makeDualRAMInit :: (Bits a, Bits d) => String -> RTL (RAM a d)
 makeDualRAMInit init = makeDualRAMCore (Just init)
 
--- Dual port RAM module
--- (One port used for reading and the other for writing)
+-- Dual port RAM module.
+-- One port used for reading and the other for writing.
 makeDualRAMCore :: (Bits a, Bits d) => Maybe String -> RTL (RAM a d)
 makeDualRAMCore init = do
   -- Create true dual port RAM
@@ -227,17 +230,17 @@ makeDualRAMCore init = do
   return (RAM loadA storeB (out portA) (out' portA) (writeEn portB))
 
 -- | Dual-port passthrough block RAM with initial contents from hex file.
--- (Read and write to same address yields new data)
+-- Read and write to same address yields new data.
 makeDualRAMPassthroughInit :: (Bits a, Bits d) => String -> RTL (RAM a d)
 makeDualRAMPassthroughInit init = makeDualRAMPassthroughCore (Just init)
 
 -- | Uninitialised dual-port passthrough block RAM.
--- (Read and write to same address yields new data)
+-- Read and write to same address yields new data.
 makeDualRAMPassthrough :: (Bits a, Bits d) => RTL (RAM a d)
 makeDualRAMPassthrough = makeDualRAMPassthroughCore Nothing
 
--- Dual port RAM module with pass-through
--- (Read and write to same address yields new data)
+-- Dual port RAM module with pass-through.
+-- Read and write to same address yields new data.
 makeDualRAMPassthroughCore :: (Bits a, Bits d) => Maybe String -> RTL (RAM a d)
 makeDualRAMPassthroughCore init = do
   -- Create dual port RAM

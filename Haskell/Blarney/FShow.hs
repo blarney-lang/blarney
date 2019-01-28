@@ -19,8 +19,9 @@ License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
 
-Blarney's display statement can display values of any types in the
-FShow class.  The FShow class supports generic deriving.
+Blarney's 'Blarney.RTL.display' statement can display values of any
+types in the 'FShow' class.  The 'FShow' class supports generic
+deriving.
 -}
 module Blarney.FShow where
 

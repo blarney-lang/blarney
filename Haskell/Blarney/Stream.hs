@@ -1,3 +1,7 @@
+{-# LANGUAGE DataKinds      #-}
+{-# LANGUAGE DeriveGeneric  #-}
+{-# LANGUAGE DeriveAnyClass #-}
+
 {-|
 Module      : Blarney.Stream
 Description : Stream library
@@ -15,6 +19,7 @@ module Blarney.Stream
 import Blarney
 import Blarney.Queue
 import Blarney.RAM
+import Prelude hiding ((.))
 
 -- |Get interface
 data Get a =

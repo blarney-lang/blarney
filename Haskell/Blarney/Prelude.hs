@@ -39,7 +39,7 @@ import Blarney.Bits
 import Blarney.IfThenElse
 import GHC.TypeLits
 
--- |Parallel reduce for a commutative an associative operator.
+-- |Parallel reduce for a commutative and associative operator.
 -- Input list must be non-empty.
 tree1 :: (a -> a -> a) -> [a] -> a
 tree1 f [x] = x

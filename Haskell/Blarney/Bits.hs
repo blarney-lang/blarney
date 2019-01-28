@@ -24,10 +24,7 @@ For example, values of a type in the 'Bits' class can be stored in a
 register, or carried along a wire.  The 'Bits' class supports generic
 deriving.
 -}
-module Blarney.Bits 
-  ( Bits(SizeOf, sizeOf, pack, unpack)
-  , GBits(..)
-  ) where
+module Blarney.Bits where
 
 -- Typed bit vectors
 import Blarney.Bit
@@ -38,10 +35,14 @@ import GHC.TypeLits
 import GHC.Generics
 
 class Bits a where
-  type SizeOf a :: Nat                  -- ^ Type-level size of bit-vector
-  sizeOf        :: a -> Int             -- ^ Value-level size of bit-vector
-  pack          :: a -> Bit (SizeOf a)  -- ^ Convert to a bit-vector
-  unpack        :: Bit (SizeOf a) -> a  -- ^ Convert from a bit-vector
+  -- |Type-level size of bit-vector
+  type SizeOf a :: Nat
+  -- |Value-level size of bit-vector
+  sizeOf        :: a -> Int
+  -- |Convert to a bit-vector
+  pack          :: a -> Bit (SizeOf a)
+  -- |Convert from a bit-vector
+  unpack        :: Bit (SizeOf a) -> a
 
   -- Defaults
   type SizeOf a        =  GSizeOf (Rep a)
