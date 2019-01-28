@@ -211,7 +211,8 @@ bits (hi, lo) a =
 unsafeBits :: (Int, Int) -> Bit n -> Bit m
 unsafeBits (hi, lo) a = FromBV $ selectBV (hi, lo) (toBV a)
 
--- |Statically-typed bit selection
+-- |Statically-typed bit selection.  Use type application to specify
+-- upper and lower indices.
 range :: forall (hi :: Nat) (lo :: Nat) i o.
            (KnownNat hi, KnownNat lo, (lo+o) ~ (hi+1), (hi+1) <= i, o <= i)
       => Bit i -> Bit o
@@ -231,12 +232,11 @@ bit i a =
     wa = bvWidth (toBV a)
     result = FromBV $ selectBV (i, i) (toBV a)
 
--- |Statically-typed bit indexing
+-- |Statically-typed bit indexing.  Use type application to specify index.
 index :: forall (i :: Nat) n. (KnownNat i, (i+1) <= n)
       => Bit n -> Bit 1
 index a = bit idx a
   where idx = fromInteger $ natVal (Proxy :: Proxy i)
-
 
 -- * Bit-vector registers
 

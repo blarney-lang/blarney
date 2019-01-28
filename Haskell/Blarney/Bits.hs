@@ -19,11 +19,15 @@ License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
 
-Any type in the Bits class can be represented in hardware at runtime.
-For example, values of a type in the Bits class can be stored in a
-register, or carried along a wire.
+Any type in the 'Bits' class can be represented in hardware at runtime.
+For example, values of a type in the 'Bits' class can be stored in a
+register, or carried along a wire.  The 'Bits' class supports generic
+deriving.
 -}
-module Blarney.Bits where
+module Blarney.Bits 
+  ( Bits(SizeOf, sizeOf, pack, unpack)
+  , GBits(..)
+  ) where
 
 -- Typed bit vectors
 import Blarney.Bit
@@ -34,10 +38,10 @@ import GHC.TypeLits
 import GHC.Generics
 
 class Bits a where
-  type SizeOf a :: Nat
-  sizeOf        :: a -> Int
-  pack          :: a -> Bit (SizeOf a)
-  unpack        :: Bit (SizeOf a) -> a
+  type SizeOf a :: Nat                  -- ^ Type-level size of bit-vector
+  sizeOf        :: a -> Int             -- ^ Value-level size of bit-vector
+  pack          :: a -> Bit (SizeOf a)  -- ^ Convert to a bit-vector
+  unpack        :: Bit (SizeOf a) -> a  -- ^ Convert from a bit-vector
 
   -- Defaults
   type SizeOf a        =  GSizeOf (Rep a)
@@ -55,7 +59,7 @@ class Bits a where
   unpack a             =  to (gunpack a)
 
 -- Generic deriving for Bits
--- ==============================
+-- =========================
 
 class GBits f where
   type GSizeOf f :: Nat
