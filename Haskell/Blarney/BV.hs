@@ -11,10 +11,11 @@ Stability   : experimental
 
 This module represents the core of the Blarney HDL, upon which all
 hardware description features are built.  It provides untyped bit
-vectors, i.e. bit vectors of unspecified width, and a set of
-associated circuit primitives.  Hardware developers should not use
-these untyped primitives directly (unless they know what they are
-doing).  Any bit-vector can be evaluated symbolically, using
+vectors, i.e. bit vectors whose width is not specified in the type,
+and a set of associated circuit primitives.  Hardware developers
+should not use these untyped primitives directly (unless they know
+what they are doing), because width-mistmatches are not checked.  Any
+bit-vector can be evaluated symbolically, using a feature similar to
 Observable Sharing [1], to produce a netlist, i.e. a graph whose nodes
 are primitive component instances and whose edges are connections.
 
@@ -22,7 +23,9 @@ are primitive component instances and whose edges are connections.
 Description, ASIAN 1999.
 -}
 module Blarney.BV 
-  ( InstId         -- Every component instance has a unique id
+  (
+    -- * Primitive component types
+    InstId         -- Every component instance has a unique id
   , OutputNumber   -- Each output from a component is numbered
   , Width          -- Bit vector width
   , InputWidth     -- Width of an input to a component
@@ -35,10 +38,13 @@ module Blarney.BV
   , Param(..)      -- Compile-time parameters
   , lookupParam    -- Given a parameter name, return the parameter value
 
+
+    -- * Untyped bit vectors
   , BV(..)         -- Untyped bit vector
   , makePrim       -- Create instance of primitive component
   , makePrim1      -- Common case: single-output components
 
+    -- * Netlists
   , Net(..)        -- Netlists are lists of Nets
   , WireId         -- Nets are connected by wires
   , Flatten(..)    -- Monad for flattening a circuit (BV) to a netlist
@@ -46,6 +52,7 @@ module Blarney.BV
   , addNet         -- Add a net to the netlist
   , flatten        -- Flatten a bit vector to a netlist
 
+    -- * Bit-vector primitives
   , constBV        -- :: Width -> Integer -> BV
   , constBitsBV    -- :: Width -> ConstBit -> BV
   , addBV          -- :: BV -> BV -> BV

@@ -9,7 +9,7 @@
 
 {-|
 Module      : Blarney.Bit
-Description : Typed bit vectors and circuit primitives
+Description : Typed bit-vectors and circuit primitives
 Copyright   : (c) Matthew Naylor, 2019
 License     : MIT
 Maintainer  : mattfn@gmail.com
@@ -21,7 +21,7 @@ Hardware developers should always use the typed versions!
 -}
 module Blarney.Bit where
 
--- Untyped bit vectors
+-- Untyped bit-vectors
 import Blarney.BV
 
 -- Utils
@@ -32,20 +32,26 @@ import Prelude
 import GHC.TypeLits
 import Data.Proxy
 
+-- * Typed bit-vectors
+
 -- |Phantom type wrapping an untyped bit vector,
--- capturing the bit vector width
+-- capturing the bit-vector width.  All bit vectors
+-- are members of the 'Num' and 'Cmp' classes.
 newtype Bit (n :: Nat) = FromBV { toBV :: BV }
 
--- Determine width of bit vector from type
+-- |Determine width of bit-vector from type
 widthOf :: KnownNat n => Bit n -> Int
 widthOf v = fromInteger (natVal v)
 
--- |Constant
+-- |Constant bit-vector
 constant :: KnownNat n => Integer -> Bit n
 constant i = result
   where
     result = FromBV $ constBV w i
     w = widthOf result
+
+
+-- * Bit-vector arithmetic
 
 -- |Adder
 infixl 6 .+.
@@ -82,6 +88,8 @@ instance KnownNat n => Num (Bit n) where
   signum a    = mux (a .==. 0) (0, mux (a .<. 0) (-1, 1))
   fromInteger = constant
 
+-- * Bitwise operations on bit-vectors
+
 -- |Bitwise invert
 inv :: Bit n -> Bit n
 inv = FromBV . invBV . toBV
@@ -101,13 +109,15 @@ infixl 6 .^.
 (.^.) :: Bit n -> Bit n -> Bit n
 a .^. b = FromBV $ xorBV (toBV a) (toBV b)
 
--- Shift left
+-- |Shift left
 (.<<.) :: Bit n -> Bit n -> Bit n
 a .<<. b = FromBV $ leftBV (toBV a) (toBV b)
 
--- Shift right
+-- |Shift right
 (.>>.) :: Bit n -> Bit n -> Bit n
 a .>>. b = FromBV $ rightBV (toBV a) (toBV b)
+
+-- * Bit-vector comparison primitives
 
 -- Comparison operators
 class Cmp a where
@@ -133,6 +143,8 @@ instance Cmp (Bit n) where
   a .==. b = FromBV $ equalBV (toBV a) (toBV b)
   a .!=. b = FromBV $ notEqualBV (toBV a) (toBV b)
 
+-- * Bit-vector width adjustment
+
 -- |Replicate bit
 rep :: KnownNat n => Bit 1 -> Bit n
 rep a = result
@@ -153,6 +165,37 @@ signExtend a = result
    where
      result = FromBV $ signExtendBV wr (toBV a)
      wr = fromInteger (natVal result)
+
+-- |Bit-vector concatenation
+(#) :: Bit n -> Bit m -> Bit (n+m)
+a # b = FromBV $ concatBV (toBV a) (toBV b)
+
+-- |Extract most significant bits
+upper :: (KnownNat m, m <= n) => Bit n -> Bit m
+upper a = result
+   where
+     result = unsafeBits (wa-1, wa-wr) a
+     wa = bvWidth (toBV a)
+     wr = fromInteger (natVal result)
+
+-- |Extract least significant bits
+lower :: (KnownNat m, m <= n) => Bit n -> Bit m
+lower a = result
+   where
+     result = unsafeBits (wr-1, 0) a
+     wa = bvWidth (toBV a)
+     wr = fromInteger (natVal result)
+
+-- |Split bit vector
+split :: KnownNat n => Bit (n+m) -> (Bit n, Bit m)
+split a = (a0, a1)
+  where
+    wa = bvWidth (toBV a)
+    w0 = fromInteger (natVal a0)
+    a0 = unsafeBits (wa-1, wa-w0) a
+    a1 = unsafeBits (wa-w0-1, 0) a
+
+-- * Bit-vector selection primitives
 
 -- |Dynamically-typed bit selection
 bits :: KnownNat m => (Int, Int) -> Bit n -> Bit m
@@ -194,45 +237,8 @@ index :: forall (i :: Nat) n. (KnownNat i, (i+1) <= n)
 index a = bit idx a
   where idx = fromInteger $ natVal (Proxy :: Proxy i)
 
--- |Bit-vector concatenation
-(#) :: Bit n -> Bit m -> Bit (n+m)
-a # b = FromBV $ concatBV (toBV a) (toBV b)
 
--- |Multiplexer
-mux :: Bit 1 -> (Bit n, Bit n) -> Bit n
-mux c (a, b) = FromBV $ muxBV (toBV c) (toBV a, toBV b)
-
--- |Population count
-countOnes :: Bit n -> Bit (Log2 n + 1)
-countOnes a = FromBV $ countOnesBV wr (toBV a)
-  where
-    wa = bvWidth (toBV a)
-    wr = log2 wa + 1
-
--- |Extract most significant bits
-upper :: (KnownNat m, m <= n) => Bit n -> Bit m
-upper a = result
-   where
-     result = unsafeBits (wa-1, wa-wr) a
-     wa = bvWidth (toBV a)
-     wr = fromInteger (natVal result)
-
--- |Extract least significant bits
-lower :: (KnownNat m, m <= n) => Bit n -> Bit m
-lower a = result
-   where
-     result = unsafeBits (wr-1, 0) a
-     wa = bvWidth (toBV a)
-     wr = fromInteger (natVal result)
-
--- |Split bit vector
-split :: KnownNat n => Bit (n+m) -> (Bit n, Bit m)
-split a = (a0, a1)
-  where
-    wa = bvWidth (toBV a)
-    w0 = fromInteger (natVal a0)
-    a0 = unsafeBits (wa-1, wa-w0) a
-    a1 = unsafeBits (wa-w0-1, 0) a
+-- * Bit-vector registers
 
 -- |Register
 reg :: Bit n -> Bit n -> Bit n
@@ -244,6 +250,19 @@ regEn :: Bit n -> Bit 1 -> Bit n -> Bit n
 regEn init en a =
     FromBV $ regEnBV w (toBV init) (toBV en) (toBV a)
   where w = bvWidth (toBV init)
+
+-- * Misc. bit-vector operations
+
+-- |Multiplexer
+mux :: Bit 1 -> (Bit n, Bit n) -> Bit n
+mux c (a, b) = FromBV $ muxBV (toBV c) (toBV a, toBV b)
+
+-- |Population count
+countOnes :: Bit n -> Bit (Log2 n + 1)
+countOnes a = FromBV $ countOnesBV wr (toBV a)
+  where
+    wa = bvWidth (toBV a)
+    wr = log2 wa + 1
 
 -- |Lift integer value to type-level natural
 liftNat :: Int -> (forall n. KnownNat n => Proxy n -> a) -> a

@@ -4,7 +4,7 @@
 
 {-|
 Module      : Blarney.IfThenElse
-Description : Overloaded if/then/else
+Description : Overloaded if-then-else
 Copyright   : (c) Matthew Naylor, 2019
 License     : MIT
 Maintainer  : mattfn@gmail.com
@@ -14,7 +14,7 @@ module Blarney.IfThenElse where
 
 import Prelude
 
--- |Overloaded if/then/else
+-- |Overloaded if-then-else
 class IfThenElse b a where
   ifThenElse :: b -> a -> a -> a
 
