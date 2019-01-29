@@ -173,7 +173,7 @@ uses, we can see that it actually has a more general type.
 So `.<.` can be used on any type in the
 [Cmp](http://mn416.github.io/blarney/Blarney-Bit.html#t:Cmp)
 (comparator) class.  Similarly '?' can be used on any type in the
-[Bits](http://mn416.github.io/blarney/Blarney-Prelude.html#t:Bits)
+[Bits](http://mn416.github.io/blarney/Blarney-Bits.html#t:Bits)
 class (which allows serialisation to a bit vector and back
 again). So a more generic definition of `twoSort` would be:
 
@@ -409,7 +409,7 @@ We use type application to specify the type-level indices.
 
 Any type in the
 [Bits](http://mn416.github.io/blarney/Blarney-Bits.html)
-lass can be represented in hardware, e.g.
+class can be represented in hardware, e.g.
 stored in a wire, a register, or a RAM.
 
 ```hs
