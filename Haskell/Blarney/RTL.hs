@@ -23,10 +23,15 @@ The module defines the RTL monad, supporting:
 4. Module input and output declarations.
 -}
 module Blarney.RTL
-  ( RTL             -- RTL monad (abstract)
+  ( -- * RTL monad
+    RTL             -- RTL monad (abstract)
+    -- * Conditional statements
   , when            -- RTL conditional block
   , whenR           -- RTL conditional block (with return value)
-  , ifThenElseRTL   -- RTL if/then/else statement
+  , ifThenElseRTL   -- RTL if-then-else statement
+  , switch          -- RTL switch statement
+  , (-->)           -- Operator for switch statement alternatives
+    -- * Mutable variables: registers and wires
   , Var(..)         -- Mutable variables
   , Reg             -- Registers
   , Wire(           -- Wires
@@ -39,18 +44,20 @@ module Blarney.RTL
   , makeWire        -- Create wire
   , makeWireU       -- Create uninitialised wire
   , makeDReg        -- Like makeReg, but holds value one cycle only
-  , switch          -- RTL switch statement
-  , (-->)           -- Operator for switch statement alternatives
+    -- * Simulation-time statements
   , Displayable     -- To support N-ary display statement
   , display         -- Display statement
   , finish          -- Terminate simulator
+    -- * External inputs and outputs
   , input           -- Declare module input
   , output          -- Declare module output
   , inputBV         -- Declare module input (untyped)
   , outputBV        -- Declare module output (untyped)
+    -- * Register files
   , RegFile(..)     -- Register file interface
   , makeRegFileInit -- Create initialised register file
   , makeRegFile     -- Create uninitialised register file
+    -- * Convert RTL to a netlist
   , netlist         -- Convert RTL monad to a netlist
   ) where
 
@@ -71,7 +78,8 @@ import Control.Monad.Fix
 import Control.Monad hiding (when)
 import Data.Map (Map, findWithDefault, fromListWith)
 
--- |The RTL monad is a fairly standard reader/writer/state monad.
+-- |The RTL monad, for register-transfer-level descriptions,
+-- is a fairly standard reader-writer-state monad.
 newtype RTL a =
   RTL { runRTL :: R -> S -> (S, W, a) }
 
@@ -169,7 +177,7 @@ ifThenElseRTL c a b =
      local (r { cond = cond r .&. c }) a
      local (r { cond = cond r .&. inv c }) b
 
--- |Overloaded if/then/else
+-- |Overloaded if-then-else
 instance IfThenElse (Bit 1) (RTL ()) where
   ifThenElse = ifThenElseRTL
 
