@@ -1,6 +1,6 @@
 # Blarney
 
-[Blarney](http://mn416.github.io/blarney/)
+[Blarney](http://mn416.github.io/blarney/index.html)
 is a Haskell library for hardware description that builds a
 range of HDL abstractions on top of a small set of core circuit
 primitives.  It is a modern variant of
