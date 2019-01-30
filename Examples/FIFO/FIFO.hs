@@ -16,15 +16,15 @@ data FIFO a =
 makeFIFO :: Bits a => RTL (FIFO a)
 makeFIFO = do
   -- Register holding the one element
-  reg :: Reg a <- makeReg
+  reg :: Reg a <- makeReg dontCare
 
   -- Register defining whether or not FIFO is full
-  full :: Reg (Bit 1) <- makeRegInit 0
+  full :: Reg (Bit 1) <- makeReg 0
 
   -- Methods
-  let notFull = val full .==. 0
+  let notFull = full.val .==. 0
 
-  let notEmpty = val full .==. 1
+  let notEmpty = full.val .==. 1
 
   let enq a = do
         reg <== a
@@ -41,25 +41,25 @@ makeFIFO = do
 top :: RTL ()
 top = do
   -- Counter
-  timer :: Reg (Bit 8) <- makeRegInit 0
-  timer <== val timer + 1
+  timer :: Reg (Bit 8) <- makeReg 0
+  timer <== timer.val + 1
 
   -- Instantiate a FIFO
   fifo :: FIFO (Bit 8) <- makeFIFO
 
   -- Writer side
-  when (notFull fifo) $ do
-    enq fifo (val timer)
-    display "Enqueued " (val timer)
+  when (fifo.notFull) $ do
+    enq fifo (timer.val)
+    display "Enqueued " (timer.val)
 
   -- Reader side
-  when (notEmpty fifo) $ do
+  when (fifo.notEmpty) $ do
     deq fifo
-    display "Dequeued " (first fifo)
+    display "Dequeued " (fifo.first)
 
   -- Terminate after 100 cycles
-  when (val timer .==. 100) finish
+  when (timer.val .==. 100) finish
 
 -- Main function
 main :: IO ()
-main = emitVerilogTop top "top" "FIFO-Verilog/"
+main = writeVerilogTop top "top" "FIFO-Verilog/"

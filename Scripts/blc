@@ -21,11 +21,10 @@ EXTS="-XScopedTypeVariables -XDataKinds -XTypeOperators -XTypeFamilies"
 EXTS="$EXTS -XBinaryLiterals -XNoImplicitPrelude -XFlexibleContexts"
 EXTS="$EXTS -XRebindableSyntax -XPartialTypeSignatures -XDeriveGeneric"
 EXTS="$EXTS -XDeriveAnyClass -XRecursiveDo -XBlockArguments "
-EXTS="$EXTS -XNumericUnderscores "
+EXTS="$EXTS -XNumericUnderscores -XTypeApplications "
 WARN="-Wno-partial-type-signatures"
 FLAGS="-fno-cse -fno-full-laziness"
 INC="$BLARNEY_ROOT/Haskell"
 INC_H="$BLARNEY_ROOT/Haskell/Blarney/"
-MACROS="$BLARNEY_ROOT/Haskell/Blarney/Macros.h"
 
-$GHC $OPT $FLAGS $WARN -cpp -I$INC_H -optP"-include$MACROS" $EXTS -i$INC $@
+$GHC $OPT $FLAGS $WARN -cpp -I$INC_H $EXTS -i$INC $@

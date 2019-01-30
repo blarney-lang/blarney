@@ -2,19 +2,18 @@
 
 EXAMPLES=(
   BasicRTL
+  BitPat
+  BitScan
   CPU
+  Derive
   Factorial
+  FIFO
   Interface
   MeanFilter
-  RAM
-  UnweightedASP
-  BitScan
-  Derive
-  FIFO
   Queue
+  RAM
   Sorter
   UpDownCounter
-  FloatingPoint
 )
 
 RED='\033[0;31m'

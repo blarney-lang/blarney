@@ -1,66 +1,119 @@
--- For overriding if/then/else
-{-# LANGUAGE DataKinds, KindSignatures, TypeOperators,
-      TypeFamilies, RebindableSyntax, MultiParamTypeClasses,
-        FlexibleContexts, ScopedTypeVariables, FlexibleInstances #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE KindSignatures        #-}
+{-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE RebindableSyntax      #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE FlexibleInstances     #-}
 
-module Blarney.RTL (
-  RTL,
-  Var(..), Displayable(..),
-  Reg(..), makeReg, makeRegInit, makeDReg,
-  Wire(..), makeWire, makeWireDefault,
-  RegFile(..), makeRegFile, makeRegFileInit,
-  when, whenNot, whenR, switch, (-->),
-  finish, display, input, output,
-  netlist
-) where
+{-|
+Module      : Blarney.RTL
+Description : Register-transfer-level descriptions
+Copyright   : (c) Matthew Naylor, 2019
+License     : MIT
+Maintainer  : mattfn@gmail.com
+Stability   : experimental
 
-import Prelude
+The module defines the RTL monad, supporting:
+
+1. Mutable wires, registers and register files.
+2. Conditional statements.
+3. Simulation-time I/O.
+4. Module input and output declarations.
+-}
+module Blarney.RTL
+  ( -- * RTL monad
+    RTL             -- RTL monad (abstract)
+    -- * Conditional statements
+  , when            -- RTL conditional block
+  , whenR           -- RTL conditional block (with return value)
+  , ifThenElseRTL   -- RTL if-then-else statement
+  , switch          -- RTL switch statement
+  , (-->)           -- Operator for switch statement alternatives
+    -- * Mutable variables: registers and wires
+  , Var(..)         -- Mutable variables
+  , Reg             -- Registers
+  , Wire(           -- Wires
+      val'          -- Registered value of wire
+    , active        -- Is wire being written to?
+    , active'       -- Registered value of active
+    )
+  , makeReg         -- Create register
+  , makeRegU        -- Create uninitialised regiseter
+  , makeWire        -- Create wire
+  , makeWireU       -- Create uninitialised wire
+  , makeDReg        -- Like makeReg, but holds value one cycle only
+    -- * Simulation-time statements
+  , Displayable     -- To support N-ary display statement
+  , display         -- Display statement
+  , finish          -- Terminate simulator
+    -- * External inputs and outputs
+  , input           -- Declare module input
+  , output          -- Declare module output
+  , inputBV         -- Declare module input (untyped)
+  , outputBV        -- Declare module output (untyped)
+    -- * Register files
+  , RegFile(..)     -- Register file interface
+  , makeRegFileInit -- Create initialised register file
+  , makeRegFile     -- Create uninitialised register file
+    -- * Convert RTL to a netlist
+  , netlist         -- Convert RTL monad to a netlist
+  ) where
+
+-- Blarney imports
+import Blarney.BV
 import Blarney.Bit
 import Blarney.Bits
-import Blarney.Unbit
+import Blarney.FShow
 import Blarney.Prelude
-import Blarney.Format
 import Blarney.IfThenElse
 import qualified Blarney.JList as JL
-import Control.Monad hiding (when)
-import Control.Monad.Fix
-import GHC.TypeLits
+
+-- Standard imports
+import Prelude
 import Data.IORef
-import Data.IntMap (IntMap, findWithDefault, fromListWith)
+import GHC.TypeLits
+import Control.Monad.Fix
+import Control.Monad hiding (when)
+import Data.Map (Map, findWithDefault, fromListWith)
 
--- Each RTL variable has a unique id
-type VarId = Int
+-- |The RTL monad, for register-transfer-level descriptions,
+-- is a fairly standard reader-writer-state monad.
+newtype RTL a =
+  RTL { runRTL :: R -> S -> (S, W, a) }
 
--- The RTL monad is a reader/writer/state monad
--- The state component is the next unique variable id
-type RTLS = VarId
+-- |The writer component maintains a list of all RTL actions to be performed
+type W = JL.JList RTLAction
 
--- The writer component is a list of RTL actions
-type RTLW = JL.JList RTLAction
-
--- RTL actions
+-- |RTL actions
 data RTLAction =
     RTLAssign Assign
   | RTLDisplay (Bit 1, Format)
   | RTLFinish (Bit 1)
-  | RTLOutput (Width, String, Unbit)
+  | RTLOutput (Width, String, BV)
   | RTLInput (Width, String)
   | RTLRegFileCreate (String, VarId, Width, Width)
-  | RTLRegFileUpdate (VarId, Bit 1, Int, Int, Unbit, Unbit)
+  | RTLRegFileUpdate (VarId, Bit 1, Int, Int, BV, BV)
 
--- The reader component is a bit defining the current condition and a
--- list of all assigments made in the RTL block.  The list of
--- assignments is obtained by circular programming, passing the
--- writer assignments from the output of the monad to the
--- reader assignments in.
-type RTLR = (Bit 1, IntMap [Assign])
+-- |Variable identifiers
+type VarId = Int
 
--- A conditional assignment
-type Assign = (Bit 1, VarId, Unbit)
+-- |Conditional variable assignment
+data Assign = Assign { enable :: Bit 1, lhs :: VarId, rhs :: BV }
 
--- The RTL monad
-newtype RTL a =
-  RTL { runRTL :: RTLR -> RTLS -> (RTLS, RTLW, a) }
+-- |The right-hand-side of an assignment is untyped,
+-- but we can give it type with the following function
+rhsTyped :: Bits a => Assign -> a
+rhsTyped = unpack . FromBV . rhs
+
+-- |The reader component contains the current condition on any
+-- RTL actions, and a list of all assigments in the computation
+-- (obtained circularly from the writer output of the monad).
+data R = R { cond :: Bit 1, assigns :: Map VarId [Assign] }
+
+-- |The state component contains the next free variable identifier
+type S = VarId
 
 instance Monad RTL where
   return a = RTL (\r s -> (s, JL.Zero, a))
@@ -76,165 +129,172 @@ instance Functor RTL where
   fmap = liftM
 
 instance MonadFix RTL where
-  mfix f = RTL $ \r s ->
-    let (s', w, a) = runRTL (f a) r s in (s', w, a)
+  mfix f = RTL (\r s -> let (s', w, a) = runRTL (f a) r s in (s', w, a))
 
-get :: RTL RTLS
+-- |Get state component
+get :: RTL S
 get = RTL (\r s -> (s, JL.Zero, s))
 
-set :: RTLS -> RTL ()
+-- |Set state component
+set :: S -> RTL ()
 set s' = RTL (\r s -> (s', JL.Zero, ()))
 
-ask :: RTL RTLR
+-- |Get reader component
+ask :: RTL R
 ask = RTL (\r s -> (s, JL.Zero, r))
 
-local :: RTLR -> RTL a -> RTL a
+-- |Execute computation in given environment
+local :: R -> RTL a -> RTL a
 local r m = RTL (\_ s -> runRTL m r s)
 
-writeAssign :: Assign -> RTL ()
-writeAssign w = RTL (\r s -> (s, JL.One (RTLAssign w), ()))
+-- |Add action to writer component
+write :: RTLAction -> RTL ()
+write rtl = RTL (\r s -> (s, JL.One rtl, ()))
 
-writeDisplay :: (Bit 1, Format) -> RTL ()
-writeDisplay w = RTL (\r s -> (s, JL.One (RTLDisplay w), ()))
-
-writeFinish :: Bit 1 -> RTL ()
-writeFinish w = RTL (\r s -> (s, JL.One (RTLFinish w), ()))
-
-writeInput :: (Width, String) -> RTL ()
-writeInput w =
-  RTL (\r s -> (s, JL.One (RTLInput w), ()))
-
-writeOutput :: (Width, String, Unbit) -> RTL ()
-writeOutput w =
-  RTL (\r s -> (s, JL.One (RTLOutput w), ()))
-
-writeAction :: RTLAction -> RTL ()
-writeAction a =
-  RTL (\r s -> (s, JL.One a, ()))
-
+-- |Get fresh variable id
 fresh :: RTL VarId
 fresh = do
   v <- get
   set (v+1)
   return v
 
--- Mutable variables
-infix 1 <==
-class Var v where
-  val :: Bits a => v a -> a
-  (<==) :: Bits a => v a -> a -> RTL ()
-
--- Register variables
-data Reg a =
-  Reg {
-    regId  :: VarId
-  , regVal :: a
-  }
-
--- Wire variables
-data Wire a =
-  Wire {
-    wireId  :: VarId
-  , wireVal :: a
-  , val'    :: a
-  , active  :: Bit 1
-  , active' :: Bit 1
-  }
-
--- Register assignment
-instance Var Reg where
-  val r = regVal r
-  r <== x = do
-    (cond, as) <- ask
-    writeAssign (cond, regId r, unbit (pack x))
-
--- Wire assignment
-instance Var Wire where
-  val r = wireVal r
-  r <== x = do
-    (cond, as) <- ask
-    writeAssign (cond, wireId r, unbit (pack x))
-
--- RTL conditional
+-- |RTL conditional block
 when :: Bit 1 -> RTL () -> RTL ()
-when cond a = do
-  (c, as) <- ask
-  local (cond .&. c, as) a
+when c a = do
+  r <- ask
+  local (r { cond = c .&. cond r }) a
 
-whenNot :: Bit 1 -> RTL () -> RTL ()
-whenNot cond a = Blarney.RTL.when (inv cond) a
-
+-- |RTL conditional block with return value
 whenR :: Bit 1 -> RTL a -> RTL a
-whenR cond a = do
-  (c, as) <- ask
-  local (cond .&. c, as) a
+whenR c a = do
+  r <- ask
+  local (r { cond = c .&. cond r }) a
 
+-- |If-then-else statement for RTL
 ifThenElseRTL :: Bit 1 -> RTL () -> RTL () -> RTL ()
 ifThenElseRTL c a b =
-  do (cond, as) <- ask
-     local (cond .&. c, as) a
-     local (cond .&. inv c, as) b
+  do r <- ask
+     local (r { cond = cond r .&. c }) a
+     local (r { cond = cond r .&. inv c }) b
 
--- Overloaded if/then/else
+-- |Overloaded if-then-else
 instance IfThenElse (Bit 1) (RTL ()) where
   ifThenElse = ifThenElseRTL
 
--- RTL switch statement
+-- |RTL switch statement
 switch :: Bits a => a -> [(a, RTL ())] -> RTL ()
 switch subject alts =
   forM_ alts $ \(lhs, rhs) ->
     when (pack subject .==. pack lhs) rhs
 
--- Operator for switch statement alternatives
+-- |Operator for switch statement alternatives
 infixl 0 -->
 (-->) :: a -> RTL () -> (a, RTL ())
 lhs --> rhs = (lhs, rhs)
 
--- Create register with initial value
-makeRegInit :: Bits a => a -> RTL (Reg a)
-makeRegInit init =
+-- |Mutable variables
+infix 1 <==
+class Var v where
+  val :: Bits a => v a -> a
+  (<==) :: Bits a => v a -> a -> RTL ()
+
+-- |Register variables
+data Reg a =
+  Reg {
+    -- |Unique identifier
+    regId  :: VarId
+    -- |Current register value
+  , regVal :: a
+  }
+
+-- |Register assignment
+instance Var Reg where
+  val v = regVal v
+  v <== x = do
+    r <- ask
+    write $ RTLAssign $
+      Assign {
+        enable = cond r
+      , lhs = regId v
+      , rhs = toBV (pack x)
+      }
+
+-- |Wire variables
+data Wire a =
+  Wire {
+    -- |Unique identifier
+    wireId  :: VarId
+    -- |Current wire value
+  , wireVal :: a
+    -- |Registered version of wireVal
+  , val'    :: a
+    -- |Is wire being assigned on this cycle?
+  , active  :: Bit 1
+    -- |Reisgeted version of active
+  , active' :: Bit 1
+  }
+
+-- |Wire assignment
+instance Var Wire where
+  val v = wireVal v
+  v <== x = do
+    r <- ask
+    write $ RTLAssign $
+      Assign {
+        enable = cond r
+      , lhs = wireId v
+      , rhs = toBV (pack x)
+      }
+
+-- |Create wire with don't care initial value
+makeRegU :: Bits a => RTL (Reg a)
+makeRegU = makeReg dontCare
+
+-- |Create register with initial value
+makeReg :: Bits a => a -> RTL (Reg a)
+makeReg init =
   do v <- fresh
-     (cond, assignMap) <- ask
-     let as = findWithDefault [] v assignMap
-     let en = orList [b | (b, _, p) <- as]
-     let w = unbitWidth (unbit (pack init))
-     let bit w p = Bit (p { unbitWidth = w })
+     r <- ask
+     let as = findWithDefault [] v (assigns r)
+     let en = orList (map enable as)
      let inp = case as of
-                 [(b, _, p)] -> unpack (bit w p)
-                 other -> select [(b, unpack (bit w p)) | (b, _, p) <- as]
-     let out = registerEn init en inp
-     return (Reg v out)
+                 [a] -> rhsTyped a
+                 other -> select [(enable a, rhsTyped a) | a <- as]
+     let out = delayEn init en inp
+     return (Reg { regId = v, regVal = out })
 
--- Create register
-makeReg :: Bits a => RTL (Reg a)
-makeReg = makeRegInit zero
-
--- Create wire with given default
-makeWireDefault def =
+-- |Create wire with default value
+makeWire :: Bits a => a -> RTL (Wire a)
+makeWire defaultVal =
   do v <- fresh
-     (cond, assignMap) <- ask
-     let w = unbitWidth (unbit (pack def))
-     let bit w p = Bit (p { unbitWidth = w })
-     let as = findWithDefault [] v assignMap
-     let some = orList [b | (b, _, p) <- as]
-     let none = inv some
-     let out = select ([(b, unpack (bit w p)) | (b, _, p) <- as] ++
-                          [(none, def)])
-     return (Wire v out (register zero out) some (reg 0 some))
+     r <- ask
+     let as = findWithDefault [] v (assigns r)
+     let any = orList (map enable as)
+     let none = inv any
+     let out = select ([(enable a, rhsTyped a) | a <- as]
+                         ++ [(none, defaultVal)])
+     return $
+       Wire {
+         wireId  = v
+       , wireVal = out
+       , val'    = delay defaultVal out
+       , active  = any
+       , active' = delay 0 any
+       }
 
--- Create wire
-makeWire :: Bits a => RTL (Wire a)
-makeWire = makeWireDefault zero
+-- |Create wire with don't care default value
+makeWireU :: Bits a => RTL (Wire a)
+makeWireU = makeWire dontCare
 
--- A DReg holds the assigned value only for one cycle.
+-- |A DReg holds the assigned value only for one cycle.
 -- At all other times, it has the given default value.
 makeDReg :: Bits a => a -> RTL (Reg a)
 makeDReg defaultVal = do
   -- Create wire with default value
-  w :: Wire a <- makeWireDefault defaultVal
+  w :: Wire a <- makeWire defaultVal
 
   -- Register the output of the wire
-  r :: Reg a <- makeRegInit defaultVal
+  r :: Reg a <- makeReg defaultVal
 
   -- Always assign to the register
   r <== val w
@@ -242,80 +302,100 @@ makeDReg defaultVal = do
   -- Write to wire and read from reg
   return (Reg { regId = wireId w, regVal = regVal r })
 
--- RTL finish statements
+-- |Terminate simulator
 finish :: RTL ()
 finish = do
-  (cond, as) <- ask
-  writeFinish cond
+  r <- ask
+  write (RTLFinish (cond r))
 
--- RTL display statements
+-- |To support a display statement with variable number of arguments
 class Displayable a where
   disp :: Format -> a
 
+-- |Base case
 instance Displayable (RTL a) where
   disp x = do
-     (cond, as) <- ask
-     writeDisplay (cond, x)
+     r <- ask
+     write (RTLDisplay (cond r, x))
      return (error "Return value of 'display' should be ignored")
 
+-- |Recursive case
 instance (FShow b, Displayable a) => Displayable (b -> a) where
   disp x b = disp (x <> fshow b)
 
+-- |Display statement
 display :: Displayable a => a
 display = disp (Format [])
 
--- Register file
+-- |RTL external input declaration
+input :: KnownNat n => String -> RTL (Bit n)
+input str =
+    do write (RTLInput (w, str))
+       return inp
+  where
+    inp = FromBV (inputPinBV w str)
+    w = widthOf inp
+
+-- |RTL external input declaration (untyped)
+inputBV :: String -> Width -> RTL BV
+inputBV str w =
+    do write (RTLInput (w, str))
+       return (inputPinBV w str)
+
+-- |RTL external output declaration
+output :: String -> Bit n -> RTL ()
+output str out = do
+  let bv = toBV out
+  write (RTLOutput (bvWidth bv, str, bv))
+
+-- |RTL external output declaration (untyped)
+outputBV :: String -> BV -> RTL ()
+outputBV str bv = write (RTLOutput (bvWidth bv, str, bv))
+
+-- Register files
+-- ==============
+
+-- |Register file interface
 data RegFile a d =
   RegFile {
     (!)    :: a -> d
   , update :: a -> d -> RTL ()
   }
 
--- Create register file with initial contents
+-- | Create register file with initial contents
 makeRegFileInit :: forall a d. (Bits a, Bits d) => String -> RTL (RegFile a d)
 makeRegFileInit initFile = do
   -- Create regsiter file identifier
   id <- fresh
 
   -- Determine widths of address/data bus
-  let aw = sizeOf (__ :: a)
-  let dw = sizeOf (__ :: d)
+  let aw = sizeOf (error "_|_" :: a)
+  let dw = sizeOf (error "_|_" :: d)
 
   -- Record register file for netlist generation
-  writeAction $ RTLRegFileCreate (initFile, id, aw, dw)
+  write $ RTLRegFileCreate (initFile, id, aw, dw)
 
   return $
     RegFile {
       (!) = \a ->
-        unpack (regFileReadPrim id dw (pack a))
+        unpack $ FromBV $ regFileReadBV id dw $ toBV (pack a)
     , update = \a d -> do
-        (cond, as) <- ask
-        writeAction $
-          RTLRegFileUpdate (id, cond, aw, dw, unbit (pack a), unbit (pack d))
+        r <- ask
+        write $
+          RTLRegFileUpdate (id, cond r, aw, dw, toBV (pack a), toBV (pack d))
     }
 
--- Uninitialised version
+-- |Create uninitialised register file
 makeRegFile :: forall a d. (Bits a, Bits d) => RTL (RegFile a d)
 makeRegFile = makeRegFileInit ""
 
--- RTL external input declaration
-input :: KnownNat n => String -> RTL (Bit n)
-input str = do
-  let b = inputPrim str
-  let u = unbit b
-  writeInput (fromInteger (natVal b), str)
-  return b
-
--- RTL external output declaration
-output :: String -> Bit n -> RTL ()
-output str v = do
-  let u = unbit v
-  writeOutput (unbitWidth u, str, u)
+-- Netlist generation
+-- ==================
 
 -- Add display primitive to netlist
 addDisplayPrim :: (Bit 1, [FormatItem]) -> Flatten ()
 addDisplayPrim (cond, items) = do
-    c <- flatten (unbit cond)
+    c <- flatten (toBV cond)
     ins <- mapM flatten [b | FormatBit w b <- items]
     id <- freshId
     let net = Net {
@@ -333,7 +413,7 @@ addDisplayPrim (cond, items) = do
 -- Add finish primitive to netlist
 addFinishPrim :: Bit 1 -> Flatten ()
 addFinishPrim cond = do
-  c <- flatten (unbit cond)
+  c <- flatten (toBV cond)
   id <- freshId
   let net = Net {
                 netPrim = Finish
@@ -344,7 +424,7 @@ addFinishPrim cond = do
   addNet net
 
 -- Add output primitive to netlist
-addOutputPrim :: (Width, String, Unbit) -> Flatten ()
+addOutputPrim :: (Width, String, BV) -> Flatten ()
 addOutputPrim (w, str, value) = do
   c <- flatten value
   id <- freshId
@@ -381,9 +461,9 @@ addRegFilePrim (initFile, regFileId, aw, dw) = do
   addNet net
 
 -- Add RegFile primitives to netlist
-addRegFileUpdatePrim :: (VarId, Bit 1, Int, Int, Unbit, Unbit) -> Flatten ()
+addRegFileUpdatePrim :: (VarId, Bit 1, Int, Int, BV, BV) -> Flatten ()
 addRegFileUpdatePrim (regFileId, c, aw, dw, a, d) = do
-  cf <- flatten (unbit c)
+  cf <- flatten (toBV c)
   af <- flatten a
   df <- flatten d
   id <- freshId
@@ -395,16 +475,16 @@ addRegFileUpdatePrim (regFileId, c, aw, dw, a, d) = do
             }
   addNet net
 
--- Convert RTL monad to a netlist
+-- |Convert RTL monad to a netlist
 netlist :: RTL () -> IO [Net]
 netlist rtl = do
   i <- newIORef (0 :: Int)
   (nl, _) <- runFlatten roots i
   return (JL.toList nl)
   where
-    (_, actsJL, _) = runRTL rtl (1, assignMap) 0
+    (_, actsJL, _) = runRTL rtl (R { cond = 1, assigns = assignMap }) 0
     acts = JL.toList actsJL
-    assignMap = fromListWith (++) [(v, [a]) | RTLAssign a@(_, v,_) <- acts]
+    assignMap = fromListWith (++) [(lhs a, [a]) | RTLAssign a <- acts]
     disps = reverse [(go, items) | RTLDisplay (go, Format items) <- acts]
     fins  = [go | RTLFinish go <- acts]
     outs  = [out | RTLOutput out <- acts]

@@ -1,35 +1,52 @@
--- Emit netlist in Verilog format
+{-|
+Module      : Blarney.Verilog
+Description : Verilog generation
+Copyright   : (c) Matthew Naylor, 2019
+License     : MIT
+Maintainer  : mattfn@gmail.com
+Stability   : experimental
 
-module Blarney.EmitVerilog
-  ( writeVerilog
-  , generateVerilog
-  , emitVerilogModule
-  , emitVerilogTop
+Convert Blarney functions to Verilog modules.
+-}
+module Blarney.Verilog
+  ( writeVerilogModule  -- Generate Verilog module
+  , writeVerilogTop     -- Generate Verilog top-level module
   ) where
 
+-- Standard imports
 import Prelude
-import Blarney.Unbit
-import Blarney.IfThenElse
-import Blarney.RTL
-import Blarney.Interface
-import Blarney.Util
+import Data.List
 import System.IO
 import Data.Maybe
-import Data.List
 import Control.Monad
-import System.IO
 import System.Process
 
-emitVerilogModule :: Module a => a -> String -> String -> IO ()
-emitVerilogModule top mod dir =
+-- Blarney imports
+import Blarney.BV
+import Blarney.RTL
+import Blarney.Util
+import Blarney.Interface
+import Blarney.IfThenElse
+
+-- |Convert given Blarney function to a Verilog module
+writeVerilogModule :: Module a
+                   => a          -- ^ Blarney function
+                   -> String     -- ^ Module name
+                   -> String     -- ^ Output directory
+                   -> IO () 
+writeVerilogModule top mod dir =
     do system ("mkdir -p " ++ dir)
        nl <- netlist (makeModule top)
        writeVerilog fileName mod nl
   where
     fileName = dir ++ "/" ++ mod ++ ".v"
 
-emitVerilogTop :: RTL () -> String -> String -> IO ()
-emitVerilogTop top mod dir =
+-- |Convert given Blarney function to a top-level Verilog module
+writeVerilogTop :: RTL ()     -- ^ Blarney RTL
+                -> String     -- ^ Top-level module name
+                -> String     -- ^ Output directory
+                -> IO ()
+writeVerilogTop top mod dir =
     do nl <- netlist top
        system ("mkdir -p " ++ dir)
        writeVerilog (dir ++ "/" ++ mod ++ ".v") mod nl
@@ -67,7 +84,6 @@ emitVerilogTop top mod dir =
       , "\tverilator -cc " ++ mod ++ ".v " ++ "-exe "
                            ++ mod ++ ".cpp " ++ "-o " ++ mod
                            ++ " -y $(BLARNEY_ROOT)/Verilog "
-                           ++ " -CFLAGS \"-include $(BLARNEY_ROOT)/C/FPOps.h\""
       , "\tmake -C obj_dir -j -f V" ++ mod ++ ".mk " ++ mod
       , "\tcp obj_dir/" ++ mod ++ " ."
       , "\trm -rf obj_dir"
@@ -128,6 +144,20 @@ hWriteVerilog h modName netlist = do
       emit (show init)
       emit ";\n"
 
+    emitDeclInitBitsHelper width wire b = do
+      emit "["
+      emit (show (width-1))
+      emit ":0] "
+      emitWire wire
+      emit " = "
+      emit (show width)
+      emit "'d"
+      let chr One = '1'
+          chr Zero = '0'
+          chr DontCare = 'x'
+      emit (replicate width (chr b))
+      emit ";\n"
+
     emitWireDecl width wire = do
       emit "wire "
       emitDeclHelper width wire
@@ -135,6 +165,10 @@ hWriteVerilog h modName netlist = do
     emitWireInitDecl width wire init = do
       emit "wire "
       emitDeclInitHelper width wire init
+
+    emitWireInitBitsDecl width wire b = do
+      emit "wire "
+      emitDeclInitBitsHelper width wire b
 
     emitRegDecl width wire = do
       emit "reg "
@@ -169,6 +203,7 @@ hWriteVerilog h modName netlist = do
       let wire = (netInstId net, 0) in
         case netPrim net of
           Const w i             -> emitWireInitDecl w wire i
+          ConstBits w b         -> emitWireInitBitsDecl w wire b
           Add w                 -> emitWireDecl w wire
           Sub w                 -> emitWireDecl w wire
           Mul w                 -> emitWireDecl w wire
@@ -186,8 +221,8 @@ hWriteVerilog h modName netlist = do
           LessThanEq w          -> emitWireDecl 1 wire
           Register i w          -> emitRegInitDecl w wire i
           RegisterEn i w        -> emitRegInitDecl w wire i
-          RAM i aw dw           -> emitRAMDecl i 1 aw dw (netInstId net)
-          TrueDualRAM i aw dw   -> emitRAMDecl i 2 aw dw (netInstId net)
+          BRAM i aw dw          -> emitRAMDecl i 1 aw dw (netInstId net)
+          TrueDualBRAM i aw dw  -> emitRAMDecl i 2 aw dw (netInstId net)
           ReplicateBit w        -> emitWireDecl w wire
           ZeroExtend wi wo      -> emitWireDecl wo wire
           SignExtend wi wo      -> emitWireDecl wo wire
@@ -402,6 +437,7 @@ hWriteVerilog h modName netlist = do
     emitInst net =
       case netPrim net of
         Const w i           -> return ()
+        ConstBits w b       -> return ()
         Add w               -> emitInfixOpInst "+" net
         Sub w               -> emitInfixOpInst "-" net
         Mul w               -> emitInfixOpInst "*" net
@@ -419,8 +455,8 @@ hWriteVerilog h modName netlist = do
         LessThanEq w        -> emitInfixOpInst "<=" net
         Register i w        -> return ()
         RegisterEn i w      -> return ()
-        RAM i aw dw         -> emitRAMInst net i aw dw
-        TrueDualRAM i aw dw -> emitTrueDualRAMInst net i aw dw
+        BRAM i aw dw        -> emitRAMInst net i aw dw
+        TrueDualBRAM i aw dw -> emitTrueDualRAMInst net i aw dw
         ReplicateBit w      -> emitReplicateInst w net
         ZeroExtend wi wo    -> emitZeroExtendInst net wi wo
         SignExtend wi wo    -> emitSignExtendInst net wi wo

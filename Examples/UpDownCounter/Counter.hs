@@ -10,19 +10,19 @@ data Counter n =
 makeCounter :: KnownNat n => RTL (Counter n)
 makeCounter = do
   -- State
-  count :: Reg (Bit n) <- makeRegInit 0
+  count :: Reg (Bit n) <- makeReg 0
 
   -- Wires
-  incWire :: Wire (Bit 1) <- makeWireDefault 0
-  decWire :: Wire (Bit 1) <- makeWireDefault 0
+  incWire :: Wire (Bit 1) <- makeWire 0
+  decWire :: Wire (Bit 1) <- makeWire 0
 
   -- Increment
-  when (val incWire .&. inv (val decWire)) $ do
-    count <== val count + 1
+  when (incWire.val .&. decWire.val.inv) do
+    count <== count.val + 1
 
   -- Decrement
-  when (inv (val incWire) .&. val decWire) $ do
-    count <== val count - 1
+  when (incWire.val.inv .&. decWire.val) do
+    count <== count.val - 1
 
   -- Interface
   let inc   = incWire <== 1
@@ -49,11 +49,11 @@ top = do
 
   done <- run (reg 1 0) testSeq
 
-  when done $ do
+  when done do
     display "Final count = " (value counter)
     finish
 
   return ()
 
 main :: IO ()
-main = emitVerilogTop top "top" "Counter-Verilog/"
+main = writeVerilogTop top "top" "Counter-Verilog/"

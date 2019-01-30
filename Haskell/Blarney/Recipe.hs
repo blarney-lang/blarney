@@ -1,22 +1,37 @@
-{-# LANGUAGE GADTs, DataKinds #-}
+{-# LANGUAGE GADTs     #-}
+{-# LANGUAGE DataKinds #-}
 
+{-|
+Module      : Blarney.Recipe
+Description : Basic imperative programming on top of RTL
+Copyright   : (c) Matthew Naylor, 2019
+License     : MIT
+Maintainer  : mattfn@gmail.com
+Stability   : experimental
+
+Recipe is a lightweight imperative language, aidingconcise
+definitions of complex state machines.
+-}
 module Blarney.Recipe 
   ( Recipe(..)
   , run
   , runOnce
   ) where
 
+-- Standard imports
 import Prelude
+import Data.Maybe
+
+-- Blarney imports
 import Blarney.Bit
 import Blarney.Prelude
 import Blarney.RTL
 import Blarney.Bits
 import Blarney.IfThenElse
-import Data.Maybe
 
 infixl 1 :=
 
--- Abstract syntax
+-- |Abstract syntax of Recipe
 data Recipe where
   Tick  :: Recipe
   (:=)  :: (Var v, Bits a) => v a -> a -> Recipe
@@ -45,7 +60,7 @@ time other = Nothing
 slowest :: [Recipe] -> Int 
 slowest = snd . maximum . flip zip [0..] . map time
 
--- Semantics
+-- |Run a recipe.  Take a go pulse and return a finish pulse.
 run :: Bit 1 -> Recipe -> RTL (Bit 1)
 run go Tick         = return (reg 0 go)
 run go (v := x)     = run go (Do [v <== x])
@@ -63,7 +78,7 @@ run go (If c r)     = do
   done <- run (go .&. c) r
   return (done .|. (go .&. inv c))
 run go (While c r)  = do
-  ready <- makeWire
+  ready <- makeWire dontCare
   done <- run (val ready .&. c) r
   ready <== go .|. done
   return (val ready .&. inv c)
@@ -75,5 +90,7 @@ sync xs = let done = andList [setReset x done | x <- xs] in done
 setReset :: Bit 1 -> Bit 1 -> Bit 1
 setReset s r = let out = s .|. reg 0 (out .&. inv r) in out
 
+-- |Run a recipe with a start pulse that is high only on the first
+-- cycle of execution, and ignore the finish pulse.
 runOnce :: Recipe -> RTL ()
 runOnce r = run (reg 1 0) r >> return ()

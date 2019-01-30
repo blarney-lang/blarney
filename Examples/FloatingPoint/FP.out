@@ -1,8 +1,0 @@
-cmp = 0x5
-fromInt = 0x4e800000
-toInt = 0x00000002
-mul = 0x40800000
-add = 0x40800000
-sub = 0x00000000
-div = 0x3f800000
-sqrt = 0x3fb504f3

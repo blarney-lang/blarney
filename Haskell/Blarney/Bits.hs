@@ -11,26 +11,41 @@
 {-# LANGUAGE ConstraintKinds      #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 
+{-|
+Module      : Blarney.Bits
+Description : Convert types to bit vectors and back
+Copyright   : (c) Matthew Naylor, 2019
+License     : MIT
+Maintainer  : mattfn@gmail.com
+Stability   : experimental
+
+Any type in the 'Bits' class can be represented in hardware at runtime.
+For example, values of a type in the 'Bits' class can be stored in a
+register, or carried along a wire.  The 'Bits' class supports generic
+deriving.
+-}
 module Blarney.Bits where
 
-import Prelude
+-- Typed bit vectors
 import Blarney.Bit
+
+-- Standard imports
+import Prelude
 import GHC.TypeLits
 import GHC.Generics
 
 class Bits a where
+  -- |Type-level size of bit-vector
   type SizeOf a :: Nat
-  replicateBit  :: Bit 1 -> a
+  -- |Value-level size of bit-vector
   sizeOf        :: a -> Int
+  -- |Convert to a bit-vector
   pack          :: a -> Bit (SizeOf a)
+  -- |Convert from a bit-vector
   unpack        :: Bit (SizeOf a) -> a
 
   -- Defaults
   type SizeOf a        =  GSizeOf (Rep a)
-  default replicateBit :: (Generic a, GBits (Rep a),
-                           GSizeOf (Rep a) ~ SizeOf a)
-                       => Bit 1 -> a
-  replicateBit b       =  to (greplicateBit b)
   default sizeOf       :: (Generic a, GBits (Rep a),
                            GSizeOf (Rep a) ~ SizeOf a)
                        => a -> Int
@@ -45,44 +60,39 @@ class Bits a where
   unpack a             =  to (gunpack a)
 
 -- Generic deriving for Bits
--- ==============================
+-- =========================
 
 class GBits f where
   type GSizeOf f :: Nat
-  greplicateBit  :: Bit 1 -> f a
   gsizeOf        :: f a -> Int
   gpack          :: f a -> Bit (GSizeOf f)
   gunpack        :: Bit (GSizeOf f) -> f a
 
 instance GBits U1 where
   type GSizeOf U1 = 0
-  greplicateBit b = U1
   gsizeOf U1 = 0
   gpack U1 = 0
   gunpack bs = U1
 
 instance (GBits a, GBits b) => GBits (a :*: b) where
   type GSizeOf (a :*: b) = GSizeOf a + GSizeOf b
-  greplicateBit b = greplicateBit b :*: greplicateBit b
   gsizeOf (a :*: b) = gsizeOf a + gsizeOf b
   gpack (a :*: b) = gpack a # gpack b
   gunpack bs = a :*: b
     where
-      a  = gunpack (unsafeGetBits (wa+wb-1, wb) bs)
-      b  = gunpack (unsafeGetBits (wb-1, 0) bs)
+      a  = gunpack (unsafeBits (wa+wb-1, wb) bs)
+      b  = gunpack (unsafeBits (wb-1, 0) bs)
       wa = gsizeOf a
       wb = gsizeOf b
 
 instance GBits a => GBits (M1 i c a) where
   type GSizeOf (M1 i c a) = GSizeOf a
-  greplicateBit b = M1 (greplicateBit b)
   gpack (M1 x) = gpack x
   gsizeOf (M1 x) = gsizeOf x
   gunpack x = M1 (gunpack x)
 
 instance Bits a => GBits (K1 i a) where
   type GSizeOf (K1 i a) = SizeOf a
-  greplicateBit b = K1 (replicateBit b)
   gsizeOf (K1 x) = sizeOf x
   gpack (K1 x) = pack x
   gunpack x = K1 (unpack x)
@@ -92,7 +102,6 @@ instance Bits a => GBits (K1 i a) where
 
 instance KnownNat n => Bits (Bit n) where
   type SizeOf (Bit n) = n
-  replicateBit = repBit
   sizeOf = widthOf
   pack = id
   unpack = id

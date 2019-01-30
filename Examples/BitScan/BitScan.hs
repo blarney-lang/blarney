@@ -28,4 +28,4 @@ top = do
 
 -- Main function
 main :: IO ()
-main = emitVerilogTop top "top" "BitScan-Verilog/"
+main = writeVerilogTop top "top" "BitScan-Verilog/"

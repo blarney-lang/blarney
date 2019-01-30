@@ -1,11 +1,10 @@
 # Blarney
 
-Blarney is a Haskell library for hardware description that builds a
+[Blarney](http://mn416.github.io/blarney/index.html)
+is a Haskell library for hardware description that builds a
 range of HDL abstractions on top of a small set of core circuit
-primitives.  It can be viewed as a modern variant of
-[Lava](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.110.5587&rep=rep1&type=pdf)
-that supports a variety of hardware description styles.  Blarney
-requires GHC 8.6.1 or later.
+primitives.  It is a modern variant of
+[Lava](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.110.5587&rep=rep1&type=pdf), requiring GHC 8.6.1 or later.
 
 ## Contents
 
@@ -17,23 +16,15 @@ Examples:
 * [Example 4: Basic RTL](#example-4-basic-rtl)
 * [Example 5: Queues](#example-5-queues)
 * [Example 6: Wires](#example-6-wires)
-* [Example 7: Recipes](#example-7-recipes)
-* [Example 8: Block RAMs](#example-8-block-rams)
-* [Example 9: Streams](#example-9-streams)
-* [Example 10: Modular compilation](#example-10-modular-compilation)
-* [Example 11: Bit-string pattern matching](#example-11-bit-string-pattern-matching)
-* [Example 12: Tiny 8-bit CPU](#example-12-tiny-8-bit-cpu)
-
-APIs:
-
-* [API 1: Bit vectors](#api-1-bit-vectors)
-* [API 2: Bit selection](#api-2-bit-selection)
-* [API 3: Bits class](#api-3-bits-class)
-* [API 4: FShow class](#api-4-fshow-class)
-* [API 5: Prelude](#api-5-prelude)
-* [API 6: RTL library](#api-6-rtl-library)
-* [API 7: Queue library](#api-7-queue-library)
-* [API 8: Block RAM library](#api-8-block-ram-library)
+* [Example 7: Bit selection](#example-7-bit-selection)
+* [Example 8: Bits class](#example-8-bits-class)
+* [Example 9: FShow class](#example-9-fshow-class)
+* [Example 10: Recipes](#example-10-recipes)
+* [Example 11: Block RAMs](#example-11-block-rams)
+* [Example 12: Streams](#example-12-streams)
+* [Example 13: Modular compilation](#example-13-modular-compilation)
+* [Example 14: Bit-string pattern matching](#example-14-bit-string-pattern-matching)
+* [Example 15: Tiny 8-bit CPU](#example-15-tiny-8-bit-cpu)
 
 ## Example 1: Two-sort
 
@@ -65,7 +56,7 @@ top = do
 
 We use Blarney's RTL (register-transfer level) monad.  All statements
 in this monad are executed *in parallel* and *on every clock cycle*.
-Now let's generate some Verilog:
+We can generate some Verilog as follows.
 
 ```hs
 main :: IO ()
@@ -82,7 +73,7 @@ compiled at the command-line using
 where `blc` stands for *Blarney compiler*.  This is just a script that
 invokes GHC with the appropriate compiler flags.  For it to work,
 the `BLARNEY_ROOT` environment variable needs to be set to the root of
-the repository, and `BLARNEY_ROOT/Scripts` must be in the `PATH`.
+the repository, and `BLARNEY_ROOT/Scripts` must be in your `PATH`.
 Running the resulting executable will produce Verilog in the
 `/tmp/twoSort` directory, including a makefile to build a Verilator
 simulator (`sudo apt-get install verilator`).  The simulator can be
@@ -98,17 +89,14 @@ twoSort (0x2,0x1) = (0x1,0x2)
 
 Looks like `twoSort` is working!
 
-(Instead of using `blc`, you can use `blci` to get a REPL, and then
-invoke `main` to generate the Verilog).
-
 ## Example 2: Bubble sort
 
 We can build a general *N*-element sorter by connecting together
 multiple two-sorters.  One of the simplest ways to do this is the
 *bubble sort* network.  The key component of this network is a
-function that takes a list of inputs and returns a new list in which
-the smallest element comes first (the smallest element "bubbles" to
-the front).
+function `bubble` that takes a list of inputs and returns a new list
+in which the smallest element comes first (the smallest element
+"bubbles" to the front).
 
 ```hs
 bubble :: [Bit 8] -> [Bit 8]
@@ -167,10 +155,9 @@ produced at the bottom.  Each `+` denotes a two-sorter that takes
 inputs from the top and the left, and produces the smaller value to
 the bottom and the larger value to the right.
 
-Check out [The design and verification of a sorter
+See [The design and verification of a sorter
 core](https://pdfs.semanticscholar.org/de30/22efc5aec833d7b52bd4770a382fea729bba.pdf)
--- one of the classic Lava papers -- for a more in-depth exploration
-of sorting circuits in Haskell.
+for a more in-depth exploration of sorting circuits in Haskell.
 
 ## Example 3: Polymorphism
 
@@ -183,10 +170,12 @@ uses, we can see that it actually has a more general type.
 (?)   :: Bits a => Bit 1 -> (a, a) -> a
 ```
 
-So `.<.` can be used on any type in the `Cmp` (comparator) class.
-Similarly `?` can be used on any type in the `Bits` class (which
-allows serialisation to a bit vector and back again). So a more
-generic definition of `twoSort` would be:
+So `.<.` can be used on any type in the
+[Cmp](http://mn416.github.io/blarney/Blarney-Bit.html#t:Cmp)
+(comparator) class.  Similarly '?' can be used on any type in the
+[Bits](http://mn416.github.io/blarney/Blarney-Bits.html#t:Bits)
+class (which allows serialisation to a bit vector and back
+again). So a more generic definition of `twoSort` would be:
 
 ```hs
 twoSort :: (Bits a, Cmp a) => (a, a) -> (a, a)
@@ -196,21 +185,18 @@ twoSort (a, b) = a .<. b ? ((a, b), (b, a))
 Indeed, this would be the type inferred by the Haskell compiler if no
 type signature was supplied.
 
-For details about the `Bits` and `Cmp` classes, see
-[here](#api-3-bits-class) and [here](#api-1-bit-vectors) respectively.
-
 ## Example 4: Basic RTL
 
 So far, we've only seen the `display` and `finish` actions of the RTL
 monad.  It also supports creation and assignment of registers.  To
-illustrate, here is a piece of RTL that creates a 4-bit `cycleCount`
+illustrate, here is an RTL block that creates a 4-bit `cycleCount`
 register, increments it on each cycle, stopping when it reaches 10.
 
 ```hs
 top :: RTL ()
 top = do
   -- Create a register
-  cycleCount :: Reg (Bit 4) <- makeRegInit 0
+  cycleCount :: Reg (Bit 4) <- makeReg 0
 
   -- Increment on every cycle
   cycleCount <== cycleCount.val + 1
@@ -224,14 +210,13 @@ top = do
     finish
 ```
 
-This example introduces a number of new library functions:
-`makeRegInit` creates a register, initialised to the given value;
-`val` returns the value of a register;
-the `.` operator is defined by Blarney as *reverse function
-application* rather than the usual *function composition*;
-and `when` allows conditional RTL blocks to be introduced.  One
-can also use `if`/`then`/`else` in an RTL context, thanks to Haskell's
-rebindable syntax feature.
+This example introduces a number of new library functions: `makeReg`
+creates a register, initialised to the given value; `val` returns the
+value of a register; the `.` operator is defined by Blarney as
+*reverse function application* rather than the usual *function
+composition*; and `when` allows conditional RTL blocks to be
+introduced.  One can also use `if`/`then`/`else` in an RTL context,
+thanks to Haskell's rebindable syntax feature.
 
 ```hs
   -- Terminate simulation when count reaches 10
@@ -262,9 +247,9 @@ Finished
 
 ## Example 5: Queues
 
-Queues (also known as FIFOs) are very commonly used abstraction in
-hardware design.  Blarney provides [a range of different queue
-implementations](#api-7-queue-library),
+Queues (also known as FIFOs) are commonly used abstraction in hardware
+design.  Blarney provides [a range of different queue
+implementations](http://mn416.github.io/blarney/Blarney-Queue.html),
 all of which implement the following interface.
 
 ```hs
@@ -285,7 +270,7 @@ and provides a range of standard functions on queues.  The `enq`
 method should only be called when `notFull` is true and the `deq`
 method should only be called when `canDeq` is true.  Similarly, the
 `first` element of the queue is only valid when `canDeq` is true.
-Below, we demonstrate the simplest possible implementation of a
+Below, we present the simplest possible implementation of a
 one-element queue.
 
 ```hs
@@ -293,10 +278,10 @@ one-element queue.
 makeSimpleQueue :: Bits a => RTL (Queue a)
 makeSimpleQueue = do
   -- Register holding the one element
-  reg :: Reg a <- makeReg
+  reg :: Reg a <- makeReg dontCare
 
   -- Register defining whether or not queue is full
-  full :: Reg (Bit 1) <- makeRegInit 0
+  full :: Reg (Bit 1) <- makeReg 0
 
   -- Methods
   let notFull  = full.val .==. 0
@@ -321,7 +306,7 @@ top = do
   queue :: Queue (Bit 8) <- makeSimpleQueue
 
   -- Create an 8-bit count register
-  count :: Reg (Bit 8) <- makeRegInit 0
+  count :: Reg (Bit 8) <- makeReg 0
   count <== count.val + 1
 
   -- Writer side
@@ -367,14 +352,14 @@ That is, if `inc` and `dec` are called on the same cycle then the
 counter's `output` is unchanged.  We'll achieve this using wires.
 
 ```hs
-makeCounter :: _ => RTL (Counter n)
+makeCounter :: KnownNat n => RTL (Counter n)
 makeCounter = do
   -- State
-  count :: Reg (Bit n) <- makeRegInit 0
+  count :: Reg (Bit n) <- makeReg 0
 
   -- Wires
-  incWire :: Wire (Bit 1) <- makeWireDefault 0
-  decWire :: Wire (Bit 1) <- makeWireDefault 0
+  incWire :: Wire (Bit 1) <- makeWire 0
+  decWire :: Wire (Bit 1) <- makeWire 0
 
   -- Increment
   when (incWire.val .&. decWire.val.inv) do
@@ -392,13 +377,111 @@ makeCounter = do
   return (Counter inc dec output)
 ```
 
-## Example 7: Recipes
+## Example 7: Bit selection
+
+Blarney provides the following untyped bit-selection functions, i.e.
+where the selection indices are values rather than types, meaning the
+width mismatches will not be caught by the type checker, but by a
+(probably unhelpful) error-message at circuit-generation time.
+
+```hs
+-- Dynamically-typed bit selection
+bit :: Int -> Bit n -> Bit 1
+
+-- Dynamically-typed sub-range selection
+bits :: KnownNat m => (Int, Int) -> Bit n -> Bit m
+```
+
+There are statically-typed versions of both these functions --
+[index](http://mn416.github.io/blarney/Blarney-Bit.html#v:index) and
+[range](http://mn416.github.io/blarney/Blarney-Bit.html#v:range).
+To illustrate, here's a function to select the upper four bits of a byte.
+
+```hs
+-- Extract upper 4 bits of a byte
+upperNibble :: Bit 8 -> Bit 4
+upperNibble x = range @7 @4 x
+```
+
+We use type application to specify the type-level indices.
+
+## Example 8: Bits class
+
+Any type in the
+[Bits](http://mn416.github.io/blarney/Blarney-Bits.html)
+class can be represented in hardware, e.g.
+stored in a wire, a register, or a RAM.
+
+```hs
+class Bits a where
+  type SizeOf a :: Nat
+  sizeOf        :: a -> Int
+  pack          :: a -> Bit (SizeOf a)
+  unpack        :: Bit (SizeOf a) -> a
+```
+
+The `Bits` class supports *generic deriving*.  For example, suppose
+we have a simple data type for memory requests:
+
+```hs
+data MemReq =
+  MemReq {
+    memOp   :: Bit 1    -- Is it a load or a store request?
+  , memAddr :: Bit 32   -- 32-bit address
+  , memData :: Bit 32   -- 32-bit data for stores
+  }
+  deriving (Generic, Bits)
+```
+
+To make this type a member of the `Bits` class, we have suffixed it
+with `derving (Generic, Bits)`.  The generic deriving mechanism for
+`Bits` does not support *sum types* (there is no way to convert a
+bit-vector to a sum type using the circuit primitives provided
+Blarney).
+
+## Example 9: FShow class
+
+Any type in the
+[FShow](http://mn416.github.io/blarney/Blarney-FShow.html)
+class can be passed as an argument to the
+`display` function.
+
+```hs
+class FShow a where
+  fshow     :: a -> Format
+  fshowList :: [a] -> Format     -- Has default definition
+
+-- Abstract data type for things that can be displayed
+newtype Format
+
+-- Format constructors
+mempty :: Format                         -- Empty (from Monoid class)
+(<>)   :: Format -> Format -> Format     -- Append (from Monoid class)
+
+-- Primitive instances
+instance FShow Char
+instance FShow (Bit n)
+```
+
+As an example, here is how the `FShow` instance for pairs is defined.
+
+```hs
+-- Example instance: displaying pairs
+instance (FShow a, FShow b) => FShow (a, b) where
+  fshow (a, b) = fshow "(" <> fshow a <> fshow "," <> fshow b <> fshow ")"
+```
+
+Like the `Bits` class, the `FShow` class supports *generic deriving*:
+just include `FShow` in the `deriving` clause for the data type.
+
+## Example 10: Recipes
 
 State machines are a common way of defining the control-path of a
 circuit.  They are typically expressed by doing case-analysis of the
 current-state and manually setting the next-state.  Quite often
-however, they can be expressed more neatly in a `Recipe` -- a simple
-imperative language with various control-flow statements.
+however, they can be expressed more neatly in a
+[Recipe](http://mn416.github.io/blarney/Blarney-Recipe.html)
+-- a simple imperative language with various control-flow statements.
 
 ```hs
 data Recipe = 
@@ -418,17 +501,19 @@ factorial of 10.
 fact :: RTL ()
 fact = do
   -- State
-  n   :: Reg (Bit 32) <- makeRegInit 0
-  acc :: Reg (Bit 32) <- makeRegInit 0
+  n   :: Reg (Bit 32) <- makeReg 0
+  acc :: Reg (Bit 32) <- makeReg 1
 
   -- Compute factorial of 10
   let recipe =
         Seq [
           RTL do
             n <== 10
-        , While (n.val .>. 0) $ RTL do
-            n <== n.val - 1
-            acc <== acc.val + n.val
+        , While (n.val .>. 0) (
+            RTL do
+              n <== n.val - 1
+              acc <== acc.val * n.val
+          )
         , RTL do
             display "fact(10) = " (acc.val)
             finish
@@ -475,13 +560,17 @@ second.  On the third cycle, we both increment and decrement it in
 parallel.  On the fourth cycle, we display the value and terminate the
 simulator.
 
-## Example 8: Block RAMs
+## Example 11: Block RAMs
 
-Blarney provides [a variety of block RAM modules]() commonly supported
-on FPGAs.  They are all based around the following interface.
+Blarney provides
+[a variety of block RAM
+modules](http://mn416.github.io/blarney/Blarney-RAM.html)
+commonly supported on FPGAs.
+They are all based around the following interface.
 
 ```hs
 -- Block RAM interface
+-- (Parameterised by the address width a and the data width d)
 data RAM a d =
   RAM {
     load    :: a -> RTL ()
@@ -493,10 +582,10 @@ data RAM a d =
 When a `load` is issued for a given address, the value at that address
 appears on `out` on the next clock cycle.  When a `store` is issued,
 the value is written to the RAM on the current cycle, and the written
-value appears on `out` on the next cycle.  A `load` and `store` to the
-same `RAM` interface should not be issued on the same cycle.  To
-illustrate, here is a test bench that creates a block RAM and performs
-a `store` followed by a `load`.
+value appears on `out` on the next cycle.  A parallel `load` and
+`store` to the same `RAM` interface should not be issued on the same
+cycle.  To illustrate, here is a test bench that creates a block RAM
+and performs a `store` followed by a `load`.
 
 ```hs
 top :: RTL ()
@@ -519,7 +608,9 @@ top = do
   runOnce test
 ```
 
-Somewhat-related to block RAMs are *register files*.  The difference
+Somewhat-related to block RAMs are
+(register files)[http://mn416.github.io/blarney/Blarney-RTL.html#t:RegFile].
+The difference
 is that a register file allows the value at an address to be
 determined *within* a clock cycle.  It also allows any number of reads
 and writes to be performed within the same cycle.  Register files have
@@ -536,13 +627,15 @@ data RegFile a d =
 Unlike block RAMs, register files (especially large ones) do not
 always map efficiently onto hardware, so use with care!
 
-## Example 9: Streams
+## Example 12: Streams
 
 Streams are another commonly-used abstraction in hardware description.
 They are often used to implement hardware modules that consume data at
 a *variable rate*, depending on internal details of the module that
 the implementer does not wish to (or is unable to) expose.  In
-Blarney, streams are captured by the following interface.
+Blarney,
+[streams](file:///home/mn416/work/mn416.github.io/blarney/Blarney-Stream.html)
+are captured by the following interface.
 
 ```hs
 type Stream a = Get a
@@ -580,21 +673,22 @@ incS xs = do
 
   -- Incrementer
   when (xs.canGet .&. buffer.notFull) do
-    xs.get
+    get xs
     enq buffer (xs.value + 1)
 
   -- Convert buffer to a stream
   return (buffer.toStream)
 ```
 
-## Example 10: Modular compilation
+## Example 13: Modular compilation
 
 So far we've seen examples of top-level modules, i.e. modules with no
 inputs or outputs, being converted to Verilog.  In fact, any Blarney
-function whose inputs and outputs are members of the `Interface` class
+function whose inputs and outputs are members of the
+[Interface](http://mn416.github.io/blarney/Blarney-Interface.html) class
 can be converted to Verilog (and the `Interface` class supports
 generic deriving).  To illustrate, we can convert the function `incS`
-(defined in [Example 9](#example-9-streams)) into a Verilog module
+(defined in [Example 12](#example-12-streams)) into a Verilog module
 as follows.
 
 ```hs
@@ -647,7 +741,7 @@ that uses the `makeIncS` function:
 top :: RTL ()
 top = do
   -- Counter
-  count :: Reg (Bit 8) <- makeRegInit 0
+  count :: Reg (Bit 8) <- makeReg 0
 
   -- Input buffer
   buffer <- makeQueue
@@ -662,7 +756,7 @@ top = do
 
   -- Consume
   when (out.canGet) do
-    out.get
+    get out
     display "Got " (out.value)
     when (out.value .==. 100) finish
 ```
@@ -683,19 +777,22 @@ design whenever we generate Verilog, rather than having to flatten it
 to massive netlist.  This technique can also be used to instantaite
 any Verilog module within a Blarney design.
 
-## Example 11: Bit-string pattern matching
+## Example 14: Bit-string pattern matching
 
 Recent work on specifying and implementing ISAs led us to develop two
-libraries for doing bit-string pattern matching.  The first, `BitPat`,
-is based on the paper [Type-safe pattern
-combinators](https://core.ac.uk/download/pdf/50525461.pdf) and let's
-us define an instruction decoder for a tiny subset of RISC-V as
-follows.
+libraries for doing bit-string pattern matching.  The first,
+[BitPat](http://mn416.github.io/blarney/Blarney-BitPat.html),
+is statically-typed and based on the paper [Type-safe pattern
+combinators](https://core.ac.uk/download/pdf/50525461.pdf).
+The second,
+[BitScan](http://mn416.github.io/blarney/Blarney-BitScan.html),
+is dynamically typed but more expressive.
+As an example, `BitScan`,
+let's us define the following instruction decoder for a tiny subset of
+RISC-V.
 
 ```hs
-import Blarney.BitPat
-
-#include <BitPat.h>
+import Blarney.BitScan
 
 -- Semantics of add instruction
 add :: Bit 5 -> Bit 5 -> Bit 5 -> RTL ()
@@ -706,45 +803,6 @@ add rs2 rs1 rd =
 addi :: Bit 12 -> Bit 5 -> Bit 5 -> RTL ()
 addi imm rs1 rd =
   display "add r" (rd.val) ", r" (rs1.val) ", " (imm.val)
-
--- Instruction dispatch
-top :: RTL ()
-top = do
-  -- Sample RISC-V add instruction
-  let instr :: Bit 32 = 0b0000000_00001_00010_000_00011_0110011
-
-  -- Dispatch
-  match instr
-    [
-      Lit(7,0) <#> Var(5) <#> Var(5) <#> Lit(3,0) <#> Var(5) <#> Lit(7,0b0110011) ==> add,
-      Var(12)             <#> Var(5) <#> Lit(3,0) <#> Var(5) <#> Lit(7,0b0010011) ==> addi
-    ]
-```
-
-Here, the `match` function represents a case statement with a case
-subject and a list of case alternatives.  Each case alternative
-contains a pattern on the left-hand-side and a function on the
-right-hand-side.  In a pattern, the macro `Lit(n,x)` matches an
-`n`-bit string containing the value `x`, whereas `Var(n)` matches
-*any* `n`-bit string and passes it as an argument to the
-right-hand-side function.  The `<#>` combinator composes patterns
-sequentially.  To use the `Lit` and `Var` macros, one needs to
-`#include <BitPat.h>`.
-
-The `BitPat` library provides strong static typing.  For example, if
-the type signatures of `add` and `addi` are omitted, then they will be
-inferred by the type checker.
-
-Our second library, `BitScan`, is more powerfull but at the cost of
-being dynamically typed rather than statically typed.  This means we
-loose type-inference of the right-hand-side function, and any width
-error will be displayed at circuit-generation time rather than
-compile-time.  In addition, the error message may not be as helpful as
-the corresponding one provided by `BitPat`.  To illustrate `BitScan`,
-let's add the RISC-V `sw` (store-word) instruction to our decoder:
-
-```hs
-import Blarney.BitScan
 
 -- Semantics of store-word instruciton
 sw :: Bit 12 -> Bit 5 -> Bit 5 -> RTL ()
@@ -762,27 +820,29 @@ top = do
       "          imm[11:0] rs1[4:0] 000 rd[4:0]  0010011" ==> addi,
       "imm[11:5] rs2[4:0]  rs1[4:0] 010 imm[4:0] 0100011" ==> sw
     ]
+
+  finish
 ```
 
 The nice thing about this decoder is that the *scattered immediate*
 field `imm` in the `sw` instruction is automatically assembled by the
 library.  That is, the `imm[11:5]` part of the immediate is combined
 with the `imm[4:0]` part to give the final 12-bit immediate value
-passed to the right-hand-side function.  Scattered immediates appear
-*a lot* in the RISC-V specification.  Thanks to Jon Woodruff for
+passed to the right-hand-side function.  Scattered immediates appear a
+lot in the RISC-V specification.  Thanks to Jon Woodruff for
 suggesting this feature!
 
-## Example 12: Tiny 8-bit CPU
+## Example 15: Tiny 8-bit CPU
 
 As a way of briging together a number of the ideas introduced above,
 let's define a very simple, 8-bit CPU with the following ISA.
 
   Opcode     | Meaning
   ---------- | ---------
-  `ZZNNNN00` | Write value `0000NNNN` to register `ZZ`
-  `ZZXXYY01` | Add register `XX` to register `YY` and store in register `ZZ`
-  `NNNNYY10` | Branch back by `NNNN` instructions if register `YY` is non-zero
-  `NNNNNN11` | Halt
+  `00ZZNNNN` | Write value `0000NNNN` to register `ZZ`
+  `01ZZXXYY` | Add register `XX` to register `YY` and store in register `ZZ`
+  `10NNNNYY` | Branch back by `NNNN` instructions if register `YY` is non-zero
+  `11NNNNNN` | Halt
 
 To begin, let's consider a non-pipelined implementation of this ISA,
 which has a CPI (cycles-per-instruction) of two: one cycle is used to
@@ -790,26 +850,19 @@ fetch the next instruction, and one cycle is used to execute it.  The
 CPU will execute the program defined in the file `instrs.hex`.
 
 ```hs
--- Instructions
-type Instr = Bit 8
-
--- Register identifiers
-type RegId = Bit 2
-
--- Tiny 8-bit CPU
 makeCPU :: RTL ()
 makeCPU = do
-  -- Instruction memory (containing 256 instructions)
-  instrMem :: RAM (Bit 8) Instr <- makeRAMInit "instrs.hex"
+  -- Instruction memory (containing 32 instructions)
+  instrMem :: RAM (Bit 5) (Bit 8) <- makeRAMInit "instrs.hex"
 
   -- Register file (containing 4 registers)
-  regFile :: RegFile RegId (Bit 8) <- makeRegFile
+  regFile :: RegFile (Bit 2) (Bit 8) <- makeRegFile
 
   -- Program counter
-  pc :: Reg (Bit 8) <- makeRegInit 0
+  pc :: Reg (Bit 5) <- makeReg 0
 
-  -- Are we fetching (1) or executing (0)?
-  fetch :: Reg (Bit 1) <- makeRegInit 1
+  -- Are we fetching (1) or executing (0)
+  fetch :: Reg (Bit 1) <- makeReg 1
 
   -- Load immediate instruction
   let li rd imm = do
@@ -834,427 +887,27 @@ makeCPU = do
   let halt imm = finish
 
   -- Fetch
-  when (fetch.val) do
+  when (fetch.val) $ do
     load instrMem (pc.val)
     fetch <== 0
 
   -- Execute
-  when (fetch.val.inv) do
+  when (fetch.val.inv) $ do
     match (instrMem.out)
       [
-        Var(2) <#> Var(4)            <#> Lit(2,0b00) ==> li,
-        Var(2) <#> Var(2) <#> Var(2) <#> Lit(2,0b01) ==> add,
-        Var(4) <#>            Var(2) <#> Lit(2,0b10) ==> bnz,
-        Var(6) <#>                       Lit(2,0b11) ==> halt
+        lit 0b00 <#> var @2 <#> var @4              ==>  li,
+        lit 0b01 <#> var @2 <#> var @2  <#> var @2  ==>  add,
+        lit 0b10 <#> var @4 <#> var @2              ==>  bnz,
+        lit 0b11 <#> var @6                         ==>  halt
       ]
     fetch <== 1
 ```
 
-Let's now look at a 3-stage pipeline implemention of the same ISA that
-has a CPI much closer to 1.  Unfortunately, it's a bit too long to
-in-line the code listing here, so we provide a
-[link](https://github.com/POETSII/blarney/blob/master/Examples/CPU/CPU.hs)
-instead.  Although the ISA is very simple, it does contain a few
-challenges for a pipelined implementation, namely *control hazards*
-(due to the branch instruction) and *data hazards* (due to the add
-instruction).  We resolve data hazards using *register forwarding* and
-control hazards by performing a *pipeline flush* when the branch is
-taken.
-
-## API 1: Bit vectors
-
-```hs
--- Bit-vector containing n bits
-newtype Bit (n :: Nat)
-
--- Determine width of bit vector from type
-widthOf :: KnownNat n => Bit n -> Int
-
--- Bit replication
-replicateBit :: KnownNat n => Bit 1 -> Bit n   -- Replication
-low          :: KnownNat n => Bit n            -- All 0's
-high         :: KnownNat n => Bit n            -- All 1's
-
--- Bitwise operators
-inv   :: Bit n -> Bit n            -- Bitwise not
-(.&.) :: Bit n -> Bit n -> Bit n   -- Bitwise and
-(.|.) :: Bit n -> Bit n -> Bit n   -- Bitwise or
-(.^.) :: Bit n -> Bit n -> Bit n   -- Bitwise xor
-
--- Arithmetic operators
-(.+.) :: Bit n -> Bit n -> Bit n    -- Addition
-(.-.) :: Bit n -> Bit n -> Bit n    -- Subtraction
-(.*.) :: Bit n -> Bit n -> Bit n    -- Multiplication
-
--- Num instance
-instance KnownNat n => Num (Bit n) where
-  (+)         :: Bit n -> Bit n -> Bit n  -- Addition
-  (-)         :: Bit n -> Bit n -> Bit n  -- Subtraction
-  (*)         :: Bit n -> Bit n -> Bit n  -- Multiplication
-  negate      :: Bit n -> Bit n           -- Two's complement
-  abs         :: Bit n -> Bit n           -- Identity function
-  signum      :: Bit n -> Bit n           -- If > 0 then 1 else 0
-  fromInteger :: Integer -> Bit n         -- Convert from integer
-
--- Comparison class
-class Cmp a where
-  (.<.)  :: a -> a -> Bit 1   -- Less than
-  (.>.)  :: a -> a -> Bit 1   -- Greater than
-  (.<=.) :: a -> a -> Bit 1   -- Less than or equal
-  (.>=.) :: a -> a -> Bit 1   -- Greated than or equal
-  (.==.) :: a -> a -> Bit 1   -- Equal
-  (.!=.) :: a -> a -> Bit 1   -- Not equal
-
--- Comparison instance
-instance Cmp (Bit n)
-
--- Fractional instance
-instance KnownNat n => Fractional (Bit n) where
-  (/) :: Bit n -> Bit n -> Bit n   -- Division
-
--- Modulus division
-(%) :: Bit n -> Bit n -> Bit n
-
--- Muxing and shifting
-mux       :: Bit 1 -> Bit n -> Bit n -> Bit n   -- Multiplexer
-(.<<.)    :: Bit n -> Bit n -> Bit n            -- Shift left
-(.>>.)    :: Bit n -> Bit n -> Bit n            -- Shift right
-
--- Population count
-countOnes :: Bit n -> Bit (Log2 n + 1)
-
--- Bit-vector resizing
-(#)        :: Bit n -> Bit m -> Bit (n+m)                -- Concatenation
-zeroExtend :: (KnownNat m, n <= m) => Bit n -> Bit m     -- Zero extension
-signExtend :: (KnownNat m, n <= m) => Bit n -> Bit m     -- Sign extension
-upper      :: (KnownNat m, m <= n) => Bit n -> Bit m     -- Extract MSBs
-lower      :: (KnownNat m, m <= n) => Bit n -> Bit m     -- Extract LSBs
-split      :: KnownNat n => Bit (n+m) -> (Bit n, Bit m)  -- Split bit vector
-
--- Registers
-reg   :: Bit n -> Bit n -> Bit n            -- Plain register
-regEn :: Bit n -> Bit 1 -> Bit n -> Bit n   -- Register with write-enable
-```
-
-## API 2: Bit selection
-
-Blarney provides the following untyped bit-selection functions, i.e.
-where the selection indices are values rather than types, meaning the
-width mismatches will not be caught by the type checker, but by a
-(probably unhelpful) error-message at circuit-generation time.
-
-```hs
--- Untyped bit selection
-getBit :: Int -> Bit n -> Bit 1
-
--- Untyped sub-range selection
-getBits :: KnownNat m => (Int, Int) -> Bit n -> Bit m
-```
-
-We recommended the following type-safe bit-selection *macros* instead:
-
-  * Macro `bit(i)`, where `i` is a type-level number, expands to a function
-that maps a given bit-vector to the bit at index `i` of that vector.
-
-  * Macro `bits(hi,lo)`, where `hi` and `lo` are type-level numbers, expands
-to  a function that maps a given bit-vector to bits `hi` down to `lo`
-of that vector.
-
-To illustrate, here's an example of using the `bits(hi,lo)` macro to
-select the upper four bits of a byte.
-
-```hs
--- Extract upper 4 bits of a byte
-upperNibble :: Bit 8 -> Bit 4
-upperNibble x = x.bits(7,4)
-```
-
-We use macros here for purely syntacic reasons: passing types to
-functions in Haskell is a bit clunky.  
-
-## API 3: Bits class
-
-Any type in the `Bits` class can be represented in hardware, e.g.
-stored in a wire, a register, or a RAM.
-
-```hs
-class Bits a where
-  type SizeOf a :: Nat
-  replicateBit  :: Bit 1 -> a
-  sizeOf        :: a -> Int
-  pack          :: a -> Bit (SizeOf a)
-  unpack        :: Bit (SizeOf a) -> a
-```
-
-The `Bits` class supports *generic deriving*.  For example, suppose
-we have a simple data type for memory requests:
-
-```hs
-data MemReq =
-  MemReq {
-    memOp   :: Bit 1    -- Is it a load or a store request?
-  , memAddr :: Bit 32   -- 32-bit address
-  , memData :: Bit 32   -- 32-bit data for stores
-  }
-  deriving (Generic, Bits)
-```
-
-To make this type a member of the `Bits` class, we have suffixed it
-with `derving (Generic, Bits)`.  The generic deriving mechanism for
-`Bits` does not support *sum types* (there is no way to convert a
-bit-vector to a sum type using the circuit primitives provided
-Blarney).
-
-## API 4: FShow class
-
-Any type in the `FShow` class can be passed as an argument to the
-`display` function.
-
-```hs
-class FShow a where
-  fshow     :: a -> Format
-  fshowList :: [a] -> Format     -- Has default definition
-
--- Abstract data type for things that can be displayed
-newtype Format
-
--- Format constructors
-mempty :: Format                         -- Empty (from Monoid class)
-(<>)   :: Format -> Format -> Format     -- Append (from Monoid class)
-
--- Primitive instances
-instance FShow Char
-instance FShow (Bit n)
-```
-
-As an example, here is how the `FShow` instance for pairs is defined.
-
-```hs
--- Example instance: displaying pairs
-instance (FShow a, FShow b) => FShow (a, b) where
-  fshow (a, b) = fshow "(" <> fshow a <> fshow "," <> fshow b <> fshow ")"
-```
-
-Like the `Bits` class, the `FShow` class supports *generic deriving*:
-just include `FShow` in the `deriving` clause for the data type.
-
-## API 5: Prelude
-
-```hs
--- Raw equality
-(===) :: Bits a => a -> a -> Bit 1
-
--- Raw disequality
-(=!=) :: Bits a => a -> a -> Bit 1
-
--- Ternary conditional operator
-(?) :: Bits a => Bit 1 -> (a, a) -> a
-
--- One-hot select
-select :: Bits a => [(Bit 1, a)] -> a
-
--- Index a list
-index :: (KnownNat n, Bits a) => Bit n -> [a] -> a
-
--- All 0's
-zero :: Bits a => a
-
--- All 1's
-ones :: Bits a => a
-
--- Register
-register   :: Bits a => a -> a -> a
-registerEn :: Bits a => a -> Bit 1 -> a -> a
-
--- RAM primitives
--- (Read new data on write)
-ram     :: (Bits a, Bits d) => (a, d, Bit 1) -> d
-ramInit :: (Bits a, Bits d) => String -> (a, d, Bit 1) -> d
-
--- True dual-port RAM primitives
--- (Reads new data on write)
--- (When read-address == write-address on different ports, read old data)
-ramTrueDual     :: (Bits a, Bits d) =>
-                   (a, d, Bit 1)
-                -> (a, d, Bit 1)
-                -> (d, d)
-ramTrueDualInit :: (Bits a, Bits d) =>
-                   String 
-                -> (a, d, Bit 1)
-                -> (a, d, Bit 1)
-                -> (d, d)
-
--- Adder tree
-sumList :: KnownNat n => [Bit n] -> Bit n
-
--- Tree of bitwise-and
-andList :: Bits a => [a] -> a
-
--- Tree of bitwise-or
-orList :: Bits a => [a] -> a
-```
-
-## API 6: RTL library
-
-```hs
--- The RTL monad
-newtype RTL a
-
--- Register variables
-data Reg a
-
--- Wire variables
-data Wire a
-
--- Mutable variables
--- (Reg and Wire are both instances of this)
-class Var v where
-  val :: Bits a => v a -> a
-  (<==) :: Bits a => v a -> a -> RTL ()
-
--- Create register
-makeReg     :: Bits a => RTL (Reg a)
-makeRegInit :: Bits a => a -> RTL (Reg a)
-
--- Create wire
-makeWire        :: Bits a => RTL (Wire a)
-makeWireDefault :: Bits a => a -> RTL (Wire a)
-
--- A DReg holds the assigned value only for one cycle.
--- At all other times, it has the given default value.
-makeDReg :: Bits a => a -> RTL (Reg a)
-
--- Extra wire functions
-val'    :: Wire a -> a       -- Registered output of wire
-active  :: Wire a -> Bit 1   -- Is wire being assigned on this cycle?
-active' :: Wire a -> Bit 1   -- Registed value of active
-
--- RegFile interface
-data RegFile a d =
-  RegFile {
-    (!)    :: a -> d              -- Read
-  , update :: a -> d -> RTL ()    -- Write
-  }
-
--- Create register file
-makeRegFileInit :: forall a d. (Bits a, Bits d) => String -> RTL (RegFile a d)
-makeRegFile :: forall a d. (Bits a, Bits d) => RTL (RegFile a d)
-
--- RTL conditionals
-when    :: Bit 1 -> RTL () -> RTL ()
-whenNot :: Bit 1 -> RTL () -> RTL ()
-
--- For rebindable syntax
--- (Haskell's if-then-else maps to this)
-ifThenElseRTL :: Bit 1 -> RTL () -> RTL () -> RTL ()
-
--- RTL switch statement
-switch :: Bits a => a -> [(a, RTL ())] -> RTL ()
-
--- For neat construction of case alternatives
-(-->)  :: a -> RTL () -> (a, RTL ())
-
--- RTL finish statements
-finish :: RTL ()
-
--- RTL display statements
--- (Variadic function: args in FShow, result of type RTL ())
-display :: Displayable a => a
-
--- Declare external input/output
-input :: String -> RTL (Bit n)
-output :: String -> Bit n -> RTL ()
-
--- Convert RTL monad to a netlist
-netlist :: RTL () -> IO [Net]
-```
-
-## API 7: Queue library
-
-The `Blarney.Queue` module defines several queue
-implementations, all implementing the interface:
-
-```hs
-data Queue a =
-  Queue {
-    notEmpty :: Bit 1        -- Is the queue non-empty?
-  , notFull  :: Bit 1        -- Is there any space in the queue?
-  , enq      :: a -> RTL ()  -- Insert an element (assuming notFull)
-  , deq      :: RTL ()       -- Remove the first element (assuming canDeq)
-  , canDeq   :: Bit 1        -- Guard on the deq and first methods
-  , first    :: a            -- View the first element (assuming canDeq)
-  }
-```
-
-**Two-element queue**:
-
-  * A full-throughput queue implemented using 2 registers.
-  * No combinatorial paths between sides.
-  * There's a mux on the enqueue path.
-
-```hs
-makeQueue :: Bits a => RTL (Queue a)
-```
-
-**Sized queue**:
-
-  * A full-throughput N-element queue implemented using 2 registers and a RAM.
-  * No combinatorial paths between sides.
-  * There's a mux on the  enqueue path.
-
-```hs
-makeSizedQueue :: Bits a => Int -> RTL (Queue a)
-```
-
-**Shift queue**:
-
-  * N-element queue implemented using a shift register.
-  * No muxes.
-  * Input element goes straight to a register and output element
-    comes straight from a register.
-  * N-cycle latency between enqueuing an element and being able to dequeue
-    it, where N is the queue capacity.
-
-```hs
--- Full throughput but there's a combinatorial path between notFull and deq.
-makePipelineQueue :: Bits a => Int -> RTL (Queue a)
-
--- No combinatorial paths between sides but max throughput = N/(N+1),
--- where N is the queue capacity
-makeShiftQueue :: Bits a => Int -> RTL (Queue a)
-```
-
-## API 8: Block RAM library
-
-The `Blarney.RAM` module defines various block RAM implementations.
-
-```hs
--- RAM interface
-data RAM a d =
-  RAM {
-    load  :: a -> RTL ()
-  , store :: a -> d -> RTL ()
-  , out   :: d
-  }
-
--- RAM (one read/write port)
-makeRAMInit :: (Bits a, Bits d) => String -> RTL (RAM a d)
-makeRAM     :: (Bits a, Bits d) => RTL (RAM a d)
-
--- Dual port RAM (one read port, one write port)
-makeDualRAMInit :: (Bits a, Bits d) => String -> RTL (RAM a d)
-makeDualRAM     :: (Bits a, Bits d) => RTL (RAM a d)
-
--- True dual port RAM (two read/write ports)
-makeTrueDualRAMInit :: (Bits a, Bits d) => String -> RTL (RAM a d, RAM a d)
-makeTrueDualRAM     :: (Bits a, Bits d) => RTL (RAM a d, RAM a d)
-
--- Dual port RAM module with pass-through
--- (Read and write to same address yields new data)
-makeDualRAMPassthroughInit :: (Bits a, Bits d) => String -> RTL (RAM a d)
-makeDualRAMPassthrough     :: (Bits a, Bits d) => RTL (RAM a d)
-
--- Extra RAM functions
-out'    :: RAM a d -> d        -- Registered output of RAM
-writeEn :: RAM a d -> Bit 1    -- Has a write been issued on current cycle?
-```
+We have also developed a [3-stage pipeline
+implemention](https://github.com/POETSII/blarney/blob/master/Examples/CPU/CPU.hs)
+of the same ISA that has a CPI much closer to 1.  Although the ISA is
+very simple, it does contain a few challenges for a pipelined
+implementation, namely *control hazards* (due to the branch
+instruction) and *data hazards* (due to the add instruction).  We
+resolve data hazards using *register forwarding* and control hazards
+by performing a *pipeline flush* when the branch is taken.

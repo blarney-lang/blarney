@@ -8,7 +8,7 @@ top = do
   queue :: Queue (Bit 32) <- makeSizedQueue 3
 
   -- Counter
-  count :: Reg (Bit 32) <- makeRegInit 0
+  count :: Reg (Bit 32) <- makeReg 0
   count <== count.val + 1
 
   -- Feed queue
@@ -23,4 +23,4 @@ top = do
 
 -- Main function
 main :: IO ()
-main = emitVerilogTop top "top" "Queue-Verilog"
+main = writeVerilogTop top "top" "Queue-Verilog"

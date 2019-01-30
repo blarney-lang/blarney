@@ -1,6 +1,49 @@
+{-# LANGUAGE DataKinds      #-}
 {-# LANGUAGE FlexibleInstances #-}
 
-module Blarney.BitScan where
+{-|
+Module      : Blarney.BitScan
+Description : Bit-string pattern matching, similar to scanf
+Copyright   : (c) Matthew Naylor, 2019
+License     : MIT
+Maintainer  : mattfn@gmail.com
+Stability   : experimental
+
+Dynamically typed pattern matching on bit-strings, similar to scanf.
+Here's an instruction decoder for a tiny subset of RISC-V, written
+using the 'match' and '==>' combinators provided by the module:
+
+@
+-- Semantics of add instruction
+add :: Bit 5 -> Bit 5 -> Bit 5 -> RTL ()
+add rs2 rs1 rd = display "add " rd ", " rs1 ", " rs2
+
+-- Semantics of addi instruction
+addi :: Bit 12 -> Bit 5 -> Bit 5 -> RTL ()
+addi imm rs1 rd = display "addi " rd ", " rs1 ", " imm
+
+-- Semantics of store instruciton
+sw :: Bit 12 -> Bit 5 -> Bit 5 -> RTL ()
+sw imm rs2 rs1 = display "sw " rs2 ", " rs1 "[" imm "]"
+
+top :: RTL ()
+top = do
+  let instr :: Bit 32 = 0b1000000_00001_00010_010_00001_0100011
+
+  match instr
+    [
+      "0000000   rs2[4:0]  rs1[4:0] 000 rd[4:0]  0110011" ==> add,
+      "          imm[11:0] rs1[4:0] 000 rd[4:0]  0010011" ==> addi,
+      "imm[11:5] rs2[4:0]  rs1[4:0] 010 imm[4:0] 0100011" ==> sw
+    ]
+
+  finish
+@
+-}
+module Blarney.BitScan
+  ( (==>)
+  , match
+  ) where
 
 import Blarney
 import Data.Char
@@ -138,18 +181,20 @@ instance RHS (RTL ()) where
 
 instance (RHS f, KnownNat n) => RHS (Bit n -> f) where
   apply f [] = error "Format error: too few pattern vars"
-  apply f (arg:args) = apply (f (fromList arg)) args
+  apply f (arg:args) = apply (f (bitListToBitVec arg)) args
 
 toBitList :: KnownNat n => Bit n -> BitList
-toBitList x = [getBit i x | i <- [0 .. widthOf x - 1]]
+toBitList x = [bit i x | i <- [0 .. widthOf x - 1]]
 
+-- |Case statement, with a subject and a list of alternatives
+match :: KnownNat n => Bit n -> [Bit n -> RTL ()] -> RTL ()
+match subj alts = sequence_ [alt subj | alt <- alts]
+
+-- |Case alternative
 infix 7 ==>
-(==>) :: KnownNat n => RHS rhs => String -> rhs -> Bit n -> RTL ()
+(==>) :: (KnownNat n, RHS rhs) => String -> rhs -> Bit n -> RTL ()
 fmt ==> rhs = \subj -> do
   let subj' = toBitList subj
   when (matches subj' toks) $
     apply rhs (args subj' (tag toks))
   where toks = tokenise fmt
-
-match :: KnownNat n => Bit n -> [Bit n -> RTL ()] -> RTL ()
-match subj alts = sequence_ [alt subj | alt <- alts]

@@ -1,3 +1,11 @@
+{-|
+Module      : Blarney.Util
+Description : Utility functions
+Copyright   : (c) Matthew Naylor, 2019
+License     : MIT
+Maintainer  : mattfn@gmail.com
+Stability   : experimental
+-}
 module Blarney.Util where
 
 import Prelude

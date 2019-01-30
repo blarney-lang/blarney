@@ -1,12 +1,27 @@
-{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE Rank2Types          #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE RebindableSyntax    #-}
 
+{-|
+Module      : Blarney.Queue
+Description : Library of various queue implementations
+Copyright   : (c) Matthew Naylor, 2019
+License     : MIT
+Maintainer  : mattfn@gmail.com
+Stability   : experimental
+-}
 module Blarney.Queue where
 
+-- Blarney imports
 import Blarney
 import Blarney.RAM
 import Blarney.Util
+
+-- Standard imports
 import Data.Proxy
 
+-- |Queue interface
 data Queue a =
   Queue {
     notEmpty :: Bit 1
@@ -17,33 +32,27 @@ data Queue a =
   , first    :: a
   }
 
-{-
+{-|
+A full-throughput 2-element queue implemented using 2 registers:
 
-Two-Element Queue
-=================
+  * No combinatorial paths between sides.
 
-A full-throughput queue implemented using 2 registers.
-
-No combinatorial paths between sides.
-
-There's a mux on the enqueue path.
-
+  * There's a mux on the enqueue path.
 -}
-
 makeQueue :: Bits a => RTL (Queue a)
 makeQueue = do
   -- Elements of the queue, stored in registers
-  elem0 :: Reg a <- makeReg
-  elem1 :: Reg a <- makeReg
+  elem0 :: Reg a <- makeReg dontCare
+  elem1 :: Reg a <- makeReg dontCare
 
   -- Which elements are valid (i.e. contain a queue value)?
-  valid0 :: Reg (Bit 1) <- makeRegInit 0
-  valid1 :: Reg (Bit 1) <- makeRegInit 0
+  valid0 :: Reg (Bit 1) <- makeReg 0
+  valid1 :: Reg (Bit 1) <- makeReg 0
 
   -- Wires
-  doEnq :: Wire a <- makeWire
-  doDeq :: Wire (Bit 1) <- makeWireDefault 0
-  update1 :: Wire (Bit 1) <- makeWireDefault 0
+  doEnq :: Wire a <- makeWire dontCare
+  doDeq :: Wire (Bit 1) <- makeWire 0
+  update1 :: Wire (Bit 1) <- makeWire 0
 
   if valid0.val.inv .|. doDeq.val
     then do
@@ -72,20 +81,37 @@ makeQueue = do
     , first    = elem0.val
     }
 
-{-
+{-|
+A full-throughput N-element queue implemented using 2 registers and a RAM:
 
-Sized Queue
-===========
+  * No combinatorial paths between sides.
 
-A full-throughput queue implemented using 2 registers and a RAM.
-
-No combinatorial paths between sides.
-
-There's a mux on the enqueue path.
-
+  * There's a mux on the enqueue path.
 -}
+makeSizedQueue :: Bits a => Int -> RTL (Queue a)
+makeSizedQueue logSize = do
+  -- Big queue
+  big :: Queue a <- makeSizedQueueCore logSize
 
--- This one has no output buffer, not great for Fmax
+  -- Small queue, buffering the output of the big queue
+  small :: Queue a <- makeQueue
+
+  -- Connect big queue to small queue
+  when (small.notFull .&. big.canDeq) $ do
+    deq big
+    enq small (big.first)
+
+  return $
+    Queue {
+      notEmpty = small.notEmpty .&. big.notEmpty
+    , notFull  = big.notFull
+    , enq      = big.enq
+    , deq      = deq small
+    , canDeq   = small.canDeq
+    , first    = small.first
+    }
+
+-- |This one has no output buffer (low latency, but not great for Fmax)
 makeSizedQueueCore :: Bits a => Int -> RTL (Queue a)
 makeSizedQueueCore logSize =
   -- Lift size n to type-level address-width
@@ -95,16 +121,16 @@ makeSizedQueueCore logSize =
     ram :: RAM (Bit aw) a <- makeDualRAMPassthrough
 
     -- Queue front and back pointers
-    front :: Reg (Bit aw) <- makeRegInit 0
-    back :: Reg (Bit aw) <- makeRegInit 0
+    front :: Reg (Bit aw) <- makeReg 0
+    back :: Reg (Bit aw) <- makeReg 0
 
     -- Full/empty status
-    full :: Reg (Bit 1)  <- makeRegInit 0
-    empty :: Reg (Bit 1)  <- makeRegInit 1
+    full :: Reg (Bit 1)  <- makeReg 0
+    empty :: Reg (Bit 1)  <- makeReg 1
 
     -- Wires
-    doEnq :: Wire a <- makeWire
-    doDeq :: Wire (Bit 1) <- makeWireDefault 0
+    doEnq :: Wire a <- makeWire dontCare
+    doDeq :: Wire (Bit 1) <- makeWire 0
 
     -- Read from new front pointer and update
     let newFront = doDeq.val ? (front.val + 1, front.val)
@@ -134,66 +160,46 @@ makeSizedQueueCore logSize =
       , first    = ram.out
       }
 
--- Let's wrap the above with an output buffer
-makeSizedQueue :: Bits a => Int -> RTL (Queue a)
-makeSizedQueue logSize = do
-  -- Big queue
-  big :: Queue a <- makeSizedQueueCore logSize
+{-|
+There are modes of operation for the shift queue (below):
 
-  -- Small queue, buffering the output of the big queue
-  small :: Queue a <- makeQueue
+  1. Optimise throughput: full throughput, but there's a
+     combinatorial path between notFull and deq
 
-  -- Connect big queue to small queue
-  when (small.notFull .&. big.canDeq) $ do
-    deq big
-    enq small (big.first)
-
-  return $
-    Queue {
-      notEmpty = small.notEmpty .&. big.notEmpty
-    , notFull  = big.notFull
-    , enq      = big.enq
-    , deq      = small.deq
-    , canDeq   = small.canDeq
-    , first    = small.first
-    }
-
-{-
-
-Shift Queue
-===========
-
-N-element queue implemented using a shift register.
-
-No muxes. Input element goes straight to a register and output element
-comes straight from a register
-
-N-cycle latency between enqueuing an element and being able to dequeue
-it, where N is the queue capacity.
-
-There are modes of operation:
-  1. Optimise throughput:
-       * full throughput
-       * but there's a combinatorial path between notFull and deq
-  2. Optimise Fmax:
-       * no combinatorial paths between sides
-       * but max throughput = N/(N+1), where N is the queue capacity
-
+  2. Optimise Fmax: no combinatorial paths between sides,
+     but max throughput = N/(N+1), where N is the queue capacity
 -}
+data ShiftQueueMode = OptFmax | OptThroughput deriving Eq
 
-data ShiftQueueMode = OptFmax | OptThroughput deriving Eq;
+{-|
+An N-element queue implemented using a shift register:
+
+  * No muxes: input element goes straight to a register and output element
+    comes straight from a register.
+
+  * N-cycle latency between enqueuing an element and being able to dequeue
+    it, where N is the queue capacity.
+
+This version optimised for Fmax.
+-}
+makeShiftQueue :: Bits a => Int -> RTL (Queue a)
+makeShiftQueue = makeShiftQueueCore OptFmax
+
+-- |This version is optimised for throughput
+makePipelineQueue :: Bits a => Int -> RTL (Queue a)
+makePipelineQueue = makeShiftQueueCore OptThroughput
 
 makeShiftQueueCore :: Bits a => ShiftQueueMode -> Int -> RTL (Queue a)
 makeShiftQueueCore mode n = do
   -- Elements of the queue, stored in registers
-  elems :: [Reg a] <- replicateM n makeReg
+  elems :: [Reg a] <- replicateM n makeRegU
 
   -- Which elements are valid?
-  valids :: [Reg (Bit 1)] <- replicateM n (makeRegInit 0)
+  valids :: [Reg (Bit 1)] <- replicateM n (makeReg 0)
 
   -- Wires
-  doEnq :: Wire a <- makeWire
-  doDeq :: Wire (Bit 1) <- makeWireDefault 0
+  doEnq :: Wire a <- makeWire dontCare
+  doDeq :: Wire (Bit 1) <- makeWire 0
 
   -- Register enable line to each element
   let ens = tail $ scanl (.|.) (doDeq.val) [v.val.inv | v <- valids]
@@ -225,10 +231,3 @@ makeShiftQueueCore mode n = do
     , canDeq   = valids.head.val
     , first    = elems.head.val
     }
-
-
-makeShiftQueue :: Bits a => Int -> RTL (Queue a)
-makeShiftQueue = makeShiftQueueCore OptFmax
-
-makePipelineQueue :: Bits a => Int -> RTL (Queue a)
-makePipelineQueue = makeShiftQueueCore OptThroughput
