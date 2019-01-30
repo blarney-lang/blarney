@@ -13,12 +13,12 @@ docs](http://mn416.github.io/blarney/index.html).
 * [Example 1: Two-sort](#example-1-two-sort)
 * [Example 2: Bubble sort](#example-2-bubble-sort)
 * [Example 3: Polymorphism](#example-3-polymorphism)
-* [Example 4: Basic RTL](#example-4-basic-rtl)
-* [Example 5: Queues](#example-5-queues)
-* [Example 6: Wires](#example-6-wires)
-* [Example 7: Bit selection](#example-7-bit-selection)
-* [Example 8: Bits class](#example-8-bits-class)
-* [Example 9: FShow class](#example-9-fshow-class)
+* [Example 4: Bits class](#example-4-bits-class)
+* [Example 5: FShow class](#example-5-fshow-class)
+* [Example 6: Basic RTL](#example-6-basic-rtl)
+* [Example 7: Queues](#example-7-queues)
+* [Example 8: Wires](#example-8-wires)
+* [Example 9: Bit selection](#example-9-bit-selection)
 * [Example 10: Recipes](#example-10-recipes)
 * [Example 11: Block RAMs](#example-11-block-rams)
 * [Example 12: Streams](#example-12-streams)
@@ -185,7 +185,77 @@ twoSort (a, b) = a .<. b ? ((a, b), (b, a))
 Indeed, this would be the type inferred by the Haskell compiler if no
 type signature was supplied.
 
-## Example 4: Basic RTL
+## Example 4: Bits class
+
+Any type in the
+[Bits](http://mn416.github.io/blarney/Blarney-Bits.html)
+class can be represented in hardware, e.g.
+stored in a wire, a register, or a RAM.
+
+```hs
+class Bits a where
+  type SizeOf a :: Nat
+  sizeOf        :: a -> Int
+  pack          :: a -> Bit (SizeOf a)
+  unpack        :: Bit (SizeOf a) -> a
+```
+
+The `Bits` class supports *generic deriving*.  For example, suppose
+we have a simple data type for memory requests:
+
+```hs
+data MemReq =
+  MemReq {
+    memOp   :: Bit 1    -- Is it a load or a store request?
+  , memAddr :: Bit 32   -- 32-bit address
+  , memData :: Bit 32   -- 32-bit data for stores
+  }
+  deriving (Generic, Bits)
+```
+
+To make this type a member of the `Bits` class, we have suffixed it
+with `derving (Generic, Bits)`.  The generic deriving mechanism for
+`Bits` does not support *sum types* (there is no way to convert a
+bit-vector to a sum type using the circuit primitives provided
+Blarney).
+
+## Example 5: FShow class
+
+Any type in the
+[FShow](http://mn416.github.io/blarney/Blarney-FShow.html)
+class can be passed as an argument to the
+`display` function.
+
+```hs
+class FShow a where
+  fshow     :: a -> Format
+  fshowList :: [a] -> Format     -- Has default definition
+
+-- Abstract data type for things that can be displayed
+newtype Format
+
+-- Format constructors
+mempty :: Format                         -- Empty (from Monoid class)
+(<>)   :: Format -> Format -> Format     -- Append (from Monoid class)
+
+-- Primitive instances
+instance FShow Char
+instance FShow (Bit n)
+```
+
+As an example, here is how the `FShow` instance for pairs is defined.
+
+```hs
+-- Example instance: displaying pairs
+instance (FShow a, FShow b) => FShow (a, b) where
+  fshow (a, b) = fshow "(" <> fshow a <> fshow "," <> fshow b <> fshow ")"
+```
+
+Like the `Bits` class, the `FShow` class supports *generic deriving*:
+just include `FShow` in the `deriving` clause for the data type.
+
+
+## Example 6: Basic RTL
 
 So far, we've only seen the `display` and `finish` actions of the RTL
 monad.  It also supports creation and assignment of registers.  To
@@ -245,7 +315,7 @@ cycleCount = 0xa
 Finished
 ```
 
-## Example 5: Queues
+## Example 7: Queues
 
 Queues (also known as FIFOs) are commonly used abstraction in hardware
 design.  Blarney provides [a range of different queue
@@ -323,7 +393,7 @@ top = do
   when (count.val .==. 100) finish
 ```
 
-## Example 6: Wires
+## Example 8: Wires
 
 *Wires* are a feature of the RTL monad that offer a way for separate
 RTL blocks to communicate *within the same clock cycle*.  Whereas
@@ -377,7 +447,7 @@ makeCounter = do
   return (Counter inc dec output)
 ```
 
-## Example 7: Bit selection
+## Example 9: Bit selection
 
 Blarney provides the following untyped bit-selection functions, i.e.
 where the selection indices are values rather than types, meaning the
@@ -404,75 +474,6 @@ upperNibble x = range @7 @4 x
 ```
 
 We use type application to specify the type-level indices.
-
-## Example 8: Bits class
-
-Any type in the
-[Bits](http://mn416.github.io/blarney/Blarney-Bits.html)
-class can be represented in hardware, e.g.
-stored in a wire, a register, or a RAM.
-
-```hs
-class Bits a where
-  type SizeOf a :: Nat
-  sizeOf        :: a -> Int
-  pack          :: a -> Bit (SizeOf a)
-  unpack        :: Bit (SizeOf a) -> a
-```
-
-The `Bits` class supports *generic deriving*.  For example, suppose
-we have a simple data type for memory requests:
-
-```hs
-data MemReq =
-  MemReq {
-    memOp   :: Bit 1    -- Is it a load or a store request?
-  , memAddr :: Bit 32   -- 32-bit address
-  , memData :: Bit 32   -- 32-bit data for stores
-  }
-  deriving (Generic, Bits)
-```
-
-To make this type a member of the `Bits` class, we have suffixed it
-with `derving (Generic, Bits)`.  The generic deriving mechanism for
-`Bits` does not support *sum types* (there is no way to convert a
-bit-vector to a sum type using the circuit primitives provided
-Blarney).
-
-## Example 9: FShow class
-
-Any type in the
-[FShow](http://mn416.github.io/blarney/Blarney-FShow.html)
-class can be passed as an argument to the
-`display` function.
-
-```hs
-class FShow a where
-  fshow     :: a -> Format
-  fshowList :: [a] -> Format     -- Has default definition
-
--- Abstract data type for things that can be displayed
-newtype Format
-
--- Format constructors
-mempty :: Format                         -- Empty (from Monoid class)
-(<>)   :: Format -> Format -> Format     -- Append (from Monoid class)
-
--- Primitive instances
-instance FShow Char
-instance FShow (Bit n)
-```
-
-As an example, here is how the `FShow` instance for pairs is defined.
-
-```hs
--- Example instance: displaying pairs
-instance (FShow a, FShow b) => FShow (a, b) where
-  fshow (a, b) = fshow "(" <> fshow a <> fshow "," <> fshow b <> fshow ")"
-```
-
-Like the `Bits` class, the `FShow` class supports *generic deriving*:
-just include `FShow` in the `deriving` clause for the data type.
 
 ## Example 10: Recipes
 
