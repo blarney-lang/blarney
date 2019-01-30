@@ -1,14 +1,14 @@
 # Blarney
 
-[Blarney](http://mn416.github.io/blarney/index.html)
-is a Haskell library for hardware description that builds a
+Blarney is a Haskell library for hardware description that builds a
 range of HDL abstractions on top of a small set of core circuit
 primitives.  It is a modern variant of
-[Lava](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.110.5587&rep=rep1&type=pdf), requiring GHC 8.6.1 or later.
+[Lava](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.110.5587&rep=rep1&type=pdf),
+requiring GHC 8.6.1 or later.  Below, we introduce the library by
+example, supplementing the [Haddock
+docs](http://mn416.github.io/blarney/index.html).
 
 ## Contents
-
-Examples:
 
 * [Example 1: Two-sort](#example-1-two-sort)
 * [Example 2: Bubble sort](#example-2-bubble-sort)
