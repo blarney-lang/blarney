@@ -174,7 +174,7 @@ instance (Bits a, Interface a) => Interface (RTL a) where
 -- ===============
 
 instance (Interface a, Interface b) => Interface (a, b) where
-  writePort s (a, b) = do
+  writePort s ~(a, b) = do
     writePort (s ++ "_0") a
     writePort (s ++ "_1") b
   readPort s = do
@@ -183,7 +183,7 @@ instance (Interface a, Interface b) => Interface (a, b) where
     return (t0, t1)
 
 instance (Interface a, Interface b, Interface c) => Interface (a, b, c) where
-  writePort s (a, b, c) = do
+  writePort s ~(a, b, c) = do
     writePort (s ++ "_0") a
     writePort (s ++ "_1") b
     writePort (s ++ "_2") c
@@ -195,7 +195,7 @@ instance (Interface a, Interface b, Interface c) => Interface (a, b, c) where
 
 instance (Interface a, Interface b, Interface c, Interface d) =>
          Interface (a, b, c, d) where
-  writePort s (a, b, c, d) = do
+  writePort s ~(a, b, c, d) = do
     writePort (s ++ "_0") a
     writePort (s ++ "_1") b
     writePort (s ++ "_2") c
@@ -261,15 +261,15 @@ instance (Bits a, Bits b, Bits c, Bits d, Bits e, Interface a,
 -- ================
 
 class GInterface f where
-  gwritePort   :: String -> String -> f a -> Ifc ()
+  gwritePort :: String -> String -> f a -> Ifc ()
   greadPort  :: String -> String -> Ifc (f a)
 
 instance GInterface U1 where
-  gwritePort s t U1 = return ()
+  gwritePort s t ~U1 = return ()
   greadPort s t = return U1
 
 instance (GInterface a, GInterface b) => GInterface (a :*: b) where
-  gwritePort s t (x0 :*: x1) = do
+  gwritePort s t ~(x0 :*: x1) = do
     gwritePort s (t ++ "0") x0
     gwritePort s (t ++ "1") x1
   greadPort s t = do
@@ -278,7 +278,7 @@ instance (GInterface a, GInterface b) => GInterface (a :*: b) where
     return (x0 :*: x1)
 
 instance (GInterface a, Selector c) => GInterface (M1 S c a) where
-  gwritePort s t m@(M1 x) = 
+  gwritePort s t ~(m@(M1 x)) = 
     case null (selName m) of
       True -> gwritePort (s ++ "_" ++ t) "" x
       False -> gwritePort (s ++ "_" ++ selName m) "" x
@@ -290,19 +290,19 @@ instance (GInterface a, Selector c) => GInterface (M1 S c a) where
     return (M1 x)
 
 instance GInterface a => GInterface (M1 D c a) where
-  gwritePort s t (M1 x) = gwritePort s t x
+  gwritePort s t ~(M1 x) = gwritePort s t x
   greadPort s t = do
     x <- greadPort s t
     return (M1 x)
 
 instance GInterface a => GInterface (M1 C c a) where
-  gwritePort s t (M1 x) = gwritePort s t x
+  gwritePort s t ~(M1 x) = gwritePort s t x
   greadPort s t = do
     x <- greadPort s t
     return (M1 x)
 
 instance Interface a => GInterface (K1 i a) where
-  gwritePort s t (K1 x) = writePort s x
+  gwritePort s t ~(K1 x) = writePort s x
   greadPort s t = do
     x <- readPort s
     return (K1 x)
@@ -334,8 +334,8 @@ instance (Interface a, Interface b) => Module (a -> RTL b) where
   makeInst s ps = \a ->
     instantiate s ps $ do
       writePort "in" a
-      a <- readPort "out"
-      return a
+      b <- readPort "out"
+      return b
 
 instance (Interface a, Interface b, Interface c) =>
          Module (a -> b -> RTL c) where
