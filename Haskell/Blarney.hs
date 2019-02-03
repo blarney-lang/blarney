@@ -14,7 +14,7 @@ module Blarney
   ( module Blarney.Bit
   , module Blarney.Bits
   , module Blarney.Prelude
-  , module Blarney.RTL
+  , module Blarney.Module
   , module Blarney.FShow
   , module Blarney.Recipe
   , module Blarney.Verilog
@@ -31,7 +31,7 @@ module Blarney
 import Blarney.Bit
 import Blarney.Bits
 import Blarney.Prelude
-import Blarney.RTL
+import Blarney.Module
 import Blarney.FShow
 import Blarney.Recipe
 import Blarney.Verilog

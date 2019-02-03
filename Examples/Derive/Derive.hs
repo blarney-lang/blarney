@@ -9,8 +9,8 @@ data MemReq =
   deriving (Generic, Bits, FShow)
 
 -- Top-level module
-top :: RTL ()
-top = do
+top :: Module ()
+top = always do
   let req = MemReq { memOp = 0, memAddr = 100, memData = 0 }
   display "req = " req
   finish

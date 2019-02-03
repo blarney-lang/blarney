@@ -43,8 +43,7 @@ twoSort (a, b) = a .<. b ? ((a, b), (b, a))
 This definition makes use of three Blarney constructs: the `Bit` type
 for bit vectors (parametised by the size of the vector); the unsigned
 comparison operator `.<.`; and the ternary conditional operator `?`.
-To check that it works, let's create a test bench that supplies some
-sample inputs and displays the outputs.
+A quick test bench to check that it works:
 
 ```hs
 top :: RTL ()
@@ -317,7 +316,7 @@ Finished
 
 ## Example 7: Queues
 
-Queues (also known as FIFOs) are commonly used abstraction in hardware
+Queues (also known as FIFOs) are a commonly used abstraction in hardware
 design.  Blarney provides [a range of different queue
 implementations](http://mn416.github.io/blarney/Blarney-Queue.html),
 all of which implement the following interface.
@@ -610,7 +609,7 @@ top = do
 ```
 
 Somewhat-related to block RAMs are
-(register files)[http://mn416.github.io/blarney/Blarney-RTL.html#t:RegFile].
+[register files](http://mn416.github.io/blarney/Blarney-RTL.html#t:RegFile).
 The difference
 is that a register file allows the value at an address to be
 determined *within* a clock cycle.  It also allows any number of reads
@@ -836,7 +835,7 @@ suggesting this feature!
 ## Example 15: Tiny 8-bit CPU
 
 As a way of briging together a number of the ideas introduced above,
-let's define a very simple, 8-bit CPU with the following ISA.
+let's look at a very simple, 8-bit CPU with the following ISA.
 
   Opcode     | Meaning
   ---------- | ---------

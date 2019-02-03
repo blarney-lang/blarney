@@ -9,8 +9,8 @@ import Blarney.BitPat
 -- 11NNNNNN  | Halt
 
 -- Instruction dispatch
-top :: RTL ()
-top = do
+top :: Module ()
+top = always do
   -- Sample add instruction
   let instr :: Bit 8 = 0b01_00_01_10
 

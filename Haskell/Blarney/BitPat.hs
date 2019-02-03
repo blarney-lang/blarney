@@ -51,9 +51,9 @@ p0 <#> p1 = \n ->
 
 -- |A case alternative (pattern plus a right-hand-side)
 infix 7 ==>
-(==>) :: BP n t (RTL ()) -> t -> Bit n -> RTL ()
-p ==> rhs = \sub -> let (b, rtl) = p sub rhs in when b rtl
+(==>) :: BP n t (Action ()) -> t -> Bit n -> Action ()
+p ==> rhs = \sub -> let (b, act) = p sub rhs in when b act
 
 -- |Match case subject against set of a case alternatives
-match :: Bit n -> [Bit n -> RTL ()] -> RTL ()
+match :: Bit n -> [Bit n -> Action ()] -> Action ()
 match sub alts = sequence_ [ alt sub | alt <- alts ]

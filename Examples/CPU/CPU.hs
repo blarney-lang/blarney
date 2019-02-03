@@ -42,7 +42,7 @@ offset :: Instr -> Bit 4
 offset instr = range @5 @2 instr
 
 -- CPU
-makeCPU :: RTL ()
+makeCPU :: Module ()
 makeCPU = do
   -- Instruction memory
   instrMem :: RAM (Bit 8) Instr <- makeRAMInit "instrs.hex"
@@ -62,8 +62,9 @@ makeCPU = do
   pcNext :: Wire (Bit 8) <- makeWire 0
   let pc = reg 0 (pcNext.val)
 
-  -- Index the instruction memory
-  load instrMem (pcNext.val)
+  always do
+    -- Index the instruction memory
+    load instrMem (pcNext.val)
 
   -- Result of the execute stage
   result :: Wire (Bit 8) <- makeWire 0
@@ -73,71 +74,72 @@ makeCPU = do
 
   -- Cycle counter
   count :: Reg (Bit 32) <- makeRegU
-  count <== count.val + 1
+  always (count <== count.val + 1)
 
   -- Trigger for each pipeline stage
   go1 :: Reg (Bit 1) <- makeDReg 0
   go2 :: Reg (Bit 1) <- makeDReg 0
   go3 :: Reg (Bit 1) <- makeDReg 0
 
-  -- Start the pipeline after one cycle
-  go1 <== 1
+  always do
+    -- Start the pipeline after one cycle
+    go1 <== 1
 
-  -- Stage 1: Instruction/Operand Fetch
-  -- ==================================
+    -- Stage 1: Instruction/Operand Fetch
+    -- ==================================
 
-  when (go1.val) $ do
-    when (flush.val.inv) $ do
-      pcNext <== pc + 1
-      go2 <== 1
+    when (go1.val) $ do
+      when (flush.val.inv) $ do
+        pcNext <== pc + 1
+        go2 <== 1
 
-  load regFileA (instrMem.out.rA)
-  load regFileB (instrMem.out.rB)
+    load regFileA (instrMem.out.rA)
+    load regFileB (instrMem.out.rB)
 
-  -- Stage 2: Decode
-  -- ===============
+    -- Stage 2: Decode
+    -- ===============
   
-  -- Latch instruction
-  instr <== instrMem.out'
+    -- Latch instruction
+    instr <== instrMem.out'
 
-  -- Register forwarding logic
-  let forward rS other =
-        (result.active .&. (instr.val.rD .==. instrMem.out'.rS)) ?
-        (result.val, other)
+    -- Register forwarding logic
+    let forward rS other =
+          (result.active .&. (instr.val.rD .==. instrMem.out'.rS)) ?
+          (result.val, other)
 
-  -- Latch operands
-  opA <== forward rA (regFileA.out)
-  opB <== forward rB (regFileB.out)
+    -- Latch operands
+    opA <== forward rA (regFileA.out)
+    opB <== forward rB (regFileB.out)
 
-  -- Trigger stage 3
-  when (flush.val.inv) $ do
-    go3 <== go2.val
+    -- Trigger stage 3
+    when (flush.val.inv) $ do
+      go3 <== go2.val
 
-  -- Stage 3: Execute
-  -- ================
+    -- Stage 3: Execute
+    -- ================
 
-  -- Instruction dispatch
-  when (go3.val) $ do
-    switch (instr.val.opcode)
-      [
-        -- Load-immediate instruction
-        0 --> result <== zeroExtend (instr.val.imm),
-        -- Add instruction
-        1 --> result <== opA.val + opB.val,
-        -- Branch instruction
-        2 --> do when (opB.val .!=. 0) $ do
-                   pcNext <== pc - zeroExtend (instr.val.offset) - 2
-                   -- Control hazard
-                   flush <== 1,
-        -- Halt instruction
-        3 --> finish
-      ]
+    -- Instruction dispatch
+    when (go3.val) $ do
+      switch (instr.val.opcode)
+        [
+          -- Load-immediate instruction
+          0 --> result <== zeroExtend (instr.val.imm),
+          -- Add instruction
+          1 --> result <== opA.val + opB.val,
+          -- Branch instruction
+          2 --> do when (opB.val .!=. 0) $ do
+                     pcNext <== pc - zeroExtend (instr.val.offset) - 2
+                     -- Control hazard
+                     flush <== 1,
+          -- Halt instruction
+          3 --> finish
+        ]
 
-    -- Writeback
-    when (result.active) $ do
-      store regFileA (instr.val.rD) (result.val)
-      store regFileB (instr.val.rD) (result.val)
-      display (count.val) ": rf[" (instr.val.rD) "] := " (result.val)
+      -- Writeback
+      when (result.active) $ do
+        store regFileA (instr.val.rD) (result.val)
+        store regFileB (instr.val.rD) (result.val)
+        display (count.val) ": rf[" (instr.val.rD) "] := " (result.val)
 
 -- Main function
 main :: IO ()

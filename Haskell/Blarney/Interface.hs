@@ -31,7 +31,7 @@ Blarney description.
 module Blarney.Interface 
   ( Ifc           -- Monad for constructing Verilog interfaces
   , Interface(..) -- Class of types that can be converted to Verilog I/O ports
-  , Module(..)    -- Class of types that can be turned into Verilog modules
+  , Modular(..)   -- Class of types that can be turned into Verilog modules
   , makeModule    -- Convert a Blarney function to a Verilog module
   , makeInstance  -- Instantiate a Verilog module in a Blarney description
   , makeInstanceWithParams  -- Allow synthesis-time Verilog parameters
@@ -49,7 +49,7 @@ import Blarney.Bit
 import Blarney.BV
 import Blarney.Bits
 import Blarney.Prelude
-import Blarney.RTL
+import Blarney.Module
 
 -- The Ifc monad
 -- =============
@@ -65,7 +65,7 @@ data Pin = WritePin BV | ReadPin Integer
 type W = [(String, Pin)]
 
 -- |The 'Ifc' monad
-newtype Ifc a = Ifc { runIfc :: R -> RTL (W, a) }
+newtype Ifc a = Ifc { runIfc :: R -> Module (W, a) }
 
 instance Monad Ifc where
   return a = Ifc $ \r -> return ([], a)
@@ -93,14 +93,14 @@ readPin s = Ifc $ \r ->
               Just x -> FromBV x
   in  return ([(s, ReadPin (natVal out))], out)
 
--- |Lift an RTL action to an Ifc action
-liftRTL :: RTL a -> Ifc a
-liftRTL rtl = Ifc $ \r -> do
-  res <- rtl
+-- |Lift a Module computation to an Ifc computation
+liftModule :: Module a -> Ifc a
+liftModule m = Ifc $ \r -> do
+  res <- m
   return ([], res)
 
 -- |Create an instance of a module
-instantiate :: String -> [Param] -> Ifc a -> RTL a
+instantiate :: String -> [Param] -> Ifc a -> Module a
 instantiate name params ifc = do
     rec (w, a) <- runIfc ifc (custom w)
     return a
@@ -113,7 +113,7 @@ instantiate name params ifc = do
               (makePrim prim (map snd inputs) (map snd outputs))
 
 -- |Create a module that can be instantiated
-modularise :: Ifc a -> RTL a
+modularise :: Ifc a -> Module a
 modularise ifc = mdo
     (w, a) <- runIfc ifc inps
     inps <- mod w
@@ -151,23 +151,23 @@ instance KnownNat n => Interface (Bit n) where
   writePort = writePin
   readPort = readPin
 
-instance (Bits a, Interface a) => Interface (RTL a) where
-  writePort s rtl = do
+instance (Bits a, Interface a) => Interface (Action a) where
+  writePort s act = do
     -- Get enable output
     enable <- readPort (s ++ "_en") 
-    -- Run RTL block when enabled
-    res <- liftRTL (whenR enable rtl)
-    -- Feed RTL result back as input
+    -- Run action block when enabled
+    res <- liftModule (always (whenR enable act))
+    -- Feed action result back as input
     writePort (s ++ "_res") res
 
   readPort s = do
     -- Get result output
     res <- readPort (s ++ "_res")
     -- Create enable wire
-    enable :: Wire (Bit 1) <- liftRTL (makeWire 0)
+    enable :: Wire (Bit 1) <- liftModule (makeWire 0)
     -- Put enable wire as input
     writePort (s ++ "_en") (val enable)
-    -- When RTL block is called, trigger the enable line
+    -- When action block is called, trigger the enable line
     return (do { enable <== 1; return res })
 
 -- Tuple instances
@@ -211,7 +211,7 @@ instance (Interface a, Interface b, Interface c, Interface d) =>
 -- ==================
 
 instance (Bits a, Bits b, Interface a, Interface b) =>
-         Interface (a -> RTL b) where
+         Interface (a -> Action b) where
   writePort s f = do
     -- Get function argument
     arg0 <- readPort (s ++ "_arg")
@@ -220,19 +220,19 @@ instance (Bits a, Bits b, Interface a, Interface b) =>
 
   readPort s = do
     -- Function argument is an input
-    arg0 :: Wire a <- liftRTL (makeWire dontCare)
+    arg0 :: Wire a <- liftModule (makeWire dontCare)
     -- Supply it
     writePort (s ++ "_arg") (val arg0)
     -- Function result is an output
-    rtl <- readPort s
+    act <- readPort s
     -- Return function that assigns argument
     return $ \a -> do
       arg0 <== a
-      rtl
+      act
 
 instance (Bits a, Bits b, Bits c,
           Interface a, Interface b, Interface c) =>
-          Interface (a -> b -> RTL c) where
+          Interface (a -> b -> Action c) where
   writePort s f = do
     writePort s (\(a, b) -> f a b)
   readPort s = do
@@ -241,7 +241,7 @@ instance (Bits a, Bits b, Bits c,
 
 instance (Bits a, Bits b, Bits c, Bits d,
           Interface a, Interface b, Interface c, Interface d) =>
-          Interface (a -> b -> c -> RTL d) where
+          Interface (a -> b -> c -> Action d) where
   writePort s f = do
     writePort s (\(a, b, c) -> f a b c)
   readPort s = do
@@ -250,7 +250,7 @@ instance (Bits a, Bits b, Bits c, Bits d,
 
 instance (Bits a, Bits b, Bits c, Bits d, Bits e, Interface a,
           Interface b, Interface c, Interface d, Interface e) =>
-          Interface (a -> b -> c -> d -> RTL e) where
+          Interface (a -> b -> c -> d -> Action e) where
   writePort s f = do
     writePort s (\(a, b, c, d) -> f a b c d)
   readPort s = do
@@ -307,28 +307,28 @@ instance Interface a => GInterface (K1 i a) where
     x <- readPort s
     return (K1 x)
 
--- Module class
--- ============
+-- Modular class
+-- =============
 
 -- |Any type in this class can be turned into a module when doing
 -- separate compilation.
-class Module a where
-  makeMod :: a -> RTL ()
+class Modular a where
+  makeMod :: a -> Module ()
   makeInst :: String -> [Param] -> a
 
-instance Interface a => Module (RTL a) where
-  makeMod rtl = modularise $ do
-    a <- liftRTL rtl
+instance Interface a => Modular (Module a) where
+  makeMod m = modularise $ do
+    a <- liftModule m
     writePort "out" a
 
   makeInst s ps = instantiate s ps $ do
     a <- readPort "out"
     return a
 
-instance (Interface a, Interface b) => Module (a -> RTL b) where
+instance (Interface a, Interface b) => Modular (a -> Module b) where
   makeMod f = modularise $ do
     a <- readPort "in"
-    b <- liftRTL (f a)
+    b <- liftModule (f a)
     writePort "out" b
 
   makeInst s ps = \a ->
@@ -338,25 +338,25 @@ instance (Interface a, Interface b) => Module (a -> RTL b) where
       return b
 
 instance (Interface a, Interface b, Interface c) =>
-         Module (a -> b -> RTL c) where
+         Modular (a -> b -> Module c) where
   makeMod f = makeMod (\(a, b) -> f a b)
   makeInst s ps = \a b -> makeInst s ps (a, b)
 
 instance (Interface a, Interface b, Interface c, Interface d) =>
-         Module (a -> b -> c -> RTL d) where
+         Modular (a -> b -> c -> Module d) where
   makeMod f = makeMod (\(a, b, c) -> f a b c)
   makeInst s ps = \a b c -> makeInst s ps (a, b, c)
 
 instance (Interface a, Interface b, Interface c, Interface d, Interface e) =>
-         Module (a -> b -> c -> d -> RTL e) where
+         Modular (a -> b -> c -> d -> Module e) where
   makeMod f = makeMod (\(a, b, c, d) -> f a b c d)
   makeInst s ps = \a b c d -> makeInst s ps (a, b, c, d)
 
-makeModule :: Module a => a -> RTL ()
+makeModule :: Modular a => a -> Module ()
 makeModule = makeMod
 
-makeInstance :: Module a => String -> a
+makeInstance :: Modular a => String -> a
 makeInstance s = makeInst s []
 
-makeInstanceWithParams :: Module a => String -> [Param] -> a
+makeInstanceWithParams :: Modular a => String -> [Param] -> a
 makeInstanceWithParams s ps = makeInst s ps

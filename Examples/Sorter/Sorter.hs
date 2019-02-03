@@ -4,7 +4,7 @@ twoSort :: (Bit 8, Bit 8) -> (Bit 8, Bit 8)
 twoSort (a, b) = a .<. b ? ((a, b), (b, a))
 
 {-
-top :: RTL ()
+top :: Module ()
 top = do
   display "twoSort (1,2) = " (twoSort (1,2))
   display "twoSort (2,1) = " (twoSort (2,1))
@@ -22,8 +22,8 @@ sort [] = []
 sort (x:xs) = smallest : sort rest
   where (smallest:rest) = bubble (x:xs)
 
-top :: RTL ()
-top = do
+top :: Module ()
+top = always do
   let inputs = [0x3, 0x4, 0x1, 0x0, 0x2]
   display "sort " inputs " = " (sort inputs)
   finish

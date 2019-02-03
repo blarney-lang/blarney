@@ -12,7 +12,7 @@ import Blarney.RAM
 import Blarney.BitPat
 import System.Process
 
-makeCPUSpec :: RTL ()
+makeCPUSpec :: Module ()
 makeCPUSpec = do
   -- Instruction memory (containing 32 instructions)
   instrMem :: RAM (Bit 5) (Bit 8) <- makeRAMInit "instrs.hex"
@@ -48,21 +48,22 @@ makeCPUSpec = do
   -- Halt instruction
   let halt imm = finish
 
-  -- Fetch
-  when (fetch.val) $ do
-    load instrMem (pc.val)
-    fetch <== 0
+  always do
+    -- Fetch
+    when (fetch.val) $ do
+      load instrMem (pc.val)
+      fetch <== 0
 
-  -- Execute
-  when (fetch.val.inv) $ do
-    match (instrMem.out)
-      [
-        lit 0b00 <#> var @2 <#> var @4              ==>  li,
-        lit 0b01 <#> var @2 <#> var @2  <#> var @2  ==>  add,
-        lit 0b10 <#> var @4 <#> var @2              ==>  bnz,
-        lit 0b11 <#> var @6                         ==>  halt
-      ]
-    fetch <== 1
+    -- Execute
+    when (fetch.val.inv) $ do
+      match (instrMem.out)
+        [
+          lit 0b00 <#> var @2 <#> var @4              ==>  li,
+          lit 0b01 <#> var @2 <#> var @2  <#> var @2  ==>  add,
+          lit 0b10 <#> var @4 <#> var @2              ==>  bnz,
+          lit 0b11 <#> var @6                         ==>  halt
+        ]
+      fetch <== 1
 
 main :: IO ()
 main = do

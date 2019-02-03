@@ -1,6 +1,6 @@
 import Blarney
 
-fact :: RTL ()
+fact :: Module ()
 fact = do
   -- State
   n   :: Reg (Bit 32) <- makeReg 0
@@ -9,14 +9,14 @@ fact = do
   -- Compute factorial of 10
   let recipe =
         Seq [
-          RTL do
+          Action do
             n <== 10
         , While (n.val .>. 0) (
-            RTL do
+            Action do
               n <== n.val - 1
               acc <== acc.val * n.val
           )
-        , RTL do
+        , Action do
             display "fact(10) = " (acc.val)
             finish
         ]
