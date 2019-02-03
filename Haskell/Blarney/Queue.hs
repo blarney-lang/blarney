@@ -1,7 +1,8 @@
 {-# LANGUAGE Rank2Types          #-}
 {-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE BlockArguments      #-}
 {-# LANGUAGE RebindableSyntax    #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 {-|
 Module      : Blarney.Queue

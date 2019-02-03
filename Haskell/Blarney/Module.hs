@@ -1,3 +1,6 @@
+{-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE RankNTypes                 #-}
+{-# LANGUAGE BlockArguments             #-}
 {-# LANGUAGE NoDeriveAnyClass           #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
