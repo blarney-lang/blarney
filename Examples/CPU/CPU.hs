@@ -62,10 +62,6 @@ makeCPU = do
   pcNext :: Wire (Bit 8) <- makeWire 0
   let pc = reg 0 (pcNext.val)
 
-  always do
-    -- Index the instruction memory
-    load instrMem (pcNext.val)
-
   -- Result of the execute stage
   result :: Wire (Bit 8) <- makeWire 0
 
@@ -82,14 +78,17 @@ makeCPU = do
   go3 :: Reg (Bit 1) <- makeDReg 0
 
   always do
+    -- Index the instruction memory
+    load instrMem (pcNext.val)
+
     -- Start the pipeline after one cycle
     go1 <== 1
 
     -- Stage 1: Instruction/Operand Fetch
     -- ==================================
 
-    when (go1.val) $ do
-      when (flush.val.inv) $ do
+    when (go1.val) do
+      when (flush.val.inv) do
         pcNext <== pc + 1
         go2 <== 1
 
@@ -112,14 +111,14 @@ makeCPU = do
     opB <== forward rB (regFileB.out)
 
     -- Trigger stage 3
-    when (flush.val.inv) $ do
+    when (flush.val.inv) do
       go3 <== go2.val
 
     -- Stage 3: Execute
     -- ================
 
     -- Instruction dispatch
-    when (go3.val) $ do
+    when (go3.val) do
       switch (instr.val.opcode)
         [
           -- Load-immediate instruction
@@ -127,16 +126,16 @@ makeCPU = do
           -- Add instruction
           1 --> result <== opA.val + opB.val,
           -- Branch instruction
-          2 --> do when (opB.val .!=. 0) $ do
-                     pcNext <== pc - zeroExtend (instr.val.offset) - 2
-                     -- Control hazard
-                     flush <== 1,
+          2 --> when (opB.val .!=. 0) do
+                   pcNext <== pc - zeroExtend (instr.val.offset) - 2
+                   -- Control hazard
+                   flush <== 1,
           -- Halt instruction
           3 --> finish
         ]
 
       -- Writeback
-      when (result.active) $ do
+      when (result.active) do
         store regFileA (instr.val.rD) (result.val)
         store regFileB (instr.val.rD) (result.val)
         display (count.val) ": rf[" (instr.val.rD) "] := " (result.val)
