@@ -8,12 +8,12 @@ import Data.List
 type Temp = Bit 32
 
 -- Update cell using values of neighbours
-step :: Reg Temp -> [Temp] -> RTL ()
+step :: Reg Temp -> [Temp] -> Action ()
 step me neighbours =
   me <== sumList neighbours .>>. 2
 
 -- Top-level
-top :: Integer -> Int -> Int -> RTL ()
+top :: Integer -> Int -> Int -> Module ()
 top t w h = do
   -- North and east borders (initialised hot)
   north <- replicateM w (makeReg 0xff0000)
@@ -23,21 +23,23 @@ top t w h = do
   west  <- replicateM (h-2) (makeReg 0x2a0000)
   -- Remaining cells
   cells <- replicateM (h-2) (replicateM (w-2) (makeReg 0))
+  -- Count time steps
+  timer :: Reg (Bit 32) <- makeReg 0
   -- Overall grid
   let grid = [north]
           ++ transpose ([east] ++ transpose cells ++ [west])
           ++ [south]
-  -- Mesh
-  mesh step grid
-  -- Count time steps
-  timer :: Reg (Bit 32) <- makeReg 0
-  timer <== timer.val + 1
-  -- Termination
-  when (timer.val .==. fromInteger t) $ do
-    forM_ (zip [0..] grid) $ \(i, row) -> 
-      forM_ (zip [0..] row) $ \(j, cell) ->
-        display (show i) "," (show j) ":" (cell.val .>>. 16)
-    finish
+  always do
+    -- Mesh
+    mesh step grid
+    -- Increment time
+    timer <== timer.val + 1
+    -- Termination
+    when (timer.val .==. fromInteger t) $ do
+      forM_ (zip [0..] grid) $ \(i, row) -> 
+        forM_ (zip [0..] row) $ \(j, cell) ->
+          display (show i) "," (show j) ":" (cell.val .>>. 16)
+      finish
 
 -- Main function
 main :: IO ()

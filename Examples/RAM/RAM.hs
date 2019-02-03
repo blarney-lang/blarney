@@ -2,7 +2,7 @@ import Blarney
 import Blarney.RAM
 
 -- Top-level module
-top :: RTL ()
+top :: Module ()
 top = do
   -- RAM
   ram :: RAM (Bit 8) (Bit 128) <- makeRAM
@@ -31,7 +31,7 @@ top = do
 
   done <- run (reg 1 0) testSeq
 
-  when done finish
+  always (when done finish)
 
   return ()
 

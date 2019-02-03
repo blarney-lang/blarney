@@ -38,5 +38,6 @@ below = transpose . right . transpose
 trim :: Mesh a -> Mesh a
 trim = map tail . map init . tail . init
 
-mesh :: B.Bits a => (B.Reg a -> [a] -> B.RTL ()) -> Mesh (B.Reg a) -> B.RTL ()
+mesh :: B.Bits a => (B.Reg a -> [a] -> B.Action ()) ->
+          Mesh (B.Reg a) -> B.Action ()
 mesh f m = uncurry f `onM_` trim (merge (,) m (map B.val `on` neighbours m))

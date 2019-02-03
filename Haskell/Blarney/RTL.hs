@@ -32,20 +32,17 @@ module Blarney.RTL
   , switch          -- RTL switch statement
   , (-->)           -- Operator for switch statement alternatives
     -- * Mutable variables: registers and wires
-  , Var(..)         -- Mutable variables
-  , Reg             -- Registers
-  , Wire(           -- Wires
-      val'          -- Registered value of wire
-    , active        -- Is wire being written to?
-    , active'       -- Registered value of active
-    )
+  , Reg(..)         -- Registers
+  , writeReg        -- Write to register
+  , Wire(..)        -- Wires
+  , writeWire       -- Write to wire
   , makeReg         -- Create register
   , makeRegU        -- Create uninitialised regiseter
   , makeWire        -- Create wire
   , makeWireU       -- Create uninitialised wire
   , makeDReg        -- Like makeReg, but holds value one cycle only
     -- * Simulation-time statements
-  , Displayable     -- To support N-ary display statement
+  , Displayable(..) -- To support N-ary display statement
   , display         -- Display statement
   , finish          -- Terminate simulator
     -- * External inputs and outputs
@@ -54,7 +51,7 @@ module Blarney.RTL
   , inputBV         -- Declare module input (untyped)
   , outputBV        -- Declare module output (untyped)
     -- * Register files
-  , RegFile(..)     -- Register file interface
+  , RegFileRTL(..)  -- Register file interface
   , makeRegFileInit -- Create initialised register file
   , makeRegFile     -- Create uninitialised register file
     -- * Convert RTL to a netlist
@@ -192,12 +189,6 @@ infixl 0 -->
 (-->) :: a -> RTL () -> (a, RTL ())
 lhs --> rhs = (lhs, rhs)
 
--- |Mutable variables
-infix 1 <==
-class Var v where
-  val :: Bits a => v a -> a
-  (<==) :: Bits a => v a -> a -> RTL ()
-
 -- |Register variables
 data Reg a =
   Reg {
@@ -208,16 +199,15 @@ data Reg a =
   }
 
 -- |Register assignment
-instance Var Reg where
-  val v = regVal v
-  v <== x = do
-    r <- ask
-    write $ RTLAssign $
-      Assign {
-        enable = cond r
-      , lhs = regId v
-      , rhs = toBV (pack x)
-      }
+writeReg :: Bits a => Reg a -> a -> RTL ()
+writeReg v x = do
+  r <- ask
+  write $ RTLAssign $
+    Assign {
+      enable = cond r
+    , lhs = regId v
+    , rhs = toBV (pack x)
+    }
 
 -- |Wire variables
 data Wire a =
@@ -235,16 +225,15 @@ data Wire a =
   }
 
 -- |Wire assignment
-instance Var Wire where
-  val v = wireVal v
-  v <== x = do
-    r <- ask
-    write $ RTLAssign $
-      Assign {
-        enable = cond r
-      , lhs = wireId v
-      , rhs = toBV (pack x)
-      }
+writeWire :: Bits a => Wire a -> a -> RTL ()
+writeWire v x = do
+  r <- ask
+  write $ RTLAssign $
+    Assign {
+      enable = cond r
+    , lhs = wireId v
+    , rhs = toBV (pack x)
+    }
 
 -- |Create wire with don't care initial value
 makeRegU :: Bits a => RTL (Reg a)
@@ -297,7 +286,7 @@ makeDReg defaultVal = do
   r :: Reg a <- makeReg defaultVal
 
   -- Always assign to the register
-  r <== val w
+  writeReg r (wireVal w)
 
   -- Write to wire and read from reg
   return (Reg { regId = wireId w, regVal = regVal r })
@@ -356,14 +345,15 @@ outputBV str bv = write (RTLOutput (bvWidth bv, str, bv))
 -- ==============
 
 -- |Register file interface
-data RegFile a d =
-  RegFile {
-    (!)    :: a -> d
-  , update :: a -> d -> RTL ()
+data RegFileRTL a d =
+  RegFileRTL {
+    lookupRTL :: a -> d
+  , updateRTL :: a -> d -> RTL ()
   }
 
 -- | Create register file with initial contents
-makeRegFileInit :: forall a d. (Bits a, Bits d) => String -> RTL (RegFile a d)
+makeRegFileInit :: forall a d. (Bits a, Bits d) =>
+                     String -> RTL (RegFileRTL a d)
 makeRegFileInit initFile = do
   -- Create regsiter file identifier
   id <- fresh
@@ -376,17 +366,17 @@ makeRegFileInit initFile = do
   write $ RTLRegFileCreate (initFile, id, aw, dw)
 
   return $
-    RegFile {
-      (!) = \a ->
+    RegFileRTL {
+      lookupRTL = \a ->
         unpack $ FromBV $ regFileReadBV id dw $ toBV (pack a)
-    , update = \a d -> do
+    , updateRTL = \a d -> do
         r <- ask
         write $
           RTLRegFileUpdate (id, cond r, aw, dw, toBV (pack a), toBV (pack d))
     }
 
 -- |Create uninitialised register file
-makeRegFile :: forall a d. (Bits a, Bits d) => RTL (RegFile a d)
+makeRegFile :: forall a d. (Bits a, Bits d) => RTL (RegFileRTL a d)
 makeRegFile = makeRegFileInit ""
 
 -- Netlist generation

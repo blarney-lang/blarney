@@ -15,7 +15,7 @@ docs](http://mn416.github.io/blarney/index.html).
 * [Example 3: Polymorphism](#example-3-polymorphism)
 * [Example 4: Bits class](#example-4-bits-class)
 * [Example 5: FShow class](#example-5-fshow-class)
-* [Example 6: Basic RTL](#example-6-basic-rtl)
+* [Example 6: Mutable registers](#example-6-mutable-registers)
 * [Example 7: Queues](#example-7-queues)
 * [Example 8: Wires](#example-8-wires)
 * [Example 9: Bit selection](#example-9-bit-selection)
@@ -43,20 +43,27 @@ twoSort (a, b) = a .<. b ? ((a, b), (b, a))
 This definition makes use of three Blarney constructs: the `Bit` type
 for bit vectors (parametised by the size of the vector); the unsigned
 comparison operator `.<.`; and the ternary conditional operator `?`.
-To check that it works, let's create a test bench that supplies some
-sample inputs and displays the outputs.
+A quick test bench to check that it works:
 
 ```hs
-top :: RTL ()
-top = do
+top :: Module ()
+top = always do
   display "twoSort (0x1,0x2) = " (twoSort (0x1,0x2))
   display "twoSort (0x2,0x1) = " (twoSort (0x2,0x1))
   finish
 ```
 
-We use Blarney's RTL (register-transfer level) monad.  All statements
-in this monad are executed *in parallel* and *on every clock cycle*.
-We can generate some Verilog as follows.
+We use Blarney's `always` construct
+
+```hs
+always :: Action a -> Module a
+```
+
+which performs the given action *on every clock cycle*.  Blarney
+actions include statements for displaying values during simulation
+(`display`), terminating the simulator (`finish`), and mutating state
+(see below).  All statements in an `Action` execute in parallel.  We
+can generate Verilog for the test bench as follows.
 
 ```hs
 main :: IO ()
@@ -118,8 +125,8 @@ sort xs = smallest : sort rest
 Running the test bench
 
 ```hs
-top :: RTL ()
-top = do
+top :: Module ()
+top = always do
   let inputs = [0x3, 0x4, 0x1, 0x0, 0x2]
   display "sort " inputs " = " (sort inputs)
   finish
@@ -223,8 +230,8 @@ Blarney).
 
 Any type in the
 [FShow](http://mn416.github.io/blarney/Blarney-FShow.html)
-class can be passed as an argument to the
-`display` function.
+class can be passed as arguments to the
+variadic `display` function.
 
 ```hs
 class FShow a where
@@ -255,38 +262,40 @@ Like the `Bits` class, the `FShow` class supports *generic deriving*:
 just include `FShow` in the `deriving` clause for the data type.
 
 
-## Example 6: Basic RTL
+## Example 6: Mutable registers
 
-So far, we've only seen the `display` and `finish` actions of the RTL
-monad.  It also supports creation and assignment of registers.  To
-illustrate, here is an RTL block that creates a 4-bit `cycleCount`
-register, increments it on each cycle, stopping when it reaches 10.
+So far, we've only seen `display` and `finish` actions inside a
+Blarney module.  It also supports creation and assignment of
+registers.  To illustrate, here is a module that creates a 4-bit
+`cycleCount` register, increments it on each cycle, stopping when it
+reaches 10.
 
 ```hs
-top :: RTL ()
+top :: Module ()
 top = do
   -- Create a register
   cycleCount :: Reg (Bit 4) <- makeReg 0
 
-  -- Increment on every cycle
-  cycleCount <== cycleCount.val + 1
+  always do
+    -- Increment on every cycle
+    cycleCount <== cycleCount.val + 1
 
-  -- Display value on every cycle
-  display "cycleCount = " (cycleCount.val)
+    -- Display value on every cycle
+    display "cycleCount = " (cycleCount.val)
 
-  -- Terminate simulation when count reaches 10
-  when (cycleCount.val .==. 10) do
-    display "Finished"
-    finish
+    -- Terminate simulation when count reaches 10
+    when (cycleCount.val .==. 10) do
+      display "Finished"
+      finish
 ```
 
 This example introduces a number of new library functions: `makeReg`
 creates a register, initialised to the given value; `val` returns the
 value of a register; the `.` operator is defined by Blarney as
 *reverse function application* rather than the usual *function
-composition*; and `when` allows conditional RTL blocks to be
-introduced.  One can also use `if`/`then`/`else` in an RTL context,
-thanks to Haskell's rebindable syntax feature.
+composition*; and `when` allows conditional actions to be introduced.
+One can also use `if`/`then`/`else` in an `Action` context, thanks to
+Haskell's rebindable syntax feature.
 
 ```hs
   -- Terminate simulation when count reaches 10
@@ -317,7 +326,7 @@ Finished
 
 ## Example 7: Queues
 
-Queues (also known as FIFOs) are commonly used abstraction in hardware
+Queues (also known as FIFOs) are a commonly used abstraction in hardware
 design.  Blarney provides [a range of different queue
 implementations](http://mn416.github.io/blarney/Blarney-Queue.html),
 all of which implement the following interface.
@@ -326,12 +335,12 @@ all of which implement the following interface.
 -- Queue interface
 data Queue a =
   Queue {
-    notEmpty :: Bit 1        -- Is the queue non-empty?
-  , notFull  :: Bit 1        -- Is there any space in the queue?
-  , enq      :: a -> RTL ()  -- Insert an element (assuming notFull)
-  , deq      :: RTL ()       -- Remove the first element (assuming canDeq)
-  , canDeq   :: Bit 1        -- Guard on the deq and first methods
-  , first    :: a            -- View the first element (assuming canDeq)
+    notEmpty :: Bit 1           -- Is the queue non-empty?
+  , notFull  :: Bit 1           -- Is there any space in the queue?
+  , enq      :: a -> Action ()  -- Insert an element (assuming notFull)
+  , deq      :: Action ()       -- Remove the first element (assuming canDeq)
+  , canDeq   :: Bit 1           -- Guard on the deq and first methods
+  , first    :: a               -- View the first element (assuming canDeq)
   }
 ```
 
@@ -345,7 +354,7 @@ one-element queue.
 
 ```hs
 -- Simple one-element queue implementation
-makeSimpleQueue :: Bits a => RTL (Queue a)
+makeSimpleQueue :: Bits a => Module (Queue a)
 makeSimpleQueue = do
   -- Register holding the one element
   reg :: Reg a <- makeReg dontCare
@@ -370,49 +379,52 @@ The following simple test bench illustrates how to use a queue.
 
 ```hs
 -- Small test bench for queues
-top :: RTL ()
+top :: Module ()
 top = do
   -- Instantiate a queue of 8-bit values
   queue :: Queue (Bit 8) <- makeSimpleQueue
 
   -- Create an 8-bit count register
   count :: Reg (Bit 8) <- makeReg 0
-  count <== count.val + 1
 
-  -- Writer side
-  when (queue.notFull) do
-    enq queue (count.val)
-    display "Enqueued " (count.val)
+  always do
+    count <== count.val + 1
 
-  -- Reader side
-  when (queue.canDeq) do
-    deq queue
-    display "Dequeued " (queue.first)
+    -- Writer side
+    when (queue.notFull) do
+      enq queue (count.val)
+      display "Enqueued " (count.val)
 
-  -- Terminate after 100 cycles
-  when (count.val .==. 100) finish
+    -- Reader side
+    when (queue.canDeq) do
+      deq queue
+      display "Dequeued " (queue.first)
+
+    -- Terminate after 100 cycles
+    when (count.val .==. 100) finish
 ```
 
 ## Example 8: Wires
 
-*Wires* are a feature of the RTL monad that offer a way for separate
-RTL blocks to communicate *within the same clock cycle*.  Whereas
-assignment to a register becomes visible on the clock cycle after the
-assigment occurs, assignment to a wire is visible on the same cycle as
-the assignment.  If no assignment is made to a wire on a particular
-cycle, then the wire emits its *default value* on that cycle.  When
-multiple assignments to the same wire occur on the same cycle, the
-wire emits the bitwise disjunction of all the assigned values.
+*Wires* are a feature of the `Action` monad that offer a way for
+separate action blocks to communicate *within the same clock cycle*.
+Whereas assignment to a register becomes visible on the clock cycle
+after the assigment occurs, assignment to a wire is visible on the
+same cycle as the assignment.  If no assignment is made to a wire on a
+particular cycle, then the wire emits its *default value* on that
+cycle.  When multiple assignments to the same wire occur on the same
+cycle, the wire emits the bitwise disjunction of all the assigned
+values.
 
 To illustrate, let's implement an *n*-bit counter module that supports
-increment and decerement operations.
+increment and decrement operations.
 
 ```hs
 -- Interface for a n-bit counter
 data Counter n =
   Counter {
-    inc    :: RTL ()
-  , dec    :: RTL ()
+    inc    :: Action ()
+  , dec    :: Action ()
   , output :: Bit n
   }
 ```
@@ -422,7 +434,7 @@ That is, if `inc` and `dec` are called on the same cycle then the
 counter's `output` is unchanged.  We'll achieve this using wires.
 
 ```hs
-makeCounter :: KnownNat n => RTL (Counter n)
+makeCounter :: KnownNat n => Module (Counter n)
 makeCounter = do
   -- State
   count :: Reg (Bit n) <- makeReg 0
@@ -431,13 +443,14 @@ makeCounter = do
   incWire :: Wire (Bit 1) <- makeWire 0
   decWire :: Wire (Bit 1) <- makeWire 0
 
-  -- Increment
-  when (incWire.val .&. decWire.val.inv) do
-    count <== count.val + 1
+  always do
+    -- Increment
+    when (incWire.val .&. decWire.val.inv) do
+      count <== count.val + 1
 
-  -- Decrement
-  when (incWire.val.inv .&. decWire.val) do
-    count <== count.val - 1
+    -- Decrement
+    when (incWire.val.inv .&. decWire.val) do
+      count <== count.val - 1
 
   -- Interface
   let inc    = incWire <== 1
@@ -488,7 +501,7 @@ however, they can be expressed more neatly in a
 data Recipe = 
     Skip                   -- Do nothing (in zero cycles)
   | Tick                   -- Do nothing (in one cycle)
-  | RTL (RTL ())           -- Perform RTL block (in one cycle)
+  | Action (Action ())     -- Perform action (in one cycle)
   | Seq [Recipe]           -- Execute recipes in sequence
   | Par [Recipe]           -- Fork-join parallelism
   | If (Bit 1) Recipe      -- Conditional recipe
@@ -499,7 +512,7 @@ To illustrate, here is a small state machine that computes the
 factorial of 10.
 
 ```hs
-fact :: RTL ()
+fact :: Module ()
 fact = do
   -- State
   n   :: Reg (Bit 32) <- makeReg 0
@@ -508,14 +521,14 @@ fact = do
   -- Compute factorial of 10
   let recipe =
         Seq [
-          RTL do
+          Action do
             n <== 10
         , While (n.val .>. 0) (
-            RTL do
+            Action do
               n <== n.val - 1
               acc <== acc.val * n.val
           )
-        , RTL do
+        , Action do
             display "fact(10) = " (acc.val)
             finish
         ]
@@ -533,7 +546,7 @@ defined earlier.
 
 ```hs
 -- Test-bench for a counter
-top :: RTL ()
+top :: Module ()
 top = do
   -- Instantiate an 4-bit counter
   counter :: Counter 4 <- makeCounter
@@ -541,14 +554,14 @@ top = do
   -- Sample test sequence
   let test =
         Seq [
-          RTL do
+          Action do
             counter.inc
-        , RTL do
+        , Action do
             counter.inc
-        , RTL do
+        , Action do
             counter.inc
             counter.dec
-        , RTL do
+        , Action do
             display "counter = " (counter.output)
             finish
         ]
@@ -574,8 +587,8 @@ They are all based around the following interface.
 -- (Parameterised by the address width a and the data width d)
 data RAM a d =
   RAM {
-    load    :: a -> RTL ()
-  , store   :: a -> d -> RTL ()
+    load    :: a -> Action ()
+  , store   :: a -> d -> Action ()
   , out     :: d
   }
 ```
@@ -589,7 +602,7 @@ cycle.  To illustrate, here is a test bench that creates a block RAM
 and performs a `store` followed by a `load`.
 
 ```hs
-top :: RTL ()
+top :: Module ()
 top = do
   -- Instantiate a 256 element RAM of 5-bit values
   ram :: RAM (Bit 8) (Bit 5) <- makeRAM
@@ -597,11 +610,11 @@ top = do
   -- Write 10 to ram[0] and read it back again
   let test =
         Seq [
-          RTL do
+          Action do
             store ram 0 10
-        , RTL do
+        , Action do
             load ram 0
-        , RTL do
+        , Action do
             display "Got " (ram.out)
             finish
         ]
@@ -610,7 +623,7 @@ top = do
 ```
 
 Somewhat-related to block RAMs are
-(register files)[http://mn416.github.io/blarney/Blarney-RTL.html#t:RegFile].
+[register files](http://mn416.github.io/blarney/Blarney-Module.html#t:RegFile).
 The difference
 is that a register file allows the value at an address to be
 determined *within* a clock cycle.  It also allows any number of reads
@@ -620,8 +633,8 @@ the following interface.
 ```hs
 data RegFile a d =
   RegFile {
-    (!)    :: a -> d              -- Read
-  , update :: a -> d -> RTL ()    -- Write
+    (!)    :: a -> d                -- Read
+  , update :: a -> d -> Action()    -- Write
   }
 ```
 
@@ -639,12 +652,10 @@ Blarney,
 are captured by the following interface.
 
 ```hs
-type Stream a = Get a
-
-data Get a =
-  Get {
-    get    :: RTL ()
-  , canGet :: Bit 1
+data Stream a =
+  Stream {
+    canGet :: Bit 1
+  , get    :: Action ()
   , value  :: a
   }
 ```
@@ -656,8 +667,8 @@ converted to a stream:
 -- Convert a queue to a stream
 toStream :: Queue a -> Stream a
 toStream q =
-  Get {
-    get    = q.deq
+  Stream {
+    get    = deq q
   , canGet = q.canDeq
   , value  = q.first
   }
@@ -667,15 +678,16 @@ As an example, here's a function that increments each value in the
 input stream to produce the output stream.
 
 ```hs
-incS :: Stream (Bit 8) -> RTL (Stream (Bit 8))
+incS :: Stream (Bit 8) -> Module (Stream (Bit 8))
 incS xs = do
   -- Output buffer
   buffer <- makeQueue
 
-  -- Incrementer
-  when (xs.canGet .&. buffer.notFull) do
-    get xs
-    enq buffer (xs.value + 1)
+  always do
+    -- Incrementer
+    when (xs.canGet .&. buffer.notFull) do
+      get xs
+      enq buffer (xs.value + 1)
 
   -- Convert buffer to a stream
   return (buffer.toStream)
@@ -730,7 +742,7 @@ instance of the Verilog `incS` module shown above.
 
 ```hs
 -- This function creates an instance of a Verilog module called "incS"
-makeIncS :: Stream (Bit 8) -> RTL (Stream (Bit 8))
+makeIncS :: Stream (Bit 8) -> Module (Stream (Bit 8))
 makeIncS = makeInstance "incS" 
 ```
 
@@ -739,7 +751,7 @@ determined from the type signature.  Here's a sample top-level module
 that uses the `makeIncS` function:
 
 ```hs
-top :: RTL ()
+top :: Module ()
 top = do
   -- Counter
   count :: Reg (Bit 8) <- makeReg 0
@@ -750,16 +762,17 @@ top = do
   -- Create an instance of incS
   out <- makeIncS (buffer.toStream)
 
-  -- Fill input
-  when (buffer.notFull) do
-    enq buffer (count.val)
-    count <== count.val + 1
+  always do
+    -- Fill input
+    when (buffer.notFull) do
+      enq buffer (count.val)
+      count <== count.val + 1
 
-  -- Consume
-  when (out.canGet) do
-    get out
-    display "Got " (out.value)
-    when (out.value .==. 100) finish
+    -- Consume
+    when (out.canGet) do
+      get out
+      display "Got " (out.value)
+      when (out.value .==. 100) finish
 ```
 
 Using the following `main` function we can generate both the `incS`
@@ -796,21 +809,21 @@ RISC-V.
 import Blarney.BitScan
 
 -- Semantics of add instruction
-add :: Bit 5 -> Bit 5 -> Bit 5 -> RTL ()
+add :: Bit 5 -> Bit 5 -> Bit 5 -> Action ()
 add rs2 rs1 rd =
   display "add r" (rd.val) ", r" (rs1.val) ", r" (rs1.val)
 
 -- Semantics of addi instruction
-addi :: Bit 12 -> Bit 5 -> Bit 5 -> RTL ()
+addi :: Bit 12 -> Bit 5 -> Bit 5 -> Action ()
 addi imm rs1 rd =
   display "add r" (rd.val) ", r" (rs1.val) ", " (imm.val)
 
 -- Semantics of store-word instruciton
-sw :: Bit 12 -> Bit 5 -> Bit 5 -> RTL ()
+sw :: Bit 12 -> Bit 5 -> Bit 5 -> Action ()
 sw imm rs2 rs1 = display "sw " rs2 ", " rs1 "[" imm "]"
 
-top :: RTL ()
-top = do
+top :: Module ()
+top = always do
   -- Sample RISC-V store-word instruction
   let instr :: Bit 32 = 0b1000000_00001_00010_010_00001_0100011
 
@@ -836,7 +849,7 @@ suggesting this feature!
 ## Example 15: Tiny 8-bit CPU
 
 As a way of briging together a number of the ideas introduced above,
-let's define a very simple, 8-bit CPU with the following ISA.
+let's look at a very simple, 8-bit CPU with the following ISA.
 
   Opcode     | Meaning
   ---------- | ---------
@@ -845,70 +858,144 @@ let's define a very simple, 8-bit CPU with the following ISA.
   `10NNNNYY` | Branch back by `NNNN` instructions if register `YY` is non-zero
   `11NNNNNN` | Halt
 
-To begin, let's consider a non-pipelined implementation of this ISA,
-which has a CPI (cycles-per-instruction) of two: one cycle is used to
-fetch the next instruction, and one cycle is used to execute it.  The
-CPU will execute the program defined in the file `instrs.hex`.
+We have developed a [3-stage pipeline
+implemention](https://github.com/POETSII/blarney/blob/master/Examples/CPU/CPU.hs)
+of the ISA that has a CPI (cycles-per-instruction) close to 1.
+Although the ISA is very simple, it does contain a few challenges for
+a pipelined implementation, namely *control hazards* (due to the
+branch instruction) and *data hazards* (due to the add instruction).
+We resolve data hazards using *register forwarding* and control
+hazards by performing a *pipeline flush* when the branch is taken.
+The CPU will execute the program defined in the file `instrs.hex`.
 
 ```hs
-makeCPU :: RTL ()
-makeCPU = do
-  -- Instruction memory (containing 32 instructions)
-  instrMem :: RAM (Bit 5) (Bit 8) <- makeRAMInit "instrs.hex"
+-- Instructions
+type Instr = Bit 8
 
-  -- Register file (containing 4 registers)
-  regFile :: RegFile (Bit 2) (Bit 8) <- makeRegFile
+-- Register identifiers
+type RegId = Bit 2
+
+-- Extract opcode
+opcode :: Instr -> Bit 2
+opcode instr = range @7 @6 instr
+
+-- Extract register A
+rA :: Instr -> RegId
+rA instr = range @3 @2 instr
+
+-- Extract register B
+rB :: Instr -> RegId
+rB instr = range @1 @0 instr
+
+-- Extract destination register
+rD :: Instr -> RegId
+rD instr = range @5 @4 instr
+
+-- Extract immediate
+imm :: Instr -> Bit 4
+imm instr = range @3 @0 instr
+
+-- Extract branch offset
+offset :: Instr -> Bit 4
+offset instr = range @5 @2 instr
+
+-- CPU
+makeCPU :: Module ()
+makeCPU = do
+  -- Instruction memory
+  instrMem :: RAM (Bit 8) Instr <- makeRAMInit "instrs.hex"
+
+  -- Register file
+  regFileA :: RAM RegId (Bit 8) <- makeDualRAMPassthrough
+  regFileB :: RAM RegId (Bit 8) <- makeDualRAMPassthrough
+
+  -- Instruction register
+  instr :: Reg (Bit 8) <- makeRegU
+
+  -- Instruction operand registers
+  opA :: Reg (Bit 8) <- makeRegU
+  opB :: Reg (Bit 8) <- makeRegU
 
   -- Program counter
-  pc :: Reg (Bit 5) <- makeReg 0
+  pcNext :: Wire (Bit 8) <- makeWire 0
+  let pc = reg 0 (pcNext.val)
 
-  -- Are we fetching (1) or executing (0)
-  fetch :: Reg (Bit 1) <- makeReg 1
+  always do
+    -- Index the instruction memory
+    load instrMem (pcNext.val)
 
-  -- Load immediate instruction
-  let li rd imm = do
-        update regFile rd (zeroExtend imm)
-        pc <== pc.val + 1
-        display "rf[" rd "] := " imm
+  -- Result of the execute stage
+  result :: Wire (Bit 8) <- makeWire 0
 
-  -- Add instruction
-  let add rd rs0 rs1 = do
-        let sum = regFile!rs0 + regFile!rs1
-        update regFile rd sum
-        pc <== pc.val + 1
-        display "rf[" rd "] := " sum
+  -- Wire to trigger a pipeline flush
+  flush :: Wire (Bit 1) <- makeWire 0
 
-  -- Branch instruction
-  let bnz offset rs = do
-        if regFile!rs .==. 0
-          then pc <== pc.val + 1
-          else pc <== pc.val - zeroExtend offset
+  -- Cycle counter
+  count :: Reg (Bit 32) <- makeRegU
+  always (count <== count.val + 1)
 
-  -- Halt instruction
-  let halt imm = finish
+  -- Trigger for each pipeline stage
+  go1 :: Reg (Bit 1) <- makeDReg 0
+  go2 :: Reg (Bit 1) <- makeDReg 0
+  go3 :: Reg (Bit 1) <- makeDReg 0
 
-  -- Fetch
-  when (fetch.val) $ do
-    load instrMem (pc.val)
-    fetch <== 0
+  always do
+    -- Start the pipeline after one cycle
+    go1 <== 1
 
-  -- Execute
-  when (fetch.val.inv) $ do
-    match (instrMem.out)
-      [
-        lit 0b00 <#> var @2 <#> var @4              ==>  li,
-        lit 0b01 <#> var @2 <#> var @2  <#> var @2  ==>  add,
-        lit 0b10 <#> var @4 <#> var @2              ==>  bnz,
-        lit 0b11 <#> var @6                         ==>  halt
-      ]
-    fetch <== 1
+    -- Stage 1: Instruction/Operand Fetch
+    -- ==================================
+
+    when (go1.val) $ do
+      when (flush.val.inv) $ do
+        pcNext <== pc + 1
+        go2 <== 1
+
+    load regFileA (instrMem.out.rA)
+    load regFileB (instrMem.out.rB)
+
+    -- Stage 2: Decode
+    -- ===============
+  
+    -- Latch instruction
+    instr <== instrMem.out'
+
+    -- Register forwarding logic
+    let forward rS other =
+          (result.active .&. (instr.val.rD .==. instrMem.out'.rS)) ?
+          (result.val, other)
+
+    -- Latch operands
+    opA <== forward rA (regFileA.out)
+    opB <== forward rB (regFileB.out)
+
+    -- Trigger stage 3
+    when (flush.val.inv) $ do
+      go3 <== go2.val
+
+    -- Stage 3: Execute
+    -- ================
+
+    -- Instruction dispatch
+    when (go3.val) $ do
+      switch (instr.val.opcode)
+        [
+          -- Load-immediate instruction
+          0 --> result <== zeroExtend (instr.val.imm),
+          -- Add instruction
+          1 --> result <== opA.val + opB.val,
+          -- Branch instruction
+          2 --> do when (opB.val .!=. 0) $ do
+                     pcNext <== pc - zeroExtend (instr.val.offset) - 2
+                     -- Control hazard
+                     flush <== 1,
+          -- Halt instruction
+          3 --> finish
+        ]
+
+      -- Writeback
+      when (result.active) $ do
+        store regFileA (instr.val.rD) (result.val)
+        store regFileB (instr.val.rD) (result.val)
+        display (count.val) ": rf[" (instr.val.rD) "] := " (result.val)
 ```
-
-We have also developed a [3-stage pipeline
-implemention](https://github.com/POETSII/blarney/blob/master/Examples/CPU/CPU.hs)
-of the same ISA that has a CPI much closer to 1.  Although the ISA is
-very simple, it does contain a few challenges for a pipelined
-implementation, namely *control hazards* (due to the branch
-instruction) and *data hazards* (due to the add instruction).  We
-resolve data hazards using *register forwarding* and control hazards
-by performing a *pipeline flush* when the branch is taken.

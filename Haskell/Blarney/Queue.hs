@@ -26,8 +26,8 @@ data Queue a =
   Queue {
     notEmpty :: Bit 1
   , notFull  :: Bit 1
-  , enq      :: a -> RTL ()
-  , deq      :: RTL ()
+  , enq      :: a -> Action ()
+  , deq      :: Action ()
   , canDeq   :: Bit 1
   , first    :: a
   }
@@ -39,7 +39,7 @@ A full-throughput 2-element queue implemented using 2 registers:
 
   * There's a mux on the enqueue path.
 -}
-makeQueue :: Bits a => RTL (Queue a)
+makeQueue :: Bits a => Module (Queue a)
 makeQueue = do
   -- Elements of the queue, stored in registers
   elem0 :: Reg a <- makeReg dontCare
@@ -54,22 +54,23 @@ makeQueue = do
   doDeq :: Wire (Bit 1) <- makeWire 0
   update1 :: Wire (Bit 1) <- makeWire 0
 
-  if valid0.val.inv .|. doDeq.val
-    then do
-      -- Update element 0
-      valid0 <== valid1.val .|. doEnq.active
-      elem0  <== valid1.val ? (elem1.val, doEnq.val)
-      when (valid1.val) $ do
-        -- Update element 1
-        valid1 <== doEnq.active
-        update1 <== 1
-    else do
-      when (doEnq.active) $ do
-        -- Update element 1
-        valid1 <== 1
-        update1 <== 1
+  always do
+    if valid0.val.inv .|. doDeq.val
+      then do
+        -- Update element 0
+        valid0 <== valid1.val .|. doEnq.active
+        elem0  <== valid1.val ? (elem1.val, doEnq.val)
+        when (valid1.val) $ do
+          -- Update element 1
+          valid1 <== doEnq.active
+          update1 <== 1
+      else do
+        when (doEnq.active) $ do
+          -- Update element 1
+          valid1 <== 1
+          update1 <== 1
 
-  when (update1.val) (elem1 <== doEnq.val)
+    when (update1.val) (elem1 <== doEnq.val)
 
   return $
     Queue {
@@ -88,7 +89,7 @@ A full-throughput N-element queue implemented using 2 registers and a RAM:
 
   * There's a mux on the enqueue path.
 -}
-makeSizedQueue :: Bits a => Int -> RTL (Queue a)
+makeSizedQueue :: Bits a => Int -> Module (Queue a)
 makeSizedQueue logSize = do
   -- Big queue
   big :: Queue a <- makeSizedQueueCore logSize
@@ -96,10 +97,11 @@ makeSizedQueue logSize = do
   -- Small queue, buffering the output of the big queue
   small :: Queue a <- makeQueue
 
-  -- Connect big queue to small queue
-  when (small.notFull .&. big.canDeq) $ do
-    deq big
-    enq small (big.first)
+  always do
+    -- Connect big queue to small queue
+    when (small.notFull .&. big.canDeq) $ do
+      deq big
+      enq small (big.first)
 
   return $
     Queue {
@@ -112,7 +114,7 @@ makeSizedQueue logSize = do
     }
 
 -- |This one has no output buffer (low latency, but not great for Fmax)
-makeSizedQueueCore :: Bits a => Int -> RTL (Queue a)
+makeSizedQueueCore :: Bits a => Int -> Module (Queue a)
 makeSizedQueueCore logSize =
   -- Lift size n to type-level address-width
   liftNat logSize $ \(_ :: Proxy aw) -> do
@@ -132,23 +134,24 @@ makeSizedQueueCore logSize =
     doEnq :: Wire a <- makeWire dontCare
     doDeq :: Wire (Bit 1) <- makeWire 0
 
-    -- Read from new front pointer and update
-    let newFront = doDeq.val ? (front.val + 1, front.val)
-    load ram newFront
-    front <== newFront
+    always do
+      -- Read from new front pointer and update
+      let newFront = doDeq.val ? (front.val + 1, front.val)
+      load ram newFront
+      front <== newFront
 
-    if doEnq.active
-      then do
-        let newBack = back.val + 1
-        back <== newBack
-        store ram (back.val) (doEnq.val)
-        when (doDeq.val.inv) $ do
-          empty <== 0
-          when (newBack .==. front.val) (full <== 1)
-      else do
-        when (doDeq.val) $ do
-          full <== 0
-          when (newFront .==. back.val) (empty <== 1)
+      if doEnq.active
+        then do
+          let newBack = back.val + 1
+          back <== newBack
+          store ram (back.val) (doEnq.val)
+          when (doDeq.val.inv) $ do
+            empty <== 0
+            when (newBack .==. front.val) (full <== 1)
+        else do
+          when (doDeq.val) $ do
+            full <== 0
+            when (newFront .==. back.val) (empty <== 1)
      
     return $
       Queue {
@@ -182,14 +185,14 @@ An N-element queue implemented using a shift register:
 
 This version optimised for Fmax.
 -}
-makeShiftQueue :: Bits a => Int -> RTL (Queue a)
+makeShiftQueue :: Bits a => Int -> Module (Queue a)
 makeShiftQueue = makeShiftQueueCore OptFmax
 
 -- |This version is optimised for throughput
-makePipelineQueue :: Bits a => Int -> RTL (Queue a)
+makePipelineQueue :: Bits a => Int -> Module (Queue a)
 makePipelineQueue = makeShiftQueueCore OptThroughput
 
-makeShiftQueueCore :: Bits a => ShiftQueueMode -> Int -> RTL (Queue a)
+makeShiftQueueCore :: Bits a => ShiftQueueMode -> Int -> Module (Queue a)
 makeShiftQueueCore mode n = do
   -- Elements of the queue, stored in registers
   elems :: [Reg a] <- replicateM n makeRegU
@@ -204,22 +207,23 @@ makeShiftQueueCore mode n = do
   -- Register enable line to each element
   let ens = tail $ scanl (.|.) (doDeq.val) [v.val.inv | v <- valids]
 
-  -- Update elements
-  sequence_ [ when en (x <== y.val)
-            | (en, x, y) <- zip3 ens elems (tail elems) ]
+  always do
+    -- Update elements
+    sequence_ [ when en (x <== y.val)
+              | (en, x, y) <- zip3 ens elems (tail elems) ]
+ 
+    -- Update valid bits
+    sequence_ [ when en (x <== y.val)
+              | (en, x, y) <- zip3 ens valids (tail valids) ]
 
-  -- Update valid bits
-  sequence_ [ when en (x <== y.val)
-            | (en, x, y) <- zip3 ens valids (tail valids) ]
+    -- Don't insert new element
+    when (doEnq.active.inv .&. ens.last) $ do
+      valids.last <== 0
 
-  -- Don't insert new element
-  when (doEnq.active.inv .&. ens.last) $ do
-    valids.last <== 0
-
-  -- Insert new element
-  when (doEnq.active) $ do
-    valids.last <== 1
-    elems.last <== doEnq.val
+    -- Insert new element
+    when (doEnq.active) $ do
+      valids.last <== 1
+      elems.last <== doEnq.val
 
   return $
     Queue {

@@ -34,9 +34,9 @@ import Prelude
 
 -- Blarney imports
 import Blarney.BV
-import Blarney.RTL
 import Blarney.Bit
 import Blarney.Bits
+import Blarney.Module
 import Blarney.Prelude
 
 -- RAM primitive (for internal use only)
@@ -104,23 +104,23 @@ ramTrueDualInit init (a0, d0, en0)
 -- |RAM interface
 data RAM a d =
   RAM {
-    load    :: a -> RTL ()       -- ^ Issue load request
-  , store   :: a -> d -> RTL ()  -- ^ Issue store request
-  , out     :: d                 -- ^ Data out
-  , out'    :: d                 -- ^ Registered data out
-  , writeEn :: Bit 1             -- ^ Is there a store currently happening?
+    load    :: a -> Action ()       -- ^ Issue load request
+  , store   :: a -> d -> Action ()  -- ^ Issue store request
+  , out     :: d                    -- ^ Data out
+  , out'    :: d                    -- ^ Registered data out
+  , writeEn :: Bit 1                -- ^ Is there a store currently happening?
   }
 
 -- | Create uninitialised block RAM
-makeRAM :: (Bits a, Bits d) => RTL (RAM a d)
+makeRAM :: (Bits a, Bits d) => Module (RAM a d)
 makeRAM = makeRAMCore Nothing
 
 -- | Create block RAM with initial contents from hex file
-makeRAMInit :: (Bits a, Bits d) => String -> RTL (RAM a d)
+makeRAMInit :: (Bits a, Bits d) => String -> Module (RAM a d)
 makeRAMInit init = makeRAMCore (Just init)
 
 -- Core RAM module
-makeRAMCore :: (Bits a, Bits d) => Maybe String -> RTL (RAM a d)
+makeRAMCore :: (Bits a, Bits d) => Maybe String -> Module (RAM a d)
 makeRAMCore init = do
   -- Address bus and data bus and write-enable
   addrBus :: Wire a <- makeWireU
@@ -150,17 +150,17 @@ makeRAMCore init = do
 
 -- |Create true dual-port block RAM.
 -- When read-address == write-address on different ports, read old data.
-makeTrueDualRAM :: (Bits a, Bits d) => RTL (RAM a d, RAM a d)
+makeTrueDualRAM :: (Bits a, Bits d) => Module (RAM a d, RAM a d)
 makeTrueDualRAM = makeTrueDualRAMCore Nothing
 
 -- |Create true dual-port block RAM with initial contents from hex file.
 -- When read-address == write-address on different ports, read old data.
-makeTrueDualRAMInit :: (Bits a, Bits d) => String -> RTL (RAM a d, RAM a d)
+makeTrueDualRAMInit :: (Bits a, Bits d) => String -> Module (RAM a d, RAM a d)
 makeTrueDualRAMInit init = makeTrueDualRAMCore (Just init)
 
 -- True dual-port core RAM module
 makeTrueDualRAMCore :: (Bits a, Bits d) =>
-                       Maybe String -> RTL (RAM a d, RAM a d)
+                       Maybe String -> Module (RAM a d, RAM a d)
 makeTrueDualRAMCore init = do
   -- Address bus and data bus and write-enable
   addrBusA :: Wire a <- makeWireU
@@ -206,17 +206,17 @@ makeTrueDualRAMCore init = do
 
 -- |Create uninitialised dual-port RAM.
 -- One port used for reading and the other for writing.
-makeDualRAM :: (Bits a, Bits d) => RTL (RAM a d)
+makeDualRAM :: (Bits a, Bits d) => Module (RAM a d)
 makeDualRAM = makeDualRAMCore Nothing
 
 -- |Create dual-port RAM with initial contents from hex file.
 -- One port used for reading and the other for writing.
-makeDualRAMInit :: (Bits a, Bits d) => String -> RTL (RAM a d)
+makeDualRAMInit :: (Bits a, Bits d) => String -> Module (RAM a d)
 makeDualRAMInit init = makeDualRAMCore (Just init)
 
 -- Dual port RAM module.
 -- One port used for reading and the other for writing.
-makeDualRAMCore :: (Bits a, Bits d) => Maybe String -> RTL (RAM a d)
+makeDualRAMCore :: (Bits a, Bits d) => Maybe String -> Module (RAM a d)
 makeDualRAMCore init = do
   -- Create true dual port RAM
   (portA :: RAM a d, portB :: RAM a d) <- makeTrueDualRAMCore init
@@ -231,17 +231,18 @@ makeDualRAMCore init = do
 
 -- | Dual-port passthrough block RAM with initial contents from hex file.
 -- Read and write to same address yields new data.
-makeDualRAMPassthroughInit :: (Bits a, Bits d) => String -> RTL (RAM a d)
+makeDualRAMPassthroughInit :: (Bits a, Bits d) => String -> Module (RAM a d)
 makeDualRAMPassthroughInit init = makeDualRAMPassthroughCore (Just init)
 
 -- | Uninitialised dual-port passthrough block RAM.
 -- Read and write to same address yields new data.
-makeDualRAMPassthrough :: (Bits a, Bits d) => RTL (RAM a d)
+makeDualRAMPassthrough :: (Bits a, Bits d) => Module (RAM a d)
 makeDualRAMPassthrough = makeDualRAMPassthroughCore Nothing
 
 -- Dual port RAM module with pass-through.
 -- Read and write to same address yields new data.
-makeDualRAMPassthroughCore :: (Bits a, Bits d) => Maybe String -> RTL (RAM a d)
+makeDualRAMPassthroughCore :: (Bits a, Bits d) =>
+                                 Maybe String -> Module (RAM a d)
 makeDualRAMPassthroughCore init = do
   -- Create dual port RAM
   ram :: RAM a d <- makeDualRAMCore init

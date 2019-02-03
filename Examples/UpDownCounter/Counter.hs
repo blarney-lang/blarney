@@ -2,12 +2,12 @@ import Blarney
 
 data Counter n =
   Counter {
-    inc   :: RTL ()
-  , dec   :: RTL ()
+    inc   :: Action ()
+  , dec   :: Action ()
   , value :: Bit n
   }
 
-makeCounter :: KnownNat n => RTL (Counter n)
+makeCounter :: KnownNat n => Module (Counter n)
 makeCounter = do
   -- State
   count :: Reg (Bit n) <- makeReg 0
@@ -16,13 +16,14 @@ makeCounter = do
   incWire :: Wire (Bit 1) <- makeWire 0
   decWire :: Wire (Bit 1) <- makeWire 0
 
-  -- Increment
-  when (incWire.val .&. decWire.val.inv) do
-    count <== count.val + 1
+  always do
+    -- Increment
+    when (incWire.val .&. decWire.val.inv) do
+      count <== count.val + 1
 
-  -- Decrement
-  when (incWire.val.inv .&. decWire.val) do
-    count <== count.val - 1
+    -- Decrement
+    when (incWire.val.inv .&. decWire.val) do
+      count <== count.val - 1
 
   -- Interface
   let inc   = incWire <== 1
@@ -32,7 +33,7 @@ makeCounter = do
   return (Counter inc dec value)
 
 -- Top-level module
-top :: RTL ()
+top :: Module ()
 top = do
   -- 32 bit counter
   counter :: Counter 32 <- makeCounter
@@ -49,9 +50,10 @@ top = do
 
   done <- run (reg 1 0) testSeq
 
-  when done do
-    display "Final count = " (value counter)
-    finish
+  always do
+    when done do
+      display "Final count = " (value counter)
+      finish
 
   return ()
 

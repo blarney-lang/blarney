@@ -23,13 +23,13 @@ import System.Process
 
 -- Blarney imports
 import Blarney.BV
-import Blarney.RTL
 import Blarney.Util
+import Blarney.Module
 import Blarney.Interface
 import Blarney.IfThenElse
 
 -- |Convert given Blarney function to a Verilog module
-writeVerilogModule :: Module a
+writeVerilogModule :: Modular a
                    => a          -- ^ Blarney function
                    -> String     -- ^ Module name
                    -> String     -- ^ Output directory
@@ -42,7 +42,7 @@ writeVerilogModule top mod dir =
     fileName = dir ++ "/" ++ mod ++ ".v"
 
 -- |Convert given Blarney function to a top-level Verilog module
-writeVerilogTop :: RTL ()     -- ^ Blarney RTL
+writeVerilogTop :: Module ()  -- ^ Blarney module
                 -> String     -- ^ Top-level module name
                 -> String     -- ^ Output directory
                 -> IO ()
@@ -92,7 +92,7 @@ writeVerilogTop top mod dir =
       , "\trm " ++ mod
       ]
 
-generateVerilog :: Module a => a -> String -> IO ()
+generateVerilog :: Modular a => a -> String -> IO ()
 generateVerilog top mod =
   netlist (makeModule top) >>= writeVerilog fileName mod
   where fileName = mod ++ ".v"

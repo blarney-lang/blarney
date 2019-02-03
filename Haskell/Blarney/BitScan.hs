@@ -15,18 +15,18 @@ using the 'match' and '==>' combinators provided by the module:
 
 @
 -- Semantics of add instruction
-add :: Bit 5 -> Bit 5 -> Bit 5 -> RTL ()
+add :: Bit 5 -> Bit 5 -> Bit 5 -> Action ()
 add rs2 rs1 rd = display "add " rd ", " rs1 ", " rs2
 
 -- Semantics of addi instruction
-addi :: Bit 12 -> Bit 5 -> Bit 5 -> RTL ()
+addi :: Bit 12 -> Bit 5 -> Bit 5 -> Action ()
 addi imm rs1 rd = display "addi " rd ", " rs1 ", " imm
 
 -- Semantics of store instruciton
-sw :: Bit 12 -> Bit 5 -> Bit 5 -> RTL ()
+sw :: Bit 12 -> Bit 5 -> Bit 5 -> Action ()
 sw imm rs2 rs1 = display "sw " rs2 ", " rs1 "[" imm "]"
 
-top :: RTL ()
+top :: Action ()
 top = do
   let instr :: Bit 32 = 0b1000000_00001_00010_010_00001_0100011
 
@@ -173,9 +173,9 @@ matches subj toks
           .&. check (n + length bs) rest
 
 class RHS f where
-  apply :: f -> [BitList] -> RTL ()
+  apply :: f -> [BitList] -> Action ()
 
-instance RHS (RTL ()) where
+instance RHS (Action ()) where
   apply f [] = f
   apply f other = error "Format error: too many pattern vars"
 
@@ -187,12 +187,12 @@ toBitList :: KnownNat n => Bit n -> BitList
 toBitList x = [bit i x | i <- [0 .. widthOf x - 1]]
 
 -- |Case statement, with a subject and a list of alternatives
-match :: KnownNat n => Bit n -> [Bit n -> RTL ()] -> RTL ()
+match :: KnownNat n => Bit n -> [Bit n -> Action ()] -> Action ()
 match subj alts = sequence_ [alt subj | alt <- alts]
 
 -- |Case alternative
 infix 7 ==>
-(==>) :: (KnownNat n, RHS rhs) => String -> rhs -> Bit n -> RTL ()
+(==>) :: (KnownNat n, RHS rhs) => String -> rhs -> Bit n -> Action ()
 fmt ==> rhs = \subj -> do
   let subj' = toBitList subj
   when (matches subj' toks) $

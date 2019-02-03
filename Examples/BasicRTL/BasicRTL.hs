@@ -1,20 +1,21 @@
 import Blarney
 
-top :: RTL ()
+top :: Module ()
 top = do
   -- Create a register
   cycleCount :: Reg (Bit 4) <- makeReg 0
 
-  -- Increment on every cycle
-  cycleCount <== cycleCount.val + 1
+  always do
+    -- Increment on every cycle
+    cycleCount <== cycleCount.val + 1
 
-  -- Display value an every cycle
-  display "cycleCount = " (cycleCount.val)
+    -- Display value an every cycle
+    display "cycleCount = " (cycleCount.val)
 
-  -- Terminate simulation when count reaches 10
-  when (cycleCount.val .==. 10) do
-    display "Finished"
-    finish
+    -- Terminate simulation when count reaches 10
+    when (cycleCount.val .==. 10) do
+      display "Finished"
+      finish
 
 main :: IO ()
 main = writeVerilogTop top "top" "BasicRTL-Verilog/"
