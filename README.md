@@ -853,9 +853,9 @@ let's look at a very simple, 8-bit CPU with the following ISA.
 
   Opcode     | Meaning
   ---------- | ---------
-  `00ZZNNNN` | Write value `0000NNNN` to register `ZZ`
-  `01ZZXXYY` | Add register `XX` to register `YY` and store in register `ZZ`
-  `10NNNNYY` | Branch back by `NNNN` instructions if register `YY` is non-zero
+  `00DDNNNN` | Write value `0000NNNN` to register `DD`
+  `01DDAABB` | Add register `AA` to register `BB` and store in register `DD`
+  `10NNNNBB` | Branch back by `NNNN` instructions if register `BB` is non-zero
   `11NNNNNN` | Halt
 
 We have developed a [3-stage pipeline
@@ -942,8 +942,8 @@ makeCPU = do
     -- Start the pipeline after one cycle
     go1 <== 1
 
-    -- Stage 1: Instruction/Operand Fetch
-    -- ==================================
+    -- Stage 1: Operand Fetch
+    -- ======================
 
     when (go1.val) do
       when (flush.val.inv) do
@@ -980,16 +980,16 @@ makeCPU = do
       switch (instr.val.opcode)
         [
           -- Load-immediate instruction
-          0 --> result <== zeroExtend (instr.val.imm),
+          0b00 --> result <== zeroExtend (instr.val.imm),
           -- Add instruction
-          1 --> result <== opA.val + opB.val,
+          0b01 --> result <== opA.val + opB.val,
           -- Branch instruction
-          2 --> when (opB.val .!=. 0) do
-                   pcNext <== pc - zeroExtend (instr.val.offset) - 2
-                   -- Control hazard
-                   flush <== 1,
+          0b10 --> when (opB.val .!=. 0) do
+                     pcNext <== pc - zeroExtend (instr.val.offset) - 2
+                     -- Control hazard
+                     flush <== 1,
           -- Halt instruction
-          3 --> finish
+          0b11 --> finish
         ]
 
       -- Writeback
