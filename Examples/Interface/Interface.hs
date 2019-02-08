@@ -5,8 +5,8 @@ import Blarney.Queue
 import Blarney.Stream
 
 -- Module that increments each element in a stream
-incS :: Stream (Bit 8) -> Module (Stream (Bit 8))
-incS xs = do
+inc :: Stream (Bit 8) -> Module (Stream (Bit 8))
+inc xs = do
   -- Output buffer
   buffer <- makeQueue
 
@@ -19,9 +19,9 @@ incS xs = do
   -- Convert buffer to a stream
   return (buffer.toStream)
 
--- This function creates an instance of a Verilog module called "incS"
+-- This function creates an instance of a Verilog module called "inc"
 makeIncS :: Stream (Bit 8) -> Module (Stream (Bit 8))
-makeIncS = makeInstance "incS"
+makeIncS = makeInstance "inc"
 
 top :: Module ()
 top = do
@@ -31,7 +31,7 @@ top = do
   -- Input buffer
   buffer <- makeQueue
 
-  -- Create an instance of incS
+  -- Create an instance of inc
   out <- makeIncS (buffer.toStream)
 
   always do
@@ -50,5 +50,5 @@ top = do
 main :: IO ()
 main = do
   let dir = "Interface-Verilog/"
-  writeVerilogModule incS "incS" dir
+  writeVerilogModule inc "inc" dir
   writeVerilogTop top "top" dir

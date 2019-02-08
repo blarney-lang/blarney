@@ -678,8 +678,8 @@ As an example, here's a function that increments each value in the
 input stream to produce the output stream.
 
 ```hs
-incS :: Stream (Bit 8) -> Module (Stream (Bit 8))
-incS xs = do
+inc :: Stream (Bit 8) -> Module (Stream (Bit 8))
+inc xs = do
   -- Output buffer
   buffer <- makeQueue
 
@@ -700,20 +700,20 @@ inputs or outputs, being converted to Verilog.  In fact, any Blarney
 function whose inputs and outputs are members of the
 [Interface](http://mn416.github.io/blarney/Blarney-Interface.html) class
 can be converted to Verilog (and the `Interface` class supports
-generic deriving).  To illustrate, we can convert the function `incS`
+generic deriving).  To illustrate, we can convert the function `inc`
 (defined in [Example 12](#example-12-streams)) into a Verilog module
 as follows.
 
 ```hs
 main :: IO ()
-main = emitVerilogModule incS "incS" "/tmp/inc"
+main = emitVerilogModule inc "inc" "/tmp/inc"
 ```
 
-The generated Verilog module `/tmp/inc/incS.v` has the following
+The generated Verilog module `/tmp/inc/inc.v` has the following
 interface:
 
 ```sv
-module incS(
+module inc(
   input  wire clock
 , output wire [0:0] in_get_en
 , input  wire [0:0] in_canGet
@@ -738,12 +738,12 @@ Signal       | Description
 
 It is also possible to instantiate a Verilog module inside a Blarney
 description.  To illustrate, here is a function that creates an
-instance of the Verilog `incS` module shown above.
+instance of the Verilog `inc` module shown above.
 
 ```hs
--- This function creates an instance of a Verilog module called "incS"
-makeIncS :: Stream (Bit 8) -> Module (Stream (Bit 8))
-makeIncS = makeInstance "incS" 
+-- This function creates an instance of a Verilog module called "inc"
+makeInc :: Stream (Bit 8) -> Module (Stream (Bit 8))
+makeInc = makeInstance "inc" 
 ```
 
 Notice that interface of the Verilog module being instantiated is
@@ -759,8 +759,8 @@ top = do
   -- Input buffer
   buffer <- makeQueue
 
-  -- Create an instance of incS
-  out <- makeIncS (buffer.toStream)
+  -- Create an instance of inc
+  out <- makeInc (buffer.toStream)
 
   always do
     -- Fill input
@@ -775,14 +775,14 @@ top = do
       when (out.value .==. 100) finish
 ```
 
-Using the following `main` function we can generate both the `incS`
+Using the following `main` function we can generate both the `inc`
 module and a top-level module that instantiates it.
 
 ```hs
 main :: IO ()
 main = do
   let dir = "/tmp/inc"
-  emitVerilogModule incS "incS" dir
+  emitVerilogModule inc "inc" dir
   emitVerilogTop top "top" dir
 ```
 
