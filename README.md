@@ -17,9 +17,9 @@ docs](http://mn416.github.io/blarney/index.html).
 * [Example 5: FShow class](#example-5-fshow-class)
 * [Example 6: Mutable registers](#example-6-mutable-registers)
 * [Example 7: Queues](#example-7-queues)
-* [Example 8: Wires](#example-8-wires)
-* [Example 9: Bit selection](#example-9-bit-selection)
-* [Example 10: Recipes](#example-10-recipes)
+* [Example 8: Mutable wires](#example-8-mutable-wires)
+* [Example 9: Recipes](#example-9-recipes)
+* [Example 10: Bit selection](#example-10-bit-selection)
 * [Example 11: Block RAMs](#example-11-block-rams)
 * [Example 12: Streams](#example-12-streams)
 * [Example 13: Modular compilation](#example-13-modular-compilation)
@@ -404,7 +404,7 @@ top = do
     when (count.val .==. 100) finish
 ```
 
-## Example 8: Wires
+## Example 8: Mutable wires
 
 *Wires* are a feature of the `Action` monad that offer a way for
 separate action blocks to communicate *within the same clock cycle*.
@@ -460,35 +460,7 @@ makeCounter = do
   return (Counter inc dec output)
 ```
 
-## Example 9: Bit selection
-
-Blarney provides the following untyped bit-selection functions, i.e.
-where the selection indices are values rather than types, meaning the
-width mismatches will not be caught by the type checker, but by a
-(probably unhelpful) error-message at circuit-generation time.
-
-```hs
--- Dynamically-typed bit selection
-bit :: Int -> Bit n -> Bit 1
-
--- Dynamically-typed sub-range selection
-bits :: KnownNat m => (Int, Int) -> Bit n -> Bit m
-```
-
-There are statically-typed versions of both these functions --
-[index](http://mn416.github.io/blarney/Blarney-Bit.html#v:index) and
-[range](http://mn416.github.io/blarney/Blarney-Bit.html#v:range).
-To illustrate, here's a function to select the upper four bits of a byte.
-
-```hs
--- Extract upper 4 bits of a byte
-upperNibble :: Bit 8 -> Bit 4
-upperNibble x = range @7 @4 x
-```
-
-We use type application to specify the type-level indices.
-
-## Example 10: Recipes
+## Example 9: Recipes
 
 State machines are a common way of defining the control-path of a
 circuit.  They are typically expressed by doing case-analysis of the
@@ -573,6 +545,34 @@ Here, we increment `counter` on the first cycle, and then again on the
 second.  On the third cycle, we both increment and decrement it in
 parallel.  On the fourth cycle, we display the value and terminate the
 simulator.
+
+## Example 10: Bit selection
+
+Blarney provides the following untyped bit-selection functions, i.e.
+where the selection indices are values rather than types, meaning the
+width mismatches will not be caught by the type checker, but by a
+(probably unhelpful) error-message at circuit-generation time.
+
+```hs
+-- Dynamically-typed bit selection
+bit :: Int -> Bit n -> Bit 1
+
+-- Dynamically-typed sub-range selection
+bits :: KnownNat m => (Int, Int) -> Bit n -> Bit m
+```
+
+There are statically-typed versions of both these functions --
+[index](http://mn416.github.io/blarney/Blarney-Bit.html#v:index) and
+[range](http://mn416.github.io/blarney/Blarney-Bit.html#v:range).
+To illustrate, here's a function to select the upper four bits of a byte.
+
+```hs
+-- Extract upper 4 bits of a byte
+upperNibble :: Bit 8 -> Bit 4
+upperNibble x = range @7 @4 x
+```
+
+We use type application to specify the type-level indices.
 
 ## Example 11: Block RAMs
 
