@@ -103,6 +103,7 @@ liftModule m = Ifc $ \r -> do
 instantiate :: String -> [Param] -> Ifc a -> Module a
 instantiate name params ifc = do
     rec (w, a) <- runIfc ifc (custom w)
+    addRoots [x | (s, WritePin x) <- w]
     return a
   where
     custom w =

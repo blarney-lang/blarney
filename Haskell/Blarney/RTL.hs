@@ -55,6 +55,7 @@ module Blarney.RTL
   , makeRegFileInit -- Create initialised register file
   , makeRegFile     -- Create uninitialised register file
     -- * Convert RTL to a netlist
+  , addRoots        -- Add netlist roots
   , netlist         -- Convert RTL monad to a netlist
   ) where
 
@@ -92,6 +93,7 @@ data RTLAction =
   | RTLInput (Width, String)
   | RTLRegFileCreate (String, VarId, Width, Width)
   | RTLRegFileUpdate (VarId, Bit 1, Int, Int, BV, BV)
+  | RTLRoots [BV]
 
 -- |Variable identifiers
 type VarId = Int
@@ -465,6 +467,10 @@ addRegFileUpdatePrim (regFileId, c, aw, dw, a, d) = do
             }
   addNet net
 
+-- |Add netlist roots
+addRoots :: [BV] -> RTL ()
+addRoots roots = write (RTLRoots roots)
+
 -- |Convert RTL monad to a netlist
 netlist :: RTL () -> IO [Net]
 netlist rtl = do
@@ -481,9 +487,11 @@ netlist rtl = do
     inps  = [out | RTLInput out <- acts]
     rfs   = [out | RTLRegFileCreate out <- acts]
     rfus  = [out | RTLRegFileUpdate out <- acts]
+    rts   = concat [roots | RTLRoots roots <- acts]
     roots = do mapM_ addDisplayPrim disps
                mapM_ addFinishPrim fins
                mapM_ addOutputPrim outs
                mapM_ addInputPrim inps
                mapM_ addRegFilePrim rfs
                mapM_ addRegFileUpdatePrim rfus
+               mapM_ flatten rts

@@ -21,3 +21,4 @@ clean:
 	make -C BitPat clean
 	make -C Derive clean
 	make -C Interface clean
+	make -C MasterSlave clean

@@ -48,7 +48,7 @@ module Blarney.Module
     input, inputBV, output, outputBV,
 
     -- * Convert RTL to a netlist
-    netlist
+    addRoots, netlist
   ) where
 
 -- Blarney imports
@@ -184,6 +184,10 @@ finish = A RTL.finish
 -- |Display statement
 instance RTL.Displayable (Action a) where
   disp x = A (RTL.disp x)
+
+-- |Add roots
+addRoots :: [BV] -> Module ()
+addRoots roots = M (RTL.addRoots roots)
 
 -- |Convert module to a netlist
 netlist :: Module () -> IO [Net]

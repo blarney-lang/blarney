@@ -70,14 +70,14 @@ class GBits f where
 
 instance GBits U1 where
   type GSizeOf U1 = 0
-  gsizeOf U1 = 0
-  gpack U1 = 0
+  gsizeOf ~U1 = 0
+  gpack ~U1 = 0
   gunpack bs = U1
 
 instance (GBits a, GBits b) => GBits (a :*: b) where
   type GSizeOf (a :*: b) = GSizeOf a + GSizeOf b
-  gsizeOf (a :*: b) = gsizeOf a + gsizeOf b
-  gpack (a :*: b) = gpack a # gpack b
+  gsizeOf ~(a :*: b) = gsizeOf a + gsizeOf b
+  gpack ~(a :*: b) = gpack a # gpack b
   gunpack bs = a :*: b
     where
       a  = gunpack (unsafeBits (wa+wb-1, wb) bs)
@@ -87,14 +87,14 @@ instance (GBits a, GBits b) => GBits (a :*: b) where
 
 instance GBits a => GBits (M1 i c a) where
   type GSizeOf (M1 i c a) = GSizeOf a
-  gpack (M1 x) = gpack x
-  gsizeOf (M1 x) = gsizeOf x
+  gpack ~(M1 x) = gpack x
+  gsizeOf ~(M1 x) = gsizeOf x
   gunpack x = M1 (gunpack x)
 
 instance Bits a => GBits (K1 i a) where
   type GSizeOf (K1 i a) = SizeOf a
-  gsizeOf (K1 x) = sizeOf x
-  gpack (K1 x) = pack x
+  gsizeOf ~(K1 x) = sizeOf x
+  gpack ~(K1 x) = pack x
   gunpack x = K1 (unpack x)
 
 -- Standard instances

@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# Run regression tests
+
 EXAMPLES=(
   BasicRTL
   BitPat
@@ -14,6 +16,7 @@ EXAMPLES=(
   RAM
   Sorter
   UpDownCounter
+  MasterSlave
 )
 
 RED='\033[0;31m'
