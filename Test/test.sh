@@ -17,6 +17,7 @@ EXAMPLES=(
   Sorter
   UpDownCounter
   MasterSlave
+  NoC
 )
 
 RED='\033[0;31m'

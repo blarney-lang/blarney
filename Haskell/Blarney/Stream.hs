@@ -13,6 +13,7 @@ Stability   : experimental
 module Blarney.Stream 
   ( Stream(..)
   , toStream
+  , nullStream
   ) where
 
 import Blarney
@@ -36,4 +37,13 @@ toStream q =
     get = q.deq
   , canGet = q.canDeq
   , value = q.first
+  }
+
+-- |Null stream
+nullStream :: Bits a => Stream a
+nullStream =
+  Stream {
+    get = return ()
+  , canGet = 0
+  , value = dontCare
   }

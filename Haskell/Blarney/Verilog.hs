@@ -83,6 +83,7 @@ writeVerilogTop top mod dir =
         mod ++ ": *.v *.cpp"
       , "\tverilator -cc " ++ mod ++ ".v " ++ "-exe "
                            ++ mod ++ ".cpp " ++ "-o " ++ mod
+                           ++ " -Wno-UNSIGNED "
                            ++ " -y $(BLARNEY_ROOT)/Verilog "
       , "\tmake -C obj_dir -j -f V" ++ mod ++ ".mk " ++ mod
       , "\tcp obj_dir/" ++ mod ++ " ."
