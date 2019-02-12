@@ -123,13 +123,17 @@ testMesh (lenX, lenY) =
   where
     node input = do
       buffer <- makeShiftQueue 1
-      regX :: Reg (Bit 8) <- makeReg 0
-      regY :: Reg (Bit 8) <- makeReg 0
+      timer :: Reg (Bit 32) <- makeReg 0
+      regX  :: Reg (Bit 8) <- makeReg 0
+      regY  :: Reg (Bit 8) <- makeReg 0
 
       always do
+        timer <== timer.val + 1
+
         when (input.canGet) do
           get input
-          display "Received @ " (input.value.destX, input.value.destY)
+          display (input.value.destX, input.value.destY)
+                  ": t=" (timer.val)
 
         when (buffer.notFull) do
           let pkt = MeshPkt { payload = 0,
@@ -139,8 +143,9 @@ testMesh (lenX, lenY) =
           if regX.val .==. fromIntegral (lenX-1)
             then do
               regX <== 0
-              when (regY.val .==. fromIntegral (lenY-1)) do
-                regY <== regY.val + 1
+              if (regY.val .==. fromIntegral (lenY-1))
+                then regY <== 0
+                else regY <== regY.val + 1
             else do
               regX <== regX.val + 1
 
@@ -155,7 +160,7 @@ top = do
   -- Simulate for 1000 cycles
   always do
     timer <== timer.val + 1
-    when (timer.val .==. 1000) finish
+    when (timer.val .==. 10000) finish
 
   -- Flood a 4x4 mesh
   testMesh (4, 4)
