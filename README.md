@@ -748,7 +748,7 @@ makeInc = makeInstance "inc"
 
 Notice that interface of the Verilog module being instantiated is
 determined from the type signature.  Here's a sample top-level module
-that uses the `makeIncS` function:
+that uses the `makeInc` function:
 
 ```hs
 top :: Module ()
