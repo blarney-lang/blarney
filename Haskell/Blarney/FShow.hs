@@ -73,6 +73,12 @@ instance FShow (Bit n) where
   fshow b = Format [FormatBit (bvWidth ub) ub]
     where ub = toBV b
 
+instance FShow Int where
+  fshow i = Format [FormatString (show i)]
+
+instance FShow Integer where
+  fshow i = Format [FormatString (show i)]
+
 instance FShow Format where
   fshow f = f
 

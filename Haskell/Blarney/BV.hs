@@ -226,7 +226,9 @@ data ConstBit = Zero | One | DontCare
 
 -- |For the Display primitive:
 -- display a string literal or a bit-vector value of a given width
-data DisplayArg = DisplayArgString String | DisplayArgBit InputWidth
+data DisplayArg =
+    DisplayArgString String
+  | DisplayArgBit InputWidth
 
 instance Show DisplayArg where
   show (DisplayArgString s) = show s

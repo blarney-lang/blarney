@@ -11,42 +11,15 @@ firstHot = first 1
     first ok [] = []
     first ok (x:xs) = (x .&. ok) : first (inv x .&. ok) xs
 
--- |Fair scheduler. Takes a ('state', 'avail') pair, where the 'avail'
--- list denotes a set of resources that are available.  Returns a
--- ('state', 'choice') pair, where the 'choice' list contains at most
--- one hot bit denoting the chosen resource.  Provided the 'state' is
--- threaded through successive calls to 'sched', resources will be
--- chosen fairly.
-sched :: ([Bit 1], [Bit 1]) -> ([Bit 1], [Bit 1])
-sched (state, avail) = (state', choice)
-  where
-    -- Second choice: any available bit
-    second = firstHot avail
-    -- First choice: an available bit that's not in the history
-    first = zipWith (.&.) second (map inv state)
-    -- Is the first choice ok?
-    firstOk = orList first
-    -- Make a choice
-    choice = map (firstOk ?) (zip first second)
-    -- Compute new state
-    state' = map (firstOk ?) (zip (zipWith (.|.) state first) second)
-
--- |Fair merger
-fairMerge :: Bits a => [Bit 1] -> [Stream a] -> Module (Stream a)
-fairMerge readys inputs = do
+-- |Conditional merger
+condMerge :: Bits a => [Bit 1] -> [Stream a] -> Module (Stream a)
+condMerge readys inputs = do
   -- Output buffer (half throughput)
   buffer <- makeShiftQueue 1
 
-  -- Scheduler state (for fairness)
-  state <- replicateM (length inputs) (makeReg 0)
-
   -- Which input streams are available for consumption?
   let avail = [s.canGet .&. r | (s, r) <- zip inputs readys]
-
-  -- Fair scheduler
-  let (state', choice) = sched (map val state, avail)
-  always do
-    zipWithM_ (<==) state state'
+  let choice = firstHot avail
 
   -- Consume
   always do
@@ -57,13 +30,38 @@ fairMerge readys inputs = do
 
   return (buffer.toStream)
 
+-- |Merger
+merge :: Bits a => [Stream a] -> Module (Stream a)
+merge inputs = condMerge (replicate n 1) inputs
+  where n = length inputs
+
+-- |Splitter
+fork :: Bits a => Int -> Stream a -> Module [Stream a]
+fork 1 inp = return [inp]
+fork n inp = do
+  -- Output buffers (half throughput)
+  buffers <- replicateM n (makeShiftQueue 1)
+
+  -- Which output streams are available to fill?
+  let avail = [b.notFull | b <- buffers]
+  let choice = firstHot avail
+
+  -- Fill
+  always do
+    forM_ (zip buffers choice) $ \(buffer, cond) -> do
+      when (cond .&. inp.canGet) do
+        get inp
+        enq buffer (inp.value)
+
+  return (map toStream buffers)
+
 -- |One-hot bit list, specifying which route to take
 type Route = [Bit 1]
 
 -- |NoC router
 router :: Bits a => (a -> Route) -> [Stream a] -> Module [Stream a]
 router route inputs =
-    sequence [fairMerge ready inputs | ready <- readys]
+    sequence [condMerge ready inputs | ready <- readys]
   where
     readys = transpose [route (inp.value) | inp <- inputs]
 
@@ -82,31 +80,37 @@ meshRouter (getX, getY) (x, y) inputs = router route inputs
     west  pkt = (pkt.getY .==. y) .&. (pkt.getX .<. x)
     route pkt = [mine pkt, north pkt, south pkt, east pkt, west pkt]
 
--- |2D mesh
+-- |Multi-channel 2D mesh
 mesh :: (KnownNat n, Bits a)
-     => (a -> Bit n, a -> Bit n)
+     => Int
+     -> (a -> Bit n, a -> Bit n)
      -> (Int, Int)
-     -> (Stream a -> Module (Stream a))
+     -> ((Int, Int) -> Stream a -> Module (Stream a))
      -> Module ()
-mesh (getX, getY) (lenX, lenY) node = mdo
+mesh chans (getX, getY) (lenX, lenY) node = mdo
     outs <- sequence
               [ sequence
-                  [ mdo me   <- node (strs.head)
-                        strs <- meshRouter (getX, getY)
-                                           (fromIntegral x, fromIntegral y)
-                                           (me : neighbours (x, y) outs)
+                  [ mdo nodeIn <- merge (map head strs)
+                        nodeOut <- node (x, y) nodeIn
+                        nodeOuts <- fork chans nodeOut
+                        strs <- sequence
+                          [ meshRouter (getX, getY)
+                                       (fromIntegral x, fromIntegral y)
+                                       (nodeOuts!!c : neighbours c (x, y) outs)
+                          | c <- [0..chans-1]
+                          ]
                         return strs
                   | x <- [0..lenX-1] ]
               | y <- [0..lenY-1] ]
     return ()
   where
-    neighbours coords m =
-      [north coords m, south coords m, east coords m, west coords m]
+    neighbours c coords m =
+      [north c coords m, south c coords m, east c coords m, west c coords m]
     [n, s, e, w] = [1, 2, 3, 4]
-    north (x, y) m = if y < (lenY-1) then m!!(y+1)!!x!!s else nullStream
-    south (x, y) m = if y > 0        then m!!(y-1)!!x!!n else nullStream
-    east  (x, y) m = if x < (lenX-1) then m!!y!!(x+1)!!w else nullStream
-    west  (x, y) m = if x > 0        then m!!y!!(x-1)!!e else nullStream
+    north c (x, y) m = if y < (lenY-1) then m!!(y+1)!!x!!c!!s else nullStream
+    south c (x, y) m = if y > 0        then m!!(y-1)!!x!!c!!n else nullStream
+    east  c (x, y) m = if x < (lenX-1) then m!!y!!(x+1)!!c!!w else nullStream
+    west  c (x, y) m = if x > 0        then m!!y!!(x-1)!!c!!e else nullStream
 
 -- |Example 2D packet format
 data MeshPkt =
@@ -119,9 +123,9 @@ data MeshPkt =
 -- |Test bench
 testMesh :: (Int, Int) -> Module ()
 testMesh (lenX, lenY) = 
-    mesh (destX, destY) (lenX, lenY) node
+    mesh 1 (destX, destY) (lenX, lenY) node
   where
-    node input = do
+    node (x, y) input = do
       buffer <- makeShiftQueue 1
       timer :: Reg (Bit 32) <- makeReg 0
       regX  :: Reg (Bit 8) <- makeReg 0
@@ -132,8 +136,9 @@ testMesh (lenX, lenY) =
 
         when (input.canGet) do
           get input
-          display (input.value.destX, input.value.destY)
-                  ": t=" (timer.val)
+          display (x, y) ": " "dest="
+                  (input.value.destX, input.value.destY)
+                  " t=" (timer.val)
 
         when (buffer.notFull) do
           let pkt = MeshPkt { payload = 0,
