@@ -181,10 +181,7 @@ instance RHS (Action ()) where
 
 instance (RHS f, KnownNat n) => RHS (Bit n -> f) where
   apply f [] = error "Format error: too few pattern vars"
-  apply f (arg:args) = apply (f (bitListToBitVec arg)) args
-
-toBitList :: KnownNat n => Bit n -> BitList
-toBitList x = [bit i x | i <- [0 .. widthOf x - 1]]
+  apply f (arg:args) = apply (f (fromBitList arg)) args
 
 -- |Case statement, with a subject and a list of alternatives
 match :: KnownNat n => Bit n -> [Bit n -> Action ()] -> Action ()

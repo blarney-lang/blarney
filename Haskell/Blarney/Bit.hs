@@ -272,9 +272,9 @@ liftNat nat k =
       k x
 
 -- |Convert list of bits to bit vector
-bitListToBitVec :: KnownNat n => [Bit 1] -> Bit n
-bitListToBitVec [] = error "fromList: applied to empty list"
-bitListToBitVec (x:xs)
+fromBitList :: KnownNat n => [Bit 1] -> Bit n
+fromBitList [] = error "fromList: applied to empty list"
+fromBitList (x:xs)
   | length (x:xs) == n = result
   | otherwise =
      error ("fromList: bit vector width mismatch: " ++ show (n, length (x:xs)))
@@ -285,3 +285,8 @@ bitListToBitVec (x:xs)
     join (x:xs) =
       let (n, y) = join xs in
         (n+1, concatBV y (toBV x))
+
+-- |Convert bit vector to list of bits
+toBitList :: KnownNat n => Bit n -> [Bit 1]
+toBitList vec = [bit i vec | i <- [0..n-1]]
+  where n = widthOf vec

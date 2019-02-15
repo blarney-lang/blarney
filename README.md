@@ -244,10 +244,6 @@ newtype Format
 -- Format constructors
 mempty :: Format                         -- Empty (from Monoid class)
 (<>)   :: Format -> Format -> Format     -- Append (from Monoid class)
-
--- Primitive instances
-instance FShow Char
-instance FShow (Bit n)
 ```
 
 As an example, here is how the `FShow` instance for pairs is defined.
