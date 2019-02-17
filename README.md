@@ -325,7 +325,8 @@ Finished
 Queues (also known as FIFOs) are a commonly used abstraction in hardware
 design.  Blarney provides [a range of different queue
 implementations](http://mn416.github.io/blarney/Blarney-Queue.html),
-all of which implement the following interface.
+all of which implement the following interface available when importing
+`Blarney.Queue`.
 
 ```hs
 -- Queue interface
@@ -349,6 +350,8 @@ Below, we present the simplest possible implementation of a
 one-element queue.
 
 ```hs
+import Blarney.Queue
+
 -- Simple one-element queue implementation
 makeSimpleQueue :: Bits a => Module (Queue a)
 makeSimpleQueue = do
