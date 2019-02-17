@@ -223,7 +223,7 @@ data MemReq =
 To make this type a member of the `Bits` class, we have suffixed it
 with `derving (Generic, Bits)`.  The generic deriving mechanism for
 `Bits` does not support *sum types* (there is no way to convert a
-bit-vector to a sum type using the circuit primitives provided
+bit-vector to a sum type using the circuit primitives provided by
 Blarney).
 
 ## Example 5: FShow class
