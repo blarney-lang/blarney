@@ -67,7 +67,7 @@ can generate Verilog for the test bench as follows.
 
 ```hs
 main :: IO ()
-main = emitVerilogTop top "top" "/tmp/twoSort/"
+main = writeVerilogTop top "top" "/tmp/twoSort/"
 ```
 
 Assuming the above code is in a file named `Sorter.hs`, it can be
@@ -81,7 +81,7 @@ where `blc` stands for *Blarney compiler*.  This is just a script that
 invokes GHC with the appropriate compiler flags.  For it to work,
 the `BLARNEY_ROOT` environment variable needs to be set to the root of
 the repository, and `BLARNEY_ROOT/Scripts` must be in your `PATH`.
-Running the resulting executable will produce Verilog in the
+Running the resulting executable `./Sorter` will produce Verilog in the
 `/tmp/twoSort` directory, including a makefile to build a Verilator
 simulator (`sudo apt-get install verilator`).  The simulator can be
 built and run as follows.
