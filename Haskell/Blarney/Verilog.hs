@@ -68,7 +68,7 @@ writeVerilogTop top mod dir =
       , "}"
       , "int main(int argc, char** argv) {"
       , "  Verilated::commandArgs(argc, argv);"
-      , "  top = new Vtop;"
+      , "  top = new V" ++ mod ++ ";"
       , "  while (!Verilated::gotFinish()) {"
       , "    top->clock = 0; top->eval();"
       , "    top->clock = 1; top->eval();"
