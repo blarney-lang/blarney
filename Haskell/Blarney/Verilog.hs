@@ -51,6 +51,7 @@ writeVerilogTop top mod dir =
        system ("mkdir -p " ++ dir)
        writeVerilog (dir ++ "/" ++ mod ++ ".v") mod nl
        writeFile (dir ++ "/" ++ mod ++ ".cpp") simCode
+       writeFile (dir ++ "/" ++ mod ++ ".mk") makefileIncCode
        writeFile (dir ++ "/Makefile") makefileCode
   where
     fileName = dir ++ "/" ++ mod ++ ".v"
@@ -68,7 +69,7 @@ writeVerilogTop top mod dir =
       , "}"
       , "int main(int argc, char** argv) {"
       , "  Verilated::commandArgs(argc, argv);"
-      , "  top = new Vtop;"
+      , "  top = new V" ++ mod ++ ";"
       , "  while (!Verilated::gotFinish()) {"
       , "    top->clock = 0; top->eval();"
       , "    top->clock = 1; top->eval();"
@@ -78,9 +79,10 @@ writeVerilogTop top mod dir =
       , "}"
       ]
 
-    makefileCode =
+    makefileIncCode =
       unlines [
-        mod ++ ": *.v *.cpp"
+        "all: " ++ mod
+      , mod ++ ": *.v *.cpp"
       , "\tverilator -cc " ++ mod ++ ".v " ++ "-exe "
                            ++ mod ++ ".cpp " ++ "-o " ++ mod
                            ++ " -Wno-UNSIGNED "
@@ -88,10 +90,13 @@ writeVerilogTop top mod dir =
       , "\tmake -C obj_dir -j -f V" ++ mod ++ ".mk " ++ mod
       , "\tcp obj_dir/" ++ mod ++ " ."
       , "\trm -rf obj_dir"
-      , ".PHONY: clean"
-      , "clean:"
-      , "\trm " ++ mod
+      , ".PHONY: clean clean-" ++ mod
+      , "clean: clean-" ++ mod
+      , "clean-" ++ mod ++ ":"
+      , "\trm -f " ++ mod
       ]
+
+    makefileCode = "include *.mk"
 
 generateVerilog :: Modular a => a -> String -> IO ()
 generateVerilog top mod =
