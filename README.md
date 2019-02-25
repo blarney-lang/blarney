@@ -809,15 +809,15 @@ The slave component might be defined as:
 ```hs
 slave :: Stream MulReq -> Module (Stream MulResp)
 slave reqs = do
-  buffer <- makeQueue
+  resps <- makeQueue
 
   always do
-    when (reqs.canGet .&. buffer.notFull) do
+    when (reqs.canGet .&. resps.notFull) do
       get reqs
       let (a, b) = reqs.value
-      enq buffer (a * b)
+      enq resps (a * b)
 
-  return (buffer.toStream)
+  return (resps.toStream)
 ```
 
 The master component produces requests for the slave, and consumes
@@ -827,13 +827,13 @@ asks the slave to multiply 2 by 2, and then terminates the simulation.
 ```hs
 master :: Stream MulResp -> Module (Stream MulReq)
 master resps = do
-  buffer <- makeQueue
+  reqs <- makeQueue
 
   let recipe =
     Seq [
-      Wait (buffer.notFull)
+      Wait (reqs.notFull)
     , Action do
-        enq buffer (2, 2)
+        enq reqs (2, 2)
     , Wait (resps.canGet)
     , Action do
         get resps
@@ -843,7 +843,7 @@ master resps = do
 
   runOnce recipe
 
-  return (buffer.toStream)
+  return (reqs.toStream)
 ```
 
 The top-level module which connects the master and the slave needs to
