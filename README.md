@@ -23,8 +23,9 @@ docs](http://mn416.github.io/blarney/index.html).
 * [Example 11: Block RAMs](#example-11-block-rams)
 * [Example 12: Streams](#example-12-streams)
 * [Example 13: Modular compilation](#example-13-modular-compilation)
-* [Example 14: Bit-string pattern matching](#example-14-bit-string-pattern-matching)
-* [Example 15: Tiny 8-bit CPU](#example-15-tiny-8-bit-cpu)
+* [Example 14: Master-slave pattern](#example-14-master-slave-pattern)
+* [Example 15: Bit-string pattern matching](#example-15-bit-string-pattern-matching)
+* [Example 16: Tiny 8-bit CPU](#example-16-tiny-8-bit-cpu)
 
 ## Example 1: Two-sort
 
@@ -477,6 +478,7 @@ data Recipe =
   | Par [Recipe]           -- Fork-join parallelism
   | If (Bit 1) Recipe      -- Conditional recipe
   | While (Bit 1) Recipe   -- Loop
+  | Wait (Bit 1)           -- Block until condition holds
 ```
 
 To illustrate, here is a small state machine that computes the
@@ -790,7 +792,73 @@ design whenever we generate Verilog, rather than having to flatten it
 to massive netlist.  This technique can also be used to instantaite
 any Verilog module within a Blarney design.
 
-## Example 14: Bit-string pattern matching
+## Example 14: Master-slave pattern
+
+This is a common pattern in hardware design.  Suppose we wish to move
+multiplication out of a module and into an separate slave module,
+where the slave takes requests (pairs of 32-bit integers to multiply)
+and produces responses (32-bit results).
+
+```hs
+type MulReq  = (Bit 32, Bit 32)
+type MulResp = Bit 32
+```
+
+The slave component might be defined as:
+
+```hs
+slave :: Stream MulReq -> Module (Stream MulResp)
+slave reqs = do
+  buffer <- makeQueue
+
+  always do
+    when (reqs.canGet .&. buffer.notFull) do
+      get reqs
+      let (a, b) = reqs.value
+      enq buffer (a * b)
+
+  return (buffer.toStream)
+```
+
+The master component produces requests for the slave, and consumes
+responses from the slave.  In the example below, the master simply
+asks the slave to multiply 2 by 2, and then terminates the simulation.
+
+```hs
+master :: Stream MulResp -> Module (Stream MulReq)
+master resps = do
+  buffer <- makeQueue
+
+  let recipe =
+    Seq [
+      Wait (buffer.notFull)
+    , Action do
+        enq buffer (2, 2)
+    , Wait (resps.canGet)
+    , Action do
+        get resps
+        display "Result: " (resps.value)
+        finish
+    ]
+
+  runOnce recipe
+
+  return (buffer.toStream)
+```
+
+The top-level module which connects the master and the slave needs to
+introduce a cycle, which can be achieved simply using Haskell's
+recursive-do (`mdo`) notation:
+
+```hs
+top :: Module ()
+top = mdo
+  resps <- master reqs
+  reqs <- slave resps
+  return ()
+```
+
+## Example 15: Bit-string pattern matching
 
 Recent work on specifying and implementing ISAs led us to develop two
 libraries for doing bit-string pattern matching.  The first,
@@ -845,7 +913,7 @@ passed to the right-hand-side function.  Scattered immediates appear a
 lot in the RISC-V specification.  Thanks to Jon Woodruff for
 suggesting this feature!
 
-## Example 15: Tiny 8-bit CPU
+## Example 16: Tiny 8-bit CPU
 
 As a way of briging together a number of the ideas introduced above,
 let's look at a very simple, 8-bit CPU with the following ISA.
