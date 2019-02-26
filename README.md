@@ -611,11 +611,12 @@ data RAM a d =
 
 When a `load` is issued for a given address, the value at that address
 appears on `out` on the next clock cycle.  When a `store` is issued,
-the value is written to the RAM on the current cycle, and the written
-value appears on `out` on the next cycle.  A parallel `load` and
-`store` to the same `RAM` interface should not be issued on the same
-cycle.  To illustrate, here is a test bench that creates a block RAM
-and performs a `store` followed by a `load`.
+the value is written to the RAM on the current cycle, and a load of
+the new value can be requested on the subsequent cycle.  A parallel
+`load` and `store` should only be issued on the same cycle if the RAM
+has been created as a dual-port RAM (as opposed to a single-port RAM).
+To illustrate, here is a test bench that creates a single-port block
+RAM and performs a `store` followed by a `load`.
 
 ```hs
 top :: Module ()
@@ -933,12 +934,12 @@ suggesting this feature!
 As a way of briging together a number of the ideas introduced above,
 let's look at a very simple, 8-bit CPU with the following ISA.
 
-  Opcode     | Meaning
-  ---------- | ---------
-  `00DDNNNN` | Write value `0000NNNN` to register `DD`
-  `01DDAABB` | Add register `AA` to register `BB` and store in register `DD`
-  `10NNNNBB` | Branch back by `NNNN` instructions if register `BB` is non-zero
-  `11NNNNNN` | Halt
+  Opcode                             | Meaning
+  ----------                         | ---------
+  `00` `rd[1:0]` `imm[3:0]`          | Write value `imm` (zero-extended) to register `rd`
+  `01` `rd[1:0]` `ra[1:0]` `rb[1:0]` | Add register `ra` to register `rb` and store in register `rd`
+  `10` `rd[1:0]` `imm[3:0] `rb[1:0]` | Branch back by `imm` instructions if register `rb` is non-zero
+  `11` `XXXXXX`                      | Halt
 
 We have developed a [3-stage pipeline
 implemention](https://github.com/POETSII/blarney/blob/master/Examples/CPU/CPU.hs)
@@ -992,11 +993,11 @@ makeCPU = do
   regFileB :: RAM RegId (Bit 8) <- makeDualRAMPassthrough
 
   -- Instruction register
-  instr :: Reg (Bit 8) <- makeRegU
+  instr :: Reg (Bit 8) <- makeReg dontCare
 
   -- Instruction operand registers
-  opA :: Reg (Bit 8) <- makeRegU
-  opB :: Reg (Bit 8) <- makeRegU
+  opA :: Reg (Bit 8) <- makeReg dontCare
+  opB :: Reg (Bit 8) <- makeReg dontCare
 
   -- Program counter
   pcNext :: Wire (Bit 8) <- makeWire 0
@@ -1009,7 +1010,7 @@ makeCPU = do
   flush :: Wire (Bit 1) <- makeWire 0
 
   -- Cycle counter
-  count :: Reg (Bit 32) <- makeRegU
+  count :: Reg (Bit 32) <- makeReg 0
   always (count <== count.val + 1)
 
   -- Trigger for each pipeline stage
@@ -1027,26 +1028,27 @@ makeCPU = do
     -- Stage 1: Operand Fetch
     -- ======================
 
+    -- Fetch operands
+    load regFileA (instrMem.out.rA)
+    load regFileB (instrMem.out.rB)
+
     when (go1.val) do
       when (flush.val.inv) do
         pcNext <== pc + 1
         go2 <== 1
 
-    load regFileA (instrMem.out.rA)
-    load regFileB (instrMem.out.rB)
-
     -- Stage 2: Decode
     -- ===============
   
-    -- Latch instruction
+    -- Latch instruction for execute stage
     instr <== instrMem.out'
 
-    -- Register forwarding logic
+    -- Register-forwarding logic
     let forward rS other =
           (result.active .&. (instr.val.rD .==. instrMem.out'.rS)) ?
           (result.val, other)
 
-    -- Latch operands
+    -- Latch operands for execute stage
     opA <== forward rA (regFileA.out)
     opB <== forward rB (regFileB.out)
 
