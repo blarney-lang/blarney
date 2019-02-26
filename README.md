@@ -63,8 +63,9 @@ always :: Action a -> Module a
 which performs the given action *on every clock cycle*.  Blarney
 actions include statements for displaying values during simulation
 (`display`), terminating the simulator (`finish`), and mutating state
-(see below).  All statements in an `Action` execute in parallel.  We
-can generate Verilog for the test bench as follows.
+(see below).  All statements in an `Action` execute in parallel,
+within a clock-cycle.  We can generate Verilog for the test bench as
+follows.
 
 ```hs
 main :: IO ()
@@ -549,8 +550,9 @@ just include `FShow` in the `deriving` clause for the data type.
 
 ## Example 10: Bit selection
 
-There are different flavours of bit selection, depending on whether
-the index (or indices) are type-level numbers or
+Bit selection is important when we want to extract a subset of bits
+out of a bit-vector.  There are different flavours, depending on
+whether the index (or indices) are type-level numbers or
 circuit-generation-time values:
 
 For type-level indices, we provide functions
