@@ -934,12 +934,12 @@ suggesting this feature!
 As a way of briging together a number of the ideas introduced above,
 let's look at a very simple, 8-bit CPU with the following ISA.
 
-  Opcode                             | Meaning
-  ----------                         | ---------
-  `00` `rd[1:0]` `imm[3:0]`          | Write value `imm` (zero-extended) to register `rd`
-  `01` `rd[1:0]` `ra[1:0]` `rb[1:0]` | Add register `ra` to register `rb` and store in register `rd`
-  `10` `rd[1:0]` `imm[3:0] `rb[1:0]` | Branch back by `imm` instructions if register `rb` is non-zero
-  `11` `XXXXXX`                      | Halt
+  Opcode                              | Meaning
+  ----------                          | ---------
+  `00` `rd[1:0]` `imm[3:0]`           | Write value `imm` (zero-extended) to register `rd`
+  `01` `rd[1:0]` `ra[1:0]` `rb[1:0]`  | Add register `ra` to register `rb` and store in register `rd`
+  `10` `rd[1:0]` `imm[3:0]` `rb[1:0]` | Branch back by `imm` instructions if register `rb` is non-zero
+  `11` `XXXXXX`                       | Halt
 
 We have developed a [3-stage pipeline
 implemention](https://github.com/POETSII/blarney/blob/master/Examples/CPU/CPU.hs)
