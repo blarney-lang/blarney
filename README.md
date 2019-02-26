@@ -13,12 +13,12 @@ docs](http://mn416.github.io/blarney/index.html).
 * [Example 1: Two-sort](#example-1-two-sort)
 * [Example 2: Bubble sort](#example-2-bubble-sort)
 * [Example 3: Polymorphism](#example-3-polymorphism)
-* [Example 4: Bits class](#example-4-bits-class)
-* [Example 5: FShow class](#example-5-fshow-class)
-* [Example 6: Mutable registers](#example-6-mutable-registers)
-* [Example 7: Queues](#example-7-queues)
-* [Example 8: Mutable wires](#example-8-mutable-wires)
-* [Example 9: Recipes](#example-9-recipes)
+* [Example 4: Mutable registers](#example-4-mutable-registers)
+* [Example 5: Queues](#example-5-queues)
+* [Example 6: Mutable wires](#example-6-mutable-wires)
+* [Example 7: Recipes](#example-7-recipes)
+* [Example 8: Bits class](#example-8-bits-class)
+* [Example 9: FShow class](#example-9-fshow-class)
 * [Example 10: Bit selection](#example-10-bit-selection)
 * [Example 11: Block RAMs](#example-11-block-rams)
 * [Example 12: Streams](#example-12-streams)
@@ -193,73 +193,7 @@ twoSort (a, b) = a .<. b ? ((a, b), (b, a))
 Indeed, this would be the type inferred by the Haskell compiler if no
 type signature was supplied.
 
-## Example 4: Bits class
-
-Any type in the
-[Bits](http://mn416.github.io/blarney/Blarney-Bits.html)
-class can be represented in hardware, e.g.
-stored in a wire, a register, or a RAM.
-
-```hs
-class Bits a where
-  type SizeOf a :: Nat
-  sizeOf        :: a -> Int
-  pack          :: a -> Bit (SizeOf a)
-  unpack        :: Bit (SizeOf a) -> a
-```
-
-The `Bits` class supports *generic deriving*.  For example, suppose
-we have a simple data type for memory requests:
-
-```hs
-data MemReq =
-  MemReq {
-    memOp   :: Bit 1    -- Is it a load or a store request?
-  , memAddr :: Bit 32   -- 32-bit address
-  , memData :: Bit 32   -- 32-bit data for stores
-  }
-  deriving (Generic, Bits)
-```
-
-To make this type a member of the `Bits` class, we have suffixed it
-with `derving (Generic, Bits)`.  The generic deriving mechanism for
-`Bits` does not support *sum types* (there is no way to convert a
-bit-vector to a sum type using the circuit primitives provided by
-Blarney).
-
-## Example 5: FShow class
-
-Any type in the
-[FShow](http://mn416.github.io/blarney/Blarney-FShow.html)
-class can be passed as arguments to the
-variadic `display` function.
-
-```hs
-class FShow a where
-  fshow     :: a -> Format
-  fshowList :: [a] -> Format     -- Has default definition
-
--- Abstract data type for things that can be displayed
-newtype Format
-
--- Format constructors
-mempty :: Format                         -- Empty (from Monoid class)
-(<>)   :: Format -> Format -> Format     -- Append (from Monoid class)
-```
-
-As an example, here is how the `FShow` instance for pairs is defined.
-
-```hs
--- Example instance: displaying pairs
-instance (FShow a, FShow b) => FShow (a, b) where
-  fshow (a, b) = fshow "(" <> fshow a <> fshow "," <> fshow b <> fshow ")"
-```
-
-Like the `Bits` class, the `FShow` class supports *generic deriving*:
-just include `FShow` in the `deriving` clause for the data type.
-
-
-## Example 6: Mutable registers
+## Example 4: Mutable registers
 
 So far, we've only seen `display` and `finish` actions inside a
 Blarney module.  It also supports creation and assignment of
@@ -321,7 +255,7 @@ cycleCount = 0xa
 Finished
 ```
 
-## Example 7: Queues
+## Example 5: Queues
 
 Queues (also known as FIFOs) are a commonly used abstraction in hardware
 design.  Blarney provides [a range of different queue
@@ -404,7 +338,7 @@ top = do
     when (count.val .==. 100) finish
 ```
 
-## Example 8: Mutable wires
+## Example 6: Mutable wires
 
 *Wires* are a feature of the `Action` monad that offer a way for
 separate action blocks to communicate *within the same clock cycle*.
@@ -460,7 +394,7 @@ makeCounter = do
   return (Counter inc dec output)
 ```
 
-## Example 9: Recipes
+## Example 7: Recipes
 
 State machines are a common way of defining the control-path of a
 circuit.  They are typically expressed by doing case-analysis of the
@@ -547,33 +481,112 @@ second.  On the third cycle, we both increment and decrement it in
 parallel.  On the fourth cycle, we display the value and terminate the
 simulator.
 
-## Example 10: Bit selection
+## Example 8: Bits class
 
-Blarney provides the following untyped bit-selection functions, i.e.
-where the selection indices are values rather than types, meaning the
-width mismatches will not be caught by the type checker, but by a
-(probably unhelpful) error-message at circuit-generation time.
+Any type in the
+[Bits](http://mn416.github.io/blarney/Blarney-Bits.html)
+class can be represented in hardware, e.g.
+stored in a wire, a register, or a RAM.
 
 ```hs
--- Dynamically-typed bit selection
-bit :: Int -> Bit n -> Bit 1
-
--- Dynamically-typed sub-range selection
-bits :: KnownNat m => (Int, Int) -> Bit n -> Bit m
+class Bits a where
+  type SizeOf a :: Nat
+  sizeOf        :: a -> Int
+  pack          :: a -> Bit (SizeOf a)
+  unpack        :: Bit (SizeOf a) -> a
 ```
 
-There are statically-typed versions of both these functions --
-[index](http://mn416.github.io/blarney/Blarney-Bit.html#v:index) and
-[range](http://mn416.github.io/blarney/Blarney-Bit.html#v:range).
-To illustrate, here's a function to select the upper four bits of a byte.
+The `Bits` class supports *generic deriving*.  For example, suppose
+we have a simple data type for memory requests:
 
 ```hs
+data MemReq =
+  MemReq {
+    memOp   :: Bit 1    -- Is it a load or a store request?
+  , memAddr :: Bit 32   -- 32-bit address
+  , memData :: Bit 32   -- 32-bit data for stores
+  }
+  deriving (Generic, Bits)
+```
+
+To make this type a member of the `Bits` class, we have suffixed it
+with `derving (Generic, Bits)`.  The generic deriving mechanism for
+`Bits` does not support *sum types*: there is no way to convert a
+bit-vector (run-time circuit value) to a sum type
+(circuit-generation-time value) using the circuit primitives provided
+by Blarney.
+
+## Example 9: FShow class
+
+Any type in the
+[FShow](http://mn416.github.io/blarney/Blarney-FShow.html)
+class can be passed as arguments to the
+variadic `display` function.
+
+```hs
+class FShow a where
+  fshow     :: a -> Format
+  fshowList :: [a] -> Format     -- Has default definition
+
+-- Abstract data type for things that can be displayed
+newtype Format
+
+-- Format constructors
+mempty :: Format                         -- Empty (from Monoid class)
+(<>)   :: Format -> Format -> Format     -- Append (from Monoid class)
+```
+
+As an example, here is how the `FShow` instance for pairs is defined.
+
+```hs
+-- Example instance: displaying pairs
+instance (FShow a, FShow b) => FShow (a, b) where
+  fshow (a, b) = fshow "(" <> fshow a <> fshow "," <> fshow b <> fshow ")"
+```
+
+Like the `Bits` class, the `FShow` class supports *generic deriving*:
+just include `FShow` in the `deriving` clause for the data type.
+
+## Example 10: Bit selection
+
+There are different flavours of bit selection, depending on whether
+the index (or indices) are type-level numbers or
+circuit-generation-time values:
+
+For type-level indices, we provide functions
+[index](http://mn416.github.io/blarney/Blarney-Bit.html#v:index) and
+[range](http://mn416.github.io/blarney/Blarney-Bit.html#v:range), and
+use type application to specify the type-level indices:
+
+```hs
+-- Extract most-sigificant bit of a byte
+msb :: Bit 8 -> Bit 1
+msb x = index @7 x
+
 -- Extract upper 4 bits of a byte
 upperNibble :: Bit 8 -> Bit 4
 upperNibble x = range @7 @4 x
 ```
 
-We use type application to specify the type-level indices.
+For circuit-generation-time indices of type `Int`, we provide
+[bit](http://mn416.github.io/blarney/Blarney-Bit.html#v:bit) and
+[bits](http://mn416.github.io/blarney/Blarney-Bit.html#v:bits):
+
+```hs
+-- Extract most-sigificant bit of a byte
+msb :: Bit 8 -> Bit 1
+msb x = bit 7 x
+
+-- Extract upper 4 bits of a byte
+upperNibble :: Bit 8 -> Bit 4
+upperNibble x = bits (7, 4) x
+```
+
+While `index` and `range` are type-safe, `bit` and `bits` are not.
+For example, the argument to `bit` could be out of range, and the
+result of `bits` could have a different width to that implied by the
+range.  Such cases will lead to confusing error messages at
+circuit-generation time -- so use with care!
 
 ## Example 11: Block RAMs
 
