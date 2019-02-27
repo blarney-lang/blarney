@@ -869,8 +869,8 @@ recursive-do (`mdo`) notation:
 ```hs
 top :: Module ()
 top = mdo
-  resps <- master reqs
-  reqs <- slave resps
+  resps <- slave reqs
+  reqs <- master resps
   return ()
 ```
 
