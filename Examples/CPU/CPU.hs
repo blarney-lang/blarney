@@ -54,10 +54,6 @@ makeCPU = do
   -- Instruction register
   instr :: Reg (Bit 8) <- makeRegU
 
-  -- Instruction operand registers
-  opA :: Reg (Bit 8) <- makeRegU
-  opB :: Reg (Bit 8) <- makeRegU
-
   -- Program counter
   pcNext :: Wire (Bit 8) <- makeWire 0
   let pc = reg 0 (pcNext.val)
@@ -92,23 +88,14 @@ makeCPU = do
         pcNext <== pc + 1
         go2 <== 1
 
-    load regFileA (instrMem.out.rA)
-    load regFileB (instrMem.out.rB)
-
     -- Stage 2: Decode
     -- ===============
   
     -- Latch instruction
     instr <== instrMem.out'
 
-    -- Register forwarding logic
-    let forward rS other =
-          (result.active .&. (instr.val.rD .==. instrMem.out'.rS)) ?
-          (result.val, other)
-
-    -- Latch operands
-    opA <== forward rA (regFileA.out)
-    opB <== forward rB (regFileB.out)
+    load regFileA (instrMem.out'.rA)
+    load regFileB (instrMem.out'.rB)
 
     -- Trigger stage 3
     when (flush.val.inv) do
@@ -124,9 +111,9 @@ makeCPU = do
           -- Load-immediate instruction
           0b00 --> result <== zeroExtend (instr.val.imm),
           -- Add instruction
-          0b01 --> result <== opA.val + opB.val,
+          0b01 --> result <== regFileA.out + regFileB.out,
           -- Branch instruction
-          0b10 --> when (opB.val .!=. 0) do
+          0b10 --> when (regFileB.out .!=. 0) do
                      pcNext <== pc - zeroExtend (instr.val.offset) - 2
                      -- Control hazard
                      flush <== 1,
