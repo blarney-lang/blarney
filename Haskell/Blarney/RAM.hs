@@ -107,7 +107,6 @@ data RAM a d =
     load    :: a -> Action ()       -- ^ Issue load request
   , store   :: a -> d -> Action ()  -- ^ Issue store request
   , out     :: d                    -- ^ Data out
-  , out'    :: d                    -- ^ Registered data out
   , writeEn :: Bit 1                -- ^ Is there a store currently happening?
   }
 
@@ -132,21 +131,16 @@ makeRAMCore init = do
         Nothing  -> ram
         Just str -> ramInit str
 
-  -- RAM output
-  let output = ramPrimitive (val addrBus, val dataBus, val writeEn)
-  let output' = delay zero output
-
-  -- Methods
-  let load a = do
-        addrBus <== a
-
-  let store a d = do
-        addrBus <== a
-        dataBus <== d
-        writeEn <== 1
-
   -- Return interface
-  return (RAM load store output output' (val writeEn))
+  return RAM {
+    load    = (addrBus <==)
+  , store   = \a d -> do
+                addrBus <== a
+                dataBus <== d
+                writeEn <== 1
+  , out     = ramPrimitive (val addrBus, val dataBus, val writeEn)
+  , writeEn = val writeEn
+  }
 
 -- |Create true dual-port block RAM.
 -- When read-address == write-address on different ports, read old data.
@@ -180,29 +174,23 @@ makeTrueDualRAMCore init = do
   let (outA, outB) = ramPrimitive (val addrBusA, val dataBusA, val writeEnA)
                                   (val addrBusB, val dataBusB, val writeEnB)
 
-  let outA' = delay zero outA
-  let outB' = delay zero outB
-
-  -- Methods
-  let loadA a = do
-        addrBusA <== a
-
-  let storeA a d = do
-        addrBusA <== a
-        dataBusA <== d
-        writeEnA <== 1
-
-  let loadB a = do
-        addrBusB <== a
-
-  let storeB a d = do
-        addrBusB <== a
-        dataBusB <== d
-        writeEnB <== 1
-
   -- Return interface
-  return (RAM loadA storeA outA outA' (val writeEnA),
-          RAM loadB storeB outB outB' (val writeEnB))
+  return (RAM {
+              load    = (addrBusA <==)
+            , store   = \a d -> do addrBusA <== a
+                                   dataBusA <== d
+                                   writeEnA <== 1
+            , out     = outA
+            , writeEn = val writeEnA
+            },
+          RAM {
+              load    = (addrBusB <==)
+            , store   = \a d -> do addrBusB <== a
+                                   dataBusB <== d
+                                   writeEnB <== 1
+            , out     = outB
+            , writeEn = val writeEnB
+            })
 
 -- |Create uninitialised dual-port RAM.
 -- One port used for reading and the other for writing.
@@ -221,13 +209,13 @@ makeDualRAMCore init = do
   -- Create true dual port RAM
   (portA :: RAM a d, portB :: RAM a d) <- makeTrueDualRAMCore init
 
-  -- Methods
-  let loadA a = load portA a
-
-  let storeB a d = store portB a d
-
   -- Return interface
-  return (RAM loadA storeB (out portA) (out' portA) (writeEn portB))
+  return RAM {
+    load    = load portA
+  , store   = store portB
+  , out     = out portA
+  , writeEn = writeEn portB
+  }
 
 -- | Dual-port passthrough block RAM with initial contents from hex file.
 -- Read and write to same address yields new data.
@@ -252,21 +240,14 @@ makeDualRAMPassthroughCore init = do
   sa :: Wire a <- makeWireU
   sd :: Wire d <- makeWireU
 
-  -- Methods
-  let loadMethod a = do
-        load ram a
-        la <== a
-
-  let storeMethod a d = do
-        store ram a d
-        sa <== a
-        sd <== d
-
-  let outMethod =
-        (delay zero (active la) .&. delay zero (active sa) .&.
-           (buffer (val la) === buffer (val sa))) ?
+  return RAM {
+    load    = \a -> do load ram a
+                       la <== a
+  , store   = \a d -> do store ram a d
+                         sa <== a
+                         sd <== d
+  , out     = (delay zero (active la) .&. delay zero (active sa) .&.
+               (buffer (val la) === buffer (val sa))) ?
               (buffer (val sd), out ram)
-
-  let outMethod' = delay zero outMethod
-
-  return (RAM loadMethod storeMethod outMethod outMethod' (writeEn ram))
+  , writeEn = writeEn ram
+  }

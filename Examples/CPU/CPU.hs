@@ -99,11 +99,11 @@ makeCPU = do
     -- ===============
   
     -- Latch instruction
-    instr <== instrMem.out'
+    instr <== instrMem.out.buffer
 
     -- Register forwarding logic
     let forward rS other =
-          (result.active .&. (instr.val.rD .==. instrMem.out'.rS)) ?
+          (result.active .&. (instr.val.rD .==. instrMem.out.buffer.rS)) ?
           (result.val, other)
 
     -- Latch operands
