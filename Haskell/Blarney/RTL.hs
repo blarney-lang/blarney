@@ -218,12 +218,8 @@ data Wire a =
     wireId  :: VarId
     -- |Current wire value
   , wireVal :: a
-    -- |Registered version of wireVal
-  , val'    :: a
     -- |Is wire being assigned on this cycle?
   , active  :: Bit 1
-    -- |Reisgeted version of active
-  , active' :: Bit 1
   }
 
 -- |Wire assignment
@@ -268,9 +264,7 @@ makeWire defaultVal =
        Wire {
          wireId  = v
        , wireVal = out
-       , val'    = delay defaultVal out
        , active  = any
-       , active' = delay 0 any
        }
 
 -- |Create wire with don't care default value

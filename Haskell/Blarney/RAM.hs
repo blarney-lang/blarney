@@ -263,9 +263,9 @@ makeDualRAMPassthroughCore init = do
         sd <== d
 
   let outMethod =
-        (active' la .&. active' sa .&.
-           (val' la === val' sa)) ?
-              (val' sd, out ram)
+        (delay zero (active la) .&. delay zero (active sa) .&.
+           (buffer (val la) === buffer (val sa))) ?
+              (buffer (val sd), out ram)
 
   let outMethod' = delay zero outMethod
 
