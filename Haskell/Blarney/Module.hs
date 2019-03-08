@@ -29,8 +29,11 @@ module Blarney.Module
     -- * Conditional actions
     when, whenR, switch, (-->),
 
-    -- * Mutable variables
-    Var(..),
+    -- * Variable value (read)
+    Val(..),
+
+    -- * Variable assignment (write)
+    Assign(..),
 
     -- * Registers
     RTL.Reg(..), makeReg, makeRegU, makeDReg,
@@ -106,20 +109,24 @@ infixl 0 -->
 (-->) :: a -> Action () -> (a, Action ())
 lhs --> rhs = (lhs, rhs)
 
--- |Mutable variables
-infix 1 <==
-class Var v where
+-- |Variable value (read)
+class Val v where
   val :: Bits a => v a -> a
+-- |Variable assignment (write)
+infix 1 <==
+class Assign v where
   (<==) :: Bits a => v a -> a -> Action ()
 
 -- |Register read and write
-instance Var RTL.Reg where
+instance Val RTL.Reg where
   val v = RTL.regVal v
+instance Assign RTL.Reg where
   v <== x = A (RTL.writeReg v x)
 
 -- |Wire read and write
-instance Var RTL.Wire where
+instance Val RTL.Wire where
   val v = RTL.wireVal v
+instance Assign RTL.Wire where
   v <== x = A (RTL.writeWire v x)
 
 -- |Create register with initial value
