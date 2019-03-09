@@ -35,7 +35,7 @@ infixl 1 :=
 -- |Abstract syntax of Recipe
 data Recipe where
   Tick   :: Recipe
-  (:=)   :: (Var v, Bits a) => v a -> a -> Recipe
+  (:=)   :: (Assign v, Bits a) => v a -> a -> Recipe
   Wait   :: Bit 1 -> Recipe
   When   :: Bit 1 -> Action () -> Recipe
   Do     :: [Action ()] -> Recipe

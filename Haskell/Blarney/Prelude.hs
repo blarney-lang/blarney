@@ -29,6 +29,7 @@ module Blarney.Prelude
   , ones            -- Generic all-ones
   , dontCare        -- Generic don't care
   , delay           -- Generic register
+  , buffer          -- Generic register with don't care default value
   , delayEn         -- Generic register with enable
   ) where
 
@@ -128,6 +129,10 @@ dontCare = unpack $ FromBV $ constBitsBV w DontCare
 -- |Generic register
 delay :: Bits a => a -> a -> a
 delay init a = unpack (reg (pack init) (pack a))
+
+-- |Generic register with don't care default value
+buffer :: Bits a => a -> a
+buffer = delay dontCare
 
 -- |Generic register with enable
 delayEn :: Bits a => a -> Bit 1 -> a -> a
