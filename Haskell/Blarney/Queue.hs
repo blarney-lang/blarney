@@ -121,7 +121,7 @@ makeSizedQueueCore logSize =
   liftNat logSize $ \(_ :: Proxy aw) -> do
 
     -- A dual-port RAM, wide enough to hold entire queue
-    ram :: RAM (Bit aw) a <- makeDualRAMPassthrough
+    ram :: RAM (Bit aw) a <- makeDualRAMForward 0
 
     -- Queue front and back pointers
     front :: Reg (Bit aw) <- makeReg 0

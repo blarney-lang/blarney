@@ -25,8 +25,8 @@ module Blarney.RAM
   , makeTrueDualRAMInit -- Initialised true dual-port block RAM
   , makeDualRAM         -- Dual-port block RAM
   , makeDualRAMInit     -- Initialised dual-port block RAM
-  , makeDualRAMPassthrough     -- Pass-through dual-port block RAM
-  , makeDualRAMPassthroughInit -- Initialised pass-through dual-port block RAM 
+  , makeDualRAMForward  -- Forwarding dual-port block RAM
+  , makeDualRAMForwardInit -- Initialised forwarding dual-port block RAM
   ) where
 
 -- Standard imports
@@ -217,21 +217,23 @@ makeDualRAMCore init = do
   , writeEn = writeEn portB
   }
 
--- | Dual-port passthrough block RAM with initial contents from hex file.
+-- | Dual-port forwarding block RAM with initial contents from hex file.
 -- Read and write to same address yields new data.
-makeDualRAMPassthroughInit :: (Bits a, Bits d) => String -> Module (RAM a d)
-makeDualRAMPassthroughInit init = makeDualRAMPassthroughCore (Just init)
+makeDualRAMForwardInit :: (Bits a, Bits d) => Int -> String -> Module (RAM a d)
+makeDualRAMForwardInit n init = makeDualRAMForwardCore n (Just init)
 
--- | Uninitialised dual-port passthrough block RAM.
+-- | Uninitialised dual-port forwarding block RAM.
 -- Read and write to same address yields new data.
-makeDualRAMPassthrough :: (Bits a, Bits d) => Module (RAM a d)
-makeDualRAMPassthrough = makeDualRAMPassthroughCore Nothing
+makeDualRAMForward :: (Bits a, Bits d) => Int -> Module (RAM a d)
+makeDualRAMForward n = makeDualRAMForwardCore n Nothing
 
--- Dual port RAM module with pass-through.
+-- Dual port RAM module with forwarding.
 -- Read and write to same address yields new data.
-makeDualRAMPassthroughCore :: (Bits a, Bits d) =>
-                                 Maybe String -> Module (RAM a d)
-makeDualRAMPassthroughCore init = do
+makeDualRAMForwardCore :: (Bits a, Bits d) =>
+                                 Int -> Maybe String -> Module (RAM a d)
+makeDualRAMForwardCore n init
+  | n < 0 = error "makeDualRAMForwardCore: n must be greater or equal to 0"
+  | otherwise = do
   -- Create dual port RAM
   ram :: RAM a d <- makeDualRAMCore init
 
@@ -240,14 +242,40 @@ makeDualRAMPassthroughCore init = do
   sa :: Wire a <- makeWireU
   sd :: Wire d <- makeWireU
 
+  let get_rdata (_,_,x,_,_,_) = x
+  let cmpStep (ractive, raddr, rdata, wactive, waddr, wdata) =
+       ( ractive
+       , raddr
+       , (ractive .&. wactive .&. (raddr === waddr)) ? (wdata, rdata)
+       , wactive
+       , waddr
+       , wdata)
+  let latchStep (ractive, raddr, rdata, wactive, waddr, wdata) =
+       ( delay 0 ractive
+       , buffer raddr
+       , rdata
+       , wactive
+       , waddr
+       , wdata)
+  let firstStage = cmpStep ( delay 0 (active la)
+                           , buffer (val la)
+                           , out ram
+                           , delay 0 (active sa)
+                           , buffer (val sa)
+                           , buffer (val sd))
+  let allStages = iterate (cmpStep `o` latchStep) ( active la
+                                                  , val la
+                                                  , get_rdata firstStage
+                                                  , active sa
+                                                  , val sa
+                                                  , val sd)
+
   return RAM {
     load    = \a -> do load ram a
                        la <== a
   , store   = \a d -> do store ram a d
                          sa <== a
                          sd <== d
-  , out     = (delay zero (active la) .&. delay zero (active sa) .&.
-               (buffer (val la) === buffer (val sa))) ?
-              (buffer (val sd), out ram)
+  , out     = get_rdata $ allStages !! n
   , writeEn = writeEn ram
   }
