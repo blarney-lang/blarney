@@ -48,8 +48,8 @@ makeCPU = do
   instrMem :: RAM (Bit 8) Instr <- makeRAMInit "instrs.hex"
 
   -- Register file
-  regFileA :: RAM RegId (Bit 8) <- makeDualRAMPassthrough
-  regFileB :: RAM RegId (Bit 8) <- makeDualRAMPassthrough
+  regFileA :: RAM RegId (Bit 8) <- makeDualRAMForward 0
+  regFileB :: RAM RegId (Bit 8) <- makeDualRAMForward 0
 
   -- Instruction register
   instr :: Reg (Bit 8) <- makeRegU
