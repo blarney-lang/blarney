@@ -1,4 +1,4 @@
--- Tiny 8-bit CPU with a 3-stage pipeline
+-- Tiny 8-bit CPU with a 4-stage pipeline
 --
 -- Opcode    | Meaning
 -- ----------+--------------------------------------------------------
@@ -47,16 +47,17 @@ makeCPU = do
   -- Instruction memory
   instrMem :: RAM (Bit 8) Instr <- makeRAMInit "instrs.hex"
 
-  -- Register file
+  -- Two block RAMs allows two operands to be read,
+  -- and one result to be written, on every cycle
   regFileA :: RAM RegId (Bit 8) <- makeDualRAMForward 0
   regFileB :: RAM RegId (Bit 8) <- makeDualRAMForward 0
 
   -- Instruction register
-  instr :: Reg (Bit 8) <- makeRegU
+  instr :: Reg (Bit 8) <- makeReg dontCare
 
   -- Instruction operand registers
-  opA :: Reg (Bit 8) <- makeRegU
-  opB :: Reg (Bit 8) <- makeRegU
+  opA :: Reg (Bit 8) <- makeReg dontCare
+  opB :: Reg (Bit 8) <- makeReg dontCare
 
   -- Program counter
   pcNext :: Wire (Bit 8) <- makeWire 0
@@ -69,7 +70,7 @@ makeCPU = do
   flush :: Wire (Bit 1) <- makeWire 0
 
   -- Cycle counter
-  count :: Reg (Bit 32) <- makeRegU
+  count :: Reg (Bit 32) <- makeReg 0
   always (count <== count.val + 1)
 
   -- Trigger for each pipeline stage
@@ -78,6 +79,9 @@ makeCPU = do
   go3 :: Reg (Bit 1) <- makeDReg 0
 
   always do
+    -- Stage 0: Instruction Fetch
+    -- ==========================
+
     -- Index the instruction memory
     load instrMem (pcNext.val)
 
@@ -95,15 +99,15 @@ makeCPU = do
     load regFileA (instrMem.out.rA)
     load regFileB (instrMem.out.rB)
 
-    -- Stage 2: Decode
-    -- ===============
+    -- Stage 2: Latch Operands
+    -- =======================
   
     -- Latch instruction
-    instr <== instrMem.out.buffer
+    instr <== instrMem.out.old
 
     -- Register forwarding logic
     let forward rS other =
-          (result.active .&. (instr.val.rD .==. instrMem.out.buffer.rS)) ?
+          (result.active .&. (instr.val.rD .==. instrMem.out.old.rS)) ?
           (result.val, other)
 
     -- Latch operands

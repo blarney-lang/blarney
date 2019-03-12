@@ -941,7 +941,7 @@ let's look at a very simple, 8-bit CPU with the following ISA.
   `10` `rd[1:0]` `imm[3:0]` `rb[1:0]` | Branch back by `imm` instructions if register `rb` is non-zero
   `11` `XXXXXX`                       | Halt
 
-We have developed a [3-stage pipeline
+We have developed a [4-stage pipeline
 implemention](https://github.com/POETSII/blarney/blob/master/Examples/CPU/CPU.hs)
 of the ISA that has a CPI (cycles-per-instruction) close to 1.
 Although the ISA is very simple, it does contain a few challenges for
@@ -988,9 +988,10 @@ makeCPU = do
   -- Instruction memory
   instrMem :: RAM (Bit 8) Instr <- makeRAMInit "instrs.hex"
 
-  -- Register file
-  regFileA :: RAM RegId (Bit 8) <- makeDualRAMPassthrough
-  regFileB :: RAM RegId (Bit 8) <- makeDualRAMPassthrough
+  -- Two block RAMs allows two operands to be read,
+  -- and one result to be written, on every cycle
+  regFileA :: RAM RegId (Bit 8) <- makeDualRAMForward 0
+  regFileB :: RAM RegId (Bit 8) <- makeDualRAMForward 0
 
   -- Instruction register
   instr :: Reg (Bit 8) <- makeReg dontCare
@@ -1019,6 +1020,9 @@ makeCPU = do
   go3 :: Reg (Bit 1) <- makeDReg 0
 
   always do
+    -- Stage 0: Instruction Fetch
+    -- ==========================
+
     -- Index the instruction memory
     load instrMem (pcNext.val)
 
@@ -1028,27 +1032,26 @@ makeCPU = do
     -- Stage 1: Operand Fetch
     -- ======================
 
-    -- Fetch operands
-    load regFileA (instrMem.out.rA)
-    load regFileB (instrMem.out.rB)
-
     when (go1.val) do
       when (flush.val.inv) do
         pcNext <== pc + 1
         go2 <== 1
 
-    -- Stage 2: Decode
-    -- ===============
-  
-    -- Latch instruction for execute stage
-    instr <== instrMem.out'
+    load regFileA (instrMem.out.rA)
+    load regFileB (instrMem.out.rB)
 
-    -- Register-forwarding logic
+    -- Stage 2: Latch Operands
+    -- =======================
+
+    -- Latch instruction
+    instr <== instrMem.out.old
+
+    -- Register forwarding logic
     let forward rS other =
-          (result.active .&. (instr.val.rD .==. instrMem.out'.rS)) ?
+          (result.active .&. (instr.val.rD .==. instrMem.out.old.rS)) ?
           (result.val, other)
 
-    -- Latch operands for execute stage
+    -- Latch operands
     opA <== forward rA (regFileA.out)
     opB <== forward rB (regFileB.out)
 
