@@ -67,13 +67,6 @@ makeCPUPipeline c = do
   -- in case of a branch instruction
   pcNext :: Wire (Bit 32) <- makeWire dontCare
 
-  -- By default, increment the PC
-  pc :: Reg (Bit 32) <- makeReg 0
-  always do
-    if (pcNext.active)
-      then pc <== pcNext.val + 4
-      else pc <== pc.val + 4
-
   -- Result of the execute stage
   resultWire :: Wire (Bit 32) <- makeWire dontCare
 
@@ -81,10 +74,10 @@ makeCPUPipeline c = do
   count :: Reg (Bit 32) <- makeReg 0
   always (count <== count.val + 1)
 
-  -- Program counters for pipeline stages 2 and 3
-  pc1 :: Reg (Bit 32) <- makeReg 0
-  pc2 :: Reg (Bit 32) <- makeReg 0
-  pc3 :: Reg (Bit 32) <- makeReg 0
+  -- Program counters for each pipeline stage
+  pc1 :: Reg (Bit 32) <- makeReg 0xfffffffc
+  pc2 :: Reg (Bit 32) <- makeReg dontCare
+  pc3 :: Reg (Bit 32) <- makeReg dontCare
 
   -- Instruction registers for pipeline stages 2 and 3
   instr2 :: Reg Instr <- makeReg 0
@@ -98,16 +91,16 @@ makeCPUPipeline c = do
     -- Stage 0: Instruction Fetch
     -- ==========================
 
-    let reqPC = pcNext.active ? (pcNext.val, pc.val)
+    -- PC to fetch
+    let pcFetch = pcNext.active ? (pcNext.val, pc1.val + 4)
+    pc1 <== pcFetch
 
     -- Index the instruction memory
-    let (instrAddr :: Bit 30, bottom :: Bit 2) = split reqPC
-    load instrMem (lower instrAddr)
+    let instrAddr = lower (range @31 @2 pcFetch)
+    load instrMem instrAddr
 
     -- Always trigger stage 1, except on first cycle
     let go1 :: Bit 1 = reg 0 1
-
-    pc1 <== reqPC
 
     -- Stage 1: Operand Fetch
     -- ======================
