@@ -351,13 +351,13 @@ hWriteVerilog h modName netlist = do
       emit "assign "
       emitWire (netInstId net, 0)
       emit " = "
-      emit "{"
+      emit "{{"
       emit (show (wo-wi))
       emit "{"
       emitInput (netInputs net !! 0)
       emit "["
       emit (show (wi-1))
-      emit "],"
+      emit "]}},"
       emitInput (netInputs net !! 0)
       emit "};\n"
 
