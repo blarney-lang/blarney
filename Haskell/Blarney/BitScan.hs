@@ -189,7 +189,7 @@ match :: KnownNat n => Bit n -> [Bit n -> Action ()] -> Action ()
 match subj alts = sequence_ [alt subj | alt <- alts]
 
 -- |Case alternative
-infix 7 ==>
+infix 1 ==>
 (==>) :: (KnownNat n, RHS rhs) => String -> rhs -> Bit n -> Action ()
 fmt ==> rhs = \subj -> do
   let subj' = toBitList subj
