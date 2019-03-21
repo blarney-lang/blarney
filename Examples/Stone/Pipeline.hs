@@ -71,7 +71,7 @@ makeCPUPipeline c = do
   pc :: Reg (Bit 32) <- makeReg 0
   always do
     if (pcNext.active)
-      then pc <== pcNext.val
+      then pc <== pcNext.val + 4
       else pc <== pc.val + 4
 
   -- Result of the execute stage
