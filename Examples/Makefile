@@ -23,3 +23,4 @@ clean:
 	make -C Interface clean
 	make -C MasterSlave clean
 	make -C NoC clean
+	make -C Stone clean
