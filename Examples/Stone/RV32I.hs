@@ -17,10 +17,9 @@ bne s imm = do
 makeRV32I :: Module ()
 makeRV32I = do
   let execute s =
-        [ "imm[11:0] _rs1[4:0] 000 _rd[4:0] 0010011" ==> addi s
-        , "0000000 _rs2[4:0] _rs1[4:0] 000 _rd[4:0] 0110011" ==> add s
-        , "imm[11] imm[9:4] _rs2[4:0] _rs1[4:0] 001" ++
-          "imm[3:0] imm[10] 1100011" ==> bne s
+        [ "imm[11:0] ?5 000 ?5 0010011" ==> addi s
+        , "0000000 ?5 ?5 000 ?5 0110011" ==> add s
+        , "imm[11] imm[9:4] ?5 ?5 001 imm[3:0] imm[10] 1100011" ==> bne s
         ]
 
   makeCPUPipeline $
