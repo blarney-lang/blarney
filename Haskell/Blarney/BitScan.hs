@@ -110,6 +110,7 @@ tag = tagger 0
       case t of
         Lit bs -> Tag n t : tagger (n + length bs) ts
         Var v -> error "tag: unranged vars not supported"
+        Range ('_':v) hi lo -> tagger (n + (hi-lo) + 1) ts
         Range v hi lo -> Tag n t : tagger (n + (hi-lo) + 1) ts
 
 -- Mapping from var bit-index to subject bit-index
