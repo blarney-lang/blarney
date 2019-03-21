@@ -50,6 +50,13 @@ constant i = result
     result = FromBV $ constBV w i
     w = widthOf result
 
+-- |True
+true :: Bit 1
+true = 1
+
+-- |False
+false :: Bit 1
+false = 0
 
 -- * Bit-vector arithmetic
 

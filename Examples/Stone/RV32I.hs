@@ -11,9 +11,8 @@ addi s imm = s.result <== s.opA + signExtend imm
 
 bne :: State -> Bit 12 -> Action ()
 bne s imm = do
-  let fullImm = imm # (0 :: Bit 1)
   when (s.opA .!=. s.opB) do
-    s.setPC $ s.getPC + signExtend fullImm
+    s.pc <== s.pc.val + signExtend (imm # (0 :: Bit 1))
 
 makeRV32I :: Module ()
 makeRV32I = do

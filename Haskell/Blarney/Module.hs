@@ -41,6 +41,9 @@ module Blarney.Module
     -- * Wires
     RTL.Wire(..), makeWire, makeWireU,
 
+    -- * Read-Write and Write-Only interfaces
+    ReadWrite(..), WriteOnly(..),
+
     -- * Register files
     RegFile(..), makeRegFileInit, makeRegFile,
 
@@ -144,6 +147,27 @@ makeWire init = M (RTL.makeWire init)
 -- |Create wire with don't care default value
 makeWireU :: Bits a => Module (RTL.Wire a)
 makeWireU = M RTL.makeWireU
+
+-- |Read-Write interface
+data ReadWrite a =
+  ReadWrite {
+    rwReadVal :: a,
+    rwWriteVal :: a -> Action ()
+  }
+
+instance Val ReadWrite where
+  val = rwReadVal
+instance Assign ReadWrite where
+  (<==) = rwWriteVal
+
+-- |Write-Only interface
+data WriteOnly a =
+  WriteOnly {
+    woWriteVal :: a -> Action ()
+  }
+
+instance Assign WriteOnly where
+  (<==) = woWriteVal
 
 -- |A DReg holds the assigned value only for one cycle.
 -- At all other times, it has the given default value.

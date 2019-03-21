@@ -37,12 +37,10 @@ data State =
     -- Source operands
     opA :: Bit 32
   , opB :: Bit 32
-    -- Current PC
-  , getPC :: Bit 32
-    -- Write a new PC
-  , setPC :: Bit 32 -> Action ()
+    -- Program counter interface
+  , pc :: ReadWrite (Bit 32)
     -- Write the instruction result
-  , result :: Wire (Bit 32)
+  , result :: WriteOnly (Bit 32)
   }
 
 -- Pipeline
@@ -134,8 +132,8 @@ makeCPUPipeline c = do
     let state = State {
             opA    = regFileA.out
           , opB    = regFileB.out
-          , getPC  = pc2.val
-          , setPC  = error "setPC not allowed in pre-execute"
+          , pc     = ReadWrite (pc2.val)
+                      (error "can't write to pc in pre-execute")
           , result = error "result wire can't be used in pre-execute"
           }
 
@@ -155,9 +153,8 @@ makeCPUPipeline c = do
     let state = State {
             opA    = regA.val
           , opB    = regB.val
-          , getPC  = pc3.val
-          , setPC  = \pcNew -> pcNext <== pcNew
-          , result = resultWire
+          , pc     = ReadWrite (pc3.val) (pcNext <==)
+          , result = WriteOnly (resultWire <==)
           }
 
     -- Instruction dispatch
