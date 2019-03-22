@@ -66,6 +66,7 @@ module Blarney.BV
   , xorBV          -- :: BV -> BV -> BV
   , leftBV         -- :: BV -> BV -> BV
   , rightBV        -- :: BV -> BV -> BV
+  , arithRightBV   -- :: BV -> BV -> BV
   , equalBV        -- :: BV -> BV -> BV
   , notEqualBV     -- :: BV -> BV -> BV
   , lessThanBV     -- :: BV -> BV -> BV
@@ -151,8 +152,10 @@ data Prim =
 
     -- |Left shift (2 inputs, 1 output)
   | ShiftLeft OutputWidth
-    -- |Right shift (2 inputs, 1 output)
+    -- |Logical right shift (2 inputs, 1 output)
   | ShiftRight OutputWidth
+    -- |Arithmetic right shift (2 inputs, 1 output)
+  | ArithShiftRight OutputWidth
 
     -- |Equality comparator (2 inputs, 1 bit output)
   | Equal InputWidth
@@ -417,6 +420,11 @@ leftBV a b = makePrim1 (ShiftLeft w) [a, b] w
 -- |Right shift
 rightBV :: BV -> BV -> BV
 rightBV a b = makePrim1 (ShiftRight w) [a, b] w
+  where w = bvWidth a
+
+-- |Right shift
+arithRightBV :: BV -> BV -> BV
+arithRightBV a b = makePrim1 (ArithShiftRight w) [a, b] w
   where w = bvWidth a
 
 -- |Equality comparator

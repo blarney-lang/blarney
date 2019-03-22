@@ -124,6 +124,10 @@ a .<<. b = FromBV $ leftBV (toBV a) (toBV b)
 (.>>.) :: Bit n -> Bit n -> Bit n
 a .>>. b = FromBV $ rightBV (toBV a) (toBV b)
 
+-- |Arithmetic shift right
+(.>>>.) :: Bit n -> Bit n -> Bit n
+a .>>>. b = FromBV $ arithRightBV (toBV a) (toBV b)
+
 -- * Bit-vector comparison primitives
 
 -- Comparison operators

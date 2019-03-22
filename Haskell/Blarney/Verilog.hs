@@ -221,6 +221,7 @@ hWriteVerilog h modName netlist = do
           Xor w                 -> emitWireDecl w wire
           ShiftLeft w           -> emitWireDecl w wire
           ShiftRight w          -> emitWireDecl w wire
+          ArithShiftRight w     -> emitWireDecl w wire
           Equal w               -> emitWireDecl 1 wire
           NotEqual w            -> emitWireDecl 1 wire
           LessThan w            -> emitWireDecl 1 wire
@@ -455,6 +456,7 @@ hWriteVerilog h modName netlist = do
         Xor w               -> emitInfixOpInst "^" net
         ShiftLeft w         -> emitShiftInst w "<<" net
         ShiftRight w        -> emitShiftInst w ">>" net
+        ArithShiftRight w   -> emitShiftInst w ">>>" net
         Equal w             -> emitInfixOpInst "==" net
         NotEqual w          -> emitInfixOpInst "!=" net
         LessThan w          -> emitInfixOpInst "<" net
