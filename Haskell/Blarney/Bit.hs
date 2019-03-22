@@ -50,6 +50,13 @@ constant i = result
     result = FromBV $ constBV w i
     w = widthOf result
 
+-- |True
+true :: Bit 1
+true = 1
+
+-- |False
+false :: Bit 1
+false = 0
 
 -- * Bit-vector arithmetic
 
@@ -116,6 +123,10 @@ a .<<. b = FromBV $ leftBV (toBV a) (toBV b)
 -- |Shift right
 (.>>.) :: Bit n -> Bit n -> Bit n
 a .>>. b = FromBV $ rightBV (toBV a) (toBV b)
+
+-- |Arithmetic shift right
+(.>>>.) :: Bit n -> Bit n -> Bit n
+a .>>>. b = FromBV $ arithRightBV (toBV a) (toBV b)
 
 -- * Bit-vector comparison primitives
 

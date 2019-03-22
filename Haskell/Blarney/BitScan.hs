@@ -66,13 +66,24 @@ tokenise = init []
     init acc (c:cs)
       | isSpace c = init acc cs
       | isBit c = lit acc (c:cs)
+      | c == '<' = len "" acc cs
       | otherwise = var "" acc (c:cs)
 
     var str acc [] = init (Var (reverse str) : acc) []
     var str acc (c:cs)
       | c == '[' = high (reverse str) acc cs 
+      | c == '<' = len (reverse str) acc cs 
       | c == ' ' = init (Var (reverse str) : acc) cs
       | otherwise = var (c:str) acc cs
+
+    len id acc cs =
+      case takeWhile isDigit cs of
+        [] -> error "Format error: expected width"
+        ds -> lenClose (Range id (n-1) 0 : acc) (dropWhile isDigit cs)
+          where n = read ds :: Int
+
+    lenClose acc ('>':cs) = init acc cs
+    lenClose acc other = error "Format error: expected '>'"
 
     high id acc cs =
       case takeWhile isDigit cs of
@@ -110,7 +121,7 @@ tag = tagger 0
       case t of
         Lit bs -> Tag n t : tagger (n + length bs) ts
         Var v -> error "tag: unranged vars not supported"
-        Range ('_':v) hi lo -> tagger (n + (hi-lo) + 1) ts
+        Range "" hi lo -> tagger (n + (hi-lo) + 1) ts
         Range v hi lo -> Tag n t : tagger (n + (hi-lo) + 1) ts
 
 -- Mapping from var bit-index to subject bit-index
