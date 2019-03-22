@@ -53,7 +53,6 @@ type BitList = [Bit 1]
 
 data Token =
     Lit String
-  | Ignore Int
   | Var String
   | Range String Int Int
   deriving (Show)
@@ -67,24 +66,24 @@ tokenise = init []
     init acc (c:cs)
       | isSpace c = init acc cs
       | isBit c = lit acc (c:cs)
-      | c == '?' = ign "" acc cs
+      | c == '<' = len "" acc cs
       | otherwise = var "" acc (c:cs)
-
-    ign str acc [] = 
-      let w = read (reverse str) :: Int
-      in  Ignore w : acc
-    ign str acc (c:cs)
-      | isSpace c =
-          let w = read (reverse str) :: Int
-          in  init (Ignore w : acc) cs
-      | isDigit c = ign (c:str) acc cs
-      | otherwise = error "Format error: width must follow ?"
 
     var str acc [] = init (Var (reverse str) : acc) []
     var str acc (c:cs)
       | c == '[' = high (reverse str) acc cs 
+      | c == '<' = len (reverse str) acc cs 
       | c == ' ' = init (Var (reverse str) : acc) cs
       | otherwise = var (c:str) acc cs
+
+    len id acc cs =
+      case takeWhile isDigit cs of
+        [] -> error "Format error: expected width"
+        ds -> lenClose (Range id (n-1) 0 : acc) (dropWhile isDigit cs)
+          where n = read ds :: Int
+
+    lenClose acc ('>':cs) = init acc cs
+    lenClose acc other = error "Format error: expected '>'"
 
     high id acc cs =
       case takeWhile isDigit cs of
@@ -122,8 +121,8 @@ tag = tagger 0
       case t of
         Lit bs -> Tag n t : tagger (n + length bs) ts
         Var v -> error "tag: unranged vars not supported"
+        Range "" hi lo -> tagger (n + (hi-lo) + 1) ts
         Range v hi lo -> Tag n t : tagger (n + (hi-lo) + 1) ts
-        Ignore w -> tagger (n + w) ts
 
 -- Mapping from var bit-index to subject bit-index
 type Mapping = [(Int, Int)]
@@ -166,7 +165,6 @@ tokenWidth :: Token -> Int
 tokenWidth (Var v) = error "Error: tokenWidth not defined for unranged vars"
 tokenWidth (Range v hi lo) = (hi-lo)+1
 tokenWidth (Lit bs) = length bs
-tokenWidth (Ignore w) = w
 
 -- Match literals in pattern against subject
 matches :: BitList -> [Token] -> Bit 1
@@ -180,7 +178,6 @@ matches subj toks
     check n (t : rest) =
       case t of
         Var v -> error "Format error: unranged vars not supported"
-        Ignore w -> check (n + w) rest
         Range id hi lo -> check (n + (hi-lo) + 1) rest
         Lit bs ->
               andList [ if c == '0' then inv b else b
