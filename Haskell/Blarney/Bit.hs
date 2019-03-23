@@ -106,7 +106,7 @@ infixl 7 .&.
 (.&.) :: Bit n -> Bit n -> Bit n
 a .&. b = FromBV $ andBV (toBV a) (toBV b)
 
--- |Bitwise and
+-- |Bitwise or
 infixl 5 .|.
 (.|.) :: Bit n -> Bit n -> Bit n
 a .|. b = FromBV $ orBV (toBV a) (toBV b)
