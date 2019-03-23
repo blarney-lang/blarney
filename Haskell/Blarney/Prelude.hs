@@ -25,6 +25,10 @@ module Blarney.Prelude
   , o               -- Function composition
   , (===)           -- Generic equality
   , (=!=)           -- Generic disequality
+  , slt             -- Signed less than
+  , sgt             -- Signed greater than
+  , slte            -- Signed less than or equal
+  , sgte            -- Signed greater than or equal
   , zero            -- Generic zero
   , ones            -- Generic all-ones
   , dontCare        -- Generic don't care
@@ -111,6 +115,26 @@ a === b = pack a .==. pack b
 infix 4 =!=
 (=!=) :: Bits a => a -> a -> Bit 1
 a =!= b = pack a .!=. pack b
+
+-- |Signed less than
+infix 4 `slt`
+slt :: (Bits a, SizeOf a ~ (1+n)) => a -> a -> Bit 1
+slt x y = invMSB (pack x) .<. invMSB (pack y)
+
+-- |Signed greater than
+infix 4 `sgt`
+sgt :: (Bits a, SizeOf a ~ (1+n)) => a -> a -> Bit 1
+sgt x y = invMSB (pack x) .>. invMSB (pack y)
+
+-- |Signed less than or equal
+infix 4 `slte`
+slte :: (Bits a, SizeOf a ~ (1+n)) => a -> a -> Bit 1
+slte x y = invMSB (pack x) .<=. invMSB (pack y)
+
+-- |Signed greater than or equal
+infix 4 `sgte`
+sgte :: (Bits a, SizeOf a ~ (1+n)) => a -> a -> Bit 1
+sgte x y = invMSB (pack x) .>=. invMSB (pack y)
 
 -- |All 0's
 zero :: forall a. Bits a => a

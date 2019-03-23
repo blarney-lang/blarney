@@ -206,6 +206,11 @@ split a = (a0, a1)
     a0 = unsafeBits (wa-1, wa-w0) a
     a1 = unsafeBits (wa-w0-1, 0) a
 
+-- |Invert most significant bit
+invMSB :: Bit (1+n) -> Bit (1+n)
+invMSB a = inv top # bot
+  where (top :: Bit 1, bot) = split a
+
 -- * Bit-vector selection primitives
 
 -- |Dynamically-typed bit selection
