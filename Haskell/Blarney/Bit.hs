@@ -237,6 +237,17 @@ range a = unsafeBits (hiVal, loVal) a
     hiVal = fromInteger $ natVal (Proxy :: Proxy hi)
     loVal = fromInteger $ natVal (Proxy :: Proxy lo)
 
+-- |Truncate
+truncate :: forall i o. (KnownNat (o-1), (o-1+1) ~ o, (o-1+1) <= i)
+              => Bit i -> Bit o
+truncate x = range @(o-1) @0 x
+
+-- |Truncate least significant bits
+truncateLSB :: forall i o. (KnownNat (i-o-1), KnownNat (i-1),
+                            o <= i, (i-o-1+o) ~ (i-1+1), (i-1+1) <= i)
+               => Bit i -> Bit o
+truncateLSB x = range @(i-1) @(i-o-1) x
+
 -- |Dynamically-typed bit indexing
 bit :: Int -> Bit n -> Bit 1
 bit i a =
