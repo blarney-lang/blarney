@@ -117,15 +117,15 @@ infixl 6 .^.
 a .^. b = FromBV $ xorBV (toBV a) (toBV b)
 
 -- |Shift left
-(.<<.) :: Bit n -> Bit n -> Bit n
+(.<<.) :: Bit n -> Bit m -> Bit n
 a .<<. b = FromBV $ leftBV (toBV a) (toBV b)
 
 -- |Shift right
-(.>>.) :: Bit n -> Bit n -> Bit n
+(.>>.) :: Bit n -> Bit m -> Bit n
 a .>>. b = FromBV $ rightBV (toBV a) (toBV b)
 
 -- |Arithmetic shift right
-(.>>>.) :: Bit n -> Bit n -> Bit n
+(.>>>.) :: Bit n -> Bit m -> Bit n
 a .>>>. b = FromBV $ arithRightBV (toBV a) (toBV b)
 
 -- * Bit-vector comparison primitives
