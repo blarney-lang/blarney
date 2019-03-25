@@ -55,19 +55,16 @@ xor :: State -> Action ()
 xor s = s.result <== s.opA .^. s.opB
 
 sll :: State -> Action ()
-sll s = s.result <== s.opA .<<. shiftAmnt
-  where shiftAmnt :: Bit 5 = truncate $ s.opB
+sll s = s.result <== s.opA .<<. range @4 @0 (s.opB)
 
 srl :: State -> Action ()
-srl s = s.result <== s.opA .>>. shiftAmnt
-  where shiftAmnt :: Bit 5 = truncate $ s.opB
+srl s = s.result <== s.opA .>>. range @4 @0 (s.opB)
 
 sub :: State -> Action ()
 sub s = s.result <== s.opA .-. s.opB
 
 sra :: State -> Action ()
-sra s = s.result <== s.opA .>>>. shiftAmnt
-  where shiftAmnt :: Bit 5 = truncate $ s.opB
+sra s = s.result <== s.opA .>>>. range @4 @0 (s.opB)
 
 jal :: State -> Bit 20 -> Action ()
 jal s imm = s.pc <== s.pc.val .+. signExtend (imm # (0 :: Bit 1))
