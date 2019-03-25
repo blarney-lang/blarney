@@ -7,7 +7,7 @@ addi :: State -> Bit 12 -> Action ()
 addi s imm = s.result <== s.opA + signExtend imm
 
 slti :: State -> Bit 12 -> Action ()
-slti s imm = s.result <== (s.opA `slt` signExtend imm) ? (1, 0)
+slti s imm = s.result <== (s.opA `sLT` signExtend imm) ? (1, 0)
 
 sltiu :: State -> Bit 12 -> Action ()
 sltiu s imm = s.result <== (s.opA .<. signExtend imm) ? (1, 0)
@@ -39,8 +39,8 @@ auipc s imm = s.result <== s.pc.val .+. signExtend (imm # (0 :: Bit 12))
 add :: State -> Action ()
 add s = s.result <== s.opA .+. s.opB
 
-slt' :: State -> Action ()
-slt' s = s.result <== (s.opA `slt` s.opB) ? (1, 0)
+slt :: State -> Action ()
+slt s = s.result <== (s.opA `sLT` s.opB) ? (1, 0)
 
 sltu :: State -> Action ()
 sltu s = s.result <== (s.opA .<. s.opB) ? (1, 0)
@@ -89,7 +89,7 @@ bne s imm = do
 
 blt :: State -> Bit 12 -> Action ()
 blt s imm = do
-  when (s.opA `slt` s.opB) do
+  when (s.opA `sLT` s.opB) do
     s.pc <== s.pc.val .+. signExtend (imm # (0 :: Bit 1))
 
 bltu :: State -> Bit 12 -> Action ()
@@ -99,7 +99,7 @@ bltu s imm = do
 
 bge :: State -> Bit 12 -> Action ()
 bge s imm = do
-  when (s.opA `sgte` s.opB) do
+  when (s.opA `sGTE` s.opB) do
     s.pc <== s.pc.val .+. signExtend (imm # (0 :: Bit 1))
 
 bgeu :: State -> Bit 12 -> Action ()
@@ -137,7 +137,7 @@ makeRV32I = do
         , "imm[19:0] <5> 0110111" ==> lui s
         , "imm[19:0] <5> 0010111" ==> auipc s
         , "0000000 <5> <5> 000 <5> 0110011" ==> add s
-        , "0000000 <5> <5> 010 <5> 0110011" ==> slt' s
+        , "0000000 <5> <5> 010 <5> 0110011" ==> slt s
         , "0000000 <5> <5> 011 <5> 0110011" ==> sltu s
         , "0000000 <5> <5> 111 <5> 0110011" ==> and' s
         , "0000000 <5> <5> 110 <5> 0110011" ==> or' s
