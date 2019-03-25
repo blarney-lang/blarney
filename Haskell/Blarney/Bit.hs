@@ -117,14 +117,17 @@ infixl 6 .^.
 a .^. b = FromBV $ xorBV (toBV a) (toBV b)
 
 -- |Shift left
+infixl 8 .<<.
 (.<<.) :: Bit n -> Bit m -> Bit n
 a .<<. b = FromBV $ leftBV (toBV a) (toBV b)
 
 -- |Shift right
+infixl 8 .>>.
 (.>>.) :: Bit n -> Bit m -> Bit n
 a .>>. b = FromBV $ rightBV (toBV a) (toBV b)
 
 -- |Arithmetic shift right
+infixl 8 .>>>.
 (.>>>.) :: Bit n -> Bit m -> Bit n
 a .>>>. b = FromBV $ arithRightBV (toBV a) (toBV b)
 
@@ -189,6 +192,10 @@ upper a = result
      wa = bvWidth (toBV a)
      wr = fromInteger (natVal result)
 
+-- |Extract most significant bits
+truncateLSB :: (KnownNat m, m <= n) => Bit n -> Bit m
+truncateLSB = upper
+
 -- |Extract least significant bits
 lower :: (KnownNat m, m <= n) => Bit n -> Bit m
 lower a = result
@@ -196,6 +203,10 @@ lower a = result
      result = unsafeBits (wr-1, 0) a
      wa = bvWidth (toBV a)
      wr = fromInteger (natVal result)
+
+-- |Extract least significant bits
+truncate :: (KnownNat m, m <= n) => Bit n -> Bit m
+truncate = lower
 
 -- |Split bit vector
 split :: KnownNat n => Bit (n+m) -> (Bit n, Bit m)
@@ -236,19 +247,6 @@ range a = unsafeBits (hiVal, loVal) a
   where
     hiVal = fromInteger $ natVal (Proxy :: Proxy hi)
     loVal = fromInteger $ natVal (Proxy :: Proxy lo)
-
--- |Truncate
-truncate :: forall i o (hi :: Nat).
-              (KnownNat hi, (hi+1) <= i, (hi+1) ~ o)
-              => Bit i -> Bit o
-truncate x = range @hi @0 x
-
--- |Truncate least significant bits
-truncateLSB :: forall i o (hi :: Nat) (lo :: Nat).
-                 (KnownNat hi, KnownNat lo,
-                 hi ~ (i-1), 0 <= lo, (hi+1) <= i, o <= i, (lo+o) ~ (hi+1))
-                 => Bit i -> Bit o
-truncateLSB x = range @hi @lo x
 
 -- |Dynamically-typed bit indexing
 bit :: Int -> Bit n -> Bit 1

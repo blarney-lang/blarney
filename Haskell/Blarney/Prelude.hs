@@ -25,10 +25,10 @@ module Blarney.Prelude
   , o               -- Function composition
   , (===)           -- Generic equality
   , (=!=)           -- Generic disequality
-  , slt             -- Signed less than
-  , sgt             -- Signed greater than
-  , slte            -- Signed less than or equal
-  , sgte            -- Signed greater than or equal
+  , sLT             -- Signed less than
+  , sGT             -- Signed greater than
+  , sLTE            -- Signed less than or equal
+  , sGTE            -- Signed greater than or equal
   , zero            -- Generic zero
   , ones            -- Generic all-ones
   , dontCare        -- Generic don't care
@@ -117,24 +117,24 @@ infix 4 =!=
 a =!= b = pack a .!=. pack b
 
 -- |Signed less than
-infix 4 `slt`
-slt :: (Bits a, SizeOf a ~ (1+n)) => a -> a -> Bit 1
-slt x y = invMSB (pack x) .<. invMSB (pack y)
+infixl 8 `sLT`
+sLT :: (Bits a, SizeOf a ~ (1+n)) => a -> a -> Bit 1
+sLT x y = invMSB (pack x) .<. invMSB (pack y)
 
 -- |Signed greater than
-infix 4 `sgt`
-sgt :: (Bits a, SizeOf a ~ (1+n)) => a -> a -> Bit 1
-sgt x y = invMSB (pack x) .>. invMSB (pack y)
+infixl 8 `sGT`
+sGT :: (Bits a, SizeOf a ~ (1+n)) => a -> a -> Bit 1
+sGT x y = invMSB (pack x) .>. invMSB (pack y)
 
 -- |Signed less than or equal
-infix 4 `slte`
-slte :: (Bits a, SizeOf a ~ (1+n)) => a -> a -> Bit 1
-slte x y = invMSB (pack x) .<=. invMSB (pack y)
+infixl 8 `sLTE`
+sLTE :: (Bits a, SizeOf a ~ (1+n)) => a -> a -> Bit 1
+sLTE x y = invMSB (pack x) .<=. invMSB (pack y)
 
 -- |Signed greater than or equal
-infix 4 `sgte`
-sgte :: (Bits a, SizeOf a ~ (1+n)) => a -> a -> Bit 1
-sgte x y = invMSB (pack x) .>=. invMSB (pack y)
+infixl 8 `sGTE`
+sGTE :: (Bits a, SizeOf a ~ (1+n)) => a -> a -> Bit 1
+sGTE x y = invMSB (pack x) .>=. invMSB (pack y)
 
 -- |All 0's
 zero :: forall a. Bits a => a
