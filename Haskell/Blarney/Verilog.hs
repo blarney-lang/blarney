@@ -293,9 +293,7 @@ hWriteVerilog h modName netlist = do
       emitInput (netInputs net !! 0)
       emit " " >> emit op >> emit " "
       let amount = netInputs net !! 1
-      let hi = log2ceil w
       emitInput (netInputs net !! 1)
-      emit ("[" ++ show hi ++ ":0]")
       emit ";\n"
 
     emitReplicateInst w net = do
