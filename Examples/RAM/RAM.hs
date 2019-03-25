@@ -15,7 +15,7 @@ top = do
         Seq [
           While (i.val .<. 100) (
             Do [
-              store ram (i.val) (1 .<<. zeroExtend (i.val)),
+              store ram (i.val) (1 .<<. i.val),
               i <== i.val + 1
             ]
           ),

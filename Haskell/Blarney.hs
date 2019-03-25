@@ -41,7 +41,7 @@ import Control.Monad hiding (when)
 import Control.Monad.Fix
 import GHC.TypeLits
 import GHC.Generics (Generic(..))
-import Prelude as P hiding ((.))
+import Prelude as P hiding ((.), truncate)
 
 -- |Reverse function application
 infixl 9 .

@@ -106,7 +106,7 @@ infixl 7 .&.
 (.&.) :: Bit n -> Bit n -> Bit n
 a .&. b = FromBV $ andBV (toBV a) (toBV b)
 
--- |Bitwise and
+-- |Bitwise or
 infixl 5 .|.
 (.|.) :: Bit n -> Bit n -> Bit n
 a .|. b = FromBV $ orBV (toBV a) (toBV b)
@@ -117,15 +117,18 @@ infixl 6 .^.
 a .^. b = FromBV $ xorBV (toBV a) (toBV b)
 
 -- |Shift left
-(.<<.) :: Bit n -> Bit n -> Bit n
+infixl 8 .<<.
+(.<<.) :: Bit n -> Bit m -> Bit n
 a .<<. b = FromBV $ leftBV (toBV a) (toBV b)
 
 -- |Shift right
-(.>>.) :: Bit n -> Bit n -> Bit n
+infixl 8 .>>.
+(.>>.) :: Bit n -> Bit m -> Bit n
 a .>>. b = FromBV $ rightBV (toBV a) (toBV b)
 
 -- |Arithmetic shift right
-(.>>>.) :: Bit n -> Bit n -> Bit n
+infixl 8 .>>>.
+(.>>>.) :: Bit n -> Bit m -> Bit n
 a .>>>. b = FromBV $ arithRightBV (toBV a) (toBV b)
 
 -- * Bit-vector comparison primitives
@@ -189,6 +192,10 @@ upper a = result
      wa = bvWidth (toBV a)
      wr = fromInteger (natVal result)
 
+-- |Extract most significant bits
+truncateLSB :: (KnownNat m, m <= n) => Bit n -> Bit m
+truncateLSB = upper
+
 -- |Extract least significant bits
 lower :: (KnownNat m, m <= n) => Bit n -> Bit m
 lower a = result
@@ -196,6 +203,10 @@ lower a = result
      result = unsafeBits (wr-1, 0) a
      wa = bvWidth (toBV a)
      wr = fromInteger (natVal result)
+
+-- |Extract least significant bits
+truncate :: (KnownNat m, m <= n) => Bit n -> Bit m
+truncate = lower
 
 -- |Split bit vector
 split :: KnownNat n => Bit (n+m) -> (Bit n, Bit m)
@@ -205,6 +216,11 @@ split a = (a0, a1)
     w0 = fromInteger (natVal a0)
     a0 = unsafeBits (wa-1, wa-w0) a
     a1 = unsafeBits (wa-w0-1, 0) a
+
+-- |Invert most significant bit
+invMSB :: Bit (1+n) -> Bit (1+n)
+invMSB a = inv top # bot
+  where (top :: Bit 1, bot) = split a
 
 -- * Bit-vector selection primitives
 
