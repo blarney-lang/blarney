@@ -109,7 +109,7 @@ switch subject alts =
 
 -- |Operator for switch statement alternatives
 infixl 0 -->
-(-->) :: a -> Action () -> (a, Action ())
+(-->) :: a -> b -> (a, b)
 lhs --> rhs = (lhs, rhs)
 
 -- |Variable value (read)

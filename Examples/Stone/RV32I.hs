@@ -2,6 +2,7 @@ import Blarney
 import Blarney.RAM
 import Blarney.BitScan
 import Pipeline
+import DataMem
 
 addi :: State -> Bit 12 -> Action ()
 addi s imm = s.result <== s.opA + signExtend imm
@@ -107,8 +108,9 @@ bgeu s imm = do
 memRead :: State -> String -> Bit 12 -> Action ()
 memRead s str = display str " not implemented"
 
-memWrite :: State -> String -> Bit 12 -> Action ()
-memWrite s str = display str " not implemented"
+memWrite :: State -> DataMem -> Bit 12 -> Bit 2 -> Action ()
+memWrite s mem imm width = 
+  dataMemWrite mem width (s.opA + signExtend imm) (s.opB)
 
 fence :: State -> Bit 4 -> Bit 4 -> Bit 4 -> Action ()
 fence s fm pred succ = display "fence not implemented"
@@ -121,6 +123,9 @@ ebreak s = display "ebreak not implemented"
 
 makeRV32I :: Module ()
 makeRV32I = do
+  -- Tightly-coupled data memory
+  mem :: DataMem <- makeDataMem
+
   let execute s =
         [ "imm[11:0] <5> 000 <5> 0010011" ==> addi s
         , "imm[11:0] <5> 010 <5> 0010011" ==> slti s
@@ -156,9 +161,7 @@ makeRV32I = do
         , "imm[11:0] <5> 001 <5> 0000011" ==> memRead s "lh"
         , "imm[11:0] <5> 101 <5> 0000011" ==> memRead s "lhu"
         , "imm[11:0] <5> 010 <5> 0000011" ==> memRead s "lw"
-        , "imm[11:5] <5> <5> 000 imm[4:0] 0100011" ==> memWrite s "sb"
-        , "imm[11:5] <5> <5> 001 imm[4:0] 0100011" ==> memWrite s "sh"
-        , "imm[11:5] <5> <5> 010 imm[4:0] 0100011" ==> memWrite s "sw"
+        , "imm[11:5] <5> <5> 0 w<2> imm[4:0] 0100011" ==> memWrite s mem
         , "fm[3:0] pred[3:0] succ[3:0] <5> 000 <5> 0001111" ==> fence s
         , "000000000000 <5> 000 <5> 1110011" ==> ecall s
         , "000000000001 <5> 000 <5> 1110011" ==> ebreak s
