@@ -3,14 +3,9 @@ module DataMem where
 
 import Blarney
 import Blarney.RAM
-import Data.List (transpose)
-import Control.Monad (replicateM)
 
 -- Data memory size in bytes
 type LogDataMemSize = 16
-
--- Data memory address
-type DataMemAddr = Bit LogDataMemSize
 
 -- Implement data memory as four block RAMs
 -- (one for each byte of word)
@@ -18,7 +13,7 @@ type DataMem = [RAM (Bit (LogDataMemSize-2)) (Bit 8)]
 
 -- Constructor
 makeDataMem :: Module DataMem
-makeDataMem = replicateM 4 makeRAM
+makeDataMem = sequence [makeRAM | i <- [0..3]]
 
 -- RV32I memory access width
 type AccessWidth = Bit 2
@@ -29,14 +24,15 @@ isByteAccess = (.==. 0b00)
 isHalfAccess = (.==. 0b01)
 isWordAccess = (.==. 0b10)
 
--- Determine byte enables given access width and lower address bits
-genByteEnable :: AccessWidth -> Bit 2 -> [Bit 1]
-genByteEnable w a =
+-- Determine byte enables given access width and address
+genByteEnable :: AccessWidth -> Bit 32 -> [Bit 1]
+genByteEnable w addr =
   selectList [
     isWordAccess w --> [1, 1, 1, 1]
   , isHalfAccess w --> [a.==.2, a.==.2, a.==.0, a.==.0]
   , isByteAccess w --> [a.==.3, a.==.2, a.==.1, a.==.0]
   ]
+  where a :: Bit 2 = truncate addr
 
 -- Align a write using access width
 writeAlign :: AccessWidth -> Bit 32 -> [Bit 8]
@@ -56,10 +52,11 @@ writeAlign w d =
 dataMemWrite :: DataMem -> AccessWidth -> Bit 32 -> Bit 32 -> Action ()
 dataMemWrite dataMem w addr d =
   sequence_
-    [ when byteEn (store mem (upper a) byte)
+    [ when byteEn do
+        let writeAddr = lower (upper addr :: Bit 30)
+        store mem writeAddr byte
     | (mem, byte, byteEn) <- zip3 dataMem bytes byteEns
     ]
   where
-    a = lower addr :: DataMemAddr
     bytes = writeAlign w d
-    byteEns = genByteEnable w (lower a)
+    byteEns = genByteEnable w addr
