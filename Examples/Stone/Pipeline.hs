@@ -14,7 +14,7 @@ type Instr = Bit 32
 type RegId = Bit 5
 
 -- Instruction memory size
-type InstrAddr = Bit 16
+type InstrAddr = Bit 14
 
 -- Pipeline configuration
 data Config =
@@ -125,13 +125,15 @@ makeCPUPipeline c = do
          (resultWire.val, other)
 
     -- Latch operands
-    regA <== forward (c.srcA) (regFileA.out)
-    regB <== forward (c.srcB) (regFileB.out)
+    let fwdA = forward (c.srcA) (regFileA.out)
+    let fwdB = forward (c.srcB) (regFileB.out)
+    regA <== fwdA
+    regB <== fwdB
 
     -- State for pre-execute stage
     let state = State {
-            opA    = regFileA.out
-          , opB    = regFileB.out
+            opA    = fwdA
+          , opB    = fwdB
           , pc     = ReadWrite (pc2.val)
                       (error "can't write to pc in pre-execute")
           , result = error "result wire can't be used in pre-execute"
@@ -149,29 +151,22 @@ makeCPUPipeline c = do
     -- Stage 3: Execute
     -- ================
 
+    -- Destination register
+    let rd = dst c (instr3.val)
+
     -- State for execute stage
     let state = State {
             opA    = regA.val
           , opB    = regB.val
           , pc     = ReadWrite (pc3.val) (pcNext <==)
-          , result = WriteOnly (resultWire <==)
+          , result = WriteOnly (\x -> when (rd .!=. 0) (resultWire <== x))
           }
 
     -- Instruction dispatch
     when (go3.val) do
       match (instr3.val) (c.execRules $ state)
 
-    if (go3.val) .==. 1
-      then do
-        display "C " (count.val) " pc=" (pc3.val) " instr=" (instr3.val)
-        return ()
-      else do
-        display "_ " (count.val) " pc=" (pc3.val) " instr=" (instr3.val)
-        return ()
-
     -- Writeback
     when (resultWire.active) do
-      let rd = dst c (instr3.val)
       store regFileA rd (resultWire.val)
       store regFileB rd (resultWire.val)
-      display (count.val) ": rf[" rd "] := " (resultWire.val)

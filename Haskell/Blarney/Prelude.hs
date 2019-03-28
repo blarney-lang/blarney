@@ -19,7 +19,8 @@ module Blarney.Prelude
   , orList          -- Bitwise-or tree
   , andList         -- Bitwise-and tree
   , sumList         -- Adder tree
-  , select          -- One-hot selection
+  , select          -- One-hot selection returning bits
+  , selectList      -- One-hot selection returning list
   , listIndex       -- Index a list of bit-vectors using a bit-vector
   , (?)             -- Ternary conditional operator
   , o               -- Function composition
@@ -39,11 +40,12 @@ module Blarney.Prelude
   ) where
 
 import Prelude
+import GHC.TypeLits
+import Data.List (transpose)
 import Blarney.BV
 import Blarney.Bit
 import Blarney.Bits
 import Blarney.IfThenElse
-import GHC.TypeLits
 
 -- |Parallel reduce for a commutative and associative operator.
 -- Input list must be non-empty.
@@ -91,6 +93,12 @@ treeB b f z xs = if null xs then z else treeB1 b f xs
 select :: Bits a => [(Bit 1, a)] -> a
 select alts =
   orList [sel ? (val, zero) | (sel, val) <- alts]
+
+-- |Variant of 'select' where right-hand-side is a list
+selectList :: Bits a => [(Bit 1, [a])] -> [a]
+selectList alts =
+  map orList $ transpose
+    [map (\x -> cond ? (x, zero)) rhs | (cond, rhs) <- alts]
 
 -- |Index a list
 listIndex :: (KnownNat n, Bits a) => Bit n -> [a] -> a
