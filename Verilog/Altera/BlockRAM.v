@@ -24,6 +24,7 @@ module BlockRAM (
   DI,      // Data in
   ADDR,    // Read address
   WE,      // Write enable
+  BE,      // Byte enable
   DO       // Data out
   );
 
@@ -41,6 +42,7 @@ module BlockRAM (
   input  [ADDR_WIDTH-1:0] ADDR;
   input  WE;
   output [DATA_WIDTH-1:0] DO;
+  input  [BE_WIDTH-1:0] BE;
 `ifndef ALTERA_RESERVED_QIS
 // synopsys translate_off
 `endif
@@ -61,7 +63,7 @@ module BlockRAM (
         .address_b (1'b1),
         .addressstall_a (1'b0),
         .addressstall_b (1'b0),
-        .byteena_a (1'b1),
+        .byteena_a (BE),
         .byteena_b (1'b1),
         .clock1 (1'b1),
         .clocken0 (1'b1),
@@ -89,6 +91,6 @@ module BlockRAM (
     altsyncram_component.read_during_write_mode_port_a = "NEW_DATA_NO_NBE_READ",
     altsyncram_component.widthad_a = ADDR_WIDTH,
     altsyncram_component.width_a = DATA_WIDTH,
-    altsyncram_component.width_byteena_a = 1;
+    altsyncram_component.width_byteena_a = BE_WIDTH;
 
 endmodule

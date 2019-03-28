@@ -35,7 +35,7 @@ lui :: State -> Bit 20 -> Action ()
 lui s imm = s.result <== signExtend (imm # (0 :: Bit 12))
 
 auipc :: State -> Bit 20 -> Action ()
-auipc s imm = s.result <== s.pc.val .+. signExtend (imm # (0 :: Bit 12))
+auipc s imm = s.result <== s.pc.val .+. (imm # (0 :: Bit 12))
 
 add :: State -> Action ()
 add s = s.result <== s.opA .+. s.opB
@@ -68,11 +68,13 @@ sra :: State -> Action ()
 sra s = s.result <== s.opA .>>>. range @4 @0 (s.opB)
 
 jal :: State -> Bit 20 -> Action ()
-jal s imm = s.pc <== s.pc.val .+. signExtend (imm # (0 :: Bit 1))
+jal s imm = do
+  s.pc <== s.pc.val .+. signExtend (imm # (0 :: Bit 1))
+  s.result <== s.pc.val + 4
 
 jalr :: State -> Bit 12 -> Action ()
 jalr s imm = do
-  s.pc <== truncateLSB (s.pc.val .+. signExtend imm) # (0 :: Bit 1)
+  s.pc <== truncateLSB (s.opA .+. signExtend imm) # (0 :: Bit 1)
   s.result <== s.pc.val + 4
 
 beq :: State -> Bit 12 -> Action ()
@@ -105,11 +107,16 @@ bgeu s imm = do
   when (s.opA .>=. s.opB) do
     s.pc <== s.pc.val .+. signExtend (imm # (0 :: Bit 1))
 
-memRead :: State -> String -> Bit 12 -> Action ()
-memRead s str = display str " not implemented"
+preMemRead :: State -> DataMem -> Bit 12 -> Action ()
+preMemRead s mem imm = do
+  dataMemRead mem (s.opA + signExtend imm)
+
+memRead :: State -> DataMem -> Bit 12 -> Bit 1 -> Bit 2 -> Action ()
+memRead s mem imm unsigned width = do
+  s.result <== readMux mem (s.opA + signExtend imm) width unsigned
 
 memWrite :: State -> DataMem -> Bit 12 -> Bit 2 -> Action ()
-memWrite s mem imm width = 
+memWrite s mem imm width = do
   dataMemWrite mem width (s.opA + signExtend imm) (s.opB)
 
 fence :: State -> Bit 4 -> Bit 4 -> Bit 4 -> Action ()
@@ -121,11 +128,19 @@ ecall s = display "ecall not implemented"
 ebreak :: State -> Action ()
 ebreak s = display "ebreak not implemented"
 
+csrw :: State -> Bit 12 -> Action ()
+csrw s csr =
+  switch csr [
+    0x800 --> display (s.opA)
+  , 0x801 --> finish
+  ]
+
 makeRV32I :: Module ()
 makeRV32I = do
   -- Tightly-coupled data memory
   mem :: DataMem <- makeDataMem
 
+  -- Execute rules
   let execute s =
         [ "imm[11:0] <5> 000 <5> 0010011" ==> addi s
         , "imm[11:0] <5> 010 <5> 0010011" ==> slti s
@@ -156,23 +171,24 @@ makeRV32I = do
         , "imm[11] imm[9:4] <5> <5> 110 imm[3:0] imm[10] 1100011" ==> bltu s
         , "imm[11] imm[9:4] <5> <5> 101 imm[3:0] imm[10] 1100011" ==> bge s
         , "imm[11] imm[9:4] <5> <5> 111 imm[3:0] imm[10] 1100011" ==> bgeu s
-        , "imm[11:0] <5> 000 <5> 0000011" ==> memRead s "lb"
-        , "imm[11:0] <5> 100 <5> 0000011" ==> memRead s "lbu"
-        , "imm[11:0] <5> 001 <5> 0000011" ==> memRead s "lh"
-        , "imm[11:0] <5> 101 <5> 0000011" ==> memRead s "lhu"
-        , "imm[11:0] <5> 010 <5> 0000011" ==> memRead s "lw"
+        , "imm[11:0] <5> u<1> w<2> <5> 0000011" ==> memRead s mem
         , "imm[11:5] <5> <5> 0 w<2> imm[4:0] 0100011" ==> memWrite s mem
         , "fm[3:0] pred[3:0] succ[3:0] <5> 000 <5> 0001111" ==> fence s
         , "000000000000 <5> 000 <5> 1110011" ==> ecall s
         , "000000000001 <5> 000 <5> 1110011" ==> ebreak s
+        , "csr<12> <5> 001 <5> 1110011" ==> csrw s
         ]
+
+  -- Pre-execute rules
+  let preExecute s =
+        [ "imm[11:0] <5> <3> <5> 0000011" ==> preMemRead s mem ]
 
   makeCPUPipeline $
     Config {
       srcA = range @19 @15
     , srcB = range @24 @20
     , dst  = range @11 @7
-    , preExecRules = \s -> []
+    , preExecRules = preExecute
     , execRules = execute
     }
 

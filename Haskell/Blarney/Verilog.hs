@@ -290,7 +290,9 @@ hWriteVerilog h modName netlist = do
       emit "assign "
       emitWire (netInstId net, 0)
       emit " = "
-      emitInput (netInputs net !! 0)
+      if op == ">>>"
+        then emit "$signed(" >> emitInput (netInputs net !! 0) >> emit ")"
+        else emitInput (netInputs net !! 0)
       emit " " >> emit op >> emit " "
       let amount = netInputs net !! 1
       emitInput (netInputs net !! 1)
