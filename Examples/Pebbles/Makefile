@@ -8,8 +8,10 @@ all:
 de5: all
 	make -C DE5-Net
 
-clean:
+de5-clean:
 	make -C DE5-Net clean
+
+clean:
 	make -C Boot clean
 	make -C Tests clean
 	rm -rf *.o *.hi Pebbles Pebbles-Verilog
