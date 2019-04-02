@@ -469,7 +469,8 @@ addRoots roots = write (RTLRoots roots)
 netlist :: RTL () -> IO [Net]
 netlist rtl = do
   i <- newIORef (0 :: Int)
-  (nl, _) <- runFlatten roots i
+  ((nl, undo), _) <- runFlatten roots i
+  undo
   return (JL.toList nl)
   where
     (_, actsJL, _) = runRTL rtl (R { cond = 1, assigns = assignMap }) 0

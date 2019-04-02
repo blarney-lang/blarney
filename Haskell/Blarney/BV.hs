@@ -308,14 +308,15 @@ newtype Flatten a = Flatten { runFlatten :: FlattenR -> IO (FlattenW, a) }
 -- |The reader component contains an IORef containing the next unique net id
 type FlattenR = IORef Int
 
--- |The writer component is the netlist
-type FlattenW = JL.JList Net
+-- |The writer component contains the netlist and
+-- an "undo" computation, which unperforms all IORef assignments.
+type FlattenW = (JL.JList Net, IO ())
 
 instance Monad Flatten where
-  return a = Flatten (\r -> return (JL.Zero, a))
-  m >>= f  = Flatten (\r -> do (w0, a) <- runFlatten m r
-                               (w1, b) <- runFlatten (f a) r
-                               return (w0 JL.:+: w1, b))
+  return a = Flatten (\r -> return ((JL.Zero, return ()), a))
+  m >>= f  = Flatten (\r -> do ((w0, u0), a) <- runFlatten m r
+                               ((w1, u1), b) <- runFlatten (f a) r
+                               return ((w0 JL.:+: w1, u0 >> u1), b))
 
 instance Applicative Flatten where
   pure = return
@@ -329,17 +330,21 @@ freshId :: Flatten Int
 freshId = Flatten $ \r -> do
   id <- readIORef r
   writeIORef r (id+1)
-  return (JL.Zero, id)
+  return ((JL.Zero, return ()), id)
 
 -- |Add a net to the netlist
 addNet :: Net -> Flatten ()
-addNet net = Flatten $ \r -> return (JL.One net, ())
+addNet net = Flatten $ \r -> return ((JL.One net, return ()), ())
+
+-- |Add an "undo" computation
+addUndo :: IO () -> Flatten ()
+addUndo undo = Flatten $ \r -> return ((JL.Zero, undo), ())
 
 -- |Lift an IO computation to a Flatten computation
 doIO :: IO a -> Flatten a
 doIO m = Flatten $ \r -> do
   a <- m
-  return (JL.Zero, a)
+  return ((JL.Zero, return ()), a)
 
 -- |Flatten bit vector to netlist
 flatten :: BV -> Flatten WireId
@@ -349,6 +354,7 @@ flatten b =
        Nothing -> do
          id <- freshId
          doIO (writeIORef (bvInstRef b) (Just id))
+         addUndo (writeIORef (bvInstRef b) Nothing)
          ins <- mapM flatten (bvInputs b)
          let net = Net { netPrim         = bvPrim b
                        , netInstId       = id

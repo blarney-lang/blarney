@@ -1,19 +1,15 @@
 OUTPUT_ARCH( "riscv" )
 
-MEMORY
-{
-  InstrMem : ORIGIN = 0, LENGTH = 0x10000
-  DataMem  : ORIGIN = 0x10000, LENGTH = 0x10000
-}
-
-__stackEnd = 0x20000;
+__stackBase = 0x0000fffc ;
 
 SECTIONS
 {
-  .text   : { *.o(.text*) }   > InstrMem
-  .bss    : { *.o(.bss*) }    > DataMem = 0
-  .rodata : { *.o(.rodata*) } > DataMem
-  .sdata  : { *.o(.sdata*) }  > DataMem
-  .data   : { *.o(.data*) }   > DataMem
+. = 0;
+  .text   : { *.o(.text*) }
+. = 0x10000;
+  .bss    : { *.o(.bss*) }
+  .rodata : { *.o(.rodata*) }
+  .sdata  : { *.o(.sdata*) }
+  .data   : { *.o(.data*) }
   __heapBase = ALIGN(.);
 }

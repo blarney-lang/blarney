@@ -1,11 +1,13 @@
 entry:
 
-# Set stack pointer to __stackEnd - 4
-la sp, __stackEnd
-addi sp, sp, -4
+# Set stack pointer
+la sp, __stackBase
 
 # Jump to main
 jal main
+
+# Terminate simulator
+csrw 0x801, zero
 
 # Loop forever
 j .
