@@ -1,10 +1,12 @@
 module Pebbles where
 
+-- Blarney imports
 import Blarney
 import Blarney.Stream
 import Blarney.BitScan
 import Blarney.Queue
 
+-- Pebbles imports
 import CSR
 import DataMem
 import Pipeline
@@ -138,7 +140,6 @@ csrrw s csrUnit csr = do
   readCSR csrUnit csr (s.result)
   writeCSR csrUnit csr (s.opA)
 
--- RV32I CPU, with UART input and output channels
 -- RV32I CPU, with UART input and output channels
 makePebbles :: Stream (Bit 8) -> Module (Stream (Bit 8))
 makePebbles uartIn = do
