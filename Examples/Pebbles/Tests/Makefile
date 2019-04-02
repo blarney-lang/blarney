@@ -9,7 +9,7 @@ CFLAGS  = -mabi=ilp32 -march=$(RV_ARCH) -O2 -I.
 LDFLAGS = -melf32lriscv -G 0 
 
 # Sizes of instruction memory in bytes
-INSTR_BYTES = 16384
+INSTR_BYTES = 65536
 
 # Sizes of data memory in words
 DATA_BYTES = 65536
@@ -25,16 +25,16 @@ all: $(patsubst %.S,%.code.hex,$(wildcard *.S)) \
 	./ihex-to-img.py $< hex 0 4 $(INSTR_BYTES) 1 > $@
 
 %.data.0.hex: %.data.ihex
-	./ihex-to-img.py $< hex 0 1 $$(($(DATA_BYTES))) 4 > $@
+	./ihex-to-img.py $< hex $(INSTR_BYTES) 1 $(DATA_BYTES) 4 > $@
 
 %.data.1.hex: %.data.ihex
-	./ihex-to-img.py $< hex 1 1 $$(($(DATA_BYTES))) 4 > $@
+	./ihex-to-img.py $< hex $$(($(INSTR_BYTES)+1)) 1 $(DATA_BYTES) 4 > $@
 
 %.data.2.hex: %.data.ihex
-	./ihex-to-img.py $< hex 2 1 $$(($(DATA_BYTES))) 4 > $@
+	./ihex-to-img.py $< hex $$(($(INSTR_BYTES)+2)) 1 $(DATA_BYTES) 4 > $@
 
 %.data.3.hex: %.data.ihex
-	./ihex-to-img.py $< hex 3 1 $$(($(DATA_BYTES))) 4 > $@
+	./ihex-to-img.py $< hex $$(($(INSTR_BYTES)+3)) 1 $(DATA_BYTES) 4 > $@
 
 %.code.ihex: %.elf
 	$(RV_OBJCOPY) -O ihex --only-section=.text $< $@

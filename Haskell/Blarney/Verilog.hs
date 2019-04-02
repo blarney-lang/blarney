@@ -139,6 +139,8 @@ hWriteVerilog h modName netlist = do
       emitWire wire
       emit ";\n"
 
+    -- TODO: emit literals in hex not decimal
+    --      (easier to read)
     emitDeclInitHelper width wire init = do
       emit "["
       emit (show (width-1))
@@ -157,7 +159,7 @@ hWriteVerilog h modName netlist = do
       emitWire wire
       emit " = "
       emit (show width)
-      emit "'d"
+      emit "'b"
       let chr One = '1'
           chr Zero = '0'
           chr DontCare = 'x'

@@ -1,7 +1,6 @@
 module Pipeline where
 
--- 4-stage pipeline, parameterised by the ISA.
--- We assume the ISA is a 32-bit 3-operand register machine.
+-- 4-stage pipeline for 32-bit 3-operand register-based CPU.
 
 import Blarney
 import Blarney.RAM
@@ -47,7 +46,7 @@ data State =
 makeCPUPipeline :: Config -> Module ()
 makeCPUPipeline c = do
   -- Instruction memory
-  instrMem :: RAM InstrAddr Instr <- makeRAMInit "prog.hex"
+  instrMem :: RAM InstrAddr Instr <- makeRAMInit "prog.mif"
 
   -- Two block RAMs allows two operands to be read,
   -- and one result to be written, on every cycle
@@ -124,18 +123,19 @@ makeCPUPipeline c = do
          (resultWire.active .&. ((c.dst $ instr3.val) .==. instr2.val.rS)) ?
          (resultWire.val, other)
 
+    -- Register forwarding
+    let a = forward (c.srcA) (regFileA.out)
+    let b = forward (c.srcB) (regFileB.out)
+
     -- Latch operands
-    let fwdA = forward (c.srcA) (regFileA.out)
-    let fwdB = forward (c.srcB) (regFileB.out)
-    regA <== fwdA
-    regB <== fwdB
+    regA <== a
+    regB <== b
 
     -- State for pre-execute stage
     let state = State {
-            opA    = fwdA
-          , opB    = fwdB
-          , pc     = ReadWrite (pc2.val)
-                      (error "can't write to pc in pre-execute")
+            opA    = a
+          , opB    = b
+          , pc     = ReadWrite (pc2.val) (error "can't write pc in pre-execute")
           , result = error "result wire can't be used in pre-execute"
           }
 
@@ -154,12 +154,15 @@ makeCPUPipeline c = do
     -- Destination register
     let rd = dst c (instr3.val)
 
+    -- Prevent write to register 0
+    let permitWrite = rd .!=. 0
+
     -- State for execute stage
     let state = State {
             opA    = regA.val
           , opB    = regB.val
           , pc     = ReadWrite (pc3.val) (pcNext <==)
-          , result = WriteOnly (\x -> when (rd .!=. 0) (resultWire <== x))
+          , result = WriteOnly (\x -> when permitWrite (resultWire <== x))
           }
 
     -- Instruction dispatch

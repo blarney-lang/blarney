@@ -39,6 +39,7 @@ mem = {}
 try:
   file = open(sys.argv[1], "rt")
   upperAddr = 0
+  segOffset = 0
   for line in file:
     # Parse leading ":"
     if line[0] != ":": raise
@@ -49,11 +50,13 @@ try:
     # Parse record type
     recType = line[7:9]
     if recType == "00":
-      addr = upperAddr*65536 + addrOffset
+      addr = upperAddr*65536 + addrOffset + segOffset
       for i in range(0, dataBytes):
         mem[addr+i] = line[9+i*2:9+i*2+2]
     elif recType == "01":
       break
+    elif recType == "02":
+      segOffset = int(line[9:13], 16) * 16
     elif recType == "05":
       pass
     elif recType == "04":
@@ -69,7 +72,7 @@ except:
 # Print out memory contents
 if fmt == "mif":
   # Altera mif format
-  print "DEPTH =", depth/width, ";"
+  print "DEPTH =", (depth/width)/inc, ";"
   print "WIDTH =", 8*width, ";"
   print "ADDRESS_RADIX = DEC ;"
   print "DATA_RADIX = HEX ;"
