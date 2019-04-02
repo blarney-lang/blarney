@@ -6,6 +6,8 @@ MEMORY
   DataMem  : ORIGIN = 0x10000, LENGTH = 0x10000
 }
 
+__stackEnd = 0x20000;
+
 SECTIONS
 {
   .text   : { *.o(.text*) }   > InstrMem

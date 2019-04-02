@@ -1,6 +1,6 @@
 .PHONY: all
 all:
-	blc RV32I.hs
+	blc Main.hs -o Pebbles
 
 clean:
-	rm -rf *.o *.hi RV32I RV32I-Verilog
+	rm -rf *.o *.hi Pebbles Pebbles-Verilog

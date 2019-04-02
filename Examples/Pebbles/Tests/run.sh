@@ -2,9 +2,9 @@
 
 export PATH=$PATH:$(realpath ../bin)
 
-VERILOG=../RV32I-Verilog
+VERILOG=../Pebbles-Verilog
 
-if [ ! -f "$VERILOG/top" ]; then
+if [ ! -f "$VERILOG/SimPebbles" ]; then
   echo Please build the simulator first
   exit -1
 fi
@@ -21,7 +21,7 @@ for FILE in *.S; do
   cp $TEST.data.3.hex $VERILOG/data_3.hex
   pushd . > /dev/null
   cd $VERILOG
-  RESULT=$(./top | head -n 1)
+  RESULT=$(./SimPebbles | head -n 1)
   popd > /dev/null
   if [ "$RESULT" == "0x00000001" ]; then
     echo "PASSED"

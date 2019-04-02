@@ -1,8 +1,13 @@
+module Pebbles where
+
 import Blarney
-import Blarney.RAM
+import Blarney.Stream
 import Blarney.BitScan
-import Pipeline
+import Blarney.Queue
+
+import CSR
 import DataMem
+import Pipeline
 
 addi :: State -> Bit 12 -> Action ()
 addi s imm = s.result <== s.opA + signExtend imm
@@ -35,10 +40,10 @@ lui :: State -> Bit 20 -> Action ()
 lui s imm = s.result <== signExtend (imm # (0 :: Bit 12))
 
 auipc :: State -> Bit 20 -> Action ()
-auipc s imm = s.result <== s.pc.val .+. (imm # (0 :: Bit 12))
+auipc s imm = s.result <== s.pc.val + (imm # (0 :: Bit 12))
 
 add :: State -> Action ()
-add s = s.result <== s.opA .+. s.opB
+add s = s.result <== s.opA + s.opB
 
 slt :: State -> Action ()
 slt s = s.result <== (s.opA `sLT` s.opB) ? (1, 0)
@@ -62,50 +67,50 @@ srl :: State -> Action ()
 srl s = s.result <== s.opA .>>. range @4 @0 (s.opB)
 
 sub :: State -> Action ()
-sub s = s.result <== s.opA .-. s.opB
+sub s = s.result <== s.opA - s.opB
 
 sra :: State -> Action ()
 sra s = s.result <== s.opA .>>>. range @4 @0 (s.opB)
 
 jal :: State -> Bit 20 -> Action ()
 jal s imm = do
-  s.pc <== s.pc.val .+. signExtend (imm # (0 :: Bit 1))
+  s.pc <== s.pc.val + signExtend (imm # (0 :: Bit 1))
   s.result <== s.pc.val + 4
 
 jalr :: State -> Bit 12 -> Action ()
 jalr s imm = do
-  s.pc <== truncateLSB (s.opA .+. signExtend imm) # (0 :: Bit 1)
+  s.pc <== truncateLSB (s.opA + signExtend imm) # (0 :: Bit 1)
   s.result <== s.pc.val + 4
 
 beq :: State -> Bit 12 -> Action ()
 beq s imm = do
   when (s.opA .==. s.opB) do
-    s.pc <== s.pc.val .+. signExtend (imm # (0 :: Bit 1))
+    s.pc <== s.pc.val + signExtend (imm # (0 :: Bit 1))
 
 bne :: State -> Bit 12 -> Action ()
 bne s imm = do
   when (s.opA .!=. s.opB) do
-    s.pc <== s.pc.val .+. signExtend (imm # (0 :: Bit 1))
+    s.pc <== s.pc.val + signExtend (imm # (0 :: Bit 1))
 
 blt :: State -> Bit 12 -> Action ()
 blt s imm = do
   when (s.opA `sLT` s.opB) do
-    s.pc <== s.pc.val .+. signExtend (imm # (0 :: Bit 1))
+    s.pc <== s.pc.val + signExtend (imm # (0 :: Bit 1))
 
 bltu :: State -> Bit 12 -> Action ()
 bltu s imm = do
   when (s.opA .<. s.opB) do
-    s.pc <== s.pc.val .+. signExtend (imm # (0 :: Bit 1))
+    s.pc <== s.pc.val + signExtend (imm # (0 :: Bit 1))
 
 bge :: State -> Bit 12 -> Action ()
 bge s imm = do
   when (s.opA `sGTE` s.opB) do
-    s.pc <== s.pc.val .+. signExtend (imm # (0 :: Bit 1))
+    s.pc <== s.pc.val + signExtend (imm # (0 :: Bit 1))
 
 bgeu :: State -> Bit 12 -> Action ()
 bgeu s imm = do
   when (s.opA .>=. s.opB) do
-    s.pc <== s.pc.val .+. signExtend (imm # (0 :: Bit 1))
+    s.pc <== s.pc.val + signExtend (imm # (0 :: Bit 1))
 
 preMemRead :: State -> DataMem -> Bit 12 -> Action ()
 preMemRead s mem imm = do
@@ -128,17 +133,20 @@ ecall s = display "ecall not implemented"
 ebreak :: State -> Action ()
 ebreak s = display "ebreak not implemented"
 
-csrw :: State -> Bit 12 -> Action ()
-csrw s csr =
-  switch csr [
-    0x800 --> display (s.opA)
-  , 0x801 --> finish
-  ]
+csrrw :: State -> CSRUnit -> Bit 12 -> Action ()
+csrrw s csrUnit csr = do
+  readCSR csrUnit csr (s.result)
+  writeCSR csrUnit csr (s.opA)
 
-makeRV32I :: Module ()
-makeRV32I = do
+-- RV32I CPU, with UART input and output channels
+-- RV32I CPU, with UART input and output channels
+makePebbles :: Stream (Bit 8) -> Module (Stream (Bit 8))
+makePebbles uartIn = do
   -- Tightly-coupled data memory
-  mem :: DataMem <- makeDataMem
+  mem <- makeDataMem
+
+  -- CSR unit
+  (uartOut, csrUnit) <- makeCSRUnit uartIn
 
   -- Execute rules
   let execute s =
@@ -175,7 +183,7 @@ makeRV32I = do
         , "fm[3:0] pred[3:0] succ[3:0] <5> 000 <5> 0001111" ==> fence s
         , "000000000000 <5> 000 <5> 1110011" ==> ecall s
         , "000000000001 <5> 000 <5> 1110011" ==> ebreak s
-        , "csr<12> <5> 001 <5> 1110011" ==> csrw s
+        , "csr<12> <5> 001 <5> 1110011" ==> csrrw s csrUnit
         ]
 
   -- Pre-execute rules
@@ -184,6 +192,7 @@ makeRV32I = do
         , "imm[11:5] <5> <5> 0 w<2> imm[4:0] 0100011" ==> preMemWrite s mem
         ]
 
+  -- CPU pipeline
   makeCPUPipeline $
     Config {
       srcA = range @19 @15
@@ -193,8 +202,4 @@ makeRV32I = do
     , execRules = execute
     }
 
--- Main function
-main :: IO ()
-main = do
-  writeVerilogTop makeRV32I "top" "RV32I-Verilog/"
-  return ()
+  return uartOut

@@ -14,7 +14,7 @@ type DataMem = [RAM (Bit (LogDataMemSize-2)) (Bit 8)]
 -- Constructor
 makeDataMem :: Module DataMem
 makeDataMem =
-  sequence [makeRAMInit ("data_" ++ show i ++ ".hex") | i <- [0..3]]
+  sequence [makeRAMInit ("data_" ++ show i ++ ".mif") | i <- [0..3]]
 
 -- RV32I memory access width
 type AccessWidth = Bit 2

@@ -356,8 +356,8 @@ flatten b =
                        , netOutputWidths = (bvWidths b)
                        }
          addNet net
-         return ((id, bvOutNum b))
-       Just id -> return ((id, bvOutNum b))
+         return (id, bvOutNum b)
+       Just id -> return (id, bvOutNum b)
 
 -- |Constant bit vector of given width
 constBV :: Width -> Integer -> BV
