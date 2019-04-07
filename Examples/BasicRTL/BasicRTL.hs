@@ -17,5 +17,10 @@ top = do
       display "Finished"
       finish
 
+    -- Display "DEBUG" when +DEBUG is passed as a plusargs
+    isDebug <- testPlusArgs "DEBUG"
+    when isDebug do
+      display "running with +DEBUG"
+
 main :: IO ()
 main = writeVerilogTop top "top" "BasicRTL-Verilog/"

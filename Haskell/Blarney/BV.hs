@@ -79,6 +79,7 @@ module Blarney.BV
   , muxBV          -- :: BV -> (BV, BV) -> BV
   , countOnesBV    -- :: OutputWidth -> BV -> BV
   , idBV           -- :: BV -> BV
+  , testPlusArgsBV -- :: String -> BV
   , inputPinBV     -- :: String -> BV
   , regBV          -- :: Width -> Integer -> BV -> BV
   , regEnBV        -- :: Width -> Integer -> BV -> BV -> BV
@@ -213,6 +214,8 @@ data Prim =
   | Display [DisplayArg]
     -- |Finish simulation (input: 1-bit enable wire)
   | Finish
+    -- |Test presence of plusargs (output: 1-bit boolean)
+  | TestPlusArgs String
 
     -- |Register file declaration
     -- (only used in RTL context, not expression context)
@@ -493,6 +496,10 @@ countOnesBV w a = makePrim1 (CountOnes w) [a] w
 idBV :: BV -> BV
 idBV a = makePrim1 (Identity w) [a] w
   where w = bvWidth a
+
+-- |Test plusargs
+testPlusArgsBV :: String -> BV
+testPlusArgsBV str = makePrim1 (TestPlusArgs str) [] 1
 
 -- |Input pin (named Verilog pin)
 inputPinBV :: Width -> String -> BV
