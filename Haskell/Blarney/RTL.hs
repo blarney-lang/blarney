@@ -45,6 +45,7 @@ module Blarney.RTL
   , Displayable(..) -- To support N-ary display statement
   , display         -- Display statement
   , finish          -- Terminate simulator
+  , testPlusArgs    -- Tests the existence of a command line plus arg
     -- * External inputs and outputs
   , input           -- Declare module input
   , output          -- Declare module output
@@ -89,6 +90,7 @@ data RTLAction =
     RTLAssign Assign
   | RTLDisplay (Bit 1, Format)
   | RTLFinish (Bit 1)
+  | RTLTestPlusArgs String
   | RTLOutput (Width, String, BV)
   | RTLInput (Width, String)
   | RTLRegFileCreate (String, VarId, Width, Width)
@@ -311,6 +313,12 @@ instance (FShow b, Displayable a) => Displayable (b -> a) where
 -- |Display statement
 display :: Displayable a => a
 display = disp (Format [])
+
+-- |RTL test plus arg
+testPlusArgs :: String -> RTL (Bit 1)
+testPlusArgs str = do
+  write (RTLTestPlusArgs str)
+  return $ FromBV (testPlusArgsBV str)
 
 -- |RTL external input declaration
 input :: KnownNat n => String -> RTL (Bit n)

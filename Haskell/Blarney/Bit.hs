@@ -1,11 +1,13 @@
-{-# LANGUAGE KindSignatures      #-}
-{-# LANGUAGE TypeOperators       #-}
-{-# LANGUAGE TypeFamilies        #-}
-{-# LANGUAGE GADTs               #-}
-{-# LANGUAGE Rank2Types          #-}
-{-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE KindSignatures        #-}
+{-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE Rank2Types            #-}
+{-# LANGUAGE AllowAmbiguousTypes   #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 {-|
 Module      : Blarney.Bit
@@ -26,6 +28,7 @@ import Blarney.BV
 
 -- Utils
 import Blarney.Util
+import Blarney.IfThenElse
 
 -- Standard imports
 import Prelude
@@ -283,6 +286,10 @@ regEn init en a =
 -- |Multiplexer
 mux :: Bit 1 -> (Bit n, Bit n) -> Bit n
 mux c (a, b) = FromBV $ muxBV (toBV c) (toBV a, toBV b)
+
+-- |Overloaded if-then-else
+instance IfThenElse (Bit 1) (Bit n) where
+  ifThenElse cond a b = mux cond (a, b)
 
 -- |Population count
 countOnes :: Bit n -> Bit (Log2 n + 1)

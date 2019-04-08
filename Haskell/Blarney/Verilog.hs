@@ -242,6 +242,7 @@ hWriteVerilog h modName netlist = do
           Identity w            -> emitWireDecl w wire
           Display args          -> return ()
           Finish                -> return ()
+          TestPlusArgs s        -> emitWireDecl 1 wire
           Input w s             -> emitWireDecl w wire
           Output w s            -> return ()
           RegFileMake f aw dw i -> emitRegFileDecl f aw dw i
@@ -394,6 +395,14 @@ hWriteVerilog h modName netlist = do
              | ((name, wire), i) <- zip args [1..] ]
       emit "\n);\n"
 
+    emitTestPlusArgsInst net s = do
+      emit "assign "
+      emitWire (netInstId net, 0)
+      emit " = "
+      emit "$test$plusargs(\""
+      emit s
+      emit "\") == 0 ? 0 : 1;\n"
+
     emitOutputInst net s = do
       emit ("assign " ++ s ++ " = ")
       emitInput (netInputs net !! 0)
@@ -477,6 +486,7 @@ hWriteVerilog h modName netlist = do
         Identity w          -> emitPrefixOpInst "" net
         Display args        -> return ()
         Finish              -> return ()
+        TestPlusArgs s      -> emitTestPlusArgsInst net s
         Input w s           -> emitInputInst net s
         Output w s          -> emitOutputInst net s
         RegFileMake _ _ _ _ -> return ()
