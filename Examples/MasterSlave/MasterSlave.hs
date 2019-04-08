@@ -26,7 +26,7 @@ master resps = do
     
     when (resps.canGet) do
       get resps
-      display "Response: " (resps.value)
+      display "Response: 0x%08x" (resps.value)
       finish
 
   return (buffer.toStream)

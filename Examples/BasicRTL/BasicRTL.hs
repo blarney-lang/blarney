@@ -12,7 +12,7 @@ top = do
     cycleCount <== cycleCount.val + 1
 
     -- Display value an every cycle
-    display "cycleCount = " (cycleCount.val)
+    display "cycleCount = %0d" (cycleCount.val)
 
     -- Terminate simulation when count reaches 10
     when (cycleCount.val .==. 10) do

@@ -30,14 +30,14 @@ makeCPUSpec = do
   let li rd imm = do
         update regFile rd (zeroExtend imm)
         pc <== pc.val + 1
-        display "rf[" rd "] := " imm
+        display "rf[%0d]" rd " := 0x%02x" (zeroExtend imm :: Bit 8)
 
   -- Add instruction
   let add rd rs0 rs1 = do
         let sum = regFile!rs0 + regFile!rs1
         update regFile rd sum
         pc <== pc.val + 1
-        display "rf[" rd "] := " sum
+        display "rf[%0d]" rd " := 0x%02x" sum
 
   -- Branch instruction
   let bnz offset rs = do

@@ -142,7 +142,7 @@ makeCPU = do
       when (result.active) do
         store regFileA (instr.val.rD) (result.val)
         store regFileB (instr.val.rD) (result.val)
-        display (count.val) ": rf[" (instr.val.rD) "] := " (result.val)
+        display "%08d" (count.val) ": rf[%0d]" (instr.val.rD) " := 0x%02x" (result.val)
 
 -- Main function
 main :: IO ()

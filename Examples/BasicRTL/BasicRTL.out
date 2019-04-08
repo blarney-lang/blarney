@@ -1,12 +1,12 @@
-cycleCount = 0x0
-cycleCount = 0x1
-cycleCount = 0x2
-cycleCount = 0x3
-cycleCount = 0x4
-cycleCount = 0x5
-cycleCount = 0x6
-cycleCount = 0x7
-cycleCount = 0x8
-cycleCount = 0x9
-cycleCount = 0xa
+cycleCount = 0
+cycleCount = 1
+cycleCount = 2
+cycleCount = 3
+cycleCount = 4
+cycleCount = 5
+cycleCount = 6
+cycleCount = 7
+cycleCount = 8
+cycleCount = 9
+cycleCount = 10
 Finished
