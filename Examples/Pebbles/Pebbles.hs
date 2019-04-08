@@ -1,3 +1,6 @@
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances    #-}
+
 module Pebbles where
 
 -- Blarney imports
@@ -114,17 +117,22 @@ bgeu s imm = do
   when (s.opA .>=. s.opB) do
     s.pc <== s.pc.val + signExtend (imm # (0 :: Bit 1))
 
-preMemRead :: State -> DataMem -> Bit 12 -> Action ()
-preMemRead s mem imm = do
+memRead_0 :: State -> DataMem -> Bit 12 -> Action ()
+memRead_0 s mem imm = do
   dataMemRead mem (s.opA + signExtend imm)
 
-memRead :: State -> DataMem -> Bit 12 -> Bit 1 -> Bit 2 -> Action ()
-memRead s mem imm unsigned width = do
-  s.result <== readMux mem (s.opA + signExtend imm) width unsigned
+memRead_1 :: State -> DataMem -> Bit 12 -> Bit 1 -> Bit 2 -> Action ()
+memRead_1 s mem imm unsigned width = do
+  let tmp = readMux mem (s.opA + signExtend imm) width unsigned
+  s.result <== tmp
+  let isDebug = testPlusArgs "DEBUG"
+  when isDebug $ display "----- MEM READ @ 0x%0x, data: 0x%0x" (s.opA + signExtend imm) tmp
 
-preMemWrite :: State -> DataMem -> Bit 12 -> Bit 2 -> Action ()
-preMemWrite s mem imm width = do
+memWrite :: State -> DataMem -> Bit 12 -> Bit 2 -> Action ()
+memWrite s mem imm width = do
   dataMemWrite mem width (s.opA + signExtend imm) (s.opB)
+  let isDebug = testPlusArgs "DEBUG"
+  when isDebug $ display "----- MEM WRITE @ 0x%0x, data: 0x%0x" (s.opA + signExtend imm) (s.opB)
 
 fence :: State -> Bit 4 -> Bit 4 -> Bit 4 -> Action ()
 fence s fm pred succ = display "fence not implemented"
@@ -180,7 +188,7 @@ makePebbles uartIn = do
         , "imm[11] imm[9:4] <5> <5> 110 imm[3:0] imm[10] 1100011" ==> bltu s
         , "imm[11] imm[9:4] <5> <5> 101 imm[3:0] imm[10] 1100011" ==> bge s
         , "imm[11] imm[9:4] <5> <5> 111 imm[3:0] imm[10] 1100011" ==> bgeu s
-        , "imm[11:0] <5> u<1> w<2> <5> 0000011" ==> memRead s mem
+        , "imm[11:0] <5> u<1> w<2> <5> 0000011" ==> memRead_1 s mem
         , "fm[3:0] pred[3:0] succ[3:0] <5> 000 <5> 0001111" ==> fence s
         , "000000000000 <5> 000 <5> 1110011" ==> ecall s
         , "000000000001 <5> 000 <5> 1110011" ==> ebreak s
@@ -189,8 +197,8 @@ makePebbles uartIn = do
 
   -- Pre-execute rules
   let preExecute s =
-        [ "imm[11:0] <5> <3> <5> 0000011" ==> preMemRead s mem
-        , "imm[11:5] <5> <5> 0 w<2> imm[4:0] 0100011" ==> preMemWrite s mem
+        [ "imm[11:0] <5> <3> <5> 0000011" ==> memRead_0 s mem
+        , "imm[11:5] <5> <5> 0 w<2> imm[4:0] 0100011" ==> memWrite s mem
         ]
 
   -- CPU pipeline
