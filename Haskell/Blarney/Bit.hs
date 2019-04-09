@@ -53,6 +53,10 @@ constant i = result
     result = FromBV $ constBV w i
     w = widthOf result
 
+-- |Test plusargs
+testPlusArgs :: String -> Bit 1
+testPlusArgs = FromBV . testPlusArgsBV
+
 -- |True
 true :: Bit 1
 true = 1

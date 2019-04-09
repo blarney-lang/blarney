@@ -5,7 +5,7 @@ top = do
   -- Create a register
   cycleCount :: Reg (Bit 4) <- makeReg 0
   -- Check for DEBUG plusarg
-  isDebug <- always $ testPlusArgs "DEBUG"
+  let isDebug = testPlusArgs "DEBUG"
 
   always do
     -- Increment on every cycle

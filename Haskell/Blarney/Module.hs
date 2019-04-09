@@ -48,7 +48,7 @@ module Blarney.Module
     RegFile(..), makeRegFileInit, makeRegFile,
 
     -- * Other actions
-    finish, RTL.display, testPlusArgs,
+    finish, RTL.display,
 
     -- * External inputs and outputs
     input, inputBV, output, outputBV,
@@ -211,10 +211,6 @@ makeRegFile = M (liftM toRegFile RTL.makeRegFile)
 -- |Terminate simulator
 finish :: Action ()
 finish = A RTL.finish
-
--- |testPlusArgs wrapper from RTL to Action
-testPlusArgs :: String -> Action (Bit 1)
-testPlusArgs str = A (RTL.testPlusArgs str)
 
 -- |Display statement
 instance RTL.Displayable (Action a) where
