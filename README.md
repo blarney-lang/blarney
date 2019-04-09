@@ -49,8 +49,8 @@ A quick test bench to check that it works:
 ```hs
 top :: Module ()
 top = always do
-  display "twoSort (0x1,0x2) = " (twoSort (0x1,0x2))
-  display "twoSort (0x2,0x1) = " (twoSort (0x2,0x1))
+  display "twoSort (01,02) = " (twoSort (01,02))
+  display "twoSort (02,01) = " (twoSort (02,01))
   finish
 ```
 
@@ -92,8 +92,8 @@ built and run as follows.
 > cd /tmp/twoSort
 > make
 > ./top
-twoSort (0x1,0x2) = (0x1,0x2)
-twoSort (0x2,0x1) = (0x1,0x2)
+twoSort (01,02) = (01,02)
+twoSort (02,01) = (01,02)
 ```
 
 Looks like `twoSort` is working!
@@ -129,7 +129,7 @@ Running the test bench
 ```hs
 top :: Module ()
 top = always do
-  let inputs = [0x3, 0x4, 0x1, 0x0, 0x2]
+  let inputs = [03, 04, 01, 00, 02]
   display "sort " inputs " = " (sort inputs)
   finish
 ```
@@ -137,7 +137,7 @@ top = always do
 in simulation yields:
 
 ```
-sort [0x3,0x4,0x1,0x0,0x2] = [0x0,0x1,0x2,0x3,0x4]
+sort [03,04,01,00,02] = [00,01,02,03,04]
 ```
 
 To see that the `sort` function really is describing a circuit, let's
@@ -213,7 +213,7 @@ top = do
     cycleCount <== cycleCount.val + 1
 
     -- Display value on every cycle
-    display "cycleCount = " (cycleCount.val)
+    display "cycleCount = %0d" (cycleCount.val)
 
     -- Terminate simulation when count reaches 10
     when (cycleCount.val .==. 10) do
@@ -242,17 +242,17 @@ Haskell's rebindable syntax feature.
 Running `top` in simulation gives
 
 ```
-cycleCount = 0x0
-cycleCount = 0x1
-cycleCount = 0x2
-cycleCount = 0x3
-cycleCount = 0x4
-cycleCount = 0x5
-cycleCount = 0x6
-cycleCount = 0x7
-cycleCount = 0x8
-cycleCount = 0x9
-cycleCount = 0xa
+cycleCount = 0
+cycleCount = 1
+cycleCount = 2
+cycleCount = 3
+cycleCount = 4
+cycleCount = 5
+cycleCount = 6
+cycleCount = 7
+cycleCount = 8
+cycleCount = 9
+cycleCount = 10
 Finished
 ```
 
@@ -437,7 +437,7 @@ fact = do
               acc <== acc.val * n.val
           )
         , Action do
-            display "fact(10) = " (acc.val)
+            display "fact(10) = %0d" (acc.val)
             finish
         ]
        
@@ -470,7 +470,7 @@ top = do
             counter.inc
             counter.dec
         , Action do
-            display "counter = " (counter.output)
+            display "counter = %0d" (counter.output)
             finish
         ]
 
@@ -632,7 +632,7 @@ top = do
         , Action do
             load ram 0
         , Action do
-            display "Got " (ram.out)
+            display "Got 0x%0x" (ram.out)
             finish
         ]
 
@@ -788,7 +788,7 @@ top = do
     -- Consume
     when (out.canGet) do
       get out
-      display "Got " (out.value)
+      display "Got 0x%0x" (out.value)
       when (out.value .==. 100) finish
 ```
 
@@ -853,7 +853,7 @@ master resps = do
     , Wait (resps.canGet)
     , Action do
         get resps
-        display "Result: " (resps.value)
+        display "Result: %0d" (resps.value)
         finish
     ]
 
@@ -894,16 +894,16 @@ import Blarney.BitScan
 -- Semantics of add instruction
 add :: Bit 5 -> Bit 5 -> Bit 5 -> Action ()
 add rs2 rs1 rd =
-  display "add r" (rd.val) ", r" (rs1.val) ", r" (rs1.val)
+  display "add r%0d" (rd.val) ", r%0d" (rs1.val) ", r%0d" (rs1.val)
 
 -- Semantics of addi instruction
 addi :: Bit 12 -> Bit 5 -> Bit 5 -> Action ()
 addi imm rs1 rd =
-  display "add r" (rd.val) ", r" (rs1.val) ", " (imm.val)
+  display "add r%0d" (rd.val) ", r%0d" (rs1.val) ", 0x%0x" (imm.val)
 
 -- Semantics of store-word instruciton
 sw :: Bit 12 -> Bit 5 -> Bit 5 -> Action ()
-sw imm rs2 rs1 = display "sw " rs2 ", " rs1 "[" imm "]"
+sw imm rs2 rs1 = display "sw r%0d" rs2 ", %0d(r%0d)" imm rs1
 
 top :: Module ()
 top = always do
@@ -1083,5 +1083,5 @@ makeCPU = do
       when (result.active) do
         store regFileA (instr.val.rD) (result.val)
         store regFileB (instr.val.rD) (result.val)
-        display (count.val) ": rf[" (instr.val.rD) "] := " (result.val)
+        display "%0d: " (count.val) "rf[r%0d]" (instr.val.rD) " := 0x%0x" (result.val)
 ```
