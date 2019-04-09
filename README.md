@@ -49,8 +49,8 @@ A quick test bench to check that it works:
 ```hs
 top :: Module ()
 top = always do
-  display "twoSort (01,02) = " (twoSort (01,02))
-  display "twoSort (02,01) = " (twoSort (02,01))
+  display "twoSort (1,2) = " (twoSort (1,2))
+  display "twoSort (2,1) = " (twoSort (2,1))
   finish
 ```
 
@@ -92,8 +92,8 @@ built and run as follows.
 > cd /tmp/twoSort
 > make
 > ./top
-twoSort (01,02) = (01,02)
-twoSort (02,01) = (01,02)
+twoSort (1,2) = (01,02)
+twoSort (2,1) = (01,02)
 ```
 
 Looks like `twoSort` is working!
@@ -129,7 +129,7 @@ Running the test bench
 ```hs
 top :: Module ()
 top = always do
-  let inputs = [03, 04, 01, 00, 02]
+  let inputs = [3, 4, 1, 0, 2]
   display "sort " inputs " = " (sort inputs)
   finish
 ```
