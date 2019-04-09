@@ -23,7 +23,7 @@ top = do
           While (i.val .<. 100) (
             Do [
               load ram (val i),
-              display "ram[" (val i) "] = " (out ram),
+              display "ram[0x%02x]" (val i) " = 0x%024x" (out ram),
               i <== val i + 1
             ]
           )

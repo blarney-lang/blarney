@@ -24,7 +24,7 @@ sort (x:xs) = smallest : sort rest
 
 top :: Module ()
 top = always do
-  let inputs = [0x3, 0x4, 0x1, 0x0, 0x2]
+  let inputs = [3, 4, 1, 0, 2]
   display "sort " inputs " = " (sort inputs)
   finish
 

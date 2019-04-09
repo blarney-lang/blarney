@@ -43,7 +43,7 @@ top = do
     -- Consume
     when (out.canGet) $ do
       out.get
-      display "Got " (out.value)
+      display "Got %0d" (out.value)
       when (out.value .==. 100) finish
  
 -- Main function
