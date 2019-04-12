@@ -5,6 +5,7 @@
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE FunctionalDependencies     #-}
 
 {-|
 Module      : Blarney.Module
@@ -113,22 +114,22 @@ infixl 0 -->
 lhs --> rhs = (lhs, rhs)
 
 -- |Variable value (read)
-class Val v where
-  val :: Bits a => v a -> a
+class Val v a | v -> a where
+  val :: Bits a => v -> a
 -- |Variable assignment (write)
 infix 1 <==
 class Assign v where
   (<==) :: Bits a => v a -> a -> Action ()
 
 -- |Register read and write
-instance Val RTL.Reg where
-  val v = RTL.regVal v
+instance Val (RTL.Reg t) t where
+  val reg = RTL.regVal reg
 instance Assign RTL.Reg where
   v <== x = A (RTL.writeReg v x)
 
 -- |Wire read and write
-instance Val RTL.Wire where
-  val v = RTL.wireVal v
+instance Val (RTL.Wire t) t where
+  val wire = RTL.wireVal wire
 instance Assign RTL.Wire where
   v <== x = A (RTL.writeWire v x)
 
@@ -155,7 +156,7 @@ data ReadWrite a =
     rwWriteVal :: a -> Action ()
   }
 
-instance Val ReadWrite where
+instance Val (ReadWrite t) t where
   val = rwReadVal
 instance Assign ReadWrite where
   (<==) = rwWriteVal
