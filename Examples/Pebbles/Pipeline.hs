@@ -24,10 +24,10 @@ data Config =
   , srcB :: Instr -> RegId
     -- Get destination register
   , dst :: Instr -> RegId
-    -- Dispatch rules for pre-execute stage
-  , preExecRules :: State -> [Instr -> Action ()]
     -- Dispatch rules for execute stage
   , execRules :: State -> [Instr -> Action ()]
+    -- Dispatch rules for write-back stage
+  , writeBackRules :: State -> [Instr -> Action ()]
   }
 
 -- Pipeline state, visisble to the ISA
@@ -45,6 +45,11 @@ data State =
 -- Pipeline
 makeCPUPipeline :: Config -> Module ()
 makeCPUPipeline c = do
+
+  -- Cycle counter
+  count :: Reg (Bit 32) <- makeReg 0
+  always (count <== count.val + 1)
+
   -- Instruction memory
   instrMem :: RAM InstrAddr Instr <- makeRAMInit "prog.mif"
 
@@ -53,123 +58,167 @@ makeCPUPipeline c = do
   regFileA :: RAM RegId (Bit 32) <- makeDualRAMForward 0
   regFileB :: RAM RegId (Bit 32) <- makeDualRAMForward 0
 
-  -- Instruction register
-  instr :: Reg Instr <- makeReg dontCare
-
-  -- Instruction operand registers
-  regA :: Reg (Bit 32) <- makeReg dontCare
-  regB :: Reg (Bit 32) <- makeReg dontCare
-
   -- Wire used to overidge the update to the PC,
   -- in case of a branch instruction
   pcNext :: Wire (Bit 32) <- makeWire dontCare
 
-  -- Result of the execute stage
-  resultWire :: Wire (Bit 32) <- makeWire dontCare
+  -- Stage 0 (Instruction Fetch) registers / wires
+  pc_0_1 :: Reg (Bit 32) <- makeReg 0xfffffffc
+  -- Always trigger stage 1, except on first cycle
+  let go_0_1 :: Bit 1 = reg 0 1
 
-  -- Cycle counter
-  count :: Reg (Bit 32) <- makeReg 0
-  always (count <== count.val + 1)
+  -- Stage 1 (Operand Fetch) registers / wires
+  pc_1_2    :: Reg (Bit 32) <- makeReg dontCare
+  instr_1_2 :: Reg Instr    <- makeReg dontCare
+  go_1_2    :: Reg (Bit 1)  <- makeDReg 0
 
-  -- Program counters for each pipeline stage
-  pc1 :: Reg (Bit 32) <- makeReg 0xfffffffc
-  pc2 :: Reg (Bit 32) <- makeReg dontCare
-  pc3 :: Reg (Bit 32) <- makeReg dontCare
+  -- Stage 2 (Latch Operands) registers / wires
+  pc_2_3    :: Reg (Bit 32) <- makeReg dontCare
+  instr_2_3 :: Reg Instr    <- makeReg dontCare
+  go_2_3    :: Reg (Bit 1)  <- makeDReg 0
+  regA_2_3  :: Reg (Bit 32) <- makeReg dontCare
+  regB_2_3  :: Reg (Bit 32) <- makeReg dontCare
 
-  -- Instruction registers for pipeline stages 2 and 3
-  instr2 :: Reg Instr <- makeReg 0
-  instr3 :: Reg Instr <- makeReg 0
+  -- Stage 3 (Execute) registers / wires
+  pc_3_4     :: Reg (Bit 32)        <- makeReg dontCare
+  instr_3_4  :: Reg Instr           <- makeReg dontCare
+  go_3_4     :: Reg (Bit 1)         <- makeDReg 0
+  regRes_3_4 :: Reg (Bit 1, Bit 32) <- makeReg (0, dontCare)
+  regA_3_4   :: Reg (Bit 32)        <- makeReg dontCare
+  wireRes_3  :: Wire (Bit 32)       <- makeWire dontCare
 
-  -- Triggers for pipeline stages 2 and 3
-  go2 :: Reg (Bit 1) <- makeDReg 0
-  go3 :: Reg (Bit 1) <- makeDReg 0
+  -- Stage 4 (WriteBack) registers / wires
+  wireInnerRes_4 :: Wire (Bit 32) <- makeWire dontCare
+  wireFinalRes_4 :: Wire (Bit 32) <- makeWire dontCare
+
+  -- helpers
+  let rdNonZero instr = (c.dst) instr .!=. 0
+  let isDebug = testPlusArgs "DEBUG"
 
   always do
     -- Stage 0: Instruction Fetch
-    -- ==========================
+    -- =========================================================================
 
     -- PC to fetch
-    let pcFetch = pcNext.active ? (pcNext.val, pc1.val + 4)
-    pc1 <== pcFetch
+    let pcFetch = pcNext.active ? (pcNext.val, pc_0_1.val + 4)
 
     -- Index the instruction memory
     let instrAddr = lower (range @31 @2 pcFetch)
     load instrMem instrAddr
 
-    -- Always trigger stage 1, except on first cycle
-    let go1 :: Bit 1 = reg 0 1
+    when isDebug do
+      display "--------------------------------------------"
+      display "Stage 0 -- pc: 0x%08x" (pcFetch)
+
+    -- Latch PC for next stage
+    pc_0_1 <== pcFetch
 
     -- Stage 1: Operand Fetch
-    -- ======================
+    -- =========================================================================
 
-    -- Trigger stage 2, except on pipeline flush
-    when go1 do
+    when go_0_1 do
+      when isDebug $ display "Stage 1 -- pc: 0x%08x" (pc_0_1.val)
+                             ", inst: 0x%08x" (instrMem.out)
+      -- Trigger stage 2, except on pipeline flush
       when (pcNext.active.inv) do
-        go2 <== 1
+        go_1_2 <== 1
 
     -- Fetch operands
     load regFileA (c.srcA $ instrMem.out)
     load regFileB (c.srcB $ instrMem.out)
 
-    -- Latch instruction and PC for next stage
-    instr2 <== instrMem.out
-    pc2 <== pc1.val
+    -- Latch PC and instruction for next stage
+    pc_1_2    <== pc_0_1.val
+    instr_1_2 <== instrMem.out
 
     -- Stage 2: Latch Operands
-    -- =======================
+    -- =========================================================================
   
     -- Register forwarding logic
     let forward rS other =
-         (resultWire.active .&. ((c.dst $ instr3.val) .==. instr2.val.rS)) ?
-         (resultWire.val, other)
+          if wireRes_3.active
+             .&. ((c.dst $ instr_2_3.val) .==. instr_1_2.val.rS) then
+          wireRes_3.val
+          else if wireFinalRes_4.active
+                  .&. ((c.dst $ instr_3_4.val) .==. instr_1_2.val.rS) then
+          wireFinalRes_4.val
+          else other
 
     -- Register forwarding
     let a = forward (c.srcA) (regFileA.out)
     let b = forward (c.srcB) (regFileB.out)
 
-    -- Latch operands
-    regA <== a
-    regB <== b
+    when (go_1_2.val) do
+      when isDebug $ display "Stage 2 -- pc: 0x%08x" (pc_1_2.val)
+                             ", inst: 0x%08x" (instr_1_2.val)
+                             ", latching a: 0x%08x" a " and b: 0x%08x" b
+      -- Trigger stage 3, except on pipeline flush
+      when (pcNext.active.inv) do
+        go_2_3 <== go_1_2.val
 
-    -- State for pre-execute stage
-    let state = State {
-            opA    = a
-          , opB    = b
-          , pc     = ReadWrite (pc2.val) (error "can't write pc in pre-execute")
-          , result = error "result wire can't be used in pre-execute"
-          }
-
-    -- Trigger stage 3, except on pipeline flush
-    when (pcNext.active.inv) do
-      match (instr2.val) (c.preExecRules $ state)
-      go3 <== go2.val
-
-    -- Latch instruction and PC for next stage
-    instr3 <== instr2.val
-    pc3 <== pc2.val
+    -- Latch PC, instruction and operands for next stage
+    pc_2_3    <== pc_1_2.val
+    instr_2_3 <== instr_1_2.val
+    regA_2_3  <== a
+    regB_2_3  <== b
 
     -- Stage 3: Execute
-    -- ================
-
-    -- Destination register
-    let rd = dst c (instr3.val)
-
-    -- Prevent write to register 0
-    let permitWrite = rd .!=. 0
+    -- =========================================================================
 
     -- State for execute stage
     let state = State {
-            opA    = regA.val
-          , opB    = regB.val
-          , pc     = ReadWrite (pc3.val) (pcNext <==)
-          , result = WriteOnly (\x -> when permitWrite (resultWire <== x))
+            opA    = regA_2_3.val
+          , opB    = regB_2_3.val
+          , pc     = ReadWrite (pc_2_3.val) (pcNext <==)
+          , result = WriteOnly (\x -> when (rdNonZero (instr_2_3.val))
+                                        (wireRes_3 <== x))
           }
+    -- on active execute stage
+    when (go_2_3.val) do
+      when isDebug $ display "Stage 3 -- pc: 0x%08x" (pc_2_3.val)
+                             ", inst: 0x%08x" (instr_2_3.val)
+                             ", regA_2_3.val: 0x%08x" (regA_2_3.val)
+                             ", regB_2_3.val: 0x%08x" (regB_2_3.val)
+                             ", wireRes_3: (%0d, 0x%08x)"
+                             (wireRes_3.active) (wireRes_3.val)
+      -- Instruction dispatch
+      match (instr_2_3.val) (c.execRules $ state)
 
-    -- Instruction dispatch
-    when (go3.val) do
-      match (instr3.val) (c.execRules $ state)
+    -- always trigger next stage
+    go_3_4 <== go_2_3.val
 
-    -- Writeback
-    when (resultWire.active) do
-      store regFileA rd (resultWire.val)
-      store regFileB rd (resultWire.val)
+    -- Latch PC, instruction, operand A and result for next stage
+    pc_3_4     <== pc_2_3.val
+    instr_3_4  <== instr_2_3.val
+    regA_3_4   <== regA_2_3.val
+    regRes_3_4 <== (wireRes_3.active, wireRes_3.val)
+
+    -- Stage 4: WriteBack
+    -- =========================================================================
+    -- State for pre-execute stage
+    let state = State {
+            opA    = regA_3_4.val
+          , opB    = error "can't access opB in write-back"
+          , pc     = error "can't access pc in write-back"
+          , result = WriteOnly (\x -> when (rdNonZero (instr_3_4.val))
+                                        (wireInnerRes_4 <== x))
+          }
+    -- on active write back stage
+    when (go_3_4.val) do
+      -- Instruction dispatch
+      match (instr_3_4.val) (c.writeBackRules $ state)
+      -- Select final result value
+      if wireInnerRes_4.active then
+        wireFinalRes_4 <== wireInnerRes_4.val
+      else if (fst $ regRes_3_4.val) then
+        wireFinalRes_4 <== (snd $ regRes_3_4.val)
+      else noAction
+      when isDebug $ display "Stage 4 -- pc: 0x%08x" (pc_3_4.val)
+                             ", inst: 0x%08x" (instr_3_4.val)
+      -- write value back to the register file
+      let rd = dst c (instr_3_4.val)
+      when (wireFinalRes_4.active) do
+        store regFileA rd (wireFinalRes_4.val)
+        store regFileB rd (wireFinalRes_4.val)
+        when isDebug $ display "Stage 4 -- reg#%0d" rd
+                               " <= 0x%08x" (wireFinalRes_4.val)

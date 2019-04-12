@@ -1,2 +1,4 @@
 *.hi
 *.o
+Examples/Pebbles/Tests/*.hex
+Examples/Pebbles/Tests/*.dump

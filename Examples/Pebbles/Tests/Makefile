@@ -3,6 +3,7 @@ RV_ARCH    = rv32i
 RV_CC      = riscv64-unknown-elf-gcc
 RV_LD      = riscv64-unknown-elf-ld
 RV_OBJCOPY = riscv64-unknown-elf-objcopy
+RV_OBJDUMP = riscv64-unknown-elf-objdump
 
 # Compiler and linker flags
 CFLAGS  = -mabi=ilp32 -march=$(RV_ARCH) -O2 -I.
@@ -48,7 +49,8 @@ all: $(patsubst %.S,%.code.hex,$(wildcard *.S)) \
 
 %.o: %.S test_macros.h riscv_test.h encoding.h
 	$(RV_CC) $(CFLAGS) -Wall -c -o $@ $<
+	$(RV_OBJDUMP) -xsSD $@ > $(basename $@).dump
 
 .PHONY: clean
 clean:
-	rm -f *.o *.elf *.out *.ihex *.hex
+	rm -f *.o *.elf *.out *.ihex *.hex *.dump
