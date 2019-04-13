@@ -27,6 +27,9 @@ module Blarney.Module
     -- * Lift actions to modules
     always,
 
+    -- * Action of doing nothing
+    noAction,
+
     -- * Conditional actions
     when, whenR, switch, (-->),
 
@@ -86,6 +89,10 @@ newtype Action a = A { runAction :: RTL.RTL a }
 -- |Execute an action on every clock cycle
 always :: Action a -> Module a
 always a = M (runAction a)
+
+-- |Action of doing nothing
+noAction :: Action ()
+noAction = return ()
 
 -- |Conditional block over actions
 when :: Bit 1 -> Action () -> Action ()
