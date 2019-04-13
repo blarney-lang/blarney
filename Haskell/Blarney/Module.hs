@@ -33,6 +33,9 @@ module Blarney.Module
     -- * Conditional actions
     when, whenR, switch, (-->),
 
+    -- * Validity of a value
+    Valid(..),
+
     -- * Variable value (read)
     Val(..),
 
@@ -119,6 +122,10 @@ switch subject alts =
 infixl 0 -->
 (-->) :: a -> b -> (a, b)
 lhs --> rhs = (lhs, rhs)
+
+-- |Validity of a value
+class Valid t where
+  valid :: t -> Bit 1
 
 -- |Variable value (read)
 class Val v a | v -> a where
