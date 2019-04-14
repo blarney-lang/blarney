@@ -7,7 +7,7 @@ module Pebbles where
 import Blarney
 import Blarney.Stream
 import Blarney.BitScan
-import Blarney.Queue
+import Blarney.PulseWire
 
 -- Pebbles imports
 import CSR
@@ -118,8 +118,9 @@ bgeu s imm = do
     s.pc <== s.pc.val + signExtend (imm # (0 :: Bit 1))
 
 memRead_0 :: State -> DataMem -> Bit 12 -> Action ()
-memRead_0 s mem imm = do
-  dataMemRead mem (s.opA + signExtend imm)
+memRead_0 State{opA = a, lateResult = lr} mem imm = do
+  dataMemRead mem (a + signExtend imm)
+  lr.pulse
 
 memRead_1 :: State -> DataMem -> Bit 12 -> Bit 1 -> Bit 2 -> Action ()
 memRead_1 s mem imm unsigned width = do

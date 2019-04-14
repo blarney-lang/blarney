@@ -1,3 +1,5 @@
+{-# LANGUAGE ExistentialQuantification #-}
+
 module Pipeline
   (
   Config(..), State(..), makeCPUPipeline
@@ -8,6 +10,7 @@ module Pipeline
 import Blarney
 import Blarney.RAM
 import Blarney.Option
+import Blarney.PulseWire
 import Blarney.BitScan
 
 -- Instructions
@@ -35,16 +38,17 @@ data Config =
   }
 
 -- Pipeline state, visisble to the ISA
-data State =
-  State {
-    -- Source operands
-    opA :: Bit 32
-  , opB :: Bit 32
-    -- Program counter interface
-  , pc :: ReadWrite (Bit 32)
-    -- Write the instruction result
-  , result :: WriteOnly (Bit 32)
-  }
+data State = forall pulsable. Pulse pulsable => State {
+  -- Source operands
+  opA :: Bit 32
+, opB :: Bit 32
+  -- Program counter interface
+, pc :: ReadWrite (Bit 32)
+  -- Write the instruction result
+, result :: WriteOnly (Bit 32)
+  -- signal late result
+, lateResult :: pulsable
+}
 
 -- inter stages communication state
 data Stg1 = Stg1 {
@@ -76,11 +80,19 @@ data Stg4 = Stg4 {
 
 -- Pipeline
 makeCPUPipeline :: Config -> Module ()
-makeCPUPipeline c = do
+makeCPUPipeline c = mdo
 
   -- Cycle counter
   count :: Reg (Bit 32) <- makeReg 0
   always (count <== count.val + 1)
+
+  -- Bubble register
+  regBubble :: Reg (Bit 1) <- makeReg 0
+  always do
+    if (wireLateRes.val) then do
+      regBubble <== true
+    else do
+      regBubble <== regBubble.val .&. wireInnerRes_4.active.inv
 
   -- Instruction memory
   instrMem :: RAM InstrAddr Instr <- makeRAMInit "prog.mif"
@@ -113,6 +125,7 @@ makeCPUPipeline c = do
 
   -- Stage 3 (Execute) wires
   wireRes_3      :: Wire (Bit 32) <- makeWire dontCare
+  wireLateRes    :: PulseWire     <- makePulseWire
   -- Stage 4 (WriteBack) wires
   wireInnerRes_4 :: Wire (Bit 32) <- makeWire dontCare
   wireFinalRes_4 :: Wire (Bit 32) <- makeWire dontCare
@@ -120,6 +133,8 @@ makeCPUPipeline c = do
   -- helpers
   let rdNonZero instr = (c.dst) instr .!=. 0
   let isDebug = testPlusArgs "DEBUG"
+  let bubbling = (wireLateRes.val .|. regBubble.val)
+                 .&. wireInnerRes_4.active.inv
 
   always do
 
@@ -131,19 +146,25 @@ makeCPUPipeline c = do
               "  (ok2:" ok2 ", go2:" go2 ")"
               "  (ok3:" ok3 ", go3:" go3 ")"
               "  (ok4:" ok4 ", go4:" go4 ")"
+      display "  bubbling:" bubbling
+              " (wireLateRes:" (wireLateRes.val)
+              ", wireInnerRes_4.active:" (wireInnerRes_4.active)
+              ", regBubble:" (regBubble.val) ")"
 
     -- Stage 0: Instruction Fetch
     -- =========================================================================
 
     -- PC to fetch
-    let pcFetch = pcNext.active ? (pcNext.val, pc1 + 4)
+    let pcFetch = if bubbling then pc1
+                  else pcNext.active ? (pcNext.val, pc1 + 4)
 
     -- Index the instruction memory
     let instrAddr = lower (range @31 @2 pcFetch)
 
     -- Stage's actions
     load instrMem instrAddr
-    stg1Reg <== (some $ Stg1 true pcFetch)
+    when (bubbling.inv) do
+      stg1Reg <== (some $ Stg1 true pcFetch)
 
     -- Stage's debug
     when isDebug do
@@ -154,7 +175,7 @@ makeCPUPipeline c = do
     -- =========================================================================
 
     -- Stage's actions
-    when (ok1 .&. go1) do
+    when (bubbling.inv .&. ok1 .&. go1) do
       -- Fetch operands
       load regFileA (c.srcA $ instrMem.out)
       load regFileB (c.srcB $ instrMem.out)
@@ -191,16 +212,17 @@ makeCPUPipeline c = do
     let b = forward (c.srcB) (regFileB.out)
 
     -- Stage's actions
-    when (ok2 .&. go2) do
-      -- Trigger stage 3, except on pipeline flush
-      if (pcNext.active) then do stg3Reg <== none
-      else do stg3Reg <== (some $ Stg3 {
-                            go    = go2
-                          , pc    = pc2
-                          , instr = instr2
-                          , regA  = a
-                          , regB  = b
-                          })
+    when (bubbling.inv .&. ok2 .&. go2) do
+      -- Trigger stage 3, except on pipeline flush / bubble
+      when (wireLateRes.val.inv) do
+        if (pcNext.active) then do stg3Reg <== none
+        else do stg3Reg <== (some $ Stg3 {
+                              go    = go2
+                            , pc    = pc2
+                            , instr = instr2
+                            , regA  = a
+                            , regB  = b
+                            })
 
     -- Stage's debug
     when isDebug do
@@ -219,10 +241,13 @@ makeCPUPipeline c = do
           , pc     = ReadWrite pc3 (pcNext <==)
           , result = WriteOnly (\x -> when (rdNonZero instr3)
                                         (wireRes_3 <== x))
+          , lateResult = wireLateRes
           }
+    -- Stage's self flush on bubble condition
+    when (wireLateRes.val) $ stg3Reg <== none
 
     -- Stage's actions
-    when (ok3 .&. go3) do
+    if (ok3 .&. go3) then do
       -- Instruction dispatch
       match instr3 (c.execRules $ state)
       -- always trigger next stage
@@ -233,6 +258,8 @@ makeCPUPipeline c = do
                           , regA  = regA3
                           , lastResult = Option (wireRes_3.active, wireRes_3.val)
                           })
+    else do
+      stg4Reg <== none
 
     -- Stage's debug
     when isDebug do
@@ -251,6 +278,8 @@ makeCPUPipeline c = do
           , pc     = error "can't access pc in write-back"
           , result = WriteOnly (\x -> when (rdNonZero instr4)
                                         (wireInnerRes_4 <== x))
+          , lateResult =
+              error "can't signal late result in write-back" :: PulseWire
           }
     -- destination register index
     let rd = c.dst $ instr4
