@@ -3,7 +3,7 @@
 
 module Blarney.Option
   ( -- * Option type
-    Option, some, none, isSome, isNone, fromOption
+    Option(..), some, none, isSome, isNone, fromOption
   ) where
 
 -- Blarney imports
