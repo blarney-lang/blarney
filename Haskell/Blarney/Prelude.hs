@@ -112,7 +112,7 @@ infixl 3 ?
 c ? (a, b) = unpack (mux c (pack a, pack b))
 
 -- |Overloaded if-then-else
-instance {-# OVERLAPPING #-} Bits a => IfThenElse (Bit 1) a where
+instance {-# OVERLAPPABLE #-} Bits a => IfThenElse (Bit 1) a where
   ifThenElse cond a b = cond ? (a, b)
 
 -- |Function composition
