@@ -56,4 +56,4 @@ isNone opt = opt.valid.inv
 
 -- | Gets the value from a valid 'Option', or a given default value otherwise
 fromOption :: Bits t => t -> Option t -> t
-fromOption dflt opt = opt.valid ? (opt.val, dflt)
+fromOption dflt opt = if opt.valid then opt.val else dflt

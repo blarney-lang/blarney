@@ -203,7 +203,7 @@ ifThenElseRTL c a b =
      local (r { cond = cond r .&. inv c }) b
 
 -- |Overloaded if-then-else
-instance IfThenElse (Bit 1) (RTL ()) where
+instance {-# OVERLAPPABLE #-} IfThenElse (Bit 1) (RTL ()) where
   ifThenElse = ifThenElseRTL
 
 -- |RTL switch statement

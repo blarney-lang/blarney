@@ -121,7 +121,7 @@ ifThenElseAction :: Bit 1 -> Action () -> Action () -> Action ()
 ifThenElseAction c a b = A (RTL.ifThenElseRTL c (runAction a) (runAction b))
 
 -- |Overloaded if-then-else
-instance IfThenElse (Bit 1) (Action ()) where
+instance {-# OVERLAPPABLE #-} IfThenElse (Bit 1) (Action ()) where
   ifThenElse = ifThenElseAction
 
 -- |Switch statement over actions

@@ -1,9 +1,11 @@
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE KindSignatures      #-}
-{-# LANGUAGE TypeOperators       #-}
-{-# LANGUAGE TypeFamilies        #-}
-{-# LANGUAGE RankNTypes          #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE KindSignatures        #-}
+{-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE RankNTypes            #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 {-|
 Module      : Blarney.Prelude
@@ -108,6 +110,10 @@ listIndex i xs = select [(i .==. fromInteger j, x) | (j, x) <- zip [0..] xs]
 infixl 3 ?
 (?) :: Bits a => Bit 1 -> (a, a) -> a
 c ? (a, b) = unpack (mux c (pack a, pack b))
+
+-- |Overloaded if-then-else
+instance {-# OVERLAPPING #-} Bits a => IfThenElse (Bit 1) a where
+  ifThenElse cond a b = cond ? (a, b)
 
 -- |Function composition
 infixr 9 `o`
