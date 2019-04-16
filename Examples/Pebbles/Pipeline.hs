@@ -86,10 +86,13 @@ makeCPUPipeline c = mdo
   count :: Reg (Bit 32) <- makeReg 0
   always (count <== count.val + 1)
 
+  -- startBubble wire
+  startBubble :: PulseWire <- makePulseWire
+
   -- Bubble register
   regBubble :: Reg (Bit 1) <- makeReg 0
   always do
-    if (wireLateRes.val) then do
+    if (startBubble.val) then do
       regBubble <== true
     else do
       regBubble <== regBubble.val .&. wireInnerRes_4.active.inv
@@ -133,7 +136,7 @@ makeCPUPipeline c = mdo
   -- helpers
   let rdNonZero instr = (c.dst) instr .!=. 0
   let isDebug = testPlusArgs "DEBUG"
-  let bubbling = (wireLateRes.val .|. regBubble.val)
+  let bubbling = (startBubble.val .|. regBubble.val)
                  .&. wireInnerRes_4.active.inv
 
   always do
@@ -198,23 +201,31 @@ makeCPUPipeline c = mdo
     -- =========================================================================
   
     -- Register forwarding logic
-    let forward rS other =
-          if wireRes_3.active
-             .&. ((c.dst $ instr3) .==. instr2.rS) then
-          wireRes_3.val
-          else if wireFinalRes_4.active
-                  .&. ((c.dst $ instr4) .==. instr2.rS) then
-          wireFinalRes_4.val
+    let srcA_is_dst3 = ((c.dst $ instr3) .==. (c.srcA $ instr2))
+    let srcB_is_dst3 = ((c.dst $ instr3) .==. (c.srcB $ instr2))
+    let srcA_is_dst4 = ((c.dst $ instr4) .==. (c.srcA $ instr2))
+    let srcB_is_dst4 = ((c.dst $ instr4) .==. (c.srcB $ instr2))
+    let forward_srcA other =
+          if wireRes_3.active .&. srcA_is_dst3 then
+            wireRes_3.val
+          else if wireFinalRes_4.active .&. srcA_is_dst4 then
+            wireFinalRes_4.val
+          else other
+    let forward_srcB other =
+          if wireRes_3.active .&. srcB_is_dst3 then
+            wireRes_3.val
+          else if wireFinalRes_4.active .&. srcB_is_dst4 then
+            wireFinalRes_4.val
           else other
 
     -- Register forwarding
-    let a = forward (c.srcA) (regFileA.out)
-    let b = forward (c.srcB) (regFileB.out)
+    let a = forward_srcA (regFileA.out)
+    let b = forward_srcB (regFileB.out)
 
     -- Stage's actions
     when (bubbling.inv .&. ok2 .&. go2) do
       -- Trigger stage 3, except on pipeline flush / bubble
-      when (wireLateRes.val.inv) do
+      when (startBubble.val.inv) do
         if (pcNext.active) then do stg3Reg <== none
         else do stg3Reg <== (some $ Stg3 {
                               go    = go2
@@ -243,8 +254,10 @@ makeCPUPipeline c = mdo
                                         (wireRes_3 <== x))
           , lateResult = wireLateRes
           }
-    -- Stage's self flush on bubble condition
-    when (wireLateRes.val) $ stg3Reg <== none
+    -- Stage's self flush on bubble initiation
+    when (wireLateRes.val .&. (srcA_is_dst3 .|. srcB_is_dst3)) do
+      startBubble.pulse
+      stg3Reg <== none
 
     -- Stage's actions
     if (ok3 .&. go3) then do
