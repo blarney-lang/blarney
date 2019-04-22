@@ -215,7 +215,7 @@ makeCPUPipeline c = do
     when (go4.val) do
       match (instr4.val) (postExecRules c state)
 
-    -- Pipeline stall
+    -- Determine final result
     let rd = dst c (instr4.val)
     when (postResultWire.active) do
       finalResultWire <== postResultWire.val
