@@ -1,6 +1,6 @@
 module Pipeline where
 
--- 4-stage pipeline for 32-bit 3-operand register-based CPU.
+-- 5-stage pipeline for 32-bit 3-operand register-based CPU.
 
 import Blarney
 import Blarney.RAM
@@ -28,6 +28,8 @@ data Config =
   , preExecRules :: State -> [Instr -> Action ()]
     -- Dispatch rules for execute stage
   , execRules :: State -> [Instr -> Action ()]
+    -- Dispatch rules for post-execute stage
+  , postExecRules :: State -> [Instr -> Action ()]
   }
 
 -- Pipeline state, visisble to the ISA
@@ -40,6 +42,8 @@ data State =
   , pc :: ReadWrite (Bit 32)
     -- Write the instruction result
   , result :: WriteOnly (Bit 32)
+    -- Indicate late result, determined in post-execute
+  , late :: WriteOnly (Bit 1)
   }
 
 -- Pipeline
@@ -66,6 +70,12 @@ makeCPUPipeline c = do
 
   -- Result of the execute stage
   resultWire :: Wire (Bit 32) <- makeWire dontCare
+  postResultWire :: Wire (Bit 32) <- makeWire dontCare
+  finalResultWire :: Wire (Bit 32) <- makeWire dontCare
+
+  -- Pipeline stall
+  lateWire :: Wire (Bit 1) <- makeWire 0
+  stallWire :: Wire (Bit 1) <- makeWire 0
 
   -- Cycle counter
   count :: Reg (Bit 32) <- makeReg 0
@@ -76,20 +86,23 @@ makeCPUPipeline c = do
   pc2 :: Reg (Bit 32) <- makeReg dontCare
   pc3 :: Reg (Bit 32) <- makeReg dontCare
 
-  -- Instruction registers for pipeline stages 2 and 3
+  -- Instruction registers for pipeline stages 2 and 3 and 4
   instr2 :: Reg Instr <- makeReg 0
   instr3 :: Reg Instr <- makeReg 0
+  instr4 :: Reg Instr <- makeReg 0
 
   -- Triggers for pipeline stages 2 and 3
   go2 :: Reg (Bit 1) <- makeDReg 0
   go3 :: Reg (Bit 1) <- makeDReg 0
+  go4 :: Reg (Bit 1) <- makeDReg 0
 
   always do
     -- Stage 0: Instruction Fetch
     -- ==========================
 
     -- PC to fetch
-    let pcFetch = pcNext.active ? (pcNext.val, pc1.val + 4)
+    let pcFetch = stallWire.val ?
+                    (pc1.val, pcNext.active ? (pcNext.val, pc1.val + 4))
     pc1 <== pcFetch
 
     -- Index the instruction memory
@@ -102,14 +115,14 @@ makeCPUPipeline c = do
     -- Stage 1: Operand Fetch
     -- ======================
 
-    -- Trigger stage 2, except on pipeline flush
+    -- Trigger stage 2, except on pipeline flush or stall
     when go1 do
-      when (pcNext.active.inv) do
+      when (pcNext.active.inv .&. stallWire.val.inv) do
         go2 <== 1
 
     -- Fetch operands
-    load regFileA (c.srcA $ instrMem.out)
-    load regFileB (c.srcB $ instrMem.out)
+    load regFileA (srcA c (instrMem.out))
+    load regFileB (srcB c (instrMem.out))
 
     -- Latch instruction and PC for next stage
     instr2 <== instrMem.out
@@ -120,12 +133,17 @@ makeCPUPipeline c = do
   
     -- Register forwarding logic
     let forward rS other =
-         (resultWire.active .&. ((c.dst $ instr3.val) .==. instr2.val.rS)) ?
+         (resultWire.active .&. (dst c (instr3.val) .==. instr2.val.rS)) ?
          (resultWire.val, other)
 
+    let forward' rS other =
+         (finalResultWire.active .&.
+           (dst c (instr4.val) .==. instr2.val.rS)) ?
+             (finalResultWire.val, other)
+
     -- Register forwarding
-    let a = forward (c.srcA) (regFileA.out)
-    let b = forward (c.srcB) (regFileB.out)
+    let a = forward (c.srcA) (forward' (c.srcA) (regFileA.out))
+    let b = forward (c.srcB) (forward' (c.srcB) (regFileB.out))
 
     -- Latch operands
     regA <== a
@@ -135,41 +153,76 @@ makeCPUPipeline c = do
     let state = State {
             opA    = a
           , opB    = b
-          , pc     = ReadWrite (pc2.val) (error "can't write pc in pre-execute")
-          , result = error "result wire can't be used in pre-execute"
+          , pc     = ReadWrite (pc2.val) (error "Can't write PC in pre-execute")
+          , result = error "Can't write result in pre-execute"
+          , late   = WriteOnly (lateWire <==)
           }
 
-    -- Trigger stage 3, except on pipeline flush
-    when (pcNext.active.inv) do
-      match (instr2.val) (c.preExecRules $ state)
-      go3 <== go2.val
+    -- Pre-execute rules
+    when (go2.val) do
+      match (instr2.val) (preExecRules c state)
+
+    -- Pipeline stall
+    when (lateWire.val) do
+      when ((srcA c (instrMem.out) .==. dst c (instr2.val)) .|.
+            (srcB c (instrMem.out) .==. dst c (instr2.val))) do
+        stallWire <== true
 
     -- Latch instruction and PC for next stage
     instr3 <== instr2.val
     pc3 <== pc2.val
 
+    -- Trigger stage 3, except on pipeline flush
+    when (pcNext.active.inv) do
+      go3 <== go2.val
+
     -- Stage 3: Execute
     -- ================
-
-    -- Destination register
-    let rd = dst c (instr3.val)
-
-    -- Prevent write to register 0
-    let permitWrite = rd .!=. 0
 
     -- State for execute stage
     let state = State {
             opA    = regA.val
           , opB    = regB.val
           , pc     = ReadWrite (pc3.val) (pcNext <==)
-          , result = WriteOnly (\x -> when permitWrite (resultWire <== x))
+          , result = WriteOnly $ \x ->
+                       when (dst c (instr3.val) .!=. 0) do
+                         resultWire <== x
+          , late   = error "Cant write late signal in execute"
           }
 
-    -- Instruction dispatch
+    -- Execute rules
     when (go3.val) do
-      match (instr3.val) (c.execRules $ state)
+      match (instr3.val) (execRules c state)
+      go4 <== go3.val
+
+    instr4 <== instr3.val
+
+    -- Stage 4: Writeback
+    -- ==================
+
+    -- State for post-execute stage
+    let state = State {
+            opA    = regA.val.old
+          , opB    = regB.val.old
+          , pc     = error "Can't access PC in post-execute"
+          , result = WriteOnly $ \x ->
+                       when (dst c (instr4.val) .!=. 0) do
+                         postResultWire <== x
+          , late   = error "Can't write late signal in post-execute"
+          }
+
+    -- Post-execute rules
+    when (go4.val) do
+      match (instr4.val) (postExecRules c state)
+
+    -- Pipeline stall
+    let rd = dst c (instr4.val)
+    when (postResultWire.active) do
+      finalResultWire <== postResultWire.val
+    when (postResultWire.active.inv .&. delay 0 (resultWire.active)) do
+      finalResultWire <== resultWire.val.old
 
     -- Writeback
-    when (resultWire.active) do
-      store regFileA rd (resultWire.val)
-      store regFileB rd (resultWire.val)
+    when (finalResultWire.active) do
+      store regFileA rd (finalResultWire.val)
+      store regFileB rd (finalResultWire.val)
