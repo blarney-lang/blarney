@@ -4,9 +4,9 @@ import Blarney.Stream
 
 -- Simulation version
 simPebbles :: Module ()
-simPebbles = makePebbles nullStream >> return ()
+simPebbles = makePebbles True nullStream >> return ()
 
 main :: IO ()
 main = do
   writeVerilogTop simPebbles "SimPebbles" "Pebbles-Verilog/"
-  writeVerilogModule makePebbles "Pebbles" "Pebbles-Verilog/"
+  writeVerilogModule (makePebbles False) "Pebbles" "Pebbles-Verilog/"

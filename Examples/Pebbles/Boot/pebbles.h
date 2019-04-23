@@ -9,10 +9,10 @@
 #define CSR_UARTCanGet     "0x804"
 #define CSR_UARTGet        "0x805"
 
-// Emit char to console (simulation only)
-inline void emit(char c)
+// Emit word to console (simulation only)
+inline void emit(unsigned int x)
 {
-  asm volatile("csrw " CSR_SimEmit ", %0\n" : : "r"(c));
+  asm volatile("csrw " CSR_SimEmit ", %0\n" : : "r"(x));
 }
 
 // Terminate simulator (simulation only)

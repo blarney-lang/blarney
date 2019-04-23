@@ -32,10 +32,14 @@ makeCSRUnit uartIn = do
   -- UART output buffer
   uartOut :: Queue (Bit 8) <- makeShiftQueue 1
 
+  -- Cycle counter
+  cycleCount :: Reg (Bit 32) <- makeReg 0
+  always do cycleCount <== cycleCount.val + 1
+
   -- Handle CSR writes
   let writeCSR csr x =
         switch csr [
-          0x800 --> display x
+          0x800 --> display (cycleCount.val) ": " x
         , 0x801 --> finish
         , 0x803 --> enq uartOut (truncate x)
         ]

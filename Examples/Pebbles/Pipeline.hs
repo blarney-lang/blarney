@@ -47,10 +47,11 @@ data State =
   }
 
 -- Pipeline
-makeCPUPipeline :: Config -> Module ()
-makeCPUPipeline c = do
+makeCPUPipeline :: Bool -> Config -> Module ()
+makeCPUPipeline sim c = do
   -- Instruction memory
-  instrMem :: RAM InstrAddr Instr <- makeRAMInit "prog.mif"
+  let ext = if sim then ".hex" else ".mif"
+  instrMem :: RAM InstrAddr Instr <- makeRAMInit ("prog" ++ ext)
 
   -- Two block RAMs allows two operands to be read,
   -- and one result to be written, on every cycle

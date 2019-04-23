@@ -21,7 +21,7 @@ for FILE in *.S; do
   cp $TEST.data.3.hex $VERILOG/data_3.mif
   pushd . > /dev/null
   cd $VERILOG
-  RESULT=$(./SimPebbles | head -n 1)
+  RESULT=$(./SimPebbles | head -n 1 | cut -d ' ' -f 2)
   popd > /dev/null
   if [ "$RESULT" == "0x00000001" ]; then
     echo "PASSED"

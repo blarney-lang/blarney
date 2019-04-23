@@ -138,10 +138,10 @@ csrrw s csrUnit csr = do
   writeCSR csrUnit csr (s.opA)
 
 -- RV32I CPU, with UART input and output channels
-makePebbles :: Stream (Bit 8) -> Module (Stream (Bit 8))
-makePebbles uartIn = do
+makePebbles :: Bool -> Stream (Bit 8) -> Module (Stream (Bit 8))
+makePebbles sim uartIn = do
   -- Tightly-coupled data memory
-  mem <- makeDataMem
+  mem <- makeDataMem sim
 
   -- CSR unit
   (uartOut, csrUnit) <- makeCSRUnit uartIn
@@ -190,7 +190,7 @@ makePebbles uartIn = do
         [ "imm[11:0] <5> u<1> w<2> <5> 0000011" ==> memRead_2 s mem ]
 
   -- CPU pipeline
-  makeCPUPipeline $
+  makeCPUPipeline sim $
     Config {
       srcA = range @19 @15
     , srcB = range @24 @20
