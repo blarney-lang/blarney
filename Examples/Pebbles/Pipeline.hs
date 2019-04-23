@@ -77,6 +77,12 @@ makeCPUPipeline sim c = do
   -- Pipeline stall
   lateWire :: Wire (Bit 1) <- makeWire 0
   stallWire :: Wire (Bit 1) <- makeWire 0
+  stallReg :: Reg (Bit 1) <- makeReg 0
+  always do
+    if (stallWire.val) then do
+      stallReg <== true
+    else do
+      stallReg <== stallReg.val .&. postResultWire.active.inv
 
   -- Cycle counter
   count :: Reg (Bit 32) <- makeReg 0
@@ -97,13 +103,15 @@ makeCPUPipeline sim c = do
   go3 :: Reg (Bit 1) <- makeDReg 0
   go4 :: Reg (Bit 1) <- makeDReg 0
 
+  let stalling = (stallWire.val .|. stallReg.val) .&. postResultWire.active.inv
+
   always do
     -- Stage 0: Instruction Fetch
     -- ==========================
 
     -- PC to fetch
-    let pcFetch = pcNext.active ?
-                    (pcNext.val, stallWire.val ? (pc1.val, pc1.val + 4))
+    let pcFetch = stalling ?
+                    (pc1.val, pcNext.active ? (pcNext.val, pc1.val + 4))
     pc1 <== pcFetch
 
     -- Index the instruction memory
@@ -118,7 +126,7 @@ makeCPUPipeline sim c = do
 
     -- Trigger stage 2, except on pipeline flush or stall
     when go1 do
-      when (pcNext.active.inv .&. stallWire.val.inv) do
+      when (pcNext.active.inv .&. stalling.inv) do
         go2 <== 1
 
     -- Fetch operands
