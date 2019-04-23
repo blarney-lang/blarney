@@ -14,11 +14,11 @@ make --quiet
 for FILE in *.S; do
   TEST=$(basename $FILE .S)
   echo -ne "$TEST\t"
-  cp $TEST.code.hex $VERILOG/prog.mif
-  cp $TEST.data.0.hex $VERILOG/data_0.mif
-  cp $TEST.data.1.hex $VERILOG/data_1.mif
-  cp $TEST.data.2.hex $VERILOG/data_2.mif
-  cp $TEST.data.3.hex $VERILOG/data_3.mif
+  cp $TEST.code.hex $VERILOG/prog.hex
+  cp $TEST.data.0.hex $VERILOG/data_0.hex
+  cp $TEST.data.1.hex $VERILOG/data_1.hex
+  cp $TEST.data.2.hex $VERILOG/data_2.hex
+  cp $TEST.data.3.hex $VERILOG/data_3.hex
   pushd . > /dev/null
   cd $VERILOG
   RESULT=$(./SimPebbles | head -n 1 | cut -d ' ' -f 2)

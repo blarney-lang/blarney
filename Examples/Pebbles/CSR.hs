@@ -39,7 +39,7 @@ makeCSRUnit uartIn = do
   -- Handle CSR writes
   let writeCSR csr x =
         switch csr [
-          0x800 --> display (cycleCount.val) ": " x
+          0x800 --> display (cycleCount.val) ": 0x%08x" x
         , 0x801 --> finish
         , 0x803 --> enq uartOut (truncate x)
         ]
