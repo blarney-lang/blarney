@@ -29,15 +29,6 @@ ori s imm = s.result <== s.opA .|. signExtend imm
 xori :: State -> Bit 12 -> Action ()
 xori s imm = s.result <== s.opA .^. signExtend imm
 
-slli :: State -> Bit 5 -> Action ()
-slli s imm = s.result <== s.opA .<<. imm
-
-srli :: State -> Bit 5 -> Action ()
-srli s imm = s.result <== s.opA .>>. imm
-
-srai :: State -> Bit 5 -> Action ()
-srai s imm = s.result <== s.opA .>>>. imm
-
 lui :: State -> Bit 20 -> Action ()
 lui s imm = s.result <== signExtend (imm # (0 :: Bit 12))
 
@@ -62,17 +53,20 @@ or' s = s.result <== s.opA .|. s.opB
 xor :: State -> Action ()
 xor s = s.result <== s.opA .^. s.opB
 
-sll :: State -> Action ()
-sll s = s.result <== s.opA .<<. range @4 @0 (s.opB)
-
-srl :: State -> Action ()
-srl s = s.result <== s.opA .>>. range @4 @0 (s.opB)
-
 sub :: State -> Action ()
 sub s = s.result <== s.opA - s.opB
 
-sra :: State -> Action ()
-sra s = s.result <== s.opA .>>>. range @4 @0 (s.opB)
+left :: State -> Bit 5 -> Bit 1 -> Action ()
+left s imm reg = do
+  let amount = reg ? (range @4 @0 (s.opB), imm)
+  s.result <== s.opA .<<. amount
+
+right :: State -> Bit 1 -> Bit 5 -> Bit 1 -> Action ()
+right s arith imm reg = do
+  let ext = arith ? (index @31 (s.opA), 0)
+  let amount = reg ? (range @4 @0 (s.opB), imm)
+  let value = ext # (s.opA)
+  s.result <== truncate (value .>>>. amount)
 
 jal :: State -> Bit 20 -> Action ()
 jal s imm = do
@@ -114,16 +108,19 @@ bgeu s imm = do
   when (s.opA .>=. s.opB) do
     s.pc <== s.pc.val + signExtend (imm # (0 :: Bit 1))
 
-preMemRead :: State -> DataMem -> Bit 12 -> Action ()
-preMemRead s mem imm = do
+memRead_0 :: State -> Action ()
+memRead_0 s = s.late <== 1
+
+memRead_1 :: State -> DataMem -> Bit 12 -> Action ()
+memRead_1 s mem imm =
   dataMemRead mem (s.opA + signExtend imm)
 
-memRead :: State -> DataMem -> Bit 12 -> Bit 1 -> Bit 2 -> Action ()
-memRead s mem imm unsigned width = do
+memRead_2 :: State -> DataMem -> Bit 12 -> Bit 1 -> Bit 2 -> Action ()
+memRead_2 s mem imm unsigned width =
   s.result <== readMux mem (s.opA + signExtend imm) width unsigned
 
-preMemWrite :: State -> DataMem -> Bit 12 -> Bit 2 -> Action ()
-preMemWrite s mem imm width = do
+memWrite :: State -> DataMem -> Bit 12 -> Bit 2 -> Action ()
+memWrite s mem imm width = do
   dataMemWrite mem width (s.opA + signExtend imm) (s.opB)
 
 fence :: State -> Bit 4 -> Bit 4 -> Bit 4 -> Action ()
@@ -157,9 +154,6 @@ makePebbles uartIn = do
         , "imm[11:0] <5> 111 <5> 0010011" ==> andi s
         , "imm[11:0] <5> 110 <5> 0010011" ==> ori s
         , "imm[11:0] <5> 100 <5> 0010011" ==> xori s
-        , "0000000 imm[4:0] <5> 001 <5> 0010011" ==> slli s
-        , "0000000 imm[4:0] <5> 101 <5> 0010011" ==> srli s
-        , "0100000 imm[4:0] <5> 101 <5> 0010011" ==> srai s
         , "imm[19:0] <5> 0110111" ==> lui s
         , "imm[19:0] <5> 0010111" ==> auipc s
         , "0000000 <5> <5> 000 <5> 0110011" ==> add s
@@ -168,10 +162,9 @@ makePebbles uartIn = do
         , "0000000 <5> <5> 111 <5> 0110011" ==> and' s
         , "0000000 <5> <5> 110 <5> 0110011" ==> or' s
         , "0000000 <5> <5> 100 <5> 0110011" ==> xor s
-        , "0000000 <5> <5> 001 <5> 0110011" ==> sll s
-        , "0000000 <5> <5> 101 <5> 0110011" ==> srl s
         , "0100000 <5> <5> 000 <5> 0110011" ==> sub s
-        , "0100000 <5> <5> 101 <5> 0110011" ==> sra s
+        , "0000000 imm[4:0] <5> 001 <5> 0 reg<1> 10011" ==> left s
+        , "0 arith<1> 00000 imm[4:0] <5> 101 <5> 0 reg<1> 10011" ==> right s
         , "imm[19] imm[9:0] imm[10] imm[18:11] <5> 1101111" ==> jal s
         , "imm[11:0] <5> 000 <5> 1100111" ==> jalr s
         , "imm[11] imm[9:4] <5> <5> 000 imm[3:0] imm[10] 1100011" ==> beq s
@@ -180,7 +173,8 @@ makePebbles uartIn = do
         , "imm[11] imm[9:4] <5> <5> 110 imm[3:0] imm[10] 1100011" ==> bltu s
         , "imm[11] imm[9:4] <5> <5> 101 imm[3:0] imm[10] 1100011" ==> bge s
         , "imm[11] imm[9:4] <5> <5> 111 imm[3:0] imm[10] 1100011" ==> bgeu s
-        , "imm[11:0] <5> u<1> w<2> <5> 0000011" ==> memRead s mem
+        , "imm[11:0] <5> <3> <5> 0000011" ==> memRead_1 s mem
+        , "imm[11:5] <5> <5> 0 w<2> imm[4:0] 0100011" ==> memWrite s mem
         , "fm[3:0] pred[3:0] succ[3:0] <5> 000 <5> 0001111" ==> fence s
         , "000000000000 <5> 000 <5> 1110011" ==> ecall s
         , "000000000001 <5> 000 <5> 1110011" ==> ebreak s
@@ -189,9 +183,11 @@ makePebbles uartIn = do
 
   -- Pre-execute rules
   let preExecute s =
-        [ "imm[11:0] <5> <3> <5> 0000011" ==> preMemRead s mem
-        , "imm[11:5] <5> <5> 0 w<2> imm[4:0] 0100011" ==> preMemWrite s mem
-        ]
+        [ "<12> <5> <3> <5> 0000011" ==> memRead_0 s ]
+
+  -- Post-execute rules
+  let postExecute s =
+        [ "imm[11:0] <5> u<1> w<2> <5> 0000011" ==> memRead_2 s mem ]
 
   -- CPU pipeline
   makeCPUPipeline $
@@ -201,6 +197,7 @@ makePebbles uartIn = do
     , dst  = range @11 @7
     , preExecRules = preExecute
     , execRules = execute
+    , postExecRules = postExecute
     }
 
   return uartOut
