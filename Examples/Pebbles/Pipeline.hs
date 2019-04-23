@@ -42,7 +42,7 @@ data State =
   , pc :: ReadWrite (Bit 32)
     -- Write the instruction result
   , result :: WriteOnly (Bit 32)
-    -- Indicate late result, determined in post-execute
+    -- Indicate late result (i.e. computed in writeback rather than execute)
   , late :: WriteOnly (Bit 1)
   }
 
