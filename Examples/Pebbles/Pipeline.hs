@@ -102,8 +102,8 @@ makeCPUPipeline sim c = do
     -- ==========================
 
     -- PC to fetch
-    let pcFetch = stallWire.val ?
-                    (pc1.val, pcNext.active ? (pcNext.val, pc1.val + 4))
+    let pcFetch = pcNext.active ?
+                    (pcNext.val, stallWire.val ? (pc1.val, pc1.val + 4))
     pc1 <== pcFetch
 
     -- Index the instruction memory
