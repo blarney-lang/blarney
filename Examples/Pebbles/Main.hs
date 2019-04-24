@@ -4,7 +4,12 @@ import Blarney.Stream
 
 -- Simulation version
 simPebbles :: Module ()
-simPebbles = makePebbles True nullStream >> return ()
+simPebbles = do
+  uartOut <- makePebbles True nullStream
+  always do
+    when (uartOut.canGet) do
+      display "%c" (uartOut.value)
+      uartOut.get
 
 main :: IO ()
 main = do
