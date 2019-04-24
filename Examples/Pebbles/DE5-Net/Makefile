@@ -7,6 +7,21 @@ one:
 	qsys-generate -syn SoC.qsys
 	quartus_sh --flow compile DE5.qpf
 
+.PHONY: many
+many:
+	qsys-generate -syn SoC.qsys
+	quartus_dse DE5.qpf    \
+    --num-seeds 7               \
+    --launcher local            \
+    --num-concurrent 4
+	quartus_dse DE5.qpf --report utilization
+	quartus_dse DE5.qpf --report fmax_summary
+
+.PHONY: report
+report:
+	quartus_dse DE5.qpf --report utilization
+	quartus_dse DE5.qpf --report fmax_summary
+
 .PHONY: download-sof
 download-sof:
 	quartus_pgm -m jtag -o "p;DE5.sof"
