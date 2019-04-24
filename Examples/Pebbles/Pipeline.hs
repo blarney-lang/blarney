@@ -90,6 +90,8 @@ makeCPUPipeline sim c = do
 
   -- Pipeline flush
   flushWire :: Wire (Bit 32) <- makeWire 0
+  let flush = delay 0 (flushWire.active)
+  let flushVal = delay dontCare (flushWire.val)
 
   -- Cycle counter
   count :: Reg (Bit 32) <- makeReg 0
@@ -118,8 +120,8 @@ makeCPUPipeline sim c = do
     -- ==========================
 
     -- PC to fetch
-    let pcFetch = flushWire.active ?
-                    (flushWire.val, stallWire.val ? (pc1.val, predWire.val))
+    let pcFetch = flush ?
+                    (flushVal, stallWire.val ? (pc1.val, predWire.val))
     pc1 <== pcFetch
 
     -- Index the instruction memory
@@ -138,7 +140,7 @@ makeCPUPipeline sim c = do
 
     -- Trigger stage 2, except on pipeline flush or stall
     when go1 do
-      when (flushWire.active.inv .&. stallWire.val.inv) do
+      when (flush.inv .&. stallWire.val.inv) do
         go2 <== 1
 
     -- Fetch operands
@@ -200,7 +202,7 @@ makeCPUPipeline sim c = do
     pc3 <== pc2.val
 
     -- Trigger stage 3, except on pipeline flush
-    when (flushWire.active.inv) do
+    when (flush.inv) do
       go3 <== go2.val
 
     -- Stage 3: Execute
@@ -217,14 +219,15 @@ makeCPUPipeline sim c = do
           , late   = error "Cant write late signal in execute"
           }
 
-    when (go3.val) do
+    when (go3.val .&. flush.inv) do
       -- Execute rules
       match (instr3.val) (execRules c state)
 
       -- Check validity of branch prediction
-      let correct = pcNext.active ? (pcNext.val, pc3.val + 4)
-      when (pc2.val .!=. correct) do
-        flushWire <== correct
+      let flushNeeded = pcNext.active ? 
+              (pcNext.val .!=. pc2.val, pc3.val + 4 .!=. pc2.val)
+      when (flushNeeded) do
+        flushWire <== pcNext.active ? (pcNext.val, pc3.val + 4)
 
       -- Update BTB
       when (isBranch c (instr3.val)) do
@@ -233,7 +236,6 @@ makeCPUPipeline sim c = do
 
       -- Trigger writeback
       go4 <== go3.val
-
 
     instr4 <== instr3.val
 
