@@ -5,6 +5,7 @@ module Pipeline where
 import Blarney
 import Blarney.RAM
 import Blarney.BitScan
+import Blarney.Option
 
 -- Instructions
 type Instr = Bit 32
@@ -15,6 +16,10 @@ type RegId = Bit 5
 -- Instruction memory size
 type InstrAddr = Bit 14
 
+-- Branch-Target-Buffer (BTB) mapping
+type BTBIndex = Bit 8
+type BTBEntry = Option InstrAddr
+
 -- Pipeline configuration
 data Config =
   Config {
@@ -24,6 +29,8 @@ data Config =
   , srcB :: Instr -> RegId
     -- Get destination register
   , dst :: Instr -> RegId
+    -- Is it a branch or jump instruction?
+  , isBranch :: Instr -> Bit 1
     -- Dispatch rules for pre-execute stage
   , preExecRules :: State -> [Instr -> Action ()]
     -- Dispatch rules for execute stage
@@ -65,6 +72,9 @@ makeCPUPipeline sim c = do
   regA :: Reg (Bit 32) <- makeReg dontCare
   regB :: Reg (Bit 32) <- makeReg dontCare
 
+  -- BTB for dynamic branch prediction
+  btb :: RAM BTBIndex BTBEntry <- makeDualRAM
+
   -- Wire used to overidge the update to the PC,
   -- in case of a branch instruction
   pcNext :: Wire (Bit 32) <- makeWire dontCare
@@ -78,6 +88,9 @@ makeCPUPipeline sim c = do
   lateWire :: Wire (Bit 1) <- makeWire 0
   stallWire :: Wire (Bit 1) <- makeWire 0
 
+  -- Pipeline flush
+  flushWire :: Wire (Bit 32) <- makeWire 0
+
   -- Cycle counter
   count :: Reg (Bit 32) <- makeReg 0
   always (count <== count.val + 1)
@@ -87,28 +100,35 @@ makeCPUPipeline sim c = do
   pc2 :: Reg (Bit 32) <- makeReg dontCare
   pc3 :: Reg (Bit 32) <- makeReg dontCare
 
-  -- Instruction registers for pipeline stages 2 and 3 and 4
+  -- Instruction registers for each pipeline stage
   instr2 :: Reg Instr <- makeReg 0
   instr3 :: Reg Instr <- makeReg 0
   instr4 :: Reg Instr <- makeReg 0
 
-  -- Triggers for pipeline stages 2 and 3
+  -- Triggers for each pipeline stage
   go2 :: Reg (Bit 1) <- makeDReg 0
   go3 :: Reg (Bit 1) <- makeDReg 0
   go4 :: Reg (Bit 1) <- makeDReg 0
+
+  -- Predicted branch target
+  predWire :: Wire (Bit 32) <- makeWire 0
 
   always do
     -- Stage 0: Instruction Fetch
     -- ==========================
 
     -- PC to fetch
-    let pcFetch = pcNext.active ?
-                    (pcNext.val, stallWire.val ? (pc1.val, pc1.val + 4))
+    let pcFetch = flushWire.active ?
+                    (flushWire.val, stallWire.val ? (pc1.val, predWire.val))
     pc1 <== pcFetch
 
     -- Index the instruction memory
-    let instrAddr = lower (range @31 @2 pcFetch)
+    let getInstrAddr pc = truncate (range @31 @2 pc)
+    let instrAddr = getInstrAddr pcFetch
     load instrMem instrAddr
+
+    -- Index the BTB
+    load btb (truncate instrAddr)
 
     -- Always trigger stage 1, except on first cycle
     let go1 :: Bit 1 = reg 0 1
@@ -118,12 +138,17 @@ makeCPUPipeline sim c = do
 
     -- Trigger stage 2, except on pipeline flush or stall
     when go1 do
-      when (pcNext.active.inv .&. stallWire.val.inv) do
+      when (flushWire.active.inv .&. stallWire.val.inv) do
         go2 <== 1
 
     -- Fetch operands
     load regFileA (srcA c (instrMem.out))
     load regFileB (srcB c (instrMem.out))
+
+    -- Dynamic branch prediction
+    if isBranch c (instrMem.out) .&. btb.out.valid
+      then predWire <== zeroExtend (btb.out.val) # (0 :: Bit 2)
+      else predWire <== pc1.val + 4
 
     -- Latch instruction and PC for next stage
     instr2 <== instrMem.out
@@ -133,18 +158,17 @@ makeCPUPipeline sim c = do
     -- =======================
   
     -- Register forwarding logic
-    let forward rS other =
-         (resultWire.active .&. (dst c (instr3.val) .==. instr2.val.rS)) ?
-         (resultWire.val, other)
-
-    let forward' rS other =
-         (finalResultWire.active .&.
-           (dst c (instr4.val) .==. instr2.val.rS)) ?
-             (finalResultWire.val, other)
+    let forward getSrc other =
+          let rs = instr2.val.getSrc in
+            if resultWire.active .&. (dst c (instr3.val) .==. rs)
+            then resultWire.val
+            else if finalResultWire.active .&. (dst c (instr4.val) .==. rs)
+                 then finalResultWire.val
+                 else other
 
     -- Register forwarding
-    let a = forward (c.srcA) (forward' (c.srcA) (regFileA.out))
-    let b = forward (c.srcB) (forward' (c.srcB) (regFileB.out))
+    let a = forward (c.srcA) (regFileA.out)
+    let b = forward (c.srcB) (regFileB.out)
 
     -- Latch operands
     regA <== a
@@ -163,18 +187,20 @@ makeCPUPipeline sim c = do
     when (go2.val) do
       match (instr2.val) (preExecRules c state)
 
-    -- Pipeline stall
+    -- Has instruction indicated that it's result will be computed in
+    -- writeback instead of execute?
     when (lateWire.val) do
+      -- Only stall if there will be a writeback->execute data hazard
       when ((srcA c (instrMem.out) .==. dst c (instr2.val)) .|.
             (srcB c (instrMem.out) .==. dst c (instr2.val))) do
         stallWire <== true
 
-    -- Latch instruction and PC for next stage
+    -- Latch for next stage
     instr3 <== instr2.val
     pc3 <== pc2.val
 
     -- Trigger stage 3, except on pipeline flush
-    when (pcNext.active.inv) do
+    when (flushWire.active.inv) do
       go3 <== go2.val
 
     -- Stage 3: Execute
@@ -191,10 +217,23 @@ makeCPUPipeline sim c = do
           , late   = error "Cant write late signal in execute"
           }
 
-    -- Execute rules
     when (go3.val) do
+      -- Execute rules
       match (instr3.val) (execRules c state)
+
+      -- Check validity of branch prediction
+      let correct = pcNext.active ? (pcNext.val, pc3.val + 4)
+      when (pc2.val .!=. correct) do
+        flushWire <== correct
+
+      -- Update BTB
+      when (isBranch c (instr3.val)) do
+        store btb (getInstrAddr (pc3.val))
+                  (Option (pcNext.active, getInstrAddr (pcNext.val)))
+
+      -- Trigger writeback
       go4 <== go3.val
+
 
     instr4 <== instr3.val
 

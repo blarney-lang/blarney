@@ -194,7 +194,8 @@ makePebbles sim uartIn = do
     Config {
       srcA = range @19 @15
     , srcB = range @24 @20
-    , dst  = range @11 @7
+    , dst = range @11 @7
+    , isBranch = \i -> range @6 @4 i .==. 0b110
     , preExecRules = preExecute
     , execRules = execute
     , postExecRules = postExecute

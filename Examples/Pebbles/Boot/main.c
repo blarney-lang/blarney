@@ -7,6 +7,7 @@ int main()
     while (!uartCanPut());
     uartPut(str[i]);
   }
+  finish();
 
   return 0;
 }
