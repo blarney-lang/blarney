@@ -16,8 +16,8 @@ The main feature of the Pebbles description is that it separates the
 definition of the instruction-set architecture (ISA) from the
 definition of the pipeline microarchitecture:
 
-  * Instruction set architecture: (Pebbles.hs)[Pebbles.hs].
-  * Pipeline microarchitecture: (Pipeline.hs)[Pipeline.hs].
+  * Instruction set architecture: [Pebbles.hs](Pebbles.hs).
+  * Pipeline microarchitecture: [Pipeline.hs](Pipeline.hs).
 
 This is achieved by parameterising the pipeline by:
 
@@ -56,6 +56,6 @@ description: on a Stratix 5 FPGA, it uses under 800 ALMs and clocks at
 over 230MHz.
 
 The core includes a built-in UART interface, accessible via CSRs.  For
-an example program, take a look at the (boot loader)[Boot/main.c],
+an example program, take a look at the [boot loader](Boot/main.c),
 i.e.  the program that resides in instruction memory at startup --
 this particular boot loader doesn't do much boot loading yet.
