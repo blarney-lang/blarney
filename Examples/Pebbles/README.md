@@ -12,9 +12,9 @@ The 5 pipeline stages are:
   * Execute
   * Writeback (a.k.a. post-execute)
 
-The main feature of the Pebbles description is that it separates the
-definition of the instruction-set architecture (ISA) from the
-definition of the pipeline microarchitecture:
+The main feature of the Pebbles description is that it largely
+separates the definition of the instruction-set architecture (ISA)
+from the definition of the pipeline microarchitecture:
 
   * Instruction set architecture: [Pebbles.hs](Pebbles.hs).
   * Pipeline microarchitecture: [Pipeline.hs](Pipeline.hs).
