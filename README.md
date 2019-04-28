@@ -26,6 +26,7 @@ docs](http://mn416.github.io/blarney/index.html).
 * [Example 14: Master-slave pattern](#example-14-master-slave-pattern)
 * [Example 15: Bit-string pattern matching](#example-15-bit-string-pattern-matching)
 * [Example 16: Tiny 8-bit CPU](#example-16-tiny-8-bit-cpu)
+* [Example 17: 32-bit RISC-V CPU](#example-17-32-bit-risc-v-cpu)
 
 ## Example 1: Two-sort
 
@@ -938,18 +939,18 @@ let's look at a very simple, 8-bit CPU with the following ISA.
   ----------                          | ---------
   `00` `rd[1:0]` `imm[3:0]`           | Write value `imm` (zero-extended) to register `rd`
   `01` `rd[1:0]` `ra[1:0]` `rb[1:0]`  | Add register `ra` to register `rb` and store in register `rd`
-  `10` `rd[1:0]` `imm[3:0]` `rb[1:0]` | Branch back by `imm` instructions if register `rb` is non-zero
+  `10` `imm[3:0]` `rb[1:0]`           | Branch back by `imm` instructions if register `rb` is non-zero
   `11` `XXXXXX`                       | Halt
 
 We have developed a [4-stage pipeline
 implemention](https://github.com/POETSII/blarney/blob/master/Examples/CPU/CPU.hs)
-of the ISA that has a CPI (cycles-per-instruction) close to 1.
-Although the ISA is very simple, it does contain a few challenges for
-a pipelined implementation, namely *control hazards* (due to the
-branch instruction) and *data hazards* (due to the add instruction).
-We resolve data hazards using *register forwarding* and control
-hazards by performing a *pipeline flush* when the branch is taken.
-The CPU will execute the program defined in the file `instrs.hex`.
+of the ISA.  Although the ISA is very simple, it does contain a few
+challenges for a pipelined implementation, namely *control hazards*
+(due to the branch instruction) and *data hazards* (due to the add
+instruction).  We resolve data hazards using *register forwarding* and
+control hazards by performing a *pipeline flush* when branches are
+taken.  The CPU will execute the program defined in the file
+`instrs.hex`.
 
 ```hs
 -- Instructions
@@ -1085,3 +1086,15 @@ makeCPU = do
         store regFileB (instr.val.rD) (result.val)
         display "%0d: " (count.val) "rf[r%0d]" (instr.val.rD) " := 0x%0x" (result.val)
 ```
+
+## Example 17: 32-bit RISC-V CPU
+
+(Pebbles)[https://github.com/POETSII/blarney/blob/master/Examples/Pebbles/]
+is a 5-stage 32-bit RISC-V core implemented in Blarney, aiming for a
+high-level definition of the `RV32I` instruction set with reasonable
+performance.  The main feature of the Pebbles description is that it
+separates the high-level architectural details of the instruction set
+form the low-level microarchitectural details of the pipeline.  See
+the (Pebbles
+page)[https://github.com/POETSII/blarney/blob/master/Examples/Pebbles/]
+for further details.
