@@ -6,27 +6,27 @@ reasonable performance.
 
 The 5 pipeline stages are:
 
-  * Intruction Fetch
-  * Operand Fetch
-  * Operand Latch (a.k.a. pre-execute)
-  * Execute
-  * Writeback (a.k.a. post-execute)
+  1. Intruction Fetch
+  2. Operand Fetch
+  3. Operand Latch (also: pre-execute)
+  4. Execute
+  5. Writeback (also: post-execute)
 
 The main feature of the Pebbles description is that it largely
 separates the definition of the instruction-set architecture (ISA)
 from the definition of the pipeline microarchitecture:
 
-  * Instruction set architecture: [Pebbles.hs](Pebbles.hs).
-  * Pipeline microarchitecture: [Pipeline.hs](Pipeline.hs).
+  * Instruction set: [Pebbles.hs](Pebbles.hs).
+  * Pipeline: [Pipeline.hs](Pipeline.hs).
 
 This is achieved by parameterising the pipeline by:
 
-  * Three functions that extract the two source registers and the 
+  * Three functions to extract the two source registers and the 
     destination register from a three-operand instruction.
   * Three sets of (pattern, rule) pairs that are applied to the
     instruction in the pre-execute, execute, and post-execute stages.
 
-Each rule gets passed the pipeline state, which is used by the rule to
+Each rule is passed the pipeline state, which is used by the rule to
 communicate with the pipeline.  This state contains the following
 fields:
 
@@ -47,9 +47,9 @@ fields:
 The pipeline automatically takes care of all data and control hazards,
 with register forwarding and branch prediction.
 
-In principle, the pipeline is meant to be fairly ISA agnostic.  For
-example, it might be possible to define another 3-operand register
-machine, such as MIPS, using more-or-less the same pipeline.
+The pipeline is intended to be fairly ISA agnostic.  For example, it
+might be possible to define another 3-operand register machine, such
+as MIPS, using more-or-less the same pipeline.
 
 The performance of the core is not bad, considering the high-level
 description: on a Stratix 5 FPGA, it uses under 800 ALMs and clocks at

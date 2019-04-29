@@ -1089,12 +1089,8 @@ makeCPU = do
 
 ## Example 17: 32-bit RISC-V CPU
 
-[Pebbles](https://github.com/POETSII/blarney/blob/master/Examples/Pebbles/)
-is a 5-stage 32-bit RISC-V core implemented in Blarney, aiming for a
-high-level definition of the `RV32I` instruction set with reasonable
-performance.  The main feature of the Pebbles description is that it
-separates the high-level architectural details of the instruction set
-form the low-level microarchitectural details of the pipeline.  See
-the [Pebbles
+Pebbles is a 5-stage 32-bit RISC-V core implemented in Blarney, aiming
+for a high-level definition of the `RV32I` instruction set with
+reasonable performance.  See the [Pebbles
 page](https://github.com/POETSII/blarney/blob/master/Examples/Pebbles/)
 for further details.
