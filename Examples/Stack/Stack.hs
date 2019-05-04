@@ -1,19 +1,33 @@
 -- This module implements a full-throughput stack that always allows
--- read access to the top two elements.  It supports popping of any
--- number of elements at a time.  It also supports parallel push
--- and pop.
+-- read access to the top two items.
 
 import Blarney
 import Blarney.RAM
 
--- Stack of 2^n elements of type a
+-- Interface
+-- =========
+
+-- Stack of 2^n items of type a
 data Stack n a =
   Stack {
+    -- Push given item
     push  :: a -> Action ()
+    -- Push nth item from top
+  , copy  :: Bit n -> Action ()
+    -- Pop any number of items
   , pop   :: Bit n -> Action ()
+    -- Top two stack values
   , top1  :: a
   , top2  :: a
   }
+
+-- Features:
+-- Parallel push and pop: yes
+-- Parallel push and copy: no
+-- Parallel pop and copy: no
+
+-- Implementation
+-- ==============
 
 makeStack :: (Bits a, KnownNat n) => Module (Stack n a)
 makeStack = do
@@ -36,17 +50,27 @@ makeStack = do
 
   -- Interface wires
   pushWire <- makeWire dontCare
+  copyWire <- makeWire dontCare
   popWire <- makeWire 0
+  let pushOrCopy = pushWire.active .|. copyWire.active
 
   always do
     -- Update stack pointer
     sp <== (sp.val - popWire.val) + (pushWire.active ? (1, 0))
 
     -- Pushing and not popping
-    when (pushWire.active .&. popWire.active.inv) do
-      reg1 <== pushWire.val
+    when (pushOrCopy .&. popWire.active.inv) do
+      if (pushWire.active)
+        then reg1 <== pushWire.val
+        else do
+          if copyWire.val .==. 0
+            then reg1 <== topVal1
+            else if copyWire.val .==. 1
+                   then reg1 <== topVal2
+                   else unlatched1 <== true
       reg2 <== topVal1
-      store ram1 (sp.val) topVal2
+      store ram2 (sp.val) topVal2
+      load ram1 (sp.val - copyWire.val + 1)
 
     -- Popping and not pushing
     when (popWire.active .&. pushWire.active.inv) do
@@ -66,18 +90,22 @@ makeStack = do
         unlatched2 <== true
         load ram2 (sp.val - popWire.val + 1)
 
-    -- Neither pushing nor popping
-    when (pushWire.active.inv .&. popWire.active.inv) do
+    -- Neither pushing, nor popping
+    when (pushOrCopy.inv .&. popWire.active.inv) do
       reg1 <== topVal1
       reg2 <== topVal2
 
   return $
     Stack {
       push = \a -> pushWire <== a
+    , copy = \n -> copyWire <== n
     , pop  = \n -> popWire <== n
     , top1 = topVal1
     , top2 = topVal2
     }
+
+-- Test bench
+-- ==========
 
 top :: Module ()
 top = do
@@ -85,7 +113,7 @@ top = do
   stk :: Stack 8 (Bit 8) <- makeStack
 
   -- Sample test sequence
-  let test0 =
+  let test =
         Seq [
           Action do push stk 1
         , Action do push stk 2
@@ -94,8 +122,7 @@ top = do
             push stk 4
             display (stk.top1) " " (stk.top2)
         , Action do
-            pop stk 2
-            push stk 5
+            copy stk 3
             display (stk.top1) " " (stk.top2)
         , Action do
             display (stk.top1) " " (stk.top2)
@@ -103,7 +130,10 @@ top = do
             display (stk.top1) " " (stk.top2)
         ]
 
-  runOnce test0
+  runOnce test
+
+-- Code generation
+-- ===============
 
 main :: IO ()
 main = writeVerilogTop top "top" "Stack-Verilog/"
