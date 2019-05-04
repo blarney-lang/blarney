@@ -24,3 +24,4 @@ clean:
 	make -C MasterSlave clean
 	make -C NoC clean
 	make -C Pebbles clean
+	make -C Stack clean
