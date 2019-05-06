@@ -131,8 +131,8 @@ top = do
   let test = 
         Seq [
           Action do
-            push1 stk 2
             push2 stk 1
+            push1 stk 2
         , Action do push1 stk 3
         , Action do
             push1 stk 4
@@ -148,6 +148,7 @@ top = do
         , Action do
             display (stk.top1) " " (stk.top2)
             push1 stk 10
+            pop stk 1
         , Action do
             push1 stk 11
             display (stk.top1) " " (stk.top2)
