@@ -56,7 +56,7 @@ makeStack = do
 
   always do
     -- Update stack pointer
-    sp <== (sp.val - popWire.val) + (pushWire.active ? (1, 0))
+    sp <== (sp.val - popWire.val) + (pushOrCopy ? (1, 0))
 
     -- Pushing and not popping
     when (pushOrCopy .&. popWire.active.inv) do
