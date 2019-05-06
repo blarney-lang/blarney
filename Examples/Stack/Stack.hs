@@ -1,5 +1,4 @@
--- This module implements a full-throughput stack that always allows
--- read access to the top two items.
+-- This module implements a full-throughput dual-port stack.
 
 import Blarney
 import Blarney.RAM
@@ -10,8 +9,11 @@ import Blarney.RAM
 -- Stack of 2^n items of type a
 data Stack n a =
   Stack {
-    -- Push given item
-    push  :: a -> Action ()
+    -- Can push one or two items per cycle:
+    --    * push2 not allowed without push1
+    --    * push1 happens after push2
+    push1 :: a -> Action ()
+  , push2 :: a -> Action ()
     -- Push nth item from top
   , copy  :: Bit n -> Action ()
     -- Pop any number of items
@@ -21,9 +23,10 @@ data Stack n a =
   , top2  :: a
   }
 
--- Features:
--- Parallel push and pop: yes
--- Parallel push and copy: no
+-- Methods:
+-- Parallel push1 and pop: yes
+-- Parallel push2 and pop: no
+-- Parallel push1/push2 and copy: no
 -- Parallel pop and copy: no
 
 -- Implementation
@@ -39,7 +42,10 @@ makeStack = do
   reg2 :: Reg a <- makeReg dontCare
 
   -- Pointer to top of stack
-  sp :: Reg (Bit n) <- makeReg dontCare
+  sp :: Reg (Bit n) <- makeReg 0
+
+  -- Pointer plus one
+  sp1 :: Reg (Bit n) <- makeReg 1
 
   -- When these signals are high, the RAM holds the
   -- top stack elements, not the registers
@@ -49,46 +55,54 @@ makeStack = do
   let topVal2 = unlatched2.val ? (ram2.out, reg2.val)
 
   -- Interface wires
-  pushWire <- makeWire dontCare
+  push1Wire <- makeWire dontCare
+  push2Wire <- makeWire dontCare
   copyWire <- makeWire dontCare
   popWire <- makeWire 0
-  let pushOrCopy = pushWire.active .|. copyWire.active
+  let pushOrCopy = push1Wire.active .|. copyWire.active
 
   always do
     -- Update stack pointer
-    sp <== (sp.val - popWire.val) + (pushOrCopy ? (1, 0))
+    let inc = push2Wire.active ? (2, pushOrCopy ? (1, 0))
+    sp <== (sp.val - popWire.val) + inc
+    sp1 <== (sp1.val - popWire.val) + inc
 
     -- Pushing and not popping
     when (pushOrCopy .&. popWire.active.inv) do
-      if (pushWire.active)
-        then reg1 <== pushWire.val
+      if push1Wire.active
+        then reg1 <== push1Wire.val
         else do
           if copyWire.val .==. 0
             then reg1 <== topVal1
             else if copyWire.val .==. 1
                    then reg1 <== topVal2
                    else unlatched1 <== true
-      reg2 <== topVal1
+      if push2Wire.active
+        then do
+          reg2 <== push2Wire.val
+          store ram1 (sp1.val) topVal1
+        else do
+          reg2 <== topVal1
+          load ram1 (sp1.val - copyWire.val)
       store ram2 (sp.val) topVal2
-      load ram1 (sp.val - copyWire.val + 1)
 
     -- Popping and not pushing
-    when (popWire.active .&. pushWire.active.inv) do
+    when (popWire.active .&. push1Wire.active.inv) do
       unlatched2 <== true
       load ram2 (sp.val - popWire.val)
       if popWire.val .==. 1
         then reg1 <== topVal2
         else do
           unlatched1 <== true
-          load ram1 (sp.val - popWire.val + 1)
+          load ram1 (sp1.val - popWire.val)
 
     -- Pushing and popping
-    when (pushWire.active .&. popWire.active) do
-      reg1 <== pushWire.val
+    when (push1Wire.active .&. popWire.active) do
+      reg1 <== push1Wire.val
       reg2 <== topVal2
       when (popWire.val .!=. 1) do
         unlatched2 <== true
-        load ram2 (sp.val - popWire.val + 1)
+        load ram2 (sp1.val - popWire.val)
 
     -- Neither pushing, nor popping
     when (pushOrCopy.inv .&. popWire.active.inv) do
@@ -97,7 +111,8 @@ makeStack = do
 
   return $
     Stack {
-      push = \a -> pushWire <== a
+      push1 = \a -> push1Wire <== a
+    , push2 = \a -> push2Wire <== a
     , copy = \n -> copyWire <== n
     , pop  = \n -> popWire <== n
     , top1 = topVal1
@@ -113,18 +128,31 @@ top = do
   stk :: Stack 8 (Bit 8) <- makeStack
 
   -- Sample test sequence
-  let test =
+  let test = 
         Seq [
-          Action do push stk 1
-        , Action do push stk 2
-        , Action do push stk 3
+          Action do
+            push1 stk 2
+            push2 stk 1
+        , Action do push1 stk 3
         , Action do
-            push stk 4
+            push1 stk 4
             display (stk.top1) " " (stk.top2)
         , Action do
             copy stk 3
             display (stk.top1) " " (stk.top2)
         , Action do
+            pop stk 1
+            display (stk.top1) " " (stk.top2)
+        , Action do
+            display (stk.top1) " " (stk.top2)
+        , Action do
+            display (stk.top1) " " (stk.top2)
+            push1 stk 10
+        , Action do
+            push1 stk 11
+            display (stk.top1) " " (stk.top2)
+        , Action do
+            pop stk 3
             display (stk.top1) " " (stk.top2)
         , Action do
             display (stk.top1) " " (stk.top2)
