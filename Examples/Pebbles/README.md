@@ -2,7 +2,7 @@
 
 Pebbles is a 5-stage 32-bit RISC-V core implemented in Blarney, aiming
 for a high-level definition of the `RV32I` instruction set and
-reasonable performance.
+moderate performance.
 
 The 5 pipeline stages are:
 

@@ -1091,6 +1091,6 @@ makeCPU = do
 
 Pebbles is a 5-stage 32-bit RISC-V core implemented in Blarney, aiming
 for a high-level definition of the `RV32I` instruction set with
-reasonable performance.  See the [Pebbles
+moderate performance.  See the [Pebbles
 page](https://github.com/POETSII/blarney/blob/master/Examples/Pebbles/)
 for further details.
