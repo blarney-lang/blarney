@@ -9,7 +9,11 @@ RV_LD      = riscv64-unknown-elf-ld
 RV_OBJCOPY = riscv64-unknown-elf-objcopy
 
 # Compiler and linker flags
-CFLAGS  = -mabi=ilp32 -march=$(RV_ARCH) -O2 -I.
+CFLAGS  = -mabi=ilp32 -march=$(RV_ARCH) -O2 -I. \
+          -static -mcmodel=medany \
+          -fvisibility=hidden -nostdlib -nostartfiles \
+          -fsingle-precision-constant -fno-builtin-printf \
+          -ffp-contract=off -fno-builtin
 LDFLAGS = -melf32lriscv -G 0 
 
 # C file to compile
