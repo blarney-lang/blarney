@@ -1,12 +1,7 @@
-#include <pebbles.h>
+#include <io.h>
 
 int main()
 {
-  const char* str = "hello world\n";
-  for (int i = 0; i < 12; i++) {
-    while (!uartCanPut());
-    uartPut(str[i]);
-  }
-
+  printf("hello world\n");
   return 0;
 }

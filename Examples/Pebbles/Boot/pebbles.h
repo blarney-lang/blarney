@@ -9,20 +9,22 @@
 #define CSR_UARTCanGet     "0x804"
 #define CSR_UARTGet        "0x805"
 
+#define INLINE inline __attribute__((always_inline))
+
 // Emit word to console (simulation only)
-inline void emit(unsigned int x)
+INLINE void emit(unsigned int x)
 {
   asm volatile("csrw " CSR_SimEmit ", %0\n" : : "r"(x));
 }
 
 // Terminate simulator (simulation only)
-inline void finish()
+INLINE void finish()
 {
   asm volatile("csrw " CSR_SimFinish ", zero\n" : :);
 }
 
 // Can write to UART?
-inline int uartCanPut()
+INLINE int uartCanPut()
 {
   int x;
   asm volatile("csrrw %0, " CSR_UARTCanPut ", zero" : "=r"(x));
@@ -30,13 +32,13 @@ inline int uartCanPut()
 }
 
 // Write to UART
-inline void uartPut(char c)
+INLINE void uartPut(char c)
 {
   asm volatile("csrw " CSR_UARTPut ", %0\n" : : "r"(c));
 }
 
 // Can write to UART?
-inline int uartCanGet()
+INLINE int uartCanGet()
 {
   int x;
   asm volatile("csrrw %0, " CSR_UARTCanGet ", zero" : "=r"(x));
@@ -44,7 +46,7 @@ inline int uartCanGet()
 }
 
 // Can write to UART?
-inline int uartGet()
+INLINE int uartGet()
 {
   int x;
   asm volatile ("csrrw %0, " CSR_UARTGet ", zero" : "=r"(x));

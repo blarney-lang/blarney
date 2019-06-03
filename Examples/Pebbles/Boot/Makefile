@@ -18,7 +18,7 @@ LDFLAGS = -melf32lriscv -G 0
 
 # C file to compile
 HFILES = pebbles.h
-CFILES = main.c
+CFILES = main.c io.c
 OFILES = $(patsubst %.c,%.o,$(CFILES))
 
 # Sizes of instruction and data memories
