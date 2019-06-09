@@ -8,7 +8,7 @@ simPebbles = do
   uartOut <- makePebbles True nullStream
   always do
     when (uartOut.canGet) do
-      display "%c" (uartOut.value)
+      display_ "%c" (uartOut.value)
       uartOut.get
 
 main :: IO ()

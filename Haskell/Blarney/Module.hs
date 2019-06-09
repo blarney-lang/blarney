@@ -55,7 +55,7 @@ module Blarney.Module
     RegFile(..), makeRegFileInit, makeRegFile,
 
     -- * Other actions
-    finish, RTL.display,
+    finish, RTL.display, RTL.display_,
 
     -- * External inputs and outputs
     input, inputBV, output, outputBV,
@@ -229,7 +229,7 @@ finish = A RTL.finish
 
 -- |Display statement
 instance RTL.Displayable (Action a) where
-  disp x = A (RTL.disp x)
+  disp x suffix = A (RTL.disp x suffix)
 
 -- |Add roots
 addRoots :: [BV] -> Module ()

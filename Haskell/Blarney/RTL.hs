@@ -44,6 +44,7 @@ module Blarney.RTL
     -- * Simulation-time statements
   , Displayable(..) -- To support N-ary display statement
   , display         -- Display statement
+  , display_        -- Display statement (without newline)
   , finish          -- Terminate simulator
     -- * External inputs and outputs
   , input           -- Declare module input
@@ -295,22 +296,26 @@ finish = do
 
 -- |To support a display statement with variable number of arguments
 class Displayable a where
-  disp :: Format -> a
+  disp :: Format -> Format -> a
 
 -- |Base case
 instance Displayable (RTL a) where
-  disp x = do
+  disp x suffix = do
      r <- ask
-     write (RTLDisplay (cond r, x))
+     write (RTLDisplay (cond r, x <> suffix))
      return (error "Return value of 'display' should be ignored")
 
 -- |Recursive case
 instance (FShow b, Displayable a) => Displayable (b -> a) where
-  disp x b = disp (x <> fshow b)
+  disp x suffix b = disp (x <> fshow b) suffix
 
 -- |Display statement
 display :: Displayable a => a
-display = disp (Format [])
+display = disp (Format []) (fshow "\n")
+
+-- |Display statement (without new line)
+display_ :: Displayable a => a
+display_ = disp (Format []) (Format [])
 
 -- |RTL external input declaration
 input :: KnownNat n => String -> RTL (Bit n)

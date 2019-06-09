@@ -512,7 +512,7 @@ hWriteVerilog h modName netlist = do
         Display args -> do
           emit "if ("
           emitInput (netInputs net !! 0)
-          emit " == 1) $display("
+          emit " == 1) $write("
           emitFormatArgs args (tail (netInputs net))
           emit ");\n"
         Finish -> do
@@ -534,7 +534,7 @@ hWriteVerilog h modName netlist = do
 
     emitFormatArgs [] _ = return ()
     emitFormatArgs (DisplayArgString s : args) wires = do
-      emit ("\"" ++ s ++ "\"")
+      emit (show s)
       if null args then return () else emit ","
       emitFormatArgs args wires
     emitFormatArgs (DisplayArgBit w : args) (wire:wires) = do
