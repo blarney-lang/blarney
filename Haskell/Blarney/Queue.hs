@@ -1,8 +1,10 @@
-{-# LANGUAGE Rank2Types          #-}
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE BlockArguments      #-}
-{-# LANGUAGE RebindableSyntax    #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE Rank2Types            #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE BlockArguments        #-}
+{-# LANGUAGE RebindableSyntax      #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances     #-}
 
 {-|
 Module      : Blarney.Queue
@@ -18,21 +20,50 @@ module Blarney.Queue where
 import Blarney
 import Blarney.RAM
 import Blarney.Util
+import Blarney.Stream
+import Blarney.SourceSink
 
 -- Standard imports
 import Data.Proxy
 
--- |Queue interface
-data Queue a =
-  Queue {
-    notEmpty :: Bit 1
-  , notFull  :: Bit 1
-  , enq      :: a -> Action ()
-  , deq      :: Action ()
-  , canDeq   :: Bit 1
-  , first    :: a
-  }
+-- | Queue interface
+data Queue a = Queue { notEmpty :: Bit 1
+                     , notFull  :: Bit 1
+                     , enq      :: a -> Action ()
+                     , deq      :: Action ()
+                     , canDeq   :: Bit 1
+                     , first    :: a
+                     }
 
+-- | ToSource instance for Queue
+instance ToSource (Queue t) t where
+  toSource q = Source { canPeek = q.canDeq
+                      , peek    = q.first
+                      , consume = q.deq
+                      }
+
+-- | ToSink instance for Queue
+instance ToSink (Queue t) t where
+  toSink q = Sink { put = \x -> do when (q.notFull) do (q.enq) x
+                                   return (q.notFull)
+                  }
+
+-- | ToStream instance for Queue
+instance ToStream (Queue a) a where
+  toStream q = Stream { get    = q.deq
+                      , canGet = q.canDeq
+                      , value  = q.first
+                      }
+
+-- | ToStreamProcessor instance for Queue
+instance ToStreamProcessor (Queue a) a a where
+  toStreamProcessor q = \s -> let cond = s.canGet .&. q.notFull in
+                              do always do when cond do (q.enq) (s.value)
+                                                        s.get
+                                 return $ Stream { get    = q.deq
+                                                 , canGet = q.canDeq
+                                                 , value  = q.first
+                                                 }
 {-|
 A full-throughput 2-element queue implemented using 2 registers:
 

@@ -1,6 +1,9 @@
-{-# LANGUAGE DataKinds      #-}
-{-# LANGUAGE DeriveGeneric  #-}
-{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DataKinds              #-}
+{-# LANGUAGE DeriveGeneric          #-}
+{-# LANGUAGE DeriveAnyClass         #-}
+{-# LANGUAGE MultiParamTypeClasses  #-}
+{-# LANGUAGE FlexibleInstances      #-}
+{-# LANGUAGE FunctionalDependencies #-}
 
 {-|
 Module      : Blarney.Stream
@@ -10,40 +13,45 @@ License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
 -}
-module Blarney.Stream 
+module Blarney.Stream
   ( Stream(..)
-  , toStream
+  , ToStream(..)
   , nullStream
+  , StreamProcessor(..)
+  , ToStreamProcessor(..)
   ) where
 
 import Blarney
-import Blarney.Queue
 import Blarney.RAM
-import Prelude hiding ((.))
 
--- |Stream interface
-data Stream a =
-  Stream {
-    canGet :: Bit 1
-  , get    :: Action ()
-  , value  :: a
-  }
-  deriving (Generic, Interface)
+-- | Stream interface
+data Stream a = Stream { canGet :: Bit 1
+                       , get    :: Action ()
+                       , value  :: a
+                       } deriving (Generic, Interface)
 
--- |Convert a queue to a stream
-toStream :: Queue a -> Stream a
-toStream q =
-  Stream {
-    get = q.deq
-  , canGet = q.canDeq
-  , value = q.first
-  }
+-- | Convert to a Stream
+class ToStream a b | a -> b where
+  toStream :: a -> Stream b
 
--- |Null stream
+-- | ToStream instance for Stream itself
+instance ToStream (Stream t) t where
+  toStream = id
+
+-- | Null stream
 nullStream :: Bits a => Stream a
-nullStream =
-  Stream {
-    get = return ()
-  , canGet = 0
-  , value = dontCare
-  }
+nullStream = Stream { get    = noAction
+                    , canGet = false
+                    , value  = dontCare
+                    }
+
+-- | StreamProcessor type
+type StreamProcessor t0 t1 = Stream t0 -> Module (Stream t1)
+
+-- | Convert to a StreamProcessor
+class ToStreamProcessor a t0 t1 | a -> t0 t1 where
+  toStreamProcessor :: a -> StreamProcessor t0 t1
+
+-- | ToStreamProcessor instance for StreamProcessor itself
+instance ToStreamProcessor (StreamProcessor t0 t1) t0 t1 where
+  toStreamProcessor = id
