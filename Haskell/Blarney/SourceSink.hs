@@ -1,6 +1,11 @@
 {-# LANGUAGE MultiParamTypeClasses  #-}
 {-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE BlockArguments         #-}
+{-# LANGUAGE DataKinds              #-}
+{-# LANGUAGE NoImplicitPrelude      #-}
+{-# LANGUAGE DeriveGeneric          #-}
+{-# LANGUAGE DeriveAnyClass         #-}
 
 module Blarney.SourceSink where
 
