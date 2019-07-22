@@ -48,10 +48,10 @@ makeCSRUnit uartIn = do
   let readCSR csr result =
         switch csr [
           0x802 --> result <== zeroExtend (uartOut.notFull)
-        , 0x804 --> result <== zeroExtend (uartIn.canGet)
+        , 0x804 --> result <== zeroExtend (uartIn.canPeek)
         , 0x805 --> do
-            result <== zeroExtend (uartIn.value)
-            uartIn.get
+            result <== zeroExtend (uartIn.peek)
+            uartIn.consume
         ]
 
   return (uartOut.toStream, CSRUnit writeCSR readCSR)

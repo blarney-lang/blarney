@@ -10,9 +10,9 @@ slave reqs = do
   buffer <- makeQueue
 
   always do
-    when (reqs.canGet .&. buffer.notFull) do
-      get reqs
-      enq buffer (reqs.value.fst * reqs.value.snd)
+    when (reqs.canPeek .&. buffer.notFull) do
+      consume reqs
+      enq buffer (reqs.peek.fst * reqs.peek.snd)
 
   return (buffer.toStream)
 
@@ -23,14 +23,14 @@ master resps = do
   always do
     when (buffer.notFull) do
       enq buffer (16, 4)
-    
-    when (resps.canGet) do
-      get resps
-      display "Response: 0x%08x" (resps.value)
+
+    when (resps.canPeek) do
+      consume resps
+      display "Response: 0x%08x" (resps.peek)
       finish
 
   return (buffer.toStream)
-  
+
 makeSlave :: Stream MulReq -> Module (Stream MulResp)
 makeSlave = makeInstance "slave"
 

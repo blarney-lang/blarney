@@ -15,9 +15,9 @@ top = do
   -- Sink/Source handles on the queue
   let (q0snk, q0src) = (toSink q0, toSource q0)
   -- queue as StreamProcessor from Queue itself
-  let sp1 = toStreamProcessor q1
+  let sp1 = toSP q1
   -- queue as StreamProcessor from (Sink, Source) pair
-  let sp2 = toStreamProcessor (toSink q2, toSource q2)
+  let sp2 = toSP (toSink q2, toSource q2)
 
   -- example composition of stream processors
   s1 <- sp1 (toStream q0src) -- turn q0's source into a sink, an pass it to

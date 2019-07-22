@@ -18,15 +18,15 @@ condMerge readys inputs = do
   buffer <- makeShiftQueue 1
 
   -- Which input streams are available for consumption?
-  let avail = [s.canGet .&. r | (s, r) <- zip inputs readys]
+  let avail = [s.canPeek .&. r | (s, r) <- zip inputs readys]
   let choice = firstHot avail
 
   -- Consume
   always do
     forM_ (zip inputs choice) $ \(input, cond) -> do
       when (cond .&. buffer.notFull) do
-        get input
-        enq buffer (input.value)
+        consume input
+        enq buffer (input.peek)
 
   return (buffer.toStream)
 
@@ -49,9 +49,9 @@ fork n inp = do
   -- Fill
   always do
     forM_ (zip buffers choice) $ \(buffer, cond) -> do
-      when (cond .&. inp.canGet) do
-        get inp
-        enq buffer (inp.value)
+      when (cond .&. inp.canPeek) do
+        consume inp
+        enq buffer (inp.peek)
 
   return (map toStream buffers)
 
@@ -63,7 +63,7 @@ router :: Bits a => (a -> Route) -> [Stream a] -> Module [Stream a]
 router route inputs =
     sequence [condMerge ready inputs | ready <- readys]
   where
-    readys = transpose [route (inp.value) | inp <- inputs]
+    readys = transpose [route (inp.peek) | inp <- inputs]
 
 -- |Mesh router
 meshRouter :: Bits a
@@ -122,7 +122,7 @@ data MeshPkt =
 
 -- |Test bench
 testMesh :: (Int, Int) -> Module ()
-testMesh (lenX, lenY) = 
+testMesh (lenX, lenY) =
     mesh 1 (destX, destY) (lenX, lenY) node
   where
     node (x, y) input = do
@@ -134,10 +134,10 @@ testMesh (lenX, lenY) =
       always do
         timer <== timer.val + 1
 
-        when (input.canGet) do
-          get input
+        when (input.canPeek) do
+          consume input
           display (x,y) ": dest=(%0d,%0d)"
-                  (input.value.destX) (input.value.destY)
+                  (input.peek.destX) (input.peek.destY)
                   " t=%0d" (timer.val)
 
         when (buffer.notFull) do

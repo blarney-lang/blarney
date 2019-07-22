@@ -12,9 +12,9 @@ inc xs = do
 
   always do
     -- Incrementer
-    when (xs.canGet .&. buffer.notFull) $ do
-      xs.get
-      enq buffer (xs.value + 1)
+    when (xs.canPeek .&. buffer.notFull) $ do
+      xs.consume
+      enq buffer (xs.peek + 1)
 
   -- Convert buffer to a stream
   return (buffer.toStream)
@@ -41,11 +41,11 @@ top = do
       count <== count.val + 1
 
     -- Consume
-    when (out.canGet) $ do
-      out.get
-      display "Got %0d" (out.value)
-      when (out.value .==. 100) finish
- 
+    when (out.canPeek) $ do
+      out.consume
+      display "Got %0d" (out.peek)
+      when (out.peek .==. 100) finish
+
 -- Main function
 main :: IO ()
 main = do

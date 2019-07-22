@@ -5,14 +5,11 @@
 module Blarney.SourceSink where
 
 -- Standard imports
---import GHC.TypeLits
---import Control.Monad.Fix
 import Control.Monad hiding (when)
 import GHC.Generics
 
 -- Blarney imports
 import Blarney
-import Blarney.Stream
 import Blarney.Connectable
 
 ------------------------------
@@ -49,14 +46,6 @@ class ToSink a b | a -> b where
 instance ToSink (Sink t) t where
   toSink = id
 
--- | ToSource instance for members of ToStream
---instance {-# OVERLAPPABLE #-} (ToStream stream_t t) => ToSource stream_t t where
-instance {-# OVERLAPPABLE #-} ToSource (Stream t) t where
-  toSource stream = Source { canPeek = stream.canGet
-                           , peek    = stream.value
-                           , consume = stream.get
-                           }
-
 ---------------------------
 -- Other class instances --
 --------------------------------------------------------------------------------
@@ -66,19 +55,6 @@ instance Connectable (Source t) (Sink t) where
   makeConnection src snk = always do
     when (src.canPeek) do done <- (snk.put) (src.peek)
                           when done do src.consume
-
--- | ToStream instance for members of ToSource
---instance {-# OVERLAPPABLE #-} (ToSource src_t t) => ToStream src_t t where
-instance {-# OVERLAPPABLE #-} ToStream (Source t) t where
-  toStream src = Stream { get    = src.consume
-                        , canGet = src.canPeek
-                        , value  = src.peek
-                        }
-
--- | ToStreamProcessor instance for (Sink, Source) pairs
-instance ToStreamProcessor (Sink t0, Source t1) t0 t1 where
-  toStreamProcessor (inSnk, outSrc) = \s -> do makeConnection (toSource s) inSnk
-                                               return $ toStream outSrc
 
 -----------------------------
 -- helpers and other utils --

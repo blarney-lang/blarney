@@ -48,22 +48,16 @@ instance ToSink (Queue t) t where
                                    return (q.notFull)
                   }
 
--- | ToStream instance for Queue
-instance ToStream (Queue a) a where
-  toStream q = Stream { get    = q.deq
-                      , canGet = q.canDeq
-                      , value  = q.first
-                      }
 
--- | ToStreamProcessor instance for Queue
-instance ToStreamProcessor (Queue a) a a where
-  toStreamProcessor q = \s -> let cond = s.canGet .&. q.notFull in
-                              do always do when cond do (q.enq) (s.value)
-                                                        s.get
-                                 return $ Stream { get    = q.deq
-                                                 , canGet = q.canDeq
-                                                 , value  = q.first
-                                                 }
+-- | ToSP instance for Queue
+instance ToSP (Queue a) a a where
+  toSP q = \s -> let cond = s.canPeek .&. q.notFull in
+                 do always do when cond do (q.enq) (s.peek)
+                                           s.consume
+                    return $ Source { consume = q.deq
+                                    , canPeek = q.canDeq
+                                    , peek    = q.first
+                                    }
 {-|
 A full-throughput 2-element queue implemented using 2 registers:
 
@@ -184,7 +178,7 @@ makeSizedQueueCore logSize =
           when (doDeq.val) $ do
             full <== 0
             when (newFront .==. back.val) (empty <== 1)
-     
+
     return $
       Queue {
         notEmpty = empty.val.inv
@@ -243,7 +237,7 @@ makeShiftQueueCore mode n = do
     -- Update elements
     sequence_ [ when en (x <== y.val)
               | (en, x, y) <- zip3 ens elems (tail elems) ]
- 
+
     -- Update valid bits
     sequence_ [ when en (x <== y.val)
               | (en, x, y) <- zip3 ens valids (tail valids) ]
