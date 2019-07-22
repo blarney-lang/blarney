@@ -673,7 +673,7 @@ are captured by the following interface.
 type Stream a = Source a
 
 data Source a =
-  Stream {
+  Source {
     canPeek :: Bit 1
   , peek    :: a
   , consume :: Action ()
@@ -687,7 +687,7 @@ converted to a stream:
 -- Convert a queue to a stream
 toStream :: Queue a -> Stream a
 toStream q =
-  Stream {
+  Source {
     canPeek  = q.canDeq
   , peek     = q.first
   , consume  = deq q
