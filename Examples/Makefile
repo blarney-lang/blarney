@@ -15,6 +15,7 @@ clean:
 	make -C RAM clean
 	make -C CPU clean
 	make -C Queue clean
+	make -C SourceSinkStream clean
 	make -C BasicRTL clean
 	make -C Sorter clean
 	make -C BitScan clean

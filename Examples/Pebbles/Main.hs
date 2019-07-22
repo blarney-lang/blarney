@@ -7,9 +7,9 @@ simPebbles :: Module ()
 simPebbles = do
   uartOut <- makePebbles True nullStream
   always do
-    when (uartOut.canGet) do
-      display_ "%c" (uartOut.value)
-      uartOut.get
+    when (uartOut.canPeek) do
+      display_ "%c" (uartOut.peek)
+      uartOut.consume
 
 main :: IO ()
 main = do

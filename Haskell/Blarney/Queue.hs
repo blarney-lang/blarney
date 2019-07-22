@@ -1,8 +1,10 @@
-{-# LANGUAGE Rank2Types          #-}
-{-# LANGUAGE DataKinds           #-}
-{-# LANGUAGE BlockArguments      #-}
-{-# LANGUAGE RebindableSyntax    #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE Rank2Types            #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE BlockArguments        #-}
+{-# LANGUAGE RebindableSyntax      #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances     #-}
 
 {-|
 Module      : Blarney.Queue
@@ -18,21 +20,44 @@ module Blarney.Queue where
 import Blarney
 import Blarney.RAM
 import Blarney.Util
+import Blarney.Stream
+import Blarney.SourceSink
 
 -- Standard imports
 import Data.Proxy
 
--- |Queue interface
-data Queue a =
-  Queue {
-    notEmpty :: Bit 1
-  , notFull  :: Bit 1
-  , enq      :: a -> Action ()
-  , deq      :: Action ()
-  , canDeq   :: Bit 1
-  , first    :: a
-  }
+-- | Queue interface
+data Queue a = Queue { notEmpty :: Bit 1
+                     , notFull  :: Bit 1
+                     , enq      :: a -> Action ()
+                     , deq      :: Action ()
+                     , canDeq   :: Bit 1
+                     , first    :: a
+                     }
 
+-- | ToSource instance for Queue
+instance ToSource (Queue t) t where
+  toSource q = Source { canPeek = q.canDeq
+                      , peek    = q.first
+                      , consume = q.deq
+                      }
+
+-- | ToSink instance for Queue
+instance ToSink (Queue t) t where
+  toSink q = Sink { put = \x -> do when (q.notFull) do (q.enq) x
+                                   return (q.notFull)
+                  }
+
+
+-- | ToSP instance for Queue
+instance ToSP (Queue a) a a where
+  toSP q = \s -> let cond = s.canPeek .&. q.notFull in
+                 do always do when cond do (q.enq) (s.peek)
+                                           s.consume
+                    return $ Source { consume = q.deq
+                                    , canPeek = q.canDeq
+                                    , peek    = q.first
+                                    }
 {-|
 A full-throughput 2-element queue implemented using 2 registers:
 
@@ -153,7 +178,7 @@ makeSizedQueueCore logSize =
           when (doDeq.val) $ do
             full <== 0
             when (newFront .==. back.val) (empty <== 1)
-     
+
     return $
       Queue {
         notEmpty = empty.val.inv
@@ -212,7 +237,7 @@ makeShiftQueueCore mode n = do
     -- Update elements
     sequence_ [ when en (x <== y.val)
               | (en, x, y) <- zip3 ens elems (tail elems) ]
- 
+
     -- Update valid bits
     sequence_ [ when en (x <== y.val)
               | (en, x, y) <- zip3 ens valids (tail valids) ]

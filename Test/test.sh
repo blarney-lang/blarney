@@ -13,6 +13,7 @@ EXAMPLES=(
   Interface
   MeanFilter
   Queue
+  SourceSinkStream
   RAM
   Sorter
   UpDownCounter

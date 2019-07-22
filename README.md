@@ -670,11 +670,13 @@ Blarney,
 are captured by the following interface.
 
 ```hs
-data Stream a =
+type Stream a = Source a
+
+data Source a =
   Stream {
-    canGet :: Bit 1
-  , get    :: Action ()
-  , value  :: a
+    canPeek :: Bit 1
+  , peek    :: a
+  , consume :: Action ()
   }
 ```
 
@@ -686,9 +688,9 @@ converted to a stream:
 toStream :: Queue a -> Stream a
 toStream q =
   Stream {
-    get    = deq q
-  , canGet = q.canDeq
-  , value  = q.first
+    canPeek  = q.canDeq
+  , peek     = q.first
+  , consume  = deq q
   }
 ```
 
@@ -703,9 +705,9 @@ inc xs = do
 
   always do
     -- Incrementer
-    when (xs.canGet .&. buffer.notFull) do
-      get xs
-      enq buffer (xs.value + 1)
+    when (xs.canPeek .&. buffer.notFull) do
+      consume xs
+      enq buffer (xs.peek + 1)
 
   -- Convert buffer to a stream
   return (buffer.toStream)
@@ -724,7 +726,7 @@ as follows.
 
 ```hs
 main :: IO ()
-main = emitVerilogModule inc "inc" "/tmp/inc"
+main = writeVerilogModule inc "inc" "/tmp/inc"
 ```
 
 The generated Verilog module `/tmp/inc/inc.v` has the following
@@ -733,26 +735,26 @@ interface:
 ```sv
 module inc(
   input  wire clock
-, output wire [0:0] in_get_en
-, input  wire [0:0] in_canGet
-, input  wire [7:0] in_value
-, input  wire [0:0] out_get_en
-, output wire [0:0] out_canGet
-, output wire [7:0] out_value
+, output wire [0:0] in_consume_en
+, input  wire [0:0] in_canPeek
+, input  wire [7:0] in_peek
+, input  wire [0:0] out_consume_en
+, output wire [7:0] out_peek
+, output wire [0:0] out_canPeek
 );
 ```
 
 Considering the definition of the `Stream` type, the correspondance
 between the Blarney and the Verilog is quite clear:
 
-Signal       | Description
-------       | -----------
-`in_get_en`  | Output asserted whenever the module consumes an element from the input stream.
-`in_canGet`  | Input signalling when there is data available in the input stream.
-`in_value`   | Input containing the next value in the input stream.
-`out_get_en` | Input signalling when the caller consumes an element from the output stream.
-`out_canGet` | Output asserted whenever there is data available in the output stream.
-`out_value`  | Output containing the next value in the output stream.
+Signal           | Description
+------           | -----------
+`in_consume_en`  | Output asserted whenever the module consumes an element from the input stream.
+`in_canPeek`     | Input signalling when there is data available in the input stream.
+`in_peek`        | Input containing the next value in the input stream.
+`out_canPeek`    | Output asserted whenever there is data available in the output stream.
+`out_peek`       | Output containing the next value in the output stream.
+`out_consume_en` | Input signalling when the caller consumes an element from the output stream.
 
 It is also possible to instantiate a Verilog module inside a Blarney
 description.  To illustrate, here is a function that creates an
@@ -761,7 +763,7 @@ instance of the Verilog `inc` module shown above.
 ```hs
 -- This function creates an instance of a Verilog module called "inc"
 makeInc :: Stream (Bit 8) -> Module (Stream (Bit 8))
-makeInc = makeInstance "inc" 
+makeInc = makeInstance "inc"
 ```
 
 Notice that interface of the Verilog module being instantiated is
@@ -787,10 +789,10 @@ top = do
       count <== count.val + 1
 
     -- Consume
-    when (out.canGet) do
-      get out
-      display "Got 0x%0x" (out.value)
-      when (out.value .==. 100) finish
+    when (out.canPeek) do
+      consume out
+      display "Got 0x%0x" (out.peek)
+      when (out.peek .==. 100) finish
 ```
 
 Using the following `main` function we can generate both the `inc`
@@ -800,8 +802,8 @@ module and a top-level module that instantiates it.
 main :: IO ()
 main = do
   let dir = "/tmp/inc"
-  emitVerilogModule inc "inc" dir
-  emitVerilogTop top "top" dir
+  writeVerilogModule inc "inc" dir
+  writeVerilogTop top "top" dir
 ```
 
 Using this approach, we can maintain the module hierarchy of a Blarney
@@ -829,9 +831,9 @@ slave reqs = do
   resps <- makeQueue
 
   always do
-    when (reqs.canGet .&. resps.notFull) do
-      get reqs
-      let (a, b) = reqs.value
+    when (reqs.canPeek .&. resps.notFull) do
+      consume reqs
+      let (a, b) = reqs.peek
       enq resps (a * b)
 
   return (resps.toStream)
@@ -851,10 +853,10 @@ master resps = do
       Wait (reqs.notFull)
     , Action do
         enq reqs (2, 2)
-    , Wait (resps.canGet)
+    , Wait (resps.canPeek)
     , Action do
-        get resps
-        display "Result: %0d" (resps.value)
+        consume resps
+        display "Result: %0d" (resps.peek)
         finish
     ]
 
