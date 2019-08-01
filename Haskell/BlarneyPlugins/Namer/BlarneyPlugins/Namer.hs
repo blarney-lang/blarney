@@ -53,7 +53,7 @@ showBinds e@(GHC.L _ (Expr.BindStmt _ pat body expr0 expr1)) = do
 
   case blarneyModuleModule of
     GHC.Found _ m -> do
-      moduleName <- GHC.lookupOrig m ( GHC.mkClsOcc "Module" )
+      moduleName <- GHC.lookupOrig m ( GHC.mkTcOcc "Module" )
       debug $ GHC.showPpr GHC.unsafeGlobalDynFlags moduleName
       debug $ GHC.showPpr GHC.unsafeGlobalDynFlags (GHC.occName moduleName)
       case CoreUtils.exprType <$> mbe of
