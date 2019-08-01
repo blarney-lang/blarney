@@ -26,6 +26,7 @@ EXTS="$EXTS -XDuplicateRecordFields"
 EXTS="$EXTS -XNoStarIsType"
 WARN="-Wno-partial-type-signatures"
 FLAGS="-fno-cse -fno-full-laziness"
+FLAGS="$FLAGS -package blarney-plugins-namer -fplugin=BlarneyPlugins.Namer"
 INC="$BLARNEY_ROOT/Haskell"
 INC_H="$BLARNEY_ROOT/Haskell/Blarney/:./"
 
