@@ -42,6 +42,9 @@ module Blarney.Module
     -- * Variable assignment (write)
     Assign(..),
 
+    -- * Naming hints
+    withNewName, withExtendedName,
+
     -- * Registers
     RTL.Reg(..), makeReg, makeRegU, makeDReg,
 
@@ -96,6 +99,14 @@ always a = M (runAction a)
 -- |Action of doing nothing
 noAction :: Action ()
 noAction = return ()
+
+-- | Set name hint
+withNewName :: String -> Module a -> Module a
+withNewName str m = M $ RTL.withNewName str (runModule m)
+
+-- | Extend name hint
+withExtendedName :: String -> Module a -> Module a
+withExtendedName str m = M $ RTL.withExtendedName str (runModule m)
 
 -- |Conditional block over actions
 when :: Bit 1 -> Action () -> Action ()

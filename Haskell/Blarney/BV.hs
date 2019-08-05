@@ -22,7 +22,7 @@ are primitive component instances and whose edges are connections.
 1. K. Claessen, D. Sands.  Observable Sharing for Functional Circuit
 Description, ASIAN 1999.
 -}
-module Blarney.BV 
+module Blarney.BV
   (
     -- * Primitive component types
     InstId         -- Every component instance has a unique id
@@ -41,6 +41,8 @@ module Blarney.BV
 
     -- * Untyped bit vectors
   , BV(..)         -- Untyped bit vector
+  , setBVName      -- Sets the name field of the BV
+  , appendBVName   -- append to the name field of the BV
   , makePrim       -- Create instance of primitive component
   , makePrim1      -- Common case: single-output components
 
@@ -87,7 +89,7 @@ module Blarney.BV
   , dualRamBV      -- :: OutputWidth -> Maybe String
   , regFileReadBV  -- :: RegFileId -> OutputWidth -> BV -> BV
   , getInitBV      -- :: BV -> Integer
-  ) where 
+  ) where
 
 import Prelude
 
@@ -103,7 +105,7 @@ import Control.Monad
 import qualified Data.Bits as B
 
 -- |Every instance of a component in the circuit has a unique id
-type InstId = Int
+type InstId = (Int, String)
 
 -- |Each output from a primitive component is numbered
 type OutputNumber = Int
@@ -251,28 +253,39 @@ lookupParam ps p = case [v | (k :-> v) <- ps, p == k] of
                      v:vs -> v
 
 -- | An untyped bit vector output wire from a primitive component instance
-data BV = 
+data BV =
   BV {
-    -- |What kind of primitive produced this bit vector?
-    bvPrim :: Prim
-    -- |Unique id of primitive instance
+    -- | The name of the BV
+    bvName :: String
+    -- | What kind of primitive produced this bit vector?
+  , bvPrim :: Prim
+    -- | Unique id of primitive instance
   , bvInstRef :: IORef (Maybe InstId)
-    -- |Inputs to the primitive instance
+    -- | Inputs to the primitive instance
   , bvInputs :: [BV]
-    -- |Output pin number
+    -- | Output pin number
   , bvOutNum :: OutputNumber
-    -- |Width of this output pin
+    -- | Width of this output pin
   , bvWidth :: Width
-    -- |Width of each output pin
+    -- | Width of each output pin
   , bvWidths :: [Width]
   }
+
+-- | Sets the name field of the BV
+setBVName :: BV -> String -> BV
+setBVName bv nm = bv { bvName = nm }
+
+-- | Appends to the name field of the BV
+appendBVName :: BV -> String -> BV
+appendBVName bv nm = bv { bvName = (bvName bv) ++ nm }
 
 {-# NOINLINE makePrim #-}
 -- |Helper function for creating an instance of a primitive component
 makePrim :: Prim -> [BV] -> [Int] -> [BV]
 makePrim prim ins outWidths =
   [ BV {
-        bvPrim    = prim
+        bvName    = ""
+      , bvPrim    = prim
       , bvInstRef = ref
       , bvInputs  = ins
       , bvOutNum  = i
@@ -294,13 +307,11 @@ makePrim1 :: Prim -> [BV] -> Int -> BV
 makePrim1 prim ins width = head (makePrim prim ins [width])
 
 -- |Netlists are lists of nets
-data Net =
-  Net {
-      netPrim         :: Prim
-    , netInstId       :: InstId
-    , netInputs       :: [WireId]
-    , netOutputWidths :: [Width]
-  } deriving Show
+data Net = Net { netPrim         :: Prim
+               , netInstId       :: InstId
+               , netInputs       :: [WireId]
+               , netOutputWidths :: [Width]
+               } deriving Show
 
 -- |A wire is uniquely identified by an instance id and an output number
 type WireId = (InstId, OutputNumber)
@@ -355,7 +366,7 @@ flatten b =
   do val <- doIO (readIORef (bvInstRef b))
      case val of
        Nothing -> do
-         id <- freshId
+         id <- liftM (\x -> (x, bvName b)) freshId
          doIO (writeIORef (bvInstRef b) (Just id))
          addUndo (writeIORef (bvInstRef b) Nothing)
          ins <- mapM flatten (bvInputs b)
@@ -505,7 +516,7 @@ testPlusArgsBV str = makePrim1 (TestPlusArgs str) [] 1
 inputPinBV :: Width -> String -> BV
 inputPinBV w s = makePrim1 (Input w s) [] w
 
--- |Register of given width with initial value 
+-- |Register of given width with initial value
 regBV :: Width -> BV -> BV -> BV
 regBV w i a = makePrim1 (Register (getInitBV i) w) [a] w
 
@@ -547,7 +558,7 @@ regFileReadBV id dw a = makePrim1 (RegFileRead dw id) [a] dw
 getInitBV :: BV -> Integer
 getInitBV = eval
   where
-    eval a = 
+    eval a =
       case bvPrim a of
         Const _ i -> i
         ConstBits w One -> (2^w) - 1

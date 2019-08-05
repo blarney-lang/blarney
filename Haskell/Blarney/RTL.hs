@@ -31,6 +31,9 @@ module Blarney.RTL
   , ifThenElseRTL   -- RTL if-then-else statement
   , switch          -- RTL switch statement
   , (-->)           -- Operator for switch statement alternatives
+    -- * Block naming statements
+  , withNewName     -- Set name for RTL block
+  , withExtendedName-- Extends current name for RTL block
     -- * Mutable variables: registers and wires
   , Reg(..)         -- Registers
   , writeReg        -- Write to register
@@ -107,10 +110,13 @@ data Assign = Assign { enable :: Bit 1, lhs :: VarId, rhs :: BV }
 rhsTyped :: Bits a => Assign -> a
 rhsTyped = unpack . FromBV . rhs
 
--- |The reader component contains the current condition on any
+-- |The reader component contains a name string, the current condition on any
 -- RTL actions, and a list of all assigments in the computation
 -- (obtained circularly from the writer output of the monad).
-data R = R { cond :: Bit 1, assigns :: Map VarId [Assign] }
+data R = R { name    :: String
+           , cond    :: Bit 1
+           , assigns :: Map VarId [Assign]
+           }
 
 -- |The state component contains the next free variable identifier
 type S = VarId
@@ -157,6 +163,18 @@ fresh = do
   v <- get
   set (v+1)
   return v
+
+-- | RTL named block
+withNewName :: String -> RTL a -> RTL a
+withNewName nm m = do
+  r <- ask
+  local (r { name = nm }) m
+
+-- | RTL extended named block
+withExtendedName :: String -> RTL a -> RTL a
+withExtendedName nm m = do
+  r <- ask
+  local (r { name = (name r) ++ nm }) m
 
 -- |RTL conditional block
 when :: Bit 1 -> RTL () -> RTL ()
@@ -249,7 +267,7 @@ makeReg init =
                  [a] -> rhsTyped a
                  other -> select [(enable a, rhsTyped a) | a <- as]
      let out = delayEn init en inp
-     return (Reg { regId = v, regVal = out })
+     return (Reg { regId = v, regVal = nameBits (name r) out })
 
 -- |Create wire with default value
 makeWire :: Bits a => a -> RTL (Wire a)
@@ -264,8 +282,8 @@ makeWire defaultVal =
      return $
        Wire {
          wireId  = v
-       , wireVal = out
-       , active  = any
+       , wireVal = nameBits (name r) out
+       , active  = nameBits (name r ++ "_act") any
        }
 
 -- |Create wire with don't care default value
@@ -388,13 +406,12 @@ addDisplayPrim :: (Bit 1, [FormatItem]) -> Flatten ()
 addDisplayPrim (cond, items) = do
     c <- flatten (toBV cond)
     ins <- mapM flatten [b | FormatBit w b <- items]
-    id <- freshId
-    let net = Net {
-                  netPrim = Display args
-                , netInstId = id
-                , netInputs = c:ins
-                , netOutputWidths = []
-              }
+    id <- liftM (\x -> (x, "")) freshId
+    let net = Net { netPrim = Display args
+                  , netInstId = id
+                  , netInputs = c:ins
+                  , netOutputWidths = []
+                  }
     addNet net
   where
     args = map toDisplayArg items
@@ -405,50 +422,46 @@ addDisplayPrim (cond, items) = do
 addFinishPrim :: Bit 1 -> Flatten ()
 addFinishPrim cond = do
   c <- flatten (toBV cond)
-  id <- freshId
-  let net = Net {
-                netPrim = Finish
-              , netInstId = id
-              , netInputs = [c]
-              , netOutputWidths = []
-            }
+  id <- liftM (\x -> (x, "")) freshId
+  let net = Net { netPrim = Finish
+                , netInstId = id
+                , netInputs = [c]
+                , netOutputWidths = []
+                }
   addNet net
 
 -- Add output primitive to netlist
 addOutputPrim :: (Width, String, BV) -> Flatten ()
 addOutputPrim (w, str, value) = do
   c <- flatten value
-  id <- freshId
-  let net = Net {
-                netPrim = Output w str
-              , netInstId = id
-              , netInputs = [c]
-              , netOutputWidths = []
-            }
+  id <- liftM (\x -> (x, "")) freshId
+  let net = Net { netPrim = Output w str
+                , netInstId = id
+                , netInputs = [c]
+                , netOutputWidths = []
+                }
   addNet net
 
 -- Add input primitive to netlist
 addInputPrim :: (Width, String) -> Flatten ()
 addInputPrim (w, str) = do
-  id <- freshId
-  let net = Net {
-                netPrim = Input w str
-              , netInstId = id
-              , netInputs = []
-              , netOutputWidths = [w]
-            }
+  id <- liftM (\x -> (x, str)) freshId
+  let net = Net { netPrim = Input w str
+                , netInstId = id
+                , netInputs = []
+                , netOutputWidths = [w]
+                }
   addNet net
 
 -- Add RegFile primitives to netlist
 addRegFilePrim :: (String, VarId, Width, Width) -> Flatten ()
 addRegFilePrim (initFile, regFileId, aw, dw) = do
-  id <- freshId
-  let net = Net {
-                netPrim = RegFileMake initFile aw dw regFileId
-              , netInstId = id
-              , netInputs = []
-              , netOutputWidths = []
-            }
+  id <- liftM (\x -> (x, "")) freshId
+  let net = Net { netPrim = RegFileMake initFile aw dw regFileId
+                , netInstId = id
+                , netInputs = []
+                , netOutputWidths = []
+                }
   addNet net
 
 -- Add RegFile primitives to netlist
@@ -457,13 +470,12 @@ addRegFileUpdatePrim (regFileId, c, aw, dw, a, d) = do
   cf <- flatten (toBV c)
   af <- flatten a
   df <- flatten d
-  id <- freshId
-  let net = Net {
-                netPrim = RegFileWrite aw dw regFileId
-              , netInstId = id
-              , netInputs = [cf, af, df]
-              , netOutputWidths = []
-            }
+  id <- liftM (\x -> (x, "")) freshId
+  let net = Net { netPrim = RegFileWrite aw dw regFileId
+                , netInstId = id
+                , netInputs = [cf, af, df]
+                , netOutputWidths = []
+                }
   addNet net
 
 -- |Add netlist roots
@@ -478,7 +490,7 @@ netlist rtl = do
   undo
   return (JL.toList nl)
   where
-    (_, actsJL, _) = runRTL rtl (R { cond = 1, assigns = assignMap }) 0
+    (_, actsJL, _) = runRTL rtl (R { name = "", cond = 1, assigns = assignMap }) 0
     acts = JL.toList actsJL
     assignMap = fromListWith (++) [(lhs a, [a]) | RTLAssign a <- acts]
     disps = reverse [(go, items) | RTLDisplay (go, Format items) <- acts]
