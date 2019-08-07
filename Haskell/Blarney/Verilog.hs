@@ -8,32 +8,35 @@ Stability   : experimental
 
 Convert Blarney functions to Verilog modules.
 -}
+
 module Blarney.Verilog
   ( writeVerilogModule  -- Generate Verilog module
   , writeVerilogTop     -- Generate Verilog top-level module
   ) where
 
 -- Standard imports
-import Prelude
+import Prelude hiding ((<>))
 import Data.List
+import Numeric (showHex)
 import System.IO
 import Data.Maybe
-import Control.Monad
 import System.Process
 
 -- Blarney imports
 import Blarney.BV
-import Blarney.Util
 import Blarney.Module
 import Blarney.Interface
 import Blarney.IfThenElse
 
--- |Convert given Blarney function to a Verilog module
+-- Toplevel API
+--------------------------------------------------------------------------------
+
+-- | Convert given Blarney function to a Verilog module
 writeVerilogModule :: Modular a
                    => a          -- ^ Blarney function
                    -> String     -- ^ Module name
                    -> String     -- ^ Output directory
-                   -> IO () 
+                   -> IO ()
 writeVerilogModule top mod dir =
     do system ("mkdir -p " ++ dir)
        nl <- netlist (makeModule top)
@@ -41,7 +44,7 @@ writeVerilogModule top mod dir =
   where
     fileName = dir ++ "/" ++ mod ++ ".v"
 
--- |Convert given Blarney function to a top-level Verilog module
+-- | Convert given Blarney function to a top-level Verilog module
 writeVerilogTop :: Module ()  -- ^ Blarney module
                 -> String     -- ^ Top-level module name
                 -> String     -- ^ Output directory
@@ -98,446 +101,300 @@ writeVerilogTop top mod dir =
 
     makefileCode = "include *.mk"
 
-generateVerilog :: Modular a => a -> String -> IO ()
-generateVerilog top mod =
-  netlist (makeModule top) >>= writeVerilog fileName mod
-  where fileName = mod ++ ".v"
-
 writeVerilog :: String -> String -> [Net] -> IO ()
 writeVerilog fileName modName netlist = do
   h <- openFile fileName WriteMode
-  hWriteVerilog h modName netlist
+  hPutStr h (showVerilogModule modName netlist $ "")
   hClose h
 
-hWriteVerilog :: Handle -> String -> [Net] -> IO ()
-hWriteVerilog h modName netlist = do
-    emit ("module " ++ modName ++ "(\n")
-    emit "  input wire clock\n"
-    emitInputOutputs (map netPrim netlist)
-    emit ");\n"
-    mapM_ emitDecl netlist
-    mapM_ emitInst netlist
-    emit "always @(posedge clock) begin\n"
-    mapM_ emitAlways netlist
-    emit "end\n"
-    emit "endmodule\n"
-  where
-    emit = hPutStr h
+-- Internal helpers
+--------------------------------------------------------------------------------
 
-    emitWire (instId, outNum) = do
-      emit "v"
-      emit (show instId)
-      emit "_"
-      emit (show outNum)
+-- NetVerilog helper type
+data NetVerilog = NetVerilog { decl :: Maybe ShowS -- declaration
+                             , inst :: Maybe ShowS -- instanciation
+                             , alws :: Maybe ShowS -- always block
+                             }
+-- pretty helpers
+--------------------------------------------------------------------------------
+chr = showChar
+str = showString
+x <> y      = x . y
+x <+> y     = x <> space <> y
+x <^> y     = x <> chr '\n' <> y
+sep         = foldr (\x y -> x <+> y) (str "")
+--vsep        = foldr (\x y -> x <^> y) (str "")
+brackets  s = chr '[' <> s <> chr ']'
+parens    s = chr '(' <> s <> chr ')'
+braces    s = chr '{' <> s <> chr '}'
+dquotes   s = chr '"' <> s <> chr '"'
+space       = chr ' '
+spaces    n = str $ replicate n ' '
+newline     = chr '\n'
+dot         = chr '.'
+comma       = chr ','
+colon       = chr ':'
+semi        = chr ';'
+equals      = chr '='
+argStyle n as =
+  foldr (.) (str "") (intersperse (str ",\n") (map (\x -> spaces n <> x) as))
 
-    emitInput = emitWire
+-- general helpers
+--------------------------------------------------------------------------------
+showName :: (Int, Int) -> ShowS
+showName (id, nOut) = chr 'v' <> shows id <> chr '_' <> shows nOut
+showNameWidth :: Int -> (Int, Int) -> ShowS
+showNameWidth width w = brackets (shows (width-1) <> str ":0") <+> showName w
+showVerilogModule :: String -> [Net] -> ShowS
+showVerilogModule modName netlst =
+     str "module" <+> str modName <+> chr '(' <^> showIOs <^> spaces 2 <> str ");"
+  <^> spaces 2 <> showComment "Declarations"
+  <^> spaces 2 <> showCommentLine
+  <>  foldl (\x y -> x <^> spaces 2 <> y) (str "") (catMaybes $ map decl netVs)
+  <^> spaces 2 <> showComment "Instances"
+  <^> spaces 2 <> showCommentLine
+  <>  foldl (\x y -> x <^> spaces 2 <> y) (str "") (catMaybes $ map inst netVs)
+  <^> spaces 2 <> showComment "Always block"
+  <^> spaces 2 <> showCommentLine
+  <^> spaces 2 <> str "always" <+> chr '@' <> parens (str "posedge clock") <+> str "begin"
+  <> foldl (\x y -> x <^> spaces 4 <> y) (str "") (catMaybes $ map alws netVs)
+  <^> spaces 2 <> str "end"
+  <^> str "endmodule"
+  where netVs = map genNetVerilog netlst
+        netPrims = map netPrim netlst
+        ins = [Input w s | (w, s) <- nub [(w, s) | Input w s <- netPrims]]
+        outs = [Output w s | Output w s <- netPrims]
+        showIOs = (argStyle 2 $ (str "input wire clock") : (map showIO (ins ++ outs)))
+        showIO (Input w s) = str "input wire" <+> brackets (shows (w-1) <> str ":0") <+> str s
+        showIO (Output w s) = str "output wire" <+> brackets (shows (w-1) <> str ":0") <+> str s
+        showIO _ = str ""
+        showComment cmt = str "//" <+> str cmt
+        --showCommentLine = remainCols (\r -> p "//" <> p (replicate (r-2) '/'))
+        showCommentLine = str (replicate 78 '/')
 
-    emitDeclHelper width wire = do
-      emit "["
-      emit (show (width-1))
-      emit ":0] "
-      emitWire wire
-      emit ";\n"
+-- declaration helpers
+--------------------------------------------------------------------------------
+declName width name =
+  showNameWidth width name <> semi
+declNameInitHex width wire init =
+  showNameWidth width wire <+> equals <+> shows width <> str "'h" <> str (showHex init "") <> semi
+declWireInitBits width wire b =
+  str "wire" <+> showNameWidth width wire <+> equals <+> shows width <> str "'b" <> str bitStr <> semi
+  where bitStr = replicate width $ bitChar b
+        bitChar One = '1'
+        bitChar Zero = '0'
+        bitChar DontCare = 'x'
+declWire width wire = str "wire" <+> declName width wire
+declWireInit width wire init = str "wire" <+> declNameInitHex width wire init
+declReg width reg = str "reg" <+> declName width reg
+declRegInit width reg init = str "reg" <+> declNameInitHex width reg init
+declRAM initFile numPorts _ dw id =
+  --vsep $ map (\n -> declWire dw (id, n)) [0..numPorts-1]
+  foldl (<+>) (str "") $ map (\n -> declWire dw (id, n)) [0..numPorts-1]
+declRegFile initFile aw dw id =
+      str "reg" <+> brackets (shows (dw-1) <> str ":0")
+  <+> str "rf" <> shows id <+> brackets (parens (str "2**" <> shows aw) <> str "-1" <> str ":0") <> semi
+  <> showInit
+  where showInit = case initFile of
+          ""    ->     str ""
+          fname ->     str "\ngenerate initial $readmemh" <> parens
+                       (str fname <> comma <+> str "rf" <> shows id) <> semi
+                   <+> str "endgenerate"
 
-    -- TODO: emit literals in hex not decimal
-    --      (easier to read)
-    emitDeclInitHelper width wire init = do
-      emit "["
-      emit (show (width-1))
-      emit ":0] "
-      emitWire wire
-      emit " = "
-      emit (show width)
-      emit "'d"
-      emit (show init)
-      emit ";\n"
+-- instanciation helpers
+--------------------------------------------------------------------------------
+instPrefixOp op net =
+      str "assign" <+> showName (netInstId net, 0) <+> equals
+  <+> str op <> parens (showName (netInputs net !! 0)) <> semi
+instInfixOp op net =
+      str "assign" <+> showName (netInstId net, 0) <+> equals
+  <+> showName (netInputs net !! 0)
+  <+> str op <+> showName (netInputs net !! 1) <> semi
+instShift w op net =
+      str "assign" <+> showName (netInstId net, 0) <+> equals
+  <+> a0 <+> str op <+> showName (netInputs net !! 1) <> semi
+  where a0 = if op == ">>>" then str "$signed" <> parens a0name
+                            else a0name
+        a0name = showName (netInputs net !! 0)
+instReplicate w net =
+      str "assign" <+> showName (netInstId net, 0) <+> equals
+  <+> braces (shows w <> braces (showName (netInputs net !! 0))) <> semi
+instMux net =
+      str "assign" <+> showName (netInstId net, 0) <+> equals
+  <+> showName (netInputs net !! 0) <+> chr '?'
+  <+> showName (netInputs net !! 1) <+> colon
+  <+> showName (netInputs net !! 2) <> semi
+instConcat net =
+      str "assign" <+> showName (netInstId net, 0) <+> equals
+  <+> braces ( showName (netInputs net !! 0) <> comma <+>
+               showName (netInputs net !! 1)) <> semi
+instSelectBits net hi lo =
+      str "assign" <+> showName (netInstId net, 0) <+> equals
+  <+> showName (netInputs net !! 0) <> brackets
+      (shows hi <> colon <> shows lo) <> semi
+instZeroExtend net wi wo =
+      str "assign" <+> showName (netInstId net, 0) <+> equals
+  <+> braces (braces (shows (wo-wi) <> braces (str "1'b0"))
+  <>  comma <+> showName (netInputs net !! 0)) <> semi
+instSignExtend net wi wo =
+      str "assign" <+> showName (netInstId net, 0) <+> equals
+  <+> braces (braces (shows (wo-wi) <> braces (showName (netInputs net !! 0)
+  <>  brackets (shows (wi-1)))) <> comma
+  <+> showName (netInputs net !! 0)) <> semi
+instCustom net name ins outs params =
+      str name <> showParams <+> str name <> chr '_' <> shows (netInstId net)
+  <+> chr '(' <^> showArgs <^> spaces 2 <> str ");"
+  where numParams = length params
+        showParams = if numParams == 0 then space
+                     else str "# (" <^> argStyle 4 allParams <^> spaces 2 <> str ")"
+        allParams = [ dot <> str key <> parens (str val) | (key :-> val, i) <- zip params [1..] ]
+        args = zip ins (netInputs net) ++ [ (o, (netInstId net, n))
+                                          | (o, n) <- zip (map fst outs) [0..] ]
+        numArgs  = length args
+        showArgs = argStyle 4 $ (str ".clock(clock)"):allArgs
+        allArgs  = [ dot <> str name <> parens (showName wire)
+                   | ((name, wire), i) <- zip args [1..] ]
+instTestPlusArgs net s =
+      str "assign" <+> showName (netInstId net, 0) <+> equals
+  <+> str "$test$plusargs" <> parens (dquotes $ str s) <+> str "== 0 ? 0 : 1;"
+instOutput net s =
+  str "assign" <+> str s <+> equals <+> showName (netInputs net !! 0) <> semi
+instInput net s =
+  str "assign" <+> showName (netInstId net, 0) <+> equals <+> str s <> semi
+instRAM net i aw dw =
+      str "BlockRAM# (" <^> argStyle 6 ramParams
+  <^> spaces 4 <> str ") ram" <> shows (netInstId net) <+> chr '('
+  <^> argStyle 6 ramArgs <^> spaces 4 <> str ");"
+  where ramParams = [ str ".INIT_FILE"  <> parens (str (show $ fromMaybe "UNUSED" i))
+                    , str ".ADDR_WIDTH" <> parens (shows aw)
+                    , str ".DATA_WIDTH" <> parens (shows dw) ]
+        ramArgs   = [ str ".CLK(clock)"
+                    , str ".DI"   <> parens (showName (netInputs net !! 1))
+                    , str ".ADDR" <> parens (showName (netInputs net !! 0))
+                    , str ".WE"   <> parens (showName (netInputs net !! 2))
+                    , str ".DO"   <> parens (showName (netInstId net, 0)) ]
+instTrueDualRAM net i aw dw =
+      str "BlockRAMTrueDual# (" <^> (argStyle 6 ramParams)
+  <^> spaces 4 <> str ") ram" <> shows (netInstId net) <+> chr '('
+  <^> argStyle 6 ramArgs <^> spaces 4 <> str ");"
+  where ramParams = [ str ".INIT_FILE"  <> parens (str (show $ fromMaybe "UNUSED" i))
+                    , str ".ADDR_WIDTH" <> parens (shows aw)
+                    , str ".DATA_WIDTH" <> parens (shows dw) ]
+        ramArgs   = [ str ".CLK(clock)"
+                    , str ".DI_A"   <> parens (showName (netInputs net !! 1))
+                    , str ".ADDR_A" <> parens (showName (netInputs net !! 0))
+                    , str ".WE_A"   <> parens (showName (netInputs net !! 2))
+                    , str ".DO_A"   <> parens (showName (netInstId net, 0))
+                    , str ".DI_B"   <> parens (showName (netInputs net !! 4))
+                    , str ".ADDR_B" <> parens (showName (netInputs net !! 3))
+                    , str ".WE_B"   <> parens (showName (netInputs net !! 5))
+                    , str ".DO_B"   <> parens (showName (netInstId net, 1)) ]
+instRegFileRead id net =
+      str "assign" <+> showName (netInstId net, 0) <+> equals
+  <+> str "rf" <> shows id <> brackets (showName (netInputs net !! 0)) <> semi
 
-    emitDeclInitBitsHelper width wire b = do
-      emit "["
-      emit (show (width-1))
-      emit ":0] "
-      emitWire wire
-      emit " = "
-      emit (show width)
-      emit "'b"
-      let chr One = '1'
-          chr Zero = '0'
-          chr DontCare = 'x'
-      emit (replicate width (chr b))
-      emit ";\n"
+-- always block helpers
+--------------------------------------------------------------------------------
+alwsRegister net = showName (netInstId net, 0) <+> str "<="
+               <+> showName (netInputs net !! 0) <> semi
+alwsRegisterEn net =
+      str "if" <+> parens (showName (netInputs net !! 0) <+> str "== 1")
+  <+> showName (netInstId net, 0) <+> str "<=" <+> showName (netInputs net !! 1)
+  <>  semi
+alwsDisplay args net =
+      str "if" <+> parens (showName (netInputs net !! 0) <+> str "== 1")
+  <+> str "$write ("
+  <^> (argStyle 8 $ fmtArgs args (tail (netInputs net)))
+  <^> spaces 6 <> str ");"
+  where fmtArgs [] _ = []
+        fmtArgs (DisplayArgString s : args) wires = shows s : (fmtArgs args wires)
+        fmtArgs (DisplayArgBit w : args) (wire:wires) = (showName wire) : (fmtArgs args wires)
+alwsFinish net =
+  str "if" <+> parens (showName (netInputs net !! 0) <+> str "== 1")
+           <+> str "$finish" <> semi
+alwsRegFileWrite id net =
+      str "if" <+> parens (showName (netInputs net !! 0) <+> str "== 1")
+  <+> str "rf" <> shows id <> brackets (showName (netInputs net !! 1))
+  <+> str "<=" <+> showName (netInputs net !! 2) <> semi
 
-    emitWireDecl width wire = do
-      emit "wire "
-      emitDeclHelper width wire
-
-    emitWireInitDecl width wire init = do
-      emit "wire "
-      emitDeclInitHelper width wire init
-
-    emitWireInitBitsDecl width wire b = do
-      emit "wire "
-      emitDeclInitBitsHelper width wire b
-
-    emitRegDecl width wire = do
-      emit "reg "
-      emitDeclHelper width wire
-
-    emitRegInitDecl width wire init = do
-      emit "reg "
-      emitDeclInitHelper width wire init
-
-    emitRAMDecl initFile numPorts aw dw id = do
-      forM_ [0..numPorts-1] $ \p ->
-        emitWireDecl dw (id, p)
-
-    emitRegFileDecl initFile aw dw id = do
-      emit "reg ["
-      emit (show (dw-1))
-      emit ":0] "
-      emit ("rf" ++ show id)
-      emit "[(2**"
-      emit (show aw)
-      emit ")-1:0];\n"
-      case initFile of
-        "" -> return ()
-        other -> do
-          emit "generate initial $readmemh("
-          emit (show initFile)
-          emit ", "
-          emit ("rf" ++ show id)
-          emit "); endgenerate\n"
-
-    emitDecl net =
-      let wire = (netInstId net, 0) in
-        case netPrim net of
-          Const w i             -> emitWireInitDecl w wire i
-          ConstBits w b         -> emitWireInitBitsDecl w wire b
-          Add w                 -> emitWireDecl w wire
-          Sub w                 -> emitWireDecl w wire
-          Mul w                 -> emitWireDecl w wire
-          Div w                 -> emitWireDecl w wire
-          Mod w                 -> emitWireDecl w wire
-          Not w                 -> emitWireDecl w wire
-          And w                 -> emitWireDecl w wire
-          Or  w                 -> emitWireDecl w wire
-          Xor w                 -> emitWireDecl w wire
-          ShiftLeft w           -> emitWireDecl w wire
-          ShiftRight w          -> emitWireDecl w wire
-          ArithShiftRight w     -> emitWireDecl w wire
-          Equal w               -> emitWireDecl 1 wire
-          NotEqual w            -> emitWireDecl 1 wire
-          LessThan w            -> emitWireDecl 1 wire
-          LessThanEq w          -> emitWireDecl 1 wire
-          Register i w          -> emitRegInitDecl w wire i
-          RegisterEn i w        -> emitRegInitDecl w wire i
-          BRAM i aw dw          -> emitRAMDecl i 1 aw dw (netInstId net)
-          TrueDualBRAM i aw dw  -> emitRAMDecl i 2 aw dw (netInstId net)
-          ReplicateBit w        -> emitWireDecl w wire
-          ZeroExtend wi wo      -> emitWireDecl wo wire
-          SignExtend wi wo      -> emitWireDecl wo wire
-          SelectBits w hi lo    -> emitWireDecl (1+hi-lo) wire
-          Concat aw bw          -> emitWireDecl (aw+bw) wire
-          Mux w                 -> emitWireDecl w wire
-          CountOnes w           -> emitWireDecl w wire
-          Identity w            -> emitWireDecl w wire
-          Display args          -> return ()
-          Finish                -> return ()
-          TestPlusArgs s        -> emitWireDecl 1 wire
-          Input w s             -> emitWireDecl w wire
-          Output w s            -> return ()
-          RegFileMake f aw dw i -> emitRegFileDecl f aw dw i
-          RegFileRead w id      -> emitWireDecl w wire
-          RegFileWrite _ _ _    -> return ()
-          Custom p is os ps     -> 
-            sequence_ [ emitWireDecl w (netInstId net, n)
-                      | ((o, w), n) <- zip os [0..] ]
-
-    emitInputOutputs nets = mapM_ emitInputOutput (ins ++ outs)
-      where
-        ins = [Input w s | (w, s) <- nub [(w, s) | Input w s <- nets]]
-        outs = [Output w s | Output w s <- nets]
-
-    emitInputOutput prim =
-      case prim of
-        Input w s ->
-          emit (", input wire [" ++ show (w-1) ++ ":0] " ++ s ++ "\n")
-        Output w s -> 
-          emit (", output wire [" ++ show (w-1) ++ ":0] " ++ s ++ "\n")
-        other -> return ()
-
-    emitAssignConst :: Width -> Integer -> Net -> IO ()
-    emitAssignConst w i net = do
-      emit "assign "
-      emitWire (netInstId net, 0)
-      emit " = "
-      emit (show w)
-      emit "'d" >>  emit (show i) >> emit ";\n"
-
-    emitPrefixOpInst op net = do
-      emit "assign "
-      emitWire (netInstId net, 0)
-      emit " = " >> emit op >> emit "("
-      emitInput (netInputs net !! 0)
-      emit ");\n"
-
-    emitInfixOpInst op net = do
-      emit "assign "
-      emitWire (netInstId net, 0)
-      emit " = "
-      emitInput (netInputs net !! 0)
-      emit " " >> emit op >> emit " "
-      emitInput (netInputs net !! 1)
-      emit ";\n"
-
-    emitShiftInst w op net = do
-      emit "assign "
-      emitWire (netInstId net, 0)
-      emit " = "
-      if op == ">>>"
-        then emit "$signed(" >> emitInput (netInputs net !! 0) >> emit ")"
-        else emitInput (netInputs net !! 0)
-      emit " " >> emit op >> emit " "
-      let amount = netInputs net !! 1
-      emitInput (netInputs net !! 1)
-      emit ";\n"
-
-    emitReplicateInst w net = do
-      emit "assign "
-      emitWire (netInstId net, 0)
-      emit " = {"
-      emit (show w)
-      emit "{"
-      emitInput (netInputs net !! 0)
-      emit "}};\n"
-
-    emitMuxInst net = do
-      emit "assign "
-      emitWire (netInstId net, 0)
-      emit " = "
-      emitInput (netInputs net !! 0)
-      emit " ? "
-      emitInput (netInputs net !! 1)
-      emit " : "
-      emitInput (netInputs net !! 2)
-      emit ";\n"
-
-    emitConcatInst net = do
-      emit "assign "
-      emitWire (netInstId net, 0)
-      emit " = {"
-      emitInput (netInputs net !! 0)
-      emit ","
-      emitInput (netInputs net !! 1)
-      emit "};\n"
-
-    emitSelectBitsInst net hi lo = do
-      emit "assign "
-      emitWire (netInstId net, 0)
-      emit " = "
-      emitInput (netInputs net !! 0)
-      emit "["
-      emit (show hi)
-      emit ":"
-      emit (show lo)
-      emit "];\n"
-
-    emitZeroExtendInst net wi wo = do
-      emit "assign "
-      emitWire (netInstId net, 0)
-      emit " = "
-      emit "{{"
-      emit (show (wo-wi))
-      emit "{1'b0}},"
-      emitInput (netInputs net !! 0)
-      emit "};\n"
-
-    emitSignExtendInst net wi wo = do
-      emit "assign "
-      emitWire (netInstId net, 0)
-      emit " = "
-      emit "{{"
-      emit (show (wo-wi))
-      emit "{"
-      emitInput (netInputs net !! 0)
-      emit "["
-      emit (show (wi-1))
-      emit "]}},"
-      emitInput (netInputs net !! 0)
-      emit "};\n"
-
-    emitCustomInst net name ins outs params = do
-      emit name >> emit " "
-      let numParams = length params
-      if numParams == 0
-        then return ()
-        else do
-          emit "#(\n"
-          sequence_
-               [ do emit "  ." >> emit key
-                    emit "(" >> emit val >> emit ")"
-                    if i < numParams then emit ",\n" else return ()
-               | (key :-> val, i) <- zip params [1..] ]
-          emit "\n)\n"
-      emit (name ++ "_" ++ show (netInstId net))
-      let args = zip ins (netInputs net) ++
-                   [ (o, (netInstId net, n))
-                   | (o, n) <- zip (map fst outs) [0..] ]
-      let numArgs = length args
-      emit "(\n"
-      emit "  .clock(clock),\n"
-      if numArgs == 0
-        then return ()
-        else do
-          sequence_
-             [ do emit "  ." >> emit name
-                  emit "(" >> emitWire wire >> emit ")"
-                  if i < numArgs then emit ",\n" else return ()
-             | ((name, wire), i) <- zip args [1..] ]
-      emit "\n);\n"
-
-    emitTestPlusArgsInst net s = do
-      emit "assign "
-      emitWire (netInstId net, 0)
-      emit " = "
-      emit "$test$plusargs(\""
-      emit s
-      emit "\") == 0 ? 0 : 1;\n"
-
-    emitOutputInst net s = do
-      emit ("assign " ++ s ++ " = ")
-      emitInput (netInputs net !! 0)
-      emit ";\n"
-
-    emitInputInst net s = do
-      emit "assign "
-      emitWire (netInstId net, 0)
-      emit " = "
-      emit s
-      emit ";\n"
-
-    emitRAMInst net i aw dw = do
-      let initFile = fromMaybe "UNUSED" i
-      emit "BlockRAM#(\n"
-      emit (".INIT_FILE(" ++ show initFile ++ "),\n")
-      emit (".ADDR_WIDTH(" ++ show aw ++ "),\n")
-      emit (".DATA_WIDTH(" ++ show dw ++ "))\n")
-      emit ("ram" ++ show (netInstId net) ++ " (\n")
-      emit ".CLK(clock),\n"
-      emit ".DI(" >> emitInput (netInputs net !! 1) >> emit "),\n"
-      emit ".ADDR(" >> emitInput (netInputs net !! 0) >> emit "),\n"
-      emit ".WE(" >> emitInput (netInputs net !! 2) >> emit "),\n"
-      emit ".DO(" >> emitWire (netInstId net, 0) >> emit "));\n"
-
-    emitTrueDualRAMInst net i aw dw = do
-      let initFile = fromMaybe "UNUSED" i
-      emit "BlockRAMTrueDual#(\n"
-      emit (".INIT_FILE(" ++ show initFile ++ "),\n")
-      emit (".ADDR_WIDTH(" ++ show aw ++ "),\n")
-      emit (".DATA_WIDTH(" ++ show dw ++ "))\n")
-      emit ("ram" ++ show (netInstId net) ++ " (\n")
-      emit ".CLK(clock),\n"
-      emit ".DI_A(" >> emitInput (netInputs net !! 1) >> emit "),\n"
-      emit ".ADDR_A(" >> emitInput (netInputs net !! 0) >> emit "),\n"
-      emit ".WE_A(" >> emitInput (netInputs net !! 2) >> emit "),\n"
-      emit ".DO_A(" >> emitWire (netInstId net, 0) >> emit "),\n"
-      emit ".DI_B(" >> emitInput (netInputs net !! 4) >> emit "),\n"
-      emit ".ADDR_B(" >> emitInput (netInputs net !! 3) >> emit "),\n"
-      emit ".WE_B(" >> emitInput (netInputs net !! 5) >> emit "),\n"
-      emit ".DO_B(" >> emitWire (netInstId net, 1) >> emit "));\n"
-
-    emitRegFileReadInst id net = do
-      emit "assign "
-      emitWire (netInstId net, 0)
-      emit " = rf" >> emit (show id) >> emit "["
-      emitInput (netInputs net !! 0)
-      emit "];\n"
-
-    emitInst net =
-      case netPrim net of
-        Const w i           -> return ()
-        ConstBits w b       -> return ()
-        Add w               -> emitInfixOpInst "+" net
-        Sub w               -> emitInfixOpInst "-" net
-        Mul w               -> emitInfixOpInst "*" net
-        Div w               -> emitInfixOpInst "/" net
-        Mod w               -> emitInfixOpInst "%" net
-        Not w               -> emitPrefixOpInst "~" net
-        And w               -> emitInfixOpInst "&" net
-        Or  w               -> emitInfixOpInst "|" net
-        Xor w               -> emitInfixOpInst "^" net
-        ShiftLeft w         -> emitShiftInst w "<<" net
-        ShiftRight w        -> emitShiftInst w ">>" net
-        ArithShiftRight w   -> emitShiftInst w ">>>" net
-        Equal w             -> emitInfixOpInst "==" net
-        NotEqual w          -> emitInfixOpInst "!=" net
-        LessThan w          -> emitInfixOpInst "<" net
-        LessThanEq w        -> emitInfixOpInst "<=" net
-        Register i w        -> return ()
-        RegisterEn i w      -> return ()
-        BRAM i aw dw        -> emitRAMInst net i aw dw
-        TrueDualBRAM i aw dw -> emitTrueDualRAMInst net i aw dw
-        ReplicateBit w      -> emitReplicateInst w net
-        ZeroExtend wi wo    -> emitZeroExtendInst net wi wo
-        SignExtend wi wo    -> emitSignExtendInst net wi wo
-        SelectBits w hi lo  -> emitSelectBitsInst net hi lo
-        Concat aw bw        -> emitConcatInst net
-        Mux w               -> emitMuxInst net
-        CountOnes w         -> emitPrefixOpInst "$countones" net
-        Identity w          -> emitPrefixOpInst "" net
-        Display args        -> return ()
-        Finish              -> return ()
-        TestPlusArgs s      -> emitTestPlusArgsInst net s
-        Input w s           -> emitInputInst net s
-        Output w s          -> emitOutputInst net s
-        RegFileMake _ _ _ _ -> return ()
-        RegFileRead w id    -> emitRegFileReadInst id net
-        RegFileWrite _ _ _  -> return ()
-        Custom p is os ps   -> emitCustomInst net p is os ps
- 
-    emitAlways net =
-      case netPrim net of
-        Register init w -> do
-          emitWire (netInstId net, 0)
-          emit " <= "
-          emitInput (netInputs net !! 0)
-          emit ";\n"
-        RegisterEn init w -> do
-          emit "if ("
-          emitInput (netInputs net !! 0)
-          emit " == 1) "
-          emitWire (netInstId net, 0)
-          emit " <= "
-          emitInput (netInputs net !! 1)
-          emit ";\n"
-        Display args -> do
-          emit "if ("
-          emitInput (netInputs net !! 0)
-          emit " == 1) $write("
-          emitFormatArgs args (tail (netInputs net))
-          emit ");\n"
-        Finish -> do
-          emit "if ("
-          emitInput (netInputs net !! 0)
-          emit " == 1) $finish;\n"
-        RegFileWrite aw dw id -> do
-          emit "if ("
-          emitInput (netInputs net !! 0)
-          emit " == 1) "
-          emit "rf"
-          emit (show id)
-          emit "["
-          emitInput (netInputs net !! 1)
-          emit "] <= "
-          emitInput (netInputs net !! 2)
-          emit ";\n"
-        other -> return ()
-
-    emitFormatArgs [] _ = return ()
-    emitFormatArgs (DisplayArgString s : args) wires = do
-      emit (show s)
-      if null args then return () else emit ","
-      emitFormatArgs args wires
-    emitFormatArgs (DisplayArgBit w : args) (wire:wires) = do
-      emitWire wire
-      if null args then return () else emit ","
-      emitFormatArgs args wires
+-- generate NetVerilog
+--------------------------------------------------------------------------------
+genNetVerilog :: Net -> NetVerilog
+genNetVerilog net = case netPrim net of
+  Const w i             -> dfltNV { decl = Just $ declWireInit w nId i }
+  ConstBits w b         -> dfltNV { decl = Just $ declWireInitBits w nId b }
+  Add w                 -> dfltNV { decl = Just $ declWire w nId
+                                  , inst = Just $ instInfixOp "+" net }
+  Sub w                 -> dfltNV { decl = Just $ declWire w nId
+                                  , inst = Just $ instInfixOp "-" net }
+  Mul w                 -> dfltNV { decl = Just $ declWire w nId
+                                  , inst = Just $ instInfixOp "*" net }
+  Div w                 -> dfltNV { decl = Just $ declWire w nId
+                                  , inst = Just $ instInfixOp "/" net }
+  Mod w                 -> dfltNV { decl = Just $ declWire w nId
+                                  , inst = Just $ instInfixOp "%" net }
+  Not w                 -> dfltNV { decl = Just $ declWire w nId
+                                  , inst = Just $ instPrefixOp "~" net }
+  And w                 -> dfltNV { decl = Just $ declWire w nId
+                                  , inst = Just $ instInfixOp "&" net }
+  Or w                  -> dfltNV { decl = Just $ declWire w nId
+                                  , inst = Just $ instInfixOp "|" net }
+  Xor w                 -> dfltNV { decl = Just $ declWire w nId
+                                  , inst = Just $ instInfixOp "^" net }
+  ShiftLeft w           -> dfltNV { decl = Just $ declWire w nId
+                                  , inst = Just $ instShift w "<<" net }
+  ShiftRight w          -> dfltNV { decl = Just $ declWire w nId
+                                  , inst = Just $ instShift w ">>" net }
+  ArithShiftRight w     -> dfltNV { decl = Just $ declWire w nId
+                                  , inst = Just $ instShift w ">>>" net }
+  Equal w               -> dfltNV { decl = Just $ declWire 1 nId
+                                  , inst = Just $ instInfixOp "==" net }
+  NotEqual w            -> dfltNV { decl = Just $ declWire 1 nId
+                                  , inst = Just $ instInfixOp "!=" net }
+  LessThan w            -> dfltNV { decl = Just $ declWire 1 nId
+                                  , inst = Just $ instInfixOp "<" net }
+  LessThanEq w          -> dfltNV { decl = Just $ declWire 1 nId
+                                  , inst = Just $ instInfixOp "<=" net }
+  Register i w          -> dfltNV { decl = Just $ declRegInit w nId i
+                                  , alws = Just $ alwsRegister net }
+  RegisterEn i w        -> dfltNV { decl = Just $ declRegInit w nId i
+                                  , alws = Just $ alwsRegisterEn net }
+  BRAM i aw dw          -> dfltNV { decl = Just $ declRAM i 1 aw dw (netInstId net)
+                                  , inst = Just $ instRAM net i aw dw }
+  TrueDualBRAM i aw dw  -> dfltNV { decl = Just $ declRAM i 2 aw dw (netInstId net)
+                                  , inst = Just $ instTrueDualRAM net i aw dw }
+  ReplicateBit w        -> dfltNV { decl = Just $ declWire w nId
+                                  , inst = Just $ instReplicate w net }
+  ZeroExtend wi wo      -> dfltNV { decl = Just $ declWire wo nId
+                                  , inst = Just $ instZeroExtend net wi wo }
+  SignExtend wi wo      -> dfltNV { decl = Just $ declWire wo nId
+                                  , inst = Just $ instSignExtend net wi wo }
+  SelectBits w hi lo    -> dfltNV { decl = Just $ declWire (1+hi-lo) nId
+                                  , inst = Just $ instSelectBits net hi lo }
+  Concat aw bw          -> dfltNV { decl = Just $ declWire (aw+bw) nId
+                                  , inst = Just $ instConcat net }
+  Mux w                 -> dfltNV { decl = Just $ declWire w nId
+                                  , inst = Just $ instMux net }
+  CountOnes w           -> dfltNV { decl = Just $ declWire w nId
+                                  , inst = Just $ instPrefixOp "$countones" net }
+  Identity w            -> dfltNV { decl = Just $ declWire w nId
+                                  , inst = Just $ instPrefixOp "" net }
+  Display args          -> dfltNV { alws = Just $ alwsDisplay args net }
+  Finish                -> dfltNV { alws = Just $ alwsFinish net }
+  TestPlusArgs s        -> dfltNV { decl = Just $ declWire 1 nId
+                                  , inst = Just $ instTestPlusArgs net s }
+  Input w s             -> dfltNV { decl = Just $ declWire w nId
+                                  , inst = Just $ instInput net s }
+  Output w s            -> dfltNV { inst = Just $ instOutput net s }
+  RegFileMake f aw dw i -> dfltNV { decl = Just $ declRegFile f aw dw i }
+  RegFileRead w id      -> dfltNV { decl = Just $ declWire w nId
+                                  , inst = Just $ instRegFileRead id net }
+  RegFileWrite _ _ id   -> dfltNV { alws = Just $ alwsRegFileWrite id net }
+  Custom p is os ps     -> dfltNV {
+                              decl = Just $ sep [ declWire w (netInstId net, n)
+                                                | ((o, w), n) <- zip os [0..] ]
+                            , inst = Just $ instCustom net p is os ps }
+  where nId = (netInstId net, 0)
+        dfltNV = NetVerilog { decl = Nothing
+                            , inst = Nothing
+                            , alws = Nothing }
