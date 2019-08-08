@@ -408,7 +408,7 @@ addDisplayPrim (cond, items) = do
     ins <- mapM flatten [b | FormatBit w b <- items]
     id <- freshNamedInstId ""
     let net = Net { netPrim = Display args
-                  , netInstId = id
+                  , netNamedInstId = id
                   , netInputs = c:ins
                   , netOutputWidths = []
                   }
@@ -424,7 +424,7 @@ addFinishPrim cond = do
   c <- flatten (toBV cond)
   id <- freshNamedInstId ""
   let net = Net { netPrim = Finish
-                , netInstId = id
+                , netNamedInstId = id
                 , netInputs = [c]
                 , netOutputWidths = []
                 }
@@ -436,7 +436,7 @@ addOutputPrim (w, str, value) = do
   c <- flatten value
   id <- freshNamedInstId ""
   let net = Net { netPrim = Output w str
-                , netInstId = id
+                , netNamedInstId = id
                 , netInputs = [c]
                 , netOutputWidths = []
                 }
@@ -447,7 +447,7 @@ addInputPrim :: (Width, String) -> Flatten ()
 addInputPrim (w, str) = do
   id <- freshNamedInstId str
   let net = Net { netPrim = Input w str
-                , netInstId = id
+                , netNamedInstId = id
                 , netInputs = []
                 , netOutputWidths = [w]
                 }
@@ -458,7 +458,7 @@ addRegFilePrim :: (String, VarId, Width, Width) -> Flatten ()
 addRegFilePrim (initFile, regFileId, aw, dw) = do
   id <- freshNamedInstId ""
   let net = Net { netPrim = RegFileMake initFile aw dw regFileId
-                , netInstId = id
+                , netNamedInstId = id
                 , netInputs = []
                 , netOutputWidths = []
                 }
@@ -472,7 +472,7 @@ addRegFileUpdatePrim (regFileId, c, aw, dw, a, d) = do
   df <- flatten d
   id <- freshNamedInstId ""
   let net = Net { netPrim = RegFileWrite aw dw regFileId
-                , netInstId = id
+                , netNamedInstId = id
                 , netInputs = [cf, af, df]
                 , netOutputWidths = []
                 }

@@ -313,7 +313,7 @@ makePrim1 prim ins width = head (makePrim prim ins [width])
 
 -- |Netlists are lists of nets
 data Net = Net { netPrim         :: Prim
-               , netInstId       :: NamedInstId
+               , netNamedInstId  :: NamedInstId
                , netInputs       :: [WireId]
                , netOutputWidths :: [Width]
                } deriving Show
@@ -383,7 +383,7 @@ flatten b =
          addUndo (writeIORef (bvInstRef b) Nothing)
          ins <- mapM flatten (bvInputs b)
          let net = Net { netPrim         = bvPrim b
-                       , netInstId       = namedId
+                       , netNamedInstId  = namedId
                        , netInputs       = ins
                        , netOutputWidths = (bvWidths b)
                        }
