@@ -50,7 +50,7 @@ module Blarney.BV
   , Net(..)        -- Netlists are lists of Nets
   , WireId         -- Nets are connected by wires
   , Flatten(..)    -- Monad for flattening a circuit (BV) to a netlist
-  , freshId        -- Obtain a fresh instance id
+  , freshInstId    -- Obtain a fresh instance id
   , addNet         -- Add a net to the netlist
   , flatten        -- Flatten a bit vector to a netlist
 
@@ -104,7 +104,8 @@ import System.IO.Unsafe(unsafePerformIO)
 import Control.Monad
 import qualified Data.Bits as B
 
--- |Every instance of a component in the circuit has a unique id
+-- |Every instance of a component in the circuit has a unique id composed of an
+--  'Int' and a 'String' name used to hint at which component is represented
 type InstId = (Int, String)
 
 -- |Each output from a primitive component is numbered
@@ -339,12 +340,13 @@ instance Applicative Flatten where
 instance Functor Flatten where
   fmap = liftM
 
--- |Obtain a fresh instance id
-freshId :: Flatten Int
-freshId = Flatten $ \r -> do
+-- |Obtain a fresh 'InstId' with the next available 'Int' and the empty 'String'
+--  as a name hint
+freshInstId :: Flatten InstId
+freshInstId = Flatten $ \r -> do
   id <- readIORef r
   writeIORef r (id+1)
-  return ((JL.Zero, return ()), id)
+  return ((JL.Zero, return ()), (id, ""))
 
 -- |Add a net to the netlist
 addNet :: Net -> Flatten ()
@@ -366,7 +368,7 @@ flatten b =
   do val <- doIO (readIORef (bvInstRef b))
      case val of
        Nothing -> do
-         id <- liftM (\x -> (x, bvName b)) freshId
+         id <- liftM (\(x, _) -> (x, bvName b)) freshInstId
          doIO (writeIORef (bvInstRef b) (Just id))
          addUndo (writeIORef (bvInstRef b) Nothing)
          ins <- mapM flatten (bvInputs b)
