@@ -26,6 +26,7 @@ module Blarney.BV
   (
     -- * Primitive component types
     InstId         -- Every component instance has a unique id
+  , NamedInstId    -- Instance id with a name hint
   , OutputNumber   -- Each output from a component is numbered
   , Width          -- Bit vector width
   , InputWidth     -- Width of an input to a component
@@ -47,12 +48,13 @@ module Blarney.BV
   , makePrim1      -- Common case: single-output components
 
     -- * Netlists
-  , Net(..)        -- Netlists are lists of Nets
-  , WireId         -- Nets are connected by wires
-  , Flatten(..)    -- Monad for flattening a circuit (BV) to a netlist
-  , freshInstId    -- Obtain a fresh instance id
-  , addNet         -- Add a net to the netlist
-  , flatten        -- Flatten a bit vector to a netlist
+  , Net(..)          -- Netlists are lists of Nets
+  , WireId           -- Nets are connected by wires
+  , Flatten(..)      -- Monad for flattening a circuit (BV) to a netlist
+  , freshInstId      -- Obtain a fresh instance id
+  , freshNamedInstId -- Obtain a fresh instance id (with optional name hint)
+  , addNet           -- Add a net to the netlist
+  , flatten          -- Flatten a bit vector to a netlist
 
     -- * Bit-vector primitives
   , constBV        -- :: Width -> Integer -> BV
@@ -104,9 +106,11 @@ import System.IO.Unsafe(unsafePerformIO)
 import Control.Monad
 import qualified Data.Bits as B
 
--- |Every instance of a component in the circuit has a unique id composed of an
---  'Int' and a 'String' name used to hint at which component is represented
-type InstId = (Int, String)
+-- |Every instance of a component in the circuit has a unique id
+type InstId = Int
+
+-- |A named id contains a string that can be used as a name hint
+type NamedInstId = (InstId, String)
 
 -- |Each output from a primitive component is numbered
 type OutputNumber = Int
@@ -309,13 +313,13 @@ makePrim1 prim ins width = head (makePrim prim ins [width])
 
 -- |Netlists are lists of nets
 data Net = Net { netPrim         :: Prim
-               , netInstId       :: InstId
+               , netInstId       :: NamedInstId
                , netInputs       :: [WireId]
                , netOutputWidths :: [Width]
                } deriving Show
 
 -- |A wire is uniquely identified by an instance id and an output number
-type WireId = (InstId, OutputNumber)
+type WireId = (NamedInstId, OutputNumber)
 
 -- |A reader/writer monad for accumulating the netlist
 newtype Flatten a = Flatten { runFlatten :: FlattenR -> IO (FlattenW, a) }
@@ -340,13 +344,18 @@ instance Applicative Flatten where
 instance Functor Flatten where
   fmap = liftM
 
--- |Obtain a fresh 'InstId' with the next available 'Int' and the empty 'String'
---  as a name hint
+-- |Obtain a fresh 'InstId' with the next available id
 freshInstId :: Flatten InstId
 freshInstId = Flatten $ \r -> do
   id <- readIORef r
   writeIORef r (id+1)
-  return ((JL.Zero, return ()), (id, ""))
+  return ((JL.Zero, return ()), id)
+
+-- |Obtain a fresh 'NamedInstId'
+freshNamedInstId :: String -> Flatten NamedInstId
+freshNamedInstId name = do
+  id <- freshInstId
+  return (id, name)
 
 -- |Add a net to the netlist
 addNet :: Net -> Flatten ()
@@ -368,18 +377,19 @@ flatten b =
   do val <- doIO (readIORef (bvInstRef b))
      case val of
        Nothing -> do
-         id <- liftM (\(x, _) -> (x, bvName b)) freshInstId
+         id <- freshInstId
+         let namedId = (id, bvName b)
          doIO (writeIORef (bvInstRef b) (Just id))
          addUndo (writeIORef (bvInstRef b) Nothing)
          ins <- mapM flatten (bvInputs b)
          let net = Net { netPrim         = bvPrim b
-                       , netInstId       = id
+                       , netInstId       = namedId
                        , netInputs       = ins
                        , netOutputWidths = (bvWidths b)
                        }
          addNet net
-         return (id, bvOutNum b)
-       Just id -> return (id, bvOutNum b)
+         return (namedId, bvOutNum b)
+       Just id -> return ((id, bvName b), bvOutNum b)
 
 -- |Constant bit vector of given width
 constBV :: Width -> Integer -> BV

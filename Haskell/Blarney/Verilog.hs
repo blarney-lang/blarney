@@ -141,10 +141,10 @@ argStyle n as =
 
 -- general helpers
 --------------------------------------------------------------------------------
-showWire :: (InstId, Int) -> ShowS
+showWire :: (NamedInstId, Int) -> ShowS
 showWire ((iId, nm), nOut) = (if (nm == "") then chr 'v' else str nm)
                             <> chr '_' <> shows iId <> chr '_' <> shows nOut
-showWireWidth :: Int -> (InstId, Int) -> ShowS
+showWireWidth :: Int -> (NamedInstId, Int) -> ShowS
 showWireWidth width wId = brackets (shows (width-1) <> str ":0") <+> showWire wId
 showVerilogModule :: String -> [Net] -> ShowS
 showVerilogModule modName netlst =

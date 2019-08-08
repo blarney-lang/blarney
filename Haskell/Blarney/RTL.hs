@@ -406,7 +406,7 @@ addDisplayPrim :: (Bit 1, [FormatItem]) -> Flatten ()
 addDisplayPrim (cond, items) = do
     c <- flatten (toBV cond)
     ins <- mapM flatten [b | FormatBit w b <- items]
-    id <- freshInstId
+    id <- freshNamedInstId ""
     let net = Net { netPrim = Display args
                   , netInstId = id
                   , netInputs = c:ins
@@ -422,7 +422,7 @@ addDisplayPrim (cond, items) = do
 addFinishPrim :: Bit 1 -> Flatten ()
 addFinishPrim cond = do
   c <- flatten (toBV cond)
-  id <- freshInstId
+  id <- freshNamedInstId ""
   let net = Net { netPrim = Finish
                 , netInstId = id
                 , netInputs = [c]
@@ -434,7 +434,7 @@ addFinishPrim cond = do
 addOutputPrim :: (Width, String, BV) -> Flatten ()
 addOutputPrim (w, str, value) = do
   c <- flatten value
-  id <- freshInstId
+  id <- freshNamedInstId ""
   let net = Net { netPrim = Output w str
                 , netInstId = id
                 , netInputs = [c]
@@ -445,7 +445,7 @@ addOutputPrim (w, str, value) = do
 -- Add input primitive to netlist
 addInputPrim :: (Width, String) -> Flatten ()
 addInputPrim (w, str) = do
-  id <- liftM (\(x, _) -> (x, str)) freshInstId
+  id <- freshNamedInstId str
   let net = Net { netPrim = Input w str
                 , netInstId = id
                 , netInputs = []
@@ -456,7 +456,7 @@ addInputPrim (w, str) = do
 -- Add RegFile primitives to netlist
 addRegFilePrim :: (String, VarId, Width, Width) -> Flatten ()
 addRegFilePrim (initFile, regFileId, aw, dw) = do
-  id <- freshInstId
+  id <- freshNamedInstId ""
   let net = Net { netPrim = RegFileMake initFile aw dw regFileId
                 , netInstId = id
                 , netInputs = []
@@ -470,7 +470,7 @@ addRegFileUpdatePrim (regFileId, c, aw, dw, a, d) = do
   cf <- flatten (toBV c)
   af <- flatten a
   df <- flatten d
-  id <- freshInstId
+  id <- freshNamedInstId ""
   let net = Net { netPrim = RegFileWrite aw dw regFileId
                 , netInstId = id
                 , netInputs = [cf, af, df]
