@@ -26,6 +26,6 @@ EXTS="$EXTS -XDuplicateRecordFields "
 WARN="-Wno-partial-type-signatures"
 FLAGS="-fno-cse -fno-full-laziness"
 INC="$BLARNEY_ROOT/Haskell"
-INC_H="$BLARNEY_ROOT/Haskell/Blarney/"
+INC_H="$BLARNEY_ROOT/Haskell/Blarney/:./"
 
 $GHC $OPT $FLAGS $WARN -cpp -I$INC_H $EXTS -i$INC $@

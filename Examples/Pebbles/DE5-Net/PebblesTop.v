@@ -46,12 +46,12 @@ module PebblesTop
 
   Pebbles cpu
   ( .clock(clock)
-  , .in_canGet(out_canGet)
-  , .in_value(out_getData)
-  , .in_get_en(out_get)
-  , .out_get_en(in_get)
-  , .out_value(in_getData)
-  , .out_canGet(in_canGet)
+  , .in_canPeek(out_canGet)
+  , .in_peek(out_getData)
+  , .in_consume_en(out_get)
+  , .out_consume_en(in_get)
+  , .out_peek(in_getData)
+  , .out_canPeek(in_canGet)
   );
 
 endmodule
