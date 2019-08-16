@@ -84,7 +84,8 @@ module Blarney.BV
   , regBV          -- :: Width -> Integer -> BV -> BV
   , regEnBV        -- :: Width -> Integer -> BV -> BV -> BV
   , ramBV          -- :: OutputWidth -> Maybe String -> (BV, BV, BV) -> BV
-  , dualRamBV      -- :: OutputWidth -> Maybe String
+  , dualRamBV      
+  , dualRamMixedBV 
   , regFileReadBV  -- :: RegFileId -> OutputWidth -> BV -> BV
   , getInitBV      -- :: BV -> Integer
   ) where 
@@ -199,7 +200,13 @@ data Prim =
   | TrueDualBRAM { ramInitFile  :: Maybe String
                  , ramAddrWidth :: Width
                  , ramDataWidth :: Width }
-
+    -- |True dual-port mixed-width block RAM
+  | TrueDualMixedBRAM { mixedRAMInitFile   :: Maybe String
+                      , mixedRAMAddrWidthA :: Width
+                      , mixedRAMAddrWidthB :: Width
+                      , mixedRAMDataWidthA :: Width
+                      , mixedRAMDataWidthB :: Width
+                      }
     -- |Custom component
     -- (component name, input names, output names/widths, parameters)
   | Custom String [String] [(String, Int)] [Param]
@@ -536,6 +543,24 @@ dualRamBV dw initFile (addrA, dataInA, weInA) (addrB, dataInB, weInB) =
     prim = TrueDualBRAM { ramInitFile  = initFile
                         , ramAddrWidth = bvWidth addrA
                         , ramDataWidth = dw }
+
+-- |True dual-port mixed-width block RAM.
+-- Input: two triples (address, data, write-enable)
+dualRamMixedBV :: (OutputWidth, OutputWidth)
+          -> (BV, BV, BV)
+          -> (BV, BV, BV)
+          -> (BV, BV)
+dualRamMixedBV (dw1, dw2) (addrA, dataInA, weInA) (addrB, dataInB, weInB) =
+    (outs !! 0, outs !! 1)
+  where
+    outs = makePrim prim [addrA, dataInA, weInA, addrB, dataInB, weInB]
+             [dw1, dw2]
+    prim = TrueDualMixedBRAM { mixedRAMInitFile  = Nothing
+                             , mixedRAMAddrWidthA = bvWidth addrA
+                             , mixedRAMAddrWidthB = bvWidth addrB
+                             , mixedRAMDataWidthA = dw1
+                             , mixedRAMDataWidthB = dw2
+                             }
 
 -- |Read from register file
 regFileReadBV :: RegFileId -> OutputWidth -> BV -> BV

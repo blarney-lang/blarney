@@ -1,5 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE TypeOperators       #-}
+{-# LANGUAGE NoStarIsType        #-}
 
 {-|
 Module      : Blarney.RAM
@@ -16,6 +18,7 @@ module Blarney.RAM
   , ramInit             -- Initialised block RAM primitive
   , ramTrueDual         -- True dual-port block RAM primitive
   , ramTrueDualInit     -- Initialised true dual-port block RAM primitive
+  , ramTrueDualMixed    -- True dual-port mixed-width block RAM primitive
 
     -- * RTL block RAM interface
   , RAM(..)             -- Block RAM interface
@@ -27,10 +30,12 @@ module Blarney.RAM
   , makeDualRAMInit     -- Initialised dual-port block RAM
   , makeDualRAMForward  -- Forwarding dual-port block RAM
   , makeDualRAMForwardInit -- Initialised forwarding dual-port block RAM
+  , makeTrueDualRAMMixed -- Mixed width true dual port RAM
   ) where
 
 -- Standard imports
 import Prelude
+import GHC.TypeLits
 
 -- Blarney imports
 import Blarney.BV
@@ -57,6 +62,22 @@ ramTrueDualPrim dataWidth init (a0, d0, en0)
    (FromBV o0, FromBV o1)
   where
     (o0, o1) = dualRamBV dataWidth init
+                 (toBV a0, toBV d0, toBV en0)
+                 (toBV a1, toBV d1, toBV en1)
+
+-- True dual-port mixed-width RAM primitive (for internal use only)
+-- (Reads new data on write)
+-- (When read-address == write-address on different ports, read old data)
+ramTrueDualMixedPrim :: d2 ~ (d1 * 2 ^ (a1 - a2))
+     => (Int, Int)
+     -> (Bit a1, Bit d1, Bit 1)
+     -> (Bit a2, Bit d2, Bit 1)
+     -> (Bit d1, Bit d2)
+ramTrueDualMixedPrim (dw1, dw2) (a0, d0, en0)
+                                (a1, d1, en1) =
+   (FromBV o0, FromBV o1)
+  where
+    (o0, o1) = dualRamMixedBV (dw1, dw2)
                  (toBV a0, toBV d0, toBV en0)
                  (toBV a1, toBV d1, toBV en1)
 
@@ -98,6 +119,22 @@ ramTrueDualInit init (a0, d0, en0)
                      (a1, d1, en1) = (unpack o0, unpack o1)
   where
     (o0, o1) = ramTrueDualPrim (sizeOf d0) (Just init)
+                 (pack a0, pack d0, en0)
+                 (pack a1, pack d1, en1)
+
+-- True dual-port mixed-width RAM primitive (for internal use only)
+-- (Reads new data on write)
+-- (When read-address == write-address on different ports, read old data)
+ramTrueDualMixed ::
+  (Bits a1, Bits d1, Bits a2, Bits d2,
+     SizeOf d2 ~ (SizeOf d1 * 2 ^ (SizeOf a1 - SizeOf a2))) =>
+         (a1, d1, Bit 1)
+      -> (a2, d2, Bit 1)
+      -> (d1, d2)
+ramTrueDualMixed (a0, d0, en0)
+                 (a1, d1, en1) = (unpack o0, unpack o1)
+  where
+    (o0, o1) = ramTrueDualMixedPrim (sizeOf d0, sizeOf d1)
                  (pack a0, pack d0, en0)
                  (pack a1, pack d1, en1)
 
@@ -279,3 +316,44 @@ makeDualRAMForwardCore n init
   , out     = get_rdata $ allStages !! n
   , writeEn = writeEn ram
   }
+
+-- |Create mixed-width true dual-port block RAM.
+-- When read-address == write-address on different ports, read old data.
+makeTrueDualRAMMixed ::
+  (Bits a1, Bits d1, Bits a2, Bits d2,
+     SizeOf d2 ~ (SizeOf d1 * 2 ^ (SizeOf a1 - SizeOf a2))) =>
+    Module (RAM a1 d1, RAM a2 d2)
+makeTrueDualRAMMixed = do
+  -- Address bus and data bus and write-enable
+  addrBusA :: Wire a1 <- makeWireU
+  dataBusA :: Wire d1 <- makeWireU
+  writeEnA :: Wire (Bit 1) <- makeWire 0
+
+  addrBusB :: Wire a2 <- makeWireU
+  dataBusB :: Wire d2 <- makeWireU
+  writeEnB :: Wire (Bit 1) <- makeWire 0
+
+  -- RAM primitive
+  let ramPrimitive = ramTrueDualMixed
+ 
+  -- RAM output
+  let (outA, outB) = ramPrimitive (val addrBusA, val dataBusA, val writeEnA)
+                                  (val addrBusB, val dataBusB, val writeEnB)
+
+  -- Return interface
+  return (RAM {
+              load    = (addrBusA <==)
+            , store   = \a d -> do addrBusA <== a
+                                   dataBusA <== d
+                                   writeEnA <== 1
+            , out     = outA
+            , writeEn = val writeEnA
+            },
+          RAM {
+              load    = (addrBusB <==)
+            , store   = \a d -> do addrBusB <== a
+                                   dataBusB <== d
+                                   writeEnB <== 1
+            , out     = outB
+            , writeEn = val writeEnB
+            })

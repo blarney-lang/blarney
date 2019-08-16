@@ -188,9 +188,10 @@ declWire width wire = str "wire" <+> declName width wire
 declWireInit width wire init = str "wire" <+> declNameInitHex width wire init
 declReg width reg = str "reg" <+> declName width reg
 declRegInit width reg init = str "reg" <+> declNameInitHex width reg init
-declRAM initFile numPorts _ dw id =
+declRAM initFile ws id =
   --vsep $ map (\n -> declWire dw (id, n)) [0..numPorts-1]
-  foldl (<+>) (str "") $ map (\n -> declWire dw (id, n)) [0..numPorts-1]
+  foldl (<+>) (str "") $
+    zipWith (\w n -> declWire w (id, n)) ws [0..]
 declRegFile initFile aw dw id =
       str "reg" <+> brackets (shows (dw-1) <> str ":0")
   <+> str "rf" <> shows id <+> brackets (parens (str "2**" <> shows aw) <> str "-1" <> str ":0") <> semi
@@ -289,6 +290,26 @@ instTrueDualRAM net i aw dw =
                     , str ".ADDR_B" <> parens (showName (netInputs net !! 3))
                     , str ".WE_B"   <> parens (showName (netInputs net !! 5))
                     , str ".DO_B"   <> parens (showName (netInstId net, 1)) ]
+instTrueDualMixedRAM net i aw0 aw1 dw0 dw1 =
+      str "BlockRAMTrueDualMixed# (" <^> (argStyle 6 ramParams)
+  <^> spaces 4 <> str ") ram" <> shows (netInstId net) <+> chr '('
+  <^> argStyle 6 ramArgs <^> spaces 4 <> str ");"
+  where
+    ramParams =
+      [ -- str ".INIT_FILE"  <> parens (str (show $ fromMaybe "UNUSED" i))
+        str ".ADDR_WIDTH_A" <> parens (shows aw0)
+      , str ".ADDR_WIDTH_B" <> parens (shows aw1)
+      , str ".DATA_WIDTH_A" <> parens (shows dw0) ]
+    ramArgs =
+      [ str ".CLK(clock)"
+      , str ".DI_A"   <> parens (showName (netInputs net !! 1))
+      , str ".ADDR_A" <> parens (showName (netInputs net !! 0))
+      , str ".WE_A"   <> parens (showName (netInputs net !! 2))
+      , str ".DO_A"   <> parens (showName (netInstId net, 0))
+      , str ".DI_B"   <> parens (showName (netInputs net !! 4))
+      , str ".ADDR_B" <> parens (showName (netInputs net !! 3))
+      , str ".WE_B"   <> parens (showName (netInputs net !! 5))
+      , str ".DO_B"   <> parens (showName (netInstId net, 1)) ]
 instRegFileRead id net =
       str "assign" <+> showName (netInstId net, 0) <+> equals
   <+> str "rf" <> shows id <> brackets (showName (netInputs net !! 0)) <> semi
@@ -359,10 +380,15 @@ genNetVerilog net = case netPrim net of
                                   , alws = Just $ alwsRegister net }
   RegisterEn i w        -> dfltNV { decl = Just $ declRegInit w nId i
                                   , alws = Just $ alwsRegisterEn net }
-  BRAM i aw dw          -> dfltNV { decl = Just $ declRAM i 1 aw dw (netInstId net)
-                                  , inst = Just $ instRAM net i aw dw }
-  TrueDualBRAM i aw dw  -> dfltNV { decl = Just $ declRAM i 2 aw dw (netInstId net)
-                                  , inst = Just $ instTrueDualRAM net i aw dw }
+  BRAM i aw dw          ->
+    dfltNV { decl = Just $ declRAM i [dw] (netInstId net)
+           , inst = Just $ instRAM net i aw dw }
+  TrueDualBRAM i aw dw  ->
+    dfltNV { decl = Just $ declRAM i [dw, dw] (netInstId net)
+           , inst = Just $ instTrueDualRAM net i aw dw }
+  TrueDualMixedBRAM i aw0 aw1 dw0 dw1 ->
+    dfltNV { decl = Just $ declRAM i [dw0, dw1] (netInstId net)
+           , inst = Just $ instTrueDualMixedRAM net i aw0 aw1 dw0 dw1 }
   ReplicateBit w        -> dfltNV { decl = Just $ declWire w nId
                                   , inst = Just $ instReplicate w net }
   ZeroExtend wi wo      -> dfltNV { decl = Just $ declWire wo nId
