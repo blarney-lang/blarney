@@ -32,12 +32,10 @@ top = do
           While (i.val .<. 20) (
             Seq [
               parA [load vecA (i.val), load vecB (i.val)],
-
-              Par [act $ res <== (out vecA) +  (out vecB)],
-              --act $ display "res = %02d" (res.val ), 
-              act $ store vecC (i.val) (val res),
-              --act $ display "storing %02d" (res.val),
-              act $ i <== i.val + 1
+              parA [store vecC (i.val) ((out vecA) + (out vecB)), i <== i.val + 1]
+              --act $ res <== (out vecA) +  (out vecB),
+              --act $ store vecC (i.val) (val res),
+              --act $ i <== i.val + 1
             ]
           ),
   
@@ -66,12 +64,11 @@ top = do
           Do [i <== 0],
           act $ display "Running pipelined vector add...",
 
-          -- How to do this? Launch main loop with pipeline register for i, then update i?
           While (i.val .<. 20) (
            Seq [
              Launch (
                Seq [
-                parA [load vecA (i.val), load vecB (i.val), i0 <== i.val],
+                parA [load vecA (i.val), load vecB (i.val), i0 <== i.val, display "load values at time %02d" (globalTime.val)],
                 parA [res <== (out vecA) + (out vecB), i1 <== i0.val],
                 act $ store vecC (i1.val) (val res)
                ]
@@ -94,6 +91,9 @@ top = do
 
         ]
 
+  always do
+    globalTime <== globalTime.val + 1
+  
   done <- run (reg 1 0) testSeq
 
   always (when done finish)
