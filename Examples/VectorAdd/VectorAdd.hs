@@ -9,8 +9,9 @@ top = do
   vecA :: RAM (Bit 8) (Bit 32) <- makeRAM
   vecB :: RAM (Bit 8) (Bit 32) <- makeRAM
 
-  vecC :: RAM (Bit 8) (Bit 32) <-makeRAM
-
+  vecCNoPipe :: RAM (Bit 8) (Bit 32) <-makeRAM
+  vecCPipe :: RAM (Bit 8) (Bit 32) <-makeRAM
+  
   globalTime :: Reg (Bit 32) <- makeReg 0
 
   i :: Reg (Bit 8) <- makeReg 0
@@ -32,7 +33,7 @@ top = do
           While (i.val .<. 20) (
             Seq [
               parA [load vecA (i.val), load vecB (i.val), display "loading un-pipelined at time %02d" (globalTime.val)],
-              parA [store vecC (i.val) ((out vecA) + (out vecB)), i <== i.val + 1]
+              parA [store vecCNoPipe (i.val) ((out vecA) + (out vecB)), i <== i.val + 1]
             ]
           ),
   
@@ -41,8 +42,8 @@ top = do
 
           While (i.val .<. 20) (
             Do [
-              load vecC (i.val),
-              display "C[%02d]" (i.val) " = %02d" (out vecC),
+              load vecCNoPipe (i.val),
+              display "C[%02d]" (i.val) " = %02d" (out vecCNoPipe),
               i <== i.val + 1
             ]
           ),
@@ -52,7 +53,7 @@ top = do
 
           While (i.val .<. 20) (
             Do [
-              store vecC (i.val) 0,
+              store vecCPipe (i.val) 0,
               i <== i.val + 1
             ]
           ),
@@ -66,7 +67,7 @@ top = do
              Launch (
                Seq [
                 parA [load vecA (i.val), load vecB (i.val), i0 <== i.val, display "load values at time %02d" (globalTime.val)],
-                act $ store vecC (i0.val) ((out vecA) + (out vecB))
+                act $ store vecCPipe (i0.val) ((out vecA) + (out vecB))
                ]
              ),
              act $ i <== i.val + 1
@@ -79,8 +80,8 @@ top = do
 
           While (i.val .<. 20) (
             Do [
-              load vecC (i.val),
-              display "C[%02d]" (i.val) " = %02d" (out vecC),
+              load vecCPipe (i.val),
+              display "C[%02d]" (i.val) " = %02d" (out vecCPipe),
               i <== i.val + 1
             ]
           )
