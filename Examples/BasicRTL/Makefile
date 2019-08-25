@@ -3,4 +3,4 @@ all:
 	blc BasicRTL.hs
 
 clean:
-rm -rf *.o *.hi BasicRTL BasicRTL-Verilog
+		rm -rf *.o *.hi BasicRTL BasicRTL-Verilog
