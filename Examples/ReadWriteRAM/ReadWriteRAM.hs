@@ -9,7 +9,7 @@ top = do
 
   i :: Reg (Bit 8) <- makeReg 0
 
-  let testSeq = Seq [While (i.val .<. 100) (Do [store ram (i.val) (1 .<<. i.val), i <== i.val + 1]), Do [i <== 0], While (i.val .<. 100) (Do [load ram (val i), display "hello", i <== i.val + 1])]
+  let testSeq = Seq [While (i.val .<. 100) (Do [store ram (i.val) (1 .<<. i.val), i <== i.val + 1]), Do [i <== 0], While (i.val .<. 100) (Do [load ram (val i), display "ram[0x%02x]" (val i) " = 0x%024x" (out ram), i <== i.val + 1])]
   --Seq [
     --While (i.val .<. 100) (
         --Do [
