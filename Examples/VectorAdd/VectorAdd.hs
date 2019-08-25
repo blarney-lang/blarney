@@ -67,8 +67,6 @@ top = do
                Seq [
                 parA [load vecA (i.val), load vecB (i.val), i0 <== i.val, display "load values at time %02d" (globalTime.val)],
                 act $ store vecC (i0.val) ((out vecA) + (out vecB))
-                --parA [res <== (out vecA) + (out vecB), i1 <== i0.val],
-                --act $ store vecC (i1.val) (val res)
                ]
              ),
              act $ i <== i.val + 1
