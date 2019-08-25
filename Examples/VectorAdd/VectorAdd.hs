@@ -13,7 +13,9 @@ top = do
 
   globalTime :: Reg (Bit 32) <- makeReg 0
 
-  i:: Reg (Bit 8) <- makeReg 0
+  i :: Reg (Bit 8) <- makeReg 0
+  i0 :: Reg (Bit 8) <- makeReg dontCare
+  i1 :: Reg (Bit 8) <- makeReg dontCare
 
   res :: Reg (Bit 32) <- makeReg dontCare
   let testSeq =
@@ -69,9 +71,9 @@ top = do
            Seq [
              Launch (
                Seq [
-                parA [load vecA (i.val), load vecB (i.val)],
-                Par [act $ res <== (out vecA) +  (out vecB)],
-                act $ store vecC (i.val) (val res)
+                parA [load vecA (i.val), load vecB (i.val), i0 <== i.val],
+                parA [res <== (out vecA) + (out vecB), i1 <== i0.val],
+                act $ store vecC (i1.val) (val res)
                ]
              ),
              act $ i <== i.val + 1
