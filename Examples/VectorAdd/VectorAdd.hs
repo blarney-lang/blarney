@@ -30,6 +30,7 @@ top = do
           Do [i <== 0],
 
 
+          act $ display "starting at %02d" (globalTime.val),
           While (i.val .<. 20) (
             Seq [
               parA [load vecA (i.val), load vecB (i.val), display "loading un-pipelined at time %02d" (globalTime.val)],
@@ -37,6 +38,8 @@ top = do
             ]
           ),
   
+          act $ display "un-pipelined loop ending at %d" (globalTime.val),
+
           Do [i <== 0],
           act $ display "C values after un-pipelined add",
 
@@ -62,6 +65,7 @@ top = do
           Do [i <== 0],
           act $ display "Running pipelined vector add...",
 
+          act $ display "starting pipelined loop at %d" (globalTime.val),
           While (i.val .<. 20) (
            Seq [
              Launch (
@@ -74,6 +78,7 @@ top = do
             ]
           ),
 
+          act $ display "ending pipelined loop at %d" (globalTime.val),
 
           Do [i <== 0],
           act $ display "After pipelined add...",
