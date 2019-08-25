@@ -6,6 +6,7 @@ top :: Module ()
 top = do
   ram :: RAM (Bit 8) (Bit 128) <- makeRAM
 
+  globalTime :: Reg (Bit 32) <- makeReg 0
   i :: Reg (Bit 8) <- makeReg 0
 
   -- What Id like:
@@ -29,6 +30,11 @@ top = do
 
   done <- run (reg 1 0) testSeq
   always (when done finish)
+
+  always do
+    globalTime <== globalTime.val + 1
+    display "global time = %02d" (val globalTime)
+
   return ()
 
 main :: IO ()
