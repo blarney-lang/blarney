@@ -1,10 +1,15 @@
 import Blarney
 import Blarney.RAM
 
+parA m = Par $ map Action m
+act = Action
+
 top :: Module ()
 top = do
   vecA :: RAM (Bit 8) (Bit 32) <- makeRAM
   vecB :: RAM (Bit 8) (Bit 32) <- makeRAM
+
+  vecC :: RAM (Bit 8) (Bit 32) <-makeRAM
 
   globalTime :: Reg (Bit 32) <- makeReg 0
 
@@ -20,12 +25,13 @@ top = do
           Do [i <== 0],
 
 
+
           While (i.val .<. 20) (
             Seq [
-              Par [Action $ load vecA (i.val), Action $ load vecB (i.val)],
-              Action $ res <== (out vecA) .+. (out vecB),
-              Action $ i <== i.val + 1,
-              Action $ store vecC (i.val) res
+              parA [load vecA (i.val), load vecB (i.val)],
+              res <== (out vecA) .+. (out vecB),
+              act $ store vecC (i.val) (val res),
+              act $ i <== i.val + 1
             ]
           )
         ]
