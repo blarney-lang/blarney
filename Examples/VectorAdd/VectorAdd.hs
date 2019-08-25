@@ -31,16 +31,52 @@ top = do
             Seq [
               parA [load vecA (i.val), load vecB (i.val)],
 
-              Par [act $ display "a val = %02d" (out vecA), act $ display "b val = %02d" (out vecB), act $ res <== (out vecA) +  (out vecB)],
-              act $ display "res = %02d" (res.val ), 
+              Par [act $ res <== (out vecA) +  (out vecB)],
+              --act $ display "res = %02d" (res.val ), 
               act $ store vecC (i.val) (val res),
-              act $ display "storing %02d" (res.val),
+              --act $ display "storing %02d" (res.val),
               act $ i <== i.val + 1
             ]
           ),
   
           Do [i <== 0],
           act $ display "C values after un-pipelined add",
+
+          While (i.val .<. 20) (
+            Do [
+              load vecC (i.val),
+              display "C[%02d]" (i.val) " = %02d" (out vecC),
+              i <== i.val + 1
+            ]
+          ),
+
+          Do [i <== 0],
+          act $ display "Clearing C values",
+
+          While (i.val .<. 20) (
+            Do [
+              store vecC (i.val) 0,
+              i <== i.val + 1
+            ]
+          ),
+
+        
+          Do [i <== 0],
+          act $ display "Running pipelined vector add...",
+
+          -- How to do this? Launch main loop with pipeline register for i, then update i?
+          While (i.val .<. 20) (
+           Seq [
+              parA [load vecA (i.val), load vecB (i.val)],
+              Par [act $ res <== (out vecA) +  (out vecB)],
+              act $ store vecC (i.val) (2 * (val res)),
+              act $ i <== i.val + 1
+            ]
+          ),
+
+
+          Do [i <== 0],
+          act $ display "After pipelined add...",
 
           While (i.val .<. 20) (
             Do [
