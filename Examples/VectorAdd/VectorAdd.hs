@@ -24,7 +24,8 @@ top = do
             Seq [
               Par [Action $ load vecA (i.val), Action $ load vecB (i.val)],
               Action $ res <== (out vecA) .+. (out vecB),
-              Action $ i <== i.val + 1
+              Action $ i <== i.val + 1,
+              Action $ store vecC (i.val) res
             ]
           )
         ]
