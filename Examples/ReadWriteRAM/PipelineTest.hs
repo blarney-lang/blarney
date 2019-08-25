@@ -22,7 +22,7 @@ top = do
   -- needs to be set in the first cycle
   let testSeq =
         Seq [
-          While (i.val .<. 20) (Do [store ram (i.val) (zeroExtend $ i.val), i <== i.val + 1]),
+          While (i.val .<. 20) (Seq [Launch $ Do [store ram (i.val) (zeroExtend $ i.val)], Do [i <== i.val + 1]]),
           Do [i <== 0],
 
           While (i.val .<. 20) (Do [load ram (val i), display "ram[0x%02x]" (val i) " = 0x%024x" (out ram), i <== i.val + 1])

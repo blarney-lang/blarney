@@ -44,6 +44,7 @@ data Recipe where
   Par    :: [Recipe] -> Recipe
   If     :: Bit 1 -> Recipe -> Recipe
   While  :: Bit 1 -> Recipe -> Recipe
+  Launch :: Recipe -> Recipe
 
 -- Is time taken by given statement known?
 known :: Recipe -> Bool
@@ -84,6 +85,9 @@ run go (While c r)  = do
   always do
     ready <== go .|. done
   return (val ready .&. inv c)
+run go (Launch r) = do
+  done <- run go r
+  return go
 
 sync :: [Bit 1] -> Bit 1
 sync [x] = x
