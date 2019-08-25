@@ -67,10 +67,14 @@ top = do
           -- How to do this? Launch main loop with pipeline register for i, then update i?
           While (i.val .<. 20) (
            Seq [
-              parA [load vecA (i.val), load vecB (i.val)],
-              Par [act $ res <== (out vecA) +  (out vecB)],
-              act $ store vecC (i.val) (2 * (val res)),
-              act $ i <== i.val + 1
+             Launch (
+               Seq [
+                parA [load vecA (i.val), load vecB (i.val)],
+                Par [act $ res <== (out vecA) +  (out vecB)],
+                act $ store vecC (i.val) (val res)
+               ]
+             ),
+             act $ i <== i.val + 1
             ]
           ),
 
