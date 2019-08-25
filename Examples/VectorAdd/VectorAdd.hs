@@ -31,11 +31,8 @@ top = do
 
           While (i.val .<. 20) (
             Seq [
-              parA [load vecA (i.val), load vecB (i.val)],
+              parA [load vecA (i.val), load vecB (i.val), display "loading un-pipelined at time %02d" (globalTime.val)],
               parA [store vecC (i.val) ((out vecA) + (out vecB)), i <== i.val + 1]
-              --act $ res <== (out vecA) +  (out vecB),
-              --act $ store vecC (i.val) (val res),
-              --act $ i <== i.val + 1
             ]
           ),
   
@@ -69,8 +66,9 @@ top = do
              Launch (
                Seq [
                 parA [load vecA (i.val), load vecB (i.val), i0 <== i.val, display "load values at time %02d" (globalTime.val)],
-                parA [res <== (out vecA) + (out vecB), i1 <== i0.val],
-                act $ store vecC (i1.val) (val res)
+                act $ store vecC (i0.val) ((out vecA) + (out vecB))
+                --parA [res <== (out vecA) + (out vecB), i1 <== i0.val],
+                --act $ store vecC (i1.val) (val res)
                ]
              ),
              act $ i <== i.val + 1
