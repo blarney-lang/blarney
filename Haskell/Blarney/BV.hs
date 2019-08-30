@@ -26,6 +26,7 @@ module Blarney.BV
   (
     -- * Primitive component types
     InstId         -- Every component instance has a unique id
+  , NameHints      -- A Hint type that handles name hints
   , OutputNumber   -- Each output from a component is numbered
   , Width          -- Bit vector width
   , InputWidth     -- Width of an input to a component
@@ -111,9 +112,6 @@ import qualified Data.Bits as B
 
 -- |Every instance of a component in the circuit has a unique id
 type InstId = Int
-
--- |An instance id with parameterised with a hint type
-type InstIdHint t = (InstId, t)
 
 -- |A Hint type that handles name hints
 type NameHints = Set String

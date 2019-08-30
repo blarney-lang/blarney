@@ -4,6 +4,7 @@
 
 EXAMPLES=(
   BasicRTL
+  NameBits
   BitPat
   BitScan
   CPU

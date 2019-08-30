@@ -79,7 +79,10 @@ import GHC.TypeLits
 import Control.Monad.Fix
 import Control.Monad hiding (when)
 import Data.Map (Map, findWithDefault, fromListWith)
-import Data.Set (empty)
+
+-- For name hints
+import Data.Set (empty, singleton, insert, toList)
+import Data.List (intercalate)
 
 -- |The RTL monad, for register-transfer-level descriptions,
 -- is a fairly standard reader-writer-state monad.
@@ -114,9 +117,9 @@ rhsTyped = unpack . FromBV . rhs
 -- |The reader component contains a name string, the current condition on any
 -- RTL actions, and a list of all assigments in the computation
 -- (obtained circularly from the writer output of the monad).
-data R = R { name    :: String
-           , cond    :: Bit 1
-           , assigns :: Map VarId [Assign]
+data R = R { nameHints :: NameHints
+           , cond      :: Bit 1
+           , assigns   :: Map VarId [Assign]
            }
 
 -- |The state component contains the next free variable identifier
@@ -169,13 +172,13 @@ fresh = do
 withNewName :: String -> RTL a -> RTL a
 withNewName nm m = do
   r <- ask
-  local (r { name = nm }) m
+  local (r { nameHints = singleton nm }) m
 
 -- | RTL extended named block
 withExtendedName :: String -> RTL a -> RTL a
 withExtendedName nm m = do
   r <- ask
-  local (r { name = (name r) ++ nm }) m
+  local (r { nameHints = insert nm (nameHints r) }) m
 
 -- |RTL conditional block
 when :: Bit 1 -> RTL () -> RTL ()
@@ -268,7 +271,9 @@ makeReg init =
                  [a] -> rhsTyped a
                  other -> select [(enable a, rhsTyped a) | a <- as]
      let out = delayEn init en inp
-     return (Reg { regId = v, regVal = nameBits (name r) out })
+     let name = intercalate "_" (toList (nameHints r))
+     let newVal = if null (nameHints r) then out else nameBits name out
+     return (Reg { regId = v, regVal = newVal })
 
 -- |Create wire with default value
 makeWire :: Bits a => a -> RTL (Wire a)
@@ -280,11 +285,13 @@ makeWire defaultVal =
      let none = inv any
      let out = select ([(enable a, rhsTyped a) | a <- as]
                          ++ [(none, defaultVal)])
+     let name = intercalate "_" (toList (nameHints r))
+     let newVal = if null (nameHints r) then out else nameBits name out
      return $
        Wire {
          wireId  = v
-       , wireVal = nameBits (name r) out
-       , active  = nameBits (name r ++ "_act") any
+       , wireVal = newVal
+       , active  = nameBits (name ++ "_act") any
        }
 
 -- |Create wire with don't care default value
@@ -504,7 +511,7 @@ netlist rtl = do
   undo
   return netlist
   where
-    (_, actsJL, _) = runRTL rtl (R { name = "", cond = 1, assigns = assignMap }) 0
+    (_, actsJL, _) = runRTL rtl (R { nameHints = empty, cond = 1, assigns = assignMap }) 0
     acts = JL.toList actsJL
     assignMap = fromListWith (++) [(lhs a, [a]) | RTLAssign a <- acts]
     disps = reverse [(go, items) | RTLDisplay (go, Format items) <- acts]
