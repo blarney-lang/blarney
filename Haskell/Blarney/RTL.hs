@@ -79,6 +79,7 @@ import GHC.TypeLits
 import Control.Monad.Fix
 import Control.Monad hiding (when)
 import Data.Map (Map, findWithDefault, fromListWith)
+import Data.Set (empty)
 
 -- |The RTL monad, for register-transfer-level descriptions,
 -- is a fairly standard reader-writer-state monad.
@@ -406,11 +407,13 @@ addDisplayPrim :: (Bit 1, [FormatItem]) -> Flatten ()
 addDisplayPrim (cond, items) = do
     c <- flatten (toBV cond)
     ins <- mapM flatten [b | FormatBit w b <- items]
-    id <- freshNamedInstId ""
+    id <- freshInstId
+    hints <- doIO (newIORef empty)
     let net = Net { netPrim = Display args
-                  , netNamedInstId = id
+                  , netInstId = id
                   , netInputs = c:ins
                   , netOutputWidths = []
+                  , netNameHints = hints
                   }
     addNet net
   where
@@ -422,11 +425,13 @@ addDisplayPrim (cond, items) = do
 addFinishPrim :: Bit 1 -> Flatten ()
 addFinishPrim cond = do
   c <- flatten (toBV cond)
-  id <- freshNamedInstId ""
+  id <- freshInstId
+  hints <- doIO (newIORef empty)
   let net = Net { netPrim = Finish
-                , netNamedInstId = id
+                , netInstId = id
                 , netInputs = [c]
                 , netOutputWidths = []
+                , netNameHints = hints
                 }
   addNet net
 
@@ -434,33 +439,39 @@ addFinishPrim cond = do
 addOutputPrim :: (Width, String, BV) -> Flatten ()
 addOutputPrim (w, str, value) = do
   c <- flatten value
-  id <- freshNamedInstId ""
+  id <- freshInstId
+  hints <- doIO (newIORef empty)
   let net = Net { netPrim = Output w str
-                , netNamedInstId = id
+                , netInstId = id
                 , netInputs = [c]
                 , netOutputWidths = []
+                , netNameHints = hints
                 }
   addNet net
 
 -- Add input primitive to netlist
 addInputPrim :: (Width, String) -> Flatten ()
 addInputPrim (w, str) = do
-  id <- freshNamedInstId str
+  id <- freshInstId
+  hints <- doIO (newIORef empty)
   let net = Net { netPrim = Input w str
-                , netNamedInstId = id
+                , netInstId = id
                 , netInputs = []
                 , netOutputWidths = [w]
+                , netNameHints = hints
                 }
   addNet net
 
 -- Add RegFile primitives to netlist
 addRegFilePrim :: (String, VarId, Width, Width) -> Flatten ()
 addRegFilePrim (initFile, regFileId, aw, dw) = do
-  id <- freshNamedInstId ""
+  id <- freshInstId
+  hints <- doIO (newIORef empty)
   let net = Net { netPrim = RegFileMake initFile aw dw regFileId
-                , netNamedInstId = id
+                , netInstId = id
                 , netInputs = []
                 , netOutputWidths = []
+                , netNameHints = hints
                 }
   addNet net
 
@@ -470,11 +481,13 @@ addRegFileUpdatePrim (regFileId, c, aw, dw, a, d) = do
   cf <- flatten (toBV c)
   af <- flatten a
   df <- flatten d
-  id <- freshNamedInstId ""
+  id <- freshInstId
+  hints <- doIO (newIORef empty)
   let net = Net { netPrim = RegFileWrite aw dw regFileId
-                , netNamedInstId = id
+                , netInstId = id
                 , netInputs = [cf, af, df]
                 , netOutputWidths = []
+                , netNameHints = hints
                 }
   addNet net
 
@@ -483,12 +496,13 @@ addRoots :: [BV] -> RTL ()
 addRoots roots = write (RTLRoots roots)
 
 -- |Convert RTL monad to a netlist
-netlist :: RTL () -> IO [Net]
+netlist :: RTL () -> IO [Net String]
 netlist rtl = do
   i <- newIORef (0 :: Int)
   ((nl, undo), _) <- runFlatten roots i
+  netlist <- derefNets (JL.toList nl)
   undo
-  return (JL.toList nl)
+  return netlist
   where
     (_, actsJL, _) = runRTL rtl (R { name = "", cond = 1, assigns = assignMap }) 0
     acts = JL.toList actsJL

@@ -247,5 +247,5 @@ addRoots :: [BV] -> Module ()
 addRoots roots = M (RTL.addRoots roots)
 
 -- |Convert module to a netlist
-netlist :: Module () -> IO [Net]
+netlist :: Module () -> IO [Net String]
 netlist m = RTL.netlist (runModule m)

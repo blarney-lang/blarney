@@ -55,7 +55,7 @@ constant i = result
 
 -- | Give a name to a 'Bit n' signal
 nameBit :: String -> Bit n -> Bit n
-nameBit nm = FromBV . (flip setBVName $ nm) . toBV
+nameBit nm = FromBV . (flip addBVNameHint $ nm) . toBV
 
 -- |Test plusargs
 testPlusArgs :: String -> Bit 1
