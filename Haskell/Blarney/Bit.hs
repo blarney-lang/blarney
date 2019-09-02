@@ -192,6 +192,7 @@ signExtend a = result
      wr = fromInteger (natVal result)
 
 -- |Bit-vector concatenation
+infixr 8 #
 (#) :: Bit n -> Bit m -> Bit (n+m)
 a # b = FromBV $ concatBV (toBV a) (toBV b)
 
