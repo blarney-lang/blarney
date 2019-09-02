@@ -5,7 +5,7 @@
 {-|
 Module      : Blarney.Recipe
 Description : Basic imperative programming on top of RTL
-Copyright   : (c) Matthew Naylor, 2019
+Copyright   : (c) 2019 Matthew Naylor, Dillon Huff
 License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
@@ -34,17 +34,17 @@ infixl 1 :=
 
 -- |Abstract syntax of Recipe
 data Recipe where
-  Tick   :: Recipe
-  (:=)   :: (Assign v, Bits a) => v a -> a -> Recipe
-  Wait   :: Bit 1 -> Recipe
-  When   :: Bit 1 -> Action () -> Recipe
-  Do     :: [Action ()] -> Recipe
-  Action :: Action () -> Recipe
-  Seq    :: [Recipe] -> Recipe
-  Par    :: [Recipe] -> Recipe
-  If     :: Bit 1 -> Recipe -> Recipe
-  While  :: Bit 1 -> Recipe -> Recipe
-  Launch :: Recipe -> Recipe
+  Tick       :: Recipe
+  (:=)       :: (Assign v, Bits a) => v a -> a -> Recipe
+  Wait       :: Bit 1 -> Recipe
+  When       :: Bit 1 -> Action () -> Recipe
+  Do         :: [Action ()] -> Recipe
+  Action     :: Action () -> Recipe
+  Seq        :: [Recipe] -> Recipe
+  Par        :: [Recipe] -> Recipe
+  If         :: Bit 1 -> Recipe -> Recipe
+  While      :: Bit 1 -> Recipe -> Recipe
+  Background :: Recipe -> Recipe
 
 -- Is time taken by given statement known?
 known :: Recipe -> Bool
@@ -85,7 +85,7 @@ run go (While c r)  = do
   always do
     ready <== go .|. done
   return (val ready .&. inv c)
-run go (Launch r) = do
+run go (Background r) = do
   done <- run go r
   return go
 

@@ -157,6 +157,7 @@ top = do
             display (stk.top1) " " (stk.top2)
         , Action do
             display (stk.top1) " " (stk.top2)
+            finish
         ]
 
   runOnce test

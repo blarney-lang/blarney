@@ -1,0 +1,108 @@
+storing 00
+storing 01
+storing 02
+storing 03
+storing 04
+storing 05
+storing 06
+storing 07
+storing 08
+storing 09
+storing 10
+storing 11
+storing 12
+storing 13
+storing 14
+storing 15
+storing 16
+storing 17
+storing 18
+storing 19
+starting at 81
+loading un-pipelined at time 82
+loading un-pipelined at time 84
+loading un-pipelined at time 86
+loading un-pipelined at time 88
+loading un-pipelined at time 90
+loading un-pipelined at time 92
+loading un-pipelined at time 94
+loading un-pipelined at time 96
+loading un-pipelined at time 98
+loading un-pipelined at time 100
+loading un-pipelined at time 102
+loading un-pipelined at time 104
+loading un-pipelined at time 106
+loading un-pipelined at time 108
+loading un-pipelined at time 110
+loading un-pipelined at time 112
+loading un-pipelined at time 114
+loading un-pipelined at time 116
+loading un-pipelined at time 118
+loading un-pipelined at time 120
+un-pipelined loop ending at        122
+C values after un-pipelined add
+C[00] = 00
+C[01] = 02
+C[02] = 04
+C[03] = 06
+C[04] = 08
+C[05] = 10
+C[06] = 12
+C[07] = 14
+C[08] = 16
+C[09] = 18
+C[10] = 20
+C[11] = 22
+C[12] = 24
+C[13] = 26
+C[14] = 28
+C[15] = 30
+C[16] = 32
+C[17] = 34
+C[18] = 36
+C[19] = 38
+Clearing C values
+Running pipelined vector add...
+starting pipelined loop at        229
+load values at time 230
+load values at time 231
+load values at time 232
+load values at time 233
+load values at time 234
+load values at time 235
+load values at time 236
+load values at time 237
+load values at time 238
+load values at time 239
+load values at time 240
+load values at time 241
+load values at time 242
+load values at time 243
+load values at time 244
+load values at time 245
+load values at time 246
+load values at time 247
+load values at time 248
+load values at time 249
+ending pipelined loop at        250
+After pipelined add...
+C[00] = 00
+C[01] = 02
+C[02] = 04
+C[03] = 06
+C[04] = 08
+C[05] = 10
+C[06] = 12
+C[07] = 14
+C[08] = 16
+C[09] = 18
+C[10] = 20
+C[11] = 22
+C[12] = 24
+C[13] = 26
+C[14] = 28
+C[15] = 30
+C[16] = 32
+C[17] = 34
+C[18] = 36
+C[19] = 38
