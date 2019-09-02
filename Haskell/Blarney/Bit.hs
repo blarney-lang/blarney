@@ -228,6 +228,16 @@ split a = (a0, a1)
     a0 = unsafeBits (wa-1, wa-w0) a
     a1 = unsafeBits (wa-w0-1, 0) a
 
+-- |Drop most significant bits
+dropBits :: forall d n. KnownNat d => Bit (d+n) -> Bit n
+dropBits a = c
+  where (b, c) = split a
+
+-- |Drop least significant bits
+dropBitsLSB :: forall d n. KnownNat n => Bit (n+d) -> Bit n
+dropBitsLSB a = b
+  where (b, c) = split a
+
 -- |Invert most significant bit
 invMSB :: Bit (1+n) -> Bit (1+n)
 invMSB a = inv top # bot
