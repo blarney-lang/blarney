@@ -53,6 +53,10 @@ constant i = result
     result = FromBV $ constBV w i
     w = widthOf result
 
+-- | Give a name to a 'Bit n' signal
+nameBit :: String -> Bit n -> Bit n
+nameBit nm = FromBV . (flip addBVNameHint $ nm) . toBV
+
 -- |Test plusargs
 testPlusArgs :: String -> Bit 1
 testPlusArgs = FromBV . testPlusArgsBV
@@ -233,7 +237,7 @@ invMSB a = inv top # bot
 
 -- |Dynamically-typed bit selection
 bits :: KnownNat m => (Int, Int) -> Bit n -> Bit m
-bits (hi, lo) a = 
+bits (hi, lo) a =
   case lo > hi || (hi+1-lo) /= wr of
     True -> error "Blarney: sub-range does not match bit width"
     False -> result

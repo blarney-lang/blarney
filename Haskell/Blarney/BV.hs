@@ -22,10 +22,11 @@ are primitive component instances and whose edges are connections.
 1. K. Claessen, D. Sands.  Observable Sharing for Functional Circuit
 Description, ASIAN 1999.
 -}
-module Blarney.BV 
+module Blarney.BV
   (
     -- * Primitive component types
     InstId         -- Every component instance has a unique id
+  , NameHints      -- A Hint type that handles name hints
   , OutputNumber   -- Each output from a component is numbered
   , Width          -- Bit vector width
   , InputWidth     -- Width of an input to a component
@@ -41,16 +42,19 @@ module Blarney.BV
 
     -- * Untyped bit vectors
   , BV(..)         -- Untyped bit vector
+  , addBVNameHint  -- Add a name hint to a 'BV'
   , makePrim       -- Create instance of primitive component
   , makePrim1      -- Common case: single-output components
 
     -- * Netlists
-  , Net(..)        -- Netlists are lists of Nets
-  , WireId         -- Nets are connected by wires
-  , Flatten(..)    -- Monad for flattening a circuit (BV) to a netlist
-  , freshId        -- Obtain a fresh instance id
-  , addNet         -- Add a net to the netlist
-  , flatten        -- Flatten a bit vector to a netlist
+  , Net(..)          -- Netlists are lists of Nets
+  , derefNets        -- Remove references in a Netlist
+  , WireId           -- Nets are connected by wires
+  , Flatten(..)      -- Monad for flattening a circuit (BV) to a netlist
+  , doIO             -- Lift an IO computation to a Flatten computation
+  , freshInstId      -- Obtain a fresh instance id
+  , addNet           -- Add a net to the netlist
+  , flatten          -- Flatten a bit vector to a netlist
 
     -- * Bit-vector primitives
   , constBV        -- :: Width -> Integer -> BV
@@ -87,7 +91,7 @@ module Blarney.BV
   , dualRamBV      -- :: OutputWidth -> Maybe String
   , regFileReadBV  -- :: RegFileId -> OutputWidth -> BV -> BV
   , getInitBV      -- :: BV -> Integer
-  ) where 
+  ) where
 
 import Prelude
 
@@ -98,12 +102,19 @@ import qualified Blarney.JList as JL
 import Data.IORef
 import System.IO.Unsafe(unsafePerformIO)
 
+-- For name hints
+import Data.Set
+import Data.List (intercalate)
+
 -- Standard imports
 import Control.Monad
 import qualified Data.Bits as B
 
 -- |Every instance of a component in the circuit has a unique id
 type InstId = Int
+
+-- |A Hint type that handles name hints
+type NameHints = Set String
 
 -- |Each output from a primitive component is numbered
 type OutputNumber = Int
@@ -251,59 +262,66 @@ lookupParam ps p = case [v | (k :-> v) <- ps, p == k] of
                      v:vs -> v
 
 -- | An untyped bit vector output wire from a primitive component instance
-data BV = 
+data BV =
   BV {
-    -- |What kind of primitive produced this bit vector?
+    -- | What kind of primitive produced this bit vector?
     bvPrim :: Prim
-    -- |Unique id of primitive instance
-  , bvInstRef :: IORef (Maybe InstId)
-    -- |Inputs to the primitive instance
+    -- | Inputs to the primitive instance
   , bvInputs :: [BV]
-    -- |Output pin number
+    -- | Output pin number
   , bvOutNum :: OutputNumber
-    -- |Width of this output pin
+    -- | Width of this output pin
   , bvWidth :: Width
-    -- |Width of each output pin
+    -- | Width of each output pin
   , bvWidths :: [Width]
+    -- | Name hints characterising the 'BV'
+  , bvNameHints :: NameHints
+    -- | Unique id of primitive instance
+  , bvInstRef :: IORef (Maybe InstId)
+    -- | Unique reference to 'NameHints' used to generate 'Net's
+  , bvNameHintsRef :: IORef NameHints
   }
+
+-- | A name hint to the 'BV'
+addBVNameHint :: BV -> String -> BV
+addBVNameHint bv nm = bv { bvNameHints = insert nm (bvNameHints bv) }
 
 {-# NOINLINE makePrim #-}
 -- |Helper function for creating an instance of a primitive component
 makePrim :: Prim -> [BV] -> [Int] -> [BV]
 makePrim prim ins outWidths =
   [ BV {
-        bvPrim    = prim
-      , bvInstRef = ref
-      , bvInputs  = ins
-      , bvOutNum  = i
-      , bvWidth   = w
-      , bvWidths  = outWidths
+        bvPrim         = prim
+      , bvInputs       = ins
+      , bvOutNum       = i
+      , bvWidth        = w
+      , bvWidths       = outWidths
+      , bvNameHints    = empty
+      , bvInstRef      = instIdRef
+      , bvNameHintsRef = nameHintsRef
     }
   | (i, w) <- zip [0..] outWidths ]
   where
-    {-# NOINLINE ref #-}
-    ref = newRef Nothing
-
-{-# NOINLINE newRef #-}
--- |For Observable Sharing.
-newRef :: Maybe InstId -> IORef (Maybe InstId)
-newRef x = unsafePerformIO (newIORef x)
+    -- |For Observable Sharing.
+    --{-# NOINLINE instIdRef #-}
+    instIdRef = unsafePerformIO (newIORef Nothing)
+    --{-# NOINLINE nameHintsRef #-}
+    nameHintsRef = unsafePerformIO (newIORef empty)
 
 -- |Create instance of primitive component which has one output
 makePrim1 :: Prim -> [BV] -> Int -> BV
 makePrim1 prim ins width = head (makePrim prim ins [width])
 
 -- |Netlists are lists of nets
-data Net =
-  Net {
-      netPrim         :: Prim
-    , netInstId       :: InstId
-    , netInputs       :: [WireId]
-    , netOutputWidths :: [Width]
-  } deriving Show
+data Net t = Net { netPrim         :: Prim
+                 , netInstId       :: InstId
+                 , netInputs       :: [WireId t]
+                 , netOutputWidths :: [Width]
+                 , netNameHints    :: t
+                 } deriving Show
 
 -- |A wire is uniquely identified by an instance id and an output number
-type WireId = (InstId, OutputNumber)
+type WireId t = (InstId, OutputNumber, t)
 
 -- |A reader/writer monad for accumulating the netlist
 newtype Flatten a = Flatten { runFlatten :: FlattenR -> IO (FlattenW, a) }
@@ -313,7 +331,7 @@ type FlattenR = IORef Int
 
 -- |The writer component contains the netlist and
 -- an "undo" computation, which unperforms all IORef assignments.
-type FlattenW = (JL.JList Net, IO ())
+type FlattenW = (JL.JList (Net (IORef NameHints)), IO ())
 
 instance Monad Flatten where
   return a = Flatten (\r -> return ((JL.Zero, return ()), a))
@@ -328,15 +346,15 @@ instance Applicative Flatten where
 instance Functor Flatten where
   fmap = liftM
 
--- |Obtain a fresh instance id
-freshId :: Flatten Int
-freshId = Flatten $ \r -> do
+-- |Obtain a fresh 'InstId' with the next available id
+freshInstId :: Flatten InstId
+freshInstId = Flatten $ \r -> do
   id <- readIORef r
   writeIORef r (id+1)
   return ((JL.Zero, return ()), id)
 
 -- |Add a net to the netlist
-addNet :: Net -> Flatten ()
+addNet :: Net (IORef NameHints) -> Flatten ()
 addNet net = Flatten $ \r -> return ((JL.One net, return ()), ())
 
 -- |Add an "undo" computation
@@ -350,23 +368,48 @@ doIO m = Flatten $ \r -> do
   return ((JL.Zero, return ()), a)
 
 -- |Flatten bit vector to netlist
-flatten :: BV -> Flatten WireId
-flatten b =
-  do val <- doIO (readIORef (bvInstRef b))
-     case val of
-       Nothing -> do
-         id <- freshId
-         doIO (writeIORef (bvInstRef b) (Just id))
-         addUndo (writeIORef (bvInstRef b) Nothing)
-         ins <- mapM flatten (bvInputs b)
-         let net = Net { netPrim         = bvPrim b
-                       , netInstId       = id
-                       , netInputs       = ins
-                       , netOutputWidths = (bvWidths b)
-                       }
-         addNet net
-         return (id, bvOutNum b)
-       Just id -> return (id, bvOutNum b)
+flatten :: BV -> Flatten (WireId (IORef NameHints))
+flatten b = do
+  -- accumulate name hints
+  nameHints <- doIO (readIORef nameHintsRef)
+  doIO (writeIORef nameHintsRef (union (bvNameHints b) nameHints))
+  addUndo (writeIORef nameHintsRef empty)
+  -- handle inst id traversal
+  instIdVal <- doIO (readIORef instRef)
+  case instIdVal of
+    Nothing -> do
+      id <- freshInstId
+      doIO (writeIORef instRef (Just id))
+      addUndo (writeIORef instRef Nothing)
+      ins <- mapM flatten (bvInputs b)
+      let net = Net { netPrim         = bvPrim b
+                    , netInstId       = id
+                    , netInputs       = ins
+                    , netOutputWidths = (bvWidths b)
+                    , netNameHints    = nameHintsRef
+                    }
+      addNet net
+      return (id, bvOutNum b, nameHintsRef)
+    Just id -> return (id, bvOutNum b, nameHintsRef)
+  where instRef = bvInstRef b
+        nameHintsRef = bvNameHintsRef b
+
+-- | TODO : document
+derefNets :: [Net (IORef NameHints)] -> IO [Net String]
+derefNets = mapM derefNet
+  where
+    derefNet net = do
+      ins <- mapM flatWire (netInputs net)
+      nameHints <- readIORef (netNameHints net)
+      return $ Net { netPrim         = netPrim net
+                   , netInstId       = netInstId net
+                   , netInputs       = ins
+                   , netOutputWidths = netOutputWidths net
+                   , netNameHints    = hintsToName nameHints
+                   }
+    flatWire (id, outNum, ref) = do hints <- readIORef ref
+                                    return (id, outNum, hintsToName hints)
+    hintsToName hints = intercalate "_" (toList hints)
 
 -- |Constant bit vector of given width
 constBV :: Width -> Integer -> BV
@@ -505,7 +548,7 @@ testPlusArgsBV str = makePrim1 (TestPlusArgs str) [] 1
 inputPinBV :: Width -> String -> BV
 inputPinBV w s = makePrim1 (Input w s) [] w
 
--- |Register of given width with initial value 
+-- |Register of given width with initial value
 regBV :: Width -> BV -> BV -> BV
 regBV w i a = makePrim1 (Register (getInitBV i) w) [a] w
 
@@ -547,7 +590,7 @@ regFileReadBV id dw a = makePrim1 (RegFileRead dw id) [a] dw
 getInitBV :: BV -> Integer
 getInitBV = eval
   where
-    eval a = 
+    eval a =
       case bvPrim a of
         Const _ i -> i
         ConstBits w One -> (2^w) - 1

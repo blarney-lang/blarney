@@ -3,7 +3,7 @@
 {-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE FlexibleContexts     #-}
 {-# LANGUAGE DataKinds            #-}
-{-# LANGUAGE KindSignatures       #-} 
+{-# LANGUAGE KindSignatures       #-}
 {-# LANGUAGE TypeOperators        #-}
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -43,21 +43,27 @@ class Bits a where
   pack          :: a -> Bit (SizeOf a)
   -- |Convert from a bit-vector
   unpack        :: Bit (SizeOf a) -> a
+  -- |Name a 'Bits'
+  nameBits      :: String -> a -> a
 
   -- Defaults
   type SizeOf a        =  GSizeOf (Rep a)
   default sizeOf       :: (Generic a, GBits (Rep a),
                            GSizeOf (Rep a) ~ SizeOf a)
                        => a -> Int
-  sizeOf a             =  gsizeOf (from a)
+  sizeOf x             =  gsizeOf (from x)
   default pack         :: (Generic a, GBits (Rep a),
                            GSizeOf (Rep a) ~ SizeOf a)
                        => a -> Bit (SizeOf a)
-  pack a               =  gpack (from a) 
+  pack x               =  gpack (from x)
   default unpack       :: (Generic a, GBits (Rep a),
                            GSizeOf (Rep a) ~ SizeOf a)
                        => Bit (SizeOf a) -> a
-  unpack a             =  to (gunpack a)
+  unpack x             =  to (gunpack x)
+  default nameBits     :: (Generic a, GBits (Rep a),
+                           GSizeOf (Rep a) ~ SizeOf a)
+                       => String -> a -> a
+  nameBits nm x        =  to (gnameBits nm (from x))
 
 -- Generic deriving for Bits
 -- =========================
@@ -67,12 +73,14 @@ class GBits f where
   gsizeOf        :: f a -> Int
   gpack          :: f a -> Bit (GSizeOf f)
   gunpack        :: Bit (GSizeOf f) -> f a
+  gnameBits      :: String -> f a -> f a
 
 instance GBits U1 where
   type GSizeOf U1 = 0
   gsizeOf ~U1 = 0
   gpack ~U1 = 0
   gunpack bs = U1
+  gnameBits nm ~U1 = U1
 
 instance (GBits a, GBits b) => GBits (a :*: b) where
   type GSizeOf (a :*: b) = GSizeOf a + GSizeOf b
@@ -84,18 +92,21 @@ instance (GBits a, GBits b) => GBits (a :*: b) where
       b  = gunpack (unsafeBits (wb-1, 0) bs)
       wa = gsizeOf a
       wb = gsizeOf b
+  gnameBits nm ~(a :*: b) = (gnameBits nm a) :*: (gnameBits nm b)
 
 instance GBits a => GBits (M1 i c a) where
   type GSizeOf (M1 i c a) = GSizeOf a
   gpack ~(M1 x) = gpack x
   gsizeOf ~(M1 x) = gsizeOf x
   gunpack x = M1 (gunpack x)
+  gnameBits nm ~(M1 x) = M1 (gnameBits nm x) -- TODO here pass field name ?
 
 instance Bits a => GBits (K1 i a) where
   type GSizeOf (K1 i a) = SizeOf a
   gsizeOf ~(K1 x) = sizeOf x
   gpack ~(K1 x) = pack x
   gunpack x = K1 (unpack x)
+  gnameBits nm ~(K1 x) = K1 (nameBits nm x)
 
 -- Standard instances
 -- ==================
@@ -105,6 +116,7 @@ instance KnownNat n => Bits (Bit n) where
   sizeOf = widthOf
   pack = id
   unpack = id
+  nameBits = nameBit
 
 instance Bits ()
 
