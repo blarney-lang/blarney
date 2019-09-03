@@ -205,7 +205,7 @@ upper a = result
      wr = fromInteger (natVal result)
 
 -- |Extract most significant bits
-truncateLSB :: (KnownNat m, m <= n) => Bit n -> Bit m
+truncateLSB :: forall m n. (KnownNat m, m <= n) => Bit n -> Bit m
 truncateLSB = upper
 
 -- |Extract least significant bits
@@ -217,7 +217,7 @@ lower a = result
      wr = fromInteger (natVal result)
 
 -- |Extract least significant bits
-truncate :: (KnownNat m, m <= n) => Bit n -> Bit m
+truncate :: forall m n. (KnownNat m, m <= n) => Bit n -> Bit m
 truncate = lower
 
 -- |Split bit vector
