@@ -9,6 +9,7 @@ top:
 .PHONY: clean
 clean:
 	make -C Factorial clean
+	make -C NameBits clean
 	make -C FIFO clean
 	make -C MeanFilter clean
 	make -C UpDownCounter clean

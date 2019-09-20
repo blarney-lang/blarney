@@ -30,7 +30,7 @@ module BlockRAM (
   begin
     if (WE) begin
       RAM[ADDR] <= DI;
-      DO <= DI;
+      DO <= {DATA_WIDTH{1'hx}};
     end
     else begin
       DO <= RAM[ADDR];

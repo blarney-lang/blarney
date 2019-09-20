@@ -937,9 +937,9 @@ As a way of briging together a number of the ideas introduced above,
 we have developed a couple of simple microprocessors in Blarney:
 
 1. [Simple](https://github.com/POETSII/blarney/blob/master/Examples/CPU/CPU.hs)
-4-stage pipelined 8-bit CPU, with just 4 instructions, which resolves
+4-stage 8-bit CPU, with just 4 instructions, which resolves
 both control and data hazards.
 
 2. [Pebbles](https://github.com/POETSII/blarney/blob/master/Examples/Pebbles/)
-is a 5-stage 32-bit RISC-V core aiming for a high-level definition of
-the `RV32I` instruction set with moderate performance.
+is a 5-stage 32-bit RISC-V core which cleanly separates the
+definitions of the ISA and the pipeline microarchitecture.

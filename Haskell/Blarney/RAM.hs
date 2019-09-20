@@ -40,14 +40,13 @@ import Blarney.Module
 import Blarney.Prelude
 
 -- RAM primitive (for internal use only)
--- (Reads new data on write)
+-- (Read during write: reads "dont care")
 ramPrim :: Int -> Maybe String -> (Bit a, Bit d, Bit 1) -> Bit d
 ramPrim dataWidth init (a, d, en) =
   FromBV $ ramBV dataWidth init (toBV a, toBV d, toBV en)
 
 -- True dual-port RAM primitive (for internal use only)
--- (Reads new data on write)
--- (When read-address == write-address on different ports, read old data)
+-- (Read during write: reads "dont care")
 ramTrueDualPrim :: Int -> Maybe String
                 -> (Bit a, Bit d, Bit 1)
                 -> (Bit a, Bit d, Bit 1)
@@ -61,20 +60,19 @@ ramTrueDualPrim dataWidth init (a0, d0, en0)
                  (toBV a1, toBV d1, toBV en1)
 
 -- |Uninitialised block RAM.
--- Reads new data on write.
+-- (Read during write: reads "dont care")
 ram :: (Bits a, Bits d) => (a, d, Bit 1) -> d
 ram (a, d, en) = 
   unpack (ramPrim (sizeOf d) Nothing (pack a, pack d, en))
 
 -- |Initilaised block RAM (contents taken from hex file).
--- Reads new data on write.
+-- (Read during write: reads "dont care")
 ramInit :: (Bits a, Bits d) => String -> (a, d, Bit 1) -> d
 ramInit init (a, d, en) =
   unpack (ramPrim (sizeOf d) (Just init) (pack a, pack d, en))
 
 -- | Uninitialised true dual-port block RAM.
--- Reads new data on write.
--- When read-address == write-address on different ports, reads old data.
+-- (Read during write: reads "dont care")
 ramTrueDual :: (Bits a, Bits d) =>
                (a, d, Bit 1)
             -> (a, d, Bit 1)
@@ -87,8 +85,7 @@ ramTrueDual (a0, d0, en0)
                  (pack a1, pack d1, en1)
 
 -- Initilaised true dual-port block RAM.
--- Reads new data on write.
--- When read-address == write-address on different ports, reads old data.
+-- (Read during write: reads "dont care")
 ramTrueDualInit :: (Bits a, Bits d) =>
                    String
                 -> (a, d, Bit 1)
@@ -143,12 +140,12 @@ makeRAMCore init = do
   }
 
 -- |Create true dual-port block RAM.
--- When read-address == write-address on different ports, read old data.
+-- (Read during write: reads "dont care")
 makeTrueDualRAM :: (Bits a, Bits d) => Module (RAM a d, RAM a d)
 makeTrueDualRAM = makeTrueDualRAMCore Nothing
 
 -- |Create true dual-port block RAM with initial contents from hex file.
--- When read-address == write-address on different ports, read old data.
+-- (Read during write: reads "dont care")
 makeTrueDualRAMInit :: (Bits a, Bits d) => String -> Module (RAM a d, RAM a d)
 makeTrueDualRAMInit init = makeTrueDualRAMCore (Just init)
 

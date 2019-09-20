@@ -30,7 +30,6 @@ module BlockRAM (
   parameter ADDR_WIDTH   = 1;
   parameter DATA_WIDTH   = 1;
   parameter NUM_ELEMS    = 1;
-  parameter RD_DURING_WR = "OLD_DATA";     // Or: "DONT_CARE"
   parameter DO_REG       = "UNREGISTERED"; // Or: "CLOCK0"
   parameter INIT_FILE    = "UNUSED";
   parameter DEV_FAMILY   = "Stratix V";
@@ -85,7 +84,7 @@ module BlockRAM (
     altsyncram_component.outdata_aclr_a = "NONE",
     altsyncram_component.outdata_reg_a = DO_REG,
     altsyncram_component.power_up_uninitialized = "FALSE",
-    altsyncram_component.read_during_write_mode_port_a = "NEW_DATA_NO_NBE_READ",
+    altsyncram_component.read_during_write_mode_port_a = "DONT_CARE",
     altsyncram_component.widthad_a = ADDR_WIDTH,
     altsyncram_component.width_a = DATA_WIDTH,
     altsyncram_component.width_byteena_a = 1;

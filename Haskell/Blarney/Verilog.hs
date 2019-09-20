@@ -88,8 +88,10 @@ writeVerilogTop top mod dir =
       , mod ++ ": *.v *.cpp"
       , "\tverilator -cc " ++ mod ++ ".v " ++ "-exe "
                            ++ mod ++ ".cpp " ++ "-o " ++ mod
-                           ++ " -Wno-UNSIGNED "
-                           ++ " -y $(BLARNEY_ROOT)/Verilog "
+                           ++ " -Wno-UNSIGNED"
+                           ++ " -y $(BLARNEY_ROOT)/Verilog"
+                           ++ " --x-assign unique"
+                           ++ " --x-initial unique"
       , "\tmake -C obj_dir -j -f V" ++ mod ++ ".mk " ++ mod
       , "\tcp obj_dir/" ++ mod ++ " ."
       , "\trm -rf obj_dir"
@@ -114,6 +116,7 @@ writeVerilog fileName modName netlist = do
 data NetVerilog = NetVerilog { decl :: Maybe ShowS -- declaration
                              , inst :: Maybe ShowS -- instanciation
                              , alws :: Maybe ShowS -- always block
+                             , rsts :: Maybe ShowS -- reset logic
                              }
 -- pretty helpers
 --------------------------------------------------------------------------------
@@ -158,14 +161,20 @@ showVerilogModule modName netlst =
   <^> spaces 2 <> showComment "Always block"
   <^> spaces 2 <> showCommentLine
   <^> spaces 2 <> str "always" <+> chr '@' <> parens (str "posedge clock") <+> str "begin"
-  <> foldl (\x y -> x <^> spaces 4 <> y) (str "") (catMaybes $ map alws netVs)
+  <^> spaces 4 <> str "if (reset) begin"
+  <> foldl (\x y -> x <^> spaces 6 <> y) (str "") (catMaybes $ map rsts netVs)
+  <^> spaces 4 <> str "end else begin"
+  <> foldl (\x y -> x <^> spaces 6 <> y) (str "") (catMaybes $ map alws netVs)
+  <^> spaces 4 <> str "end"
   <^> spaces 2 <> str "end"
   <^> str "endmodule"
   where netVs = map genNetVerilog netlst
         netPrims = map netPrim netlst
         ins = [Input w s | (w, s) <- nub [(w, s) | Input w s <- netPrims]]
         outs = [Output w s | Output w s <- netPrims]
-        showIOs = (argStyle 2 $ (str "input wire clock") : (map showIO (ins ++ outs)))
+        showIOs = argStyle 2 $ str "input wire clock"
+                             : str "input wire reset"
+                             : map showIO (ins ++ outs)
         showIO (Input w s) = str "input wire" <+> brackets (shows (w-1) <> str ":0") <+> str s
         showIO (Output w s) = str "output wire" <+> brackets (shows (w-1) <> str ":0") <+> str s
         showIO _ = str ""
@@ -201,7 +210,14 @@ declRegFile initFile aw dw id =
                        (str fname <> comma <+> str "rf" <> shows id) <> semi
                    <+> str "endgenerate"
 
--- instanciation helpers
+-- reset helpers
+--------------------------------------------------------------------------------
+
+resetRegister width reg init =
+      showWire reg <+> str "<="
+  <+> shows width <> str "'h" <> str (showHex init "") <> semi
+
+-- instantiation helpers
 --------------------------------------------------------------------------------
 instPrefixOp op net =
       str "assign" <+> showWire (netInstId net, 0, netNameHints net) <+> equals
@@ -251,7 +267,8 @@ instCustom net name ins outs params =
         args = zip ins (netInputs net) ++ [ (o, (nId, n, netNameHints net))
                                           | (o, n) <- zip (map fst outs) [0..] ]
         numArgs  = length args
-        showArgs = argStyle 4 $ (str ".clock(clock)"):allArgs
+        showArgs = argStyle 4 $ str ".clock(clock)" 
+                              : str ".reset(reset)" : allArgs
         allArgs  = [ dot <> str name <> parens (showWire wire)
                    | ((name, wire), i) <- zip args [1..] ]
         nId = netInstId net
@@ -359,9 +376,11 @@ genNetVerilog net = case netPrim net of
   LessThanEq w            -> dfltNV { decl = Just $ declWire 1 wId
                                     , inst = Just $ instInfixOp "<=" net }
   Register i w            -> dfltNV { decl = Just $ declRegInit w wId i
-                                    , alws = Just $ alwsRegister net }
+                                    , alws = Just $ alwsRegister net
+                                    , rsts = Just $ resetRegister w wId i }
   RegisterEn i w          -> dfltNV { decl = Just $ declRegInit w wId i
-                                    , alws = Just $ alwsRegisterEn net }
+                                    , alws = Just $ alwsRegisterEn net
+                                    , rsts = Just $ resetRegister w wId i }
   BRAM i aw dw            -> dfltNV { decl = Just $ declRAM i 1 aw dw nId nName
                                     , inst = Just $ instRAM net i aw dw }
   TrueDualBRAM i aw dw    -> dfltNV { decl = Just $ declRAM i 2 aw dw nId nName
@@ -401,4 +420,5 @@ genNetVerilog net = case netPrim net of
         wId = (nId, 0, nName)
         dfltNV = NetVerilog { decl = Nothing
                             , inst = Nothing
-                            , alws = Nothing }
+                            , alws = Nothing
+                            , rsts = Nothing }

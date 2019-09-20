@@ -34,9 +34,9 @@ module BlockRAMTrueDual (
   begin
     if (WE_A) begin
       RAM[ADDR_A] <= DI_A;
-      DO_A <= DI_A;
+      DO_A <= {DATA_WIDTH{1'hx}};;
     end else begin
-      DO_A <= RAM[ADDR_A];
+      DO_A <= (WE_B && ADDR_A == ADDR_B) ? {DATA_WIDTH{1'hx}} : RAM[ADDR_A];
     end 
   end 
 
@@ -45,9 +45,9 @@ module BlockRAMTrueDual (
   begin
     if (WE_B) begin
       RAM[ADDR_B] <= DI_B;
-      DO_B <= DI_B;
+      DO_B <= {DATA_WIDTH{1'hx}};
     end else begin
-      DO_B <= RAM[ADDR_B];
+      DO_B <= (WE_A && ADDR_A == ADDR_B) ? {DATA_WIDTH{1'hx}} : RAM[ADDR_B];
     end 
   end
 

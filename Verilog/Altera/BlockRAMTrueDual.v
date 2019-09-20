@@ -34,7 +34,7 @@ module BlockRAMTrueDual (
   parameter ADDR_WIDTH   = 1;
   parameter DATA_WIDTH   = 1;
   parameter NUM_ELEMS    = 1;
-  parameter RD_DURING_WR = "OLD_DATA";     // Or: "DONT_CARE"
+  parameter RD_DURING_WR = "DONT_CARE";
   parameter DO_REG_A     = "UNREGISTERED"; // Or: "CLOCK0"
   parameter DO_REG_B     = "UNREGISTERED"; // Or: "CLOCK0"
   parameter INIT_FILE    = "UNUSED";
@@ -96,8 +96,8 @@ module BlockRAMTrueDual (
     altsyncram_component.outdata_reg_b = DO_REG_B,
     altsyncram_component.power_up_uninitialized = "FALSE",
     altsyncram_component.read_during_write_mode_mixed_ports = RD_DURING_WR,
-    altsyncram_component.read_during_write_mode_port_a = "NEW_DATA_NO_NBE_READ",
-    altsyncram_component.read_during_write_mode_port_b = "NEW_DATA_NO_NBE_READ",
+    altsyncram_component.read_during_write_mode_port_a = "DONT_CARE",
+    altsyncram_component.read_during_write_mode_port_b = "DONT_CARE",
     altsyncram_component.widthad_a = ADDR_WIDTH,
     altsyncram_component.widthad_b = ADDR_WIDTH,
     altsyncram_component.width_a = DATA_WIDTH,
