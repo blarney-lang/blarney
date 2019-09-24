@@ -68,11 +68,6 @@ tcPass _ _  env = do
 -- | Helper function to preserve Blarney modules' instance name.
 nameModule :: GHC.FindResult -> Expr.ExprLStmt GHC.GhcTc -> GHC.TcM (Expr.ExprLStmt GHC.GhcTc)
 nameModule (GHC.Found _ m) e@(GHC.L loc (Expr.BindStmt xbind pat body expr0 expr1)) = do
-
-  case body of
-    GHC.L _ (GHC.HsWrap a b c) -> msg "HOOORUUU"
-    _ -> return ()
-
   hs_env <- GHC.getTopEnv
   blModuleTy <- GHC.lookupOrig m (GHC.mkTcOcc "Module")
   (_, mbe) <- liftIO (GHC.deSugarExpr hs_env body)
