@@ -39,6 +39,8 @@ import qualified TcSimplify as GHC
 import qualified TcType as GHC
 import qualified Type
 import qualified Data.Generics as SYB
+import Data.IORef
+import Control.Monad
 
 -- | Printing helpers
 msg :: String -> GHC.TcM ()
@@ -58,16 +60,24 @@ plugin = GHC.defaultPlugin {
 -- | The type checker pass.
 tcPass :: [GHC.CommandLineOption] -> GHC.ModSummary -> GHC.TcGblEnv
        -> GHC.TcM GHC.TcGblEnv
-tcPass _ _  env = do
+tcPass _ modS env = do
+  count  <- liftIO $ newIORef 0
   hs_env <- GHC.getTopEnv
   blMod  <- liftIO $ GHC.findImportedModule hs_env
                     (GHC.mkModuleName "Blarney.Module") Nothing
-  tcg_binds <- SYB.mkM (nameModule blMod) `SYB.everywhereM` GHC.tcg_binds env
+  tcg_binds <- SYB.mkM (nameModule count blMod)
+               `SYB.everywhereM` GHC.tcg_binds env
+  n <- liftIO $ readIORef count
+  when (n > 0) $
+    msg $ "\tBlarney's Namer pluging preserved " ++ show n ++ " module name"
+                                                 ++ if n > 1 then "s" else ""
+  --msg $ show (GHC.ms_location modS)
   return $ env { GHC.tcg_binds = tcg_binds }
 
 -- | Helper function to preserve Blarney modules' instance name.
-nameModule :: GHC.FindResult -> Expr.ExprLStmt GHC.GhcTc -> GHC.TcM (Expr.ExprLStmt GHC.GhcTc)
-nameModule (GHC.Found _ m) e@(GHC.L loc (Expr.BindStmt xbind pat body expr0 expr1)) = do
+nameModule :: IORef Int ->  GHC.FindResult -> Expr.ExprLStmt GHC.GhcTc
+           -> GHC.TcM (Expr.ExprLStmt GHC.GhcTc)
+nameModule count (GHC.Found _ m) e@(GHC.L loc (Expr.BindStmt xbind pat body e0 e1)) = do
   hs_env <- GHC.getTopEnv
   blModuleTy <- GHC.lookupOrig m (GHC.mkTcOcc "Module")
   (_, mbe) <- liftIO (GHC.deSugarExpr hs_env body)
@@ -89,6 +99,7 @@ nameModule (GHC.Found _ m) e@(GHC.L loc (Expr.BindStmt xbind pat body expr0 expr
                           $ GHC.HsString GHC.NoSourceText (GHC.fsLit name)
         let namedE = bLoc $ GHC.HsApp GHC.noExt namerE nameE
         let body'  = bLoc $ GHC.HsApp GHC.noExt namedE body
-        return $ GHC.L loc (Expr.BindStmt xbind pat body' expr0 expr1)
+        liftIO $ modifyIORef count (+1)
+        return $ GHC.L loc (Expr.BindStmt xbind pat body' e0 e1)
       _ -> return e
-nameModule _ e = return e
+nameModule _ _ e = return e
