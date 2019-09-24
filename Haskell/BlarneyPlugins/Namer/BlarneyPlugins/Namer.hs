@@ -50,7 +50,10 @@ pprMsg = msg . ppr
 
 -- | The exported 'GHC.Plugin'. Defines a custom type checker pass.
 plugin :: GHC.Plugin
-plugin = GHC.defaultPlugin { GHC.typeCheckResultAction = tcPass }
+plugin = GHC.defaultPlugin {
+           GHC.typeCheckResultAction = tcPass
+         , GHC.pluginRecompile = \_ -> return GHC.NoForceRecompile
+         }
 
 -- | The type checker pass.
 tcPass :: [GHC.CommandLineOption] -> GHC.ModSummary -> GHC.TcGblEnv
