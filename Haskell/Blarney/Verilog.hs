@@ -20,6 +20,7 @@ import Data.List
 import Numeric (showHex)
 import System.IO
 import Data.Maybe
+import Data.Bits
 import System.Process
 
 -- Blarney imports
@@ -250,8 +251,11 @@ instConcat net =
                showNetInput (netInputs net !! 1)) <> semi
 instSelectBits net hi lo =
       str "assign" <+> showWire (netInstId net, 0, netNameHints net) <+> equals
-  <+> showNetInput (netInputs net !! 0) <> brackets
-      (shows hi <> colon <> shows lo) <> semi
+  <+> sel (netInputs net !! 0) <> semi
+  where sel (InputWire w) = showWire w <> brackets (shows hi <> colon <> shows lo)
+        sel (InputIntLit w v) = showIntLit width ((v `shiftR` lo) .&. ((2^width)-1))
+        sel (InputBitLit w v) = showBitLit width v
+        width = hi+1-lo
 instZeroExtend net wi wo =
       str "assign" <+> showWire (netInstId net, 0, netNameHints net) <+> equals
   <+> braces (braces (shows (wo-wi) <> braces (str "1'b0"))
