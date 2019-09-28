@@ -49,8 +49,9 @@ module Blarney.BV
     -- * Netlists
   , Net(..)          -- Netlists are lists of Nets
   , NetInput(..)     -- Net inputs type
-  , derefNets        -- Remove references in a Netlist
   , WireId           -- Nets are connected by wires
+  , Expr(..)         -- Net inputs can also be an expression
+  , derefNets        -- Remove references in a Netlist
   , Flatten(..)      -- Monad for flattening a circuit (BV) to a netlist
   , doIO             -- Lift an IO computation to a Flatten computation
   , freshInstId      -- Obtain a fresh instance id
@@ -323,9 +324,11 @@ data Net t = Net { netPrim         :: Prim
 
 -- |A Net input can be: a wire, an int literal or a bit literal
 data NetInput t = InputWire (WireId t)
-                | InputIntLit OutputWidth Integer
-                | InputBitLit OutputWidth ConstBit
+                | InputExpr Expr
                 deriving Show
+
+-- |An expression used as a 'Net' input
+data Expr = Prim :< [Expr] deriving Show
 
 -- |A wire is uniquely identified by an instance id and an output number
 type WireId t = (InstId, OutputNumber, t)
@@ -376,8 +379,8 @@ doIO m = Flatten $ \r -> do
 
 -- |Flatten bit vector to netlist
 flatten :: BV -> Flatten (NetInput (IORef NameHints))
-flatten BV{bvPrim=(Const width val)} = return $ InputIntLit width val
-flatten BV{bvPrim=(ConstBits width val)} = return $ InputBitLit width val
+flatten BV{bvPrim=x@(Const _ _)} = return $ InputExpr (x :< [])
+flatten BV{bvPrim=x@(ConstBits _ _)} = return $ InputExpr (x :< [])
 flatten b = do
   -- accumulate name hints
   nameHints <- doIO (readIORef nameHintsRef)
@@ -408,7 +411,7 @@ derefNets :: [Net (IORef NameHints)] -> IO [Net String]
 derefNets = mapM derefNet
   where
     derefNet net = do
-      ins <- mapM flatWire (netInputs net)
+      ins <- mapM flatInput (netInputs net)
       nameHints <- readIORef (netNameHints net)
       return $ Net { netPrim         = netPrim net
                    , netInstId       = netInstId net
@@ -416,11 +419,10 @@ derefNets = mapM derefNet
                    , netOutputWidths = netOutputWidths net
                    , netNameHints    = hintsToName nameHints
                    }
-    flatWire (InputWire (id, outNum, ref)) = do
+    flatInput (InputWire (id, outNum, ref)) = do
       hints <- readIORef ref
       return $ InputWire (id, outNum, hintsToName hints)
-    flatWire (InputIntLit width val ) = return $ InputIntLit width val
-    flatWire (InputBitLit width val ) = return $ InputBitLit width val
+    flatInput (InputExpr e) = return $ InputExpr e
     hintsToName hints = intercalate "_" (toList hints)
 
 -- |Constant bit vector of given width

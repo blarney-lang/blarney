@@ -146,22 +146,25 @@ argStyle n as =
 -- general helpers
 --------------------------------------------------------------------------------
 showIntLit :: Int -> Integer -> ShowS
-showIntLit width val = shows width <> str "'h" <> showHex val
+showIntLit w v = shows w <> str "'h" <> showHex v
 showBitLit :: Int -> ConstBit -> ShowS
-showBitLit width b = shows width <> str "'b" <> str bitStr
-  where bitStr = replicate width $ bitChar b
-        bitChar One = '1'
-        bitChar Zero = '0'
-        bitChar DontCare = 'x'
+showBitLit w b = shows w <> str "'b" <> str bitStr
+                 where bitStr = replicate w $ bitChar b
+                       bitChar Zero = '0'
+                       bitChar One = '1'
+                       bitChar DontCare = 'x'
+showExpr :: Expr -> ShowS
+showExpr (Const w v :< []) = showIntLit w v
+showExpr (ConstBits w b :< []) = showBitLit w b
+showExpr x = error $ "Unsupported Expr " ++ show x
 showWire :: (InstId, Int, String) -> ShowS
 showWire (iId, nOut, nm) = (if (nm == "") then chr 'v' else str nm)
                             <> chr '_' <> shows iId <> chr '_' <> shows nOut
 showWireWidth :: Int -> (InstId, Int, String) -> ShowS
 showWireWidth width wId = brackets (shows (width-1) <> str ":0") <+> showWire wId
 showNetInput :: NetInput String -> ShowS
-showNetInput (InputIntLit width val) = showIntLit width val
-showNetInput (InputBitLit width val) = showBitLit width val
 showNetInput (InputWire wId) = showWire wId
+showNetInput (InputExpr expr) = showExpr expr
 showVerilogModule :: String -> [Net String] -> ShowS
 showVerilogModule modName netlst =
      str "module" <+> str modName <+> chr '(' <^> showIOs <^> spaces 2 <> str ");"
@@ -253,8 +256,8 @@ instSelectBits net hi lo =
       str "assign" <+> showWire (netInstId net, 0, netNameHints net) <+> equals
   <+> sel (netInputs net !! 0) <> semi
   where sel (InputWire w) = showWire w <> brackets (shows hi <> colon <> shows lo)
-        sel (InputIntLit w v) = showIntLit width ((v `shiftR` lo) .&. ((2^width)-1))
-        sel (InputBitLit w v) = showBitLit width v
+        sel (InputExpr (Const _ v :< [])) = showIntLit width ((v `shiftR` lo) .&. ((2^width)-1))
+        sel (InputExpr (ConstBits _ b :< [])) = showBitLit width b
         width = hi+1-lo
 instZeroExtend net wi wo =
       str "assign" <+> showWire (netInstId net, 0, netNameHints net) <+> equals
