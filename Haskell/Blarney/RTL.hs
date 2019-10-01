@@ -460,6 +460,10 @@ finaliseNames = mapArray inner
 --        genName hints = if null hints then "v"
 --                        else intercalate "_" (toList hints)
 
+-- | Constant folding pass
+foldConstants :: IOArray InstId (Maybe Net) -> IO (IOArray InstId (Maybe Net))
+foldConstants = mapArray (fmap evalConstNet)
+
 -- |Convert RTL monad to a netlist
 netlist :: RTL () -> IO [Net]
 netlist rtl = do
@@ -470,8 +474,10 @@ netlist rtl = do
                 // [(netInstId n, Just n) | n <- JL.toList nl]
   netlist' <- thaw netlist
   netlist'' <- finaliseNames netlist'
+  --netlist''' <- foldConstants netlist''
   undo
   nl' <- getElems netlist''
+  --nl' <- getElems netlist'''
   return $ catMaybes nl'
   where
     (_, actsJL, _) = runRTL rtl (R { nameHints = empty
