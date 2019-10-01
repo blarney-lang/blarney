@@ -79,9 +79,12 @@ import GHC.TypeLits
 import Control.Monad.Fix
 import Control.Monad hiding (when)
 import Data.Map (Map, findWithDefault, fromListWith)
+import Data.Array
+import Data.Array.IO
+import Data.Maybe
 
 -- For name hints
-import Data.Set (empty, singleton, insert, toList)
+import Data.Set (Set, empty, singleton, insert, toList, union)
 import Data.List (intercalate)
 
 -- |The RTL monad, for register-transfer-level descriptions,
@@ -114,10 +117,10 @@ data Assign = Assign { enable :: Bit 1, lhs :: VarId, rhs :: BV }
 rhsTyped :: Bits a => Assign -> a
 rhsTyped = unpack . FromBV . rhs
 
--- |The reader component contains a name string, the current condition on any
+-- |The reader component contains name hints, the current condition on any
 -- RTL actions, and a list of all assigments in the computation
 -- (obtained circularly from the writer output of the monad).
-data R = R { nameHints :: NameHints
+data R = R { nameHints :: Set String
            , cond      :: Bit 1
            , assigns   :: Map VarId [Assign]
            }
@@ -415,12 +418,11 @@ addDisplayPrim (cond, items) = do
     c <- flatten (toBV cond)
     ins <- mapM flatten [b | FormatBit w b <- items]
     id <- freshInstId
-    hints <- doIO (newIORef empty)
     let net = Net { netPrim = Display args
                   , netInstId = id
                   , netInputs = c:ins
                   , netOutputWidths = []
-                  , netNameHints = hints
+                  , netName = Hints empty
                   }
     addNet net
   where
@@ -433,12 +435,11 @@ addFinishPrim :: Bit 1 -> Flatten ()
 addFinishPrim cond = do
   c <- flatten (toBV cond)
   id <- freshInstId
-  hints <- doIO (newIORef empty)
   let net = Net { netPrim = Finish
                 , netInstId = id
                 , netInputs = [c]
                 , netOutputWidths = []
-                , netNameHints = hints
+                , netName = Hints empty
                 }
   addNet net
 
@@ -447,12 +448,11 @@ addOutputPrim :: (Width, String, BV) -> Flatten ()
 addOutputPrim (w, str, value) = do
   c <- flatten value
   id <- freshInstId
-  hints <- doIO (newIORef empty)
   let net = Net { netPrim = Output w str
                 , netInstId = id
                 , netInputs = [c]
                 , netOutputWidths = []
-                , netNameHints = hints
+                , netName = Hints empty
                 }
   addNet net
 
@@ -460,12 +460,11 @@ addOutputPrim (w, str, value) = do
 addInputPrim :: (Width, String) -> Flatten ()
 addInputPrim (w, str) = do
   id <- freshInstId
-  hints <- doIO (newIORef empty)
   let net = Net { netPrim = Input w str
                 , netInstId = id
                 , netInputs = []
                 , netOutputWidths = [w]
-                , netNameHints = hints
+                , netName = Hints empty
                 }
   addNet net
 
@@ -473,12 +472,11 @@ addInputPrim (w, str) = do
 addRegFilePrim :: (String, VarId, Width, Width) -> Flatten ()
 addRegFilePrim (initFile, regFileId, aw, dw) = do
   id <- freshInstId
-  hints <- doIO (newIORef empty)
   let net = Net { netPrim = RegFileMake initFile aw dw regFileId
                 , netInstId = id
                 , netInputs = []
                 , netOutputWidths = []
-                , netNameHints = hints
+                , netName = Hints empty
                 }
   addNet net
 
@@ -489,12 +487,11 @@ addRegFileUpdatePrim (regFileId, c, aw, dw, a, d) = do
   af <- flatten a
   df <- flatten d
   id <- freshInstId
-  hints <- doIO (newIORef empty)
   let net = Net { netPrim = RegFileWrite aw dw regFileId
                 , netInstId = id
                 , netInputs = [cf, af, df]
                 , netOutputWidths = []
-                , netNameHints = hints
+                , netName = Hints empty
                 }
   addNet net
 
@@ -502,14 +499,66 @@ addRegFileUpdatePrim (regFileId, c, aw, dw, a, d) = do
 addRoots :: [BV] -> RTL ()
 addRoots roots = write (RTLRoots roots)
 
+-- | Finalise 'Name's in netlist to "v_"
+finaliseNames :: IOArray InstId (Maybe Net) -> IO (IOArray InstId (Maybe Net))
+finaliseNames = mapArray inner
+  where inner (Just net) = Just net { netInputs = map f (netInputs net)
+                                    , netName   = Final "v"
+                                    }
+        inner Nothing = Nothing
+        f (InputWire (i, n, _)) = InputWire (i, n, Final "v")
+        f i = i
+
+-- | Finalise names in Netlist preserving name hints
+--finaliseNames :: IOArray InstId (Maybe Net) -> IO (IOArray InstId (Maybe Net))
+--finaliseNames arr = do
+--  bounds <- getBounds arr
+--  names :: IOArray InstId (Set String) <- newArray bounds empty
+--  pairs <- getAssocs arr
+--  -- accumulate names for each Net
+--  forM_ [(a,b) | x@(a, Just b) <- pairs] $ \(idx, net) -> do
+--    -- update names with current netName
+--    updt names idx (netName net)
+--    -- update names with current net's input wires
+--    forM_ [wId | x@(InputWire wId) <- netInputs net] $ \(i, n, nm) -> do
+--      updt names i nm
+--  -- fold names back into Netlist
+--  forM_ [(a,b) | x@(a, Just b) <- pairs] $ \(idx, net) -> do
+--    -- prepare new netInputs
+--    netInputs' <- forM (netInputs net) $ \inpt -> do
+--      case inpt of
+--        InputWire (i, n, _) -> do nm <- liftM genName (readArray names i)
+--                                  return $ InputWire (i, n, Final nm)
+--        x -> return x
+--    -- prepare new netName
+--    netName' <- liftM genName (readArray names idx)
+--    -- update the current net
+--    writeArray arr idx (Just net { netInputs = netInputs'
+--                                 , netName   = Final netName'
+--                                 })
+--  -- return mutated netlist
+--  return arr
+--  -- inner helpers
+--  where updt names i nm = do old <- readArray names i
+--                             case nm of
+--                               Hints nms -> writeArray names i (union nms old)
+--                               Final nm  -> writeArray names i (insert nm old)
+--        genName hints = if null hints then "v"
+--                        else intercalate "_" (toList hints)
+
 -- |Convert RTL monad to a netlist
-netlist :: RTL () -> IO [Net String]
+netlist :: RTL () -> IO [Net]
 netlist rtl = do
-  i <- newIORef (0 :: Int)
+  i <- newIORef (0 :: InstId)
   ((nl, undo), _) <- runFlatten roots i
-  netlist <- derefNets (JL.toList nl)
+  maxId <- readIORef i
+  let netlist = listArray (0, maxId) (replicate (maxId+1) Nothing)
+                // [(netInstId n, Just n) | n <- JL.toList nl]
+  netlist' <- thaw netlist
+  netlist'' <- finaliseNames netlist'
   undo
-  return netlist
+  nl' <- getElems netlist''
+  return $ catMaybes nl'
   where
     (_, actsJL, _) = runRTL rtl (R { nameHints = empty, cond = 1, assigns = assignMap }) 0
     acts = JL.toList actsJL
