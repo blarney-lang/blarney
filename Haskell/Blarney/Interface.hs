@@ -2,17 +2,17 @@
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE DataKinds             #-} 
+{-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE UndecidableInstances  #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE ConstraintKinds       #-} 
-{-# LANGUAGE ScopedTypeVariables   #-} 
-{-# LANGUAGE RecursiveDo           #-} 
-{-# LANGUAGE PartialTypeSignatures #-} 
+{-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE RecursiveDo           #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 
 {-|
 Module      : Blarney.Interface
@@ -28,7 +28,7 @@ Verilog.  This module allows Blarney functions to be turned into
 Verilog modules, and Verilog modules to be instantiated in a
 Blarney description.
 -}
-module Blarney.Interface 
+module Blarney.Interface
   ( Ifc           -- Monad for constructing Verilog interfaces
   , Interface(..) -- Class of types that can be converted to Verilog I/O ports
   , Modular(..)   -- Class of types that can be turned into Verilog modules
@@ -155,7 +155,7 @@ instance KnownNat n => Interface (Bit n) where
 instance (Bits a, Interface a) => Interface (Action a) where
   writePort s act = do
     -- Get enable output
-    enable <- readPort (s ++ "_en") 
+    enable <- readPort (s ++ "_en")
     -- Run action block when enabled
     res <- liftModule (always (whenR enable act))
     -- Feed action result back as input
@@ -279,7 +279,7 @@ instance (GInterface a, GInterface b) => GInterface (a :*: b) where
     return (x0 :*: x1)
 
 instance (GInterface a, Selector c) => GInterface (M1 S c a) where
-  gwritePort s t ~(m@(M1 x)) = 
+  gwritePort s t ~(m@(M1 x)) =
     case null (selName m) of
       True -> gwritePort (s ++ "_" ++ t) "" x
       False -> gwritePort (s ++ "_" ++ selName m) "" x
