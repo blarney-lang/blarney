@@ -104,7 +104,7 @@ writeVerilogTop top mod dir =
 
     makefileCode = "include *.mk"
 
-writeVerilog :: String -> String -> [Net String] -> IO ()
+writeVerilog :: String -> String -> [Net] -> IO ()
 writeVerilog fileName modName netlist = do
   h <- openFile fileName WriteMode
   hPutStr h (showVerilogModule modName netlist $ "")
@@ -157,15 +157,17 @@ showExpr :: Expr -> ShowS
 showExpr (Const w v :< []) = showIntLit w v
 showExpr (ConstBits w b :< []) = showBitLit w b
 showExpr x = error $ "Unsupported Expr " ++ show x
-showWire :: (InstId, Int, String) -> ShowS
-showWire (iId, nOut, nm) = (if (nm == "") then chr 'v' else str nm)
-                            <> chr '_' <> shows iId <> chr '_' <> shows nOut
-showWireWidth :: Int -> (InstId, Int, String) -> ShowS
+showWire :: (InstId, Int, Name) -> ShowS
+showWire (iId, nOut, Final nm) =    str nm
+                                 <> chr '_' <> shows iId
+                                 <> chr '_' <> shows nOut
+showWire (iId, nOut, _) = error "Name must be Final"
+showWireWidth :: Int -> (InstId, Int, Name) -> ShowS
 showWireWidth width wId = brackets (shows (width-1) <> str ":0") <+> showWire wId
-showNetInput :: NetInput String -> ShowS
+showNetInput :: NetInput -> ShowS
 showNetInput (InputWire wId) = showWire wId
 showNetInput (InputExpr expr) = showExpr expr
-showVerilogModule :: String -> [Net String] -> ShowS
+showVerilogModule :: String -> [Net] -> ShowS
 showVerilogModule modName netlst =
      str "module" <+> str modName <+> chr '(' <^> showIOs <^> spaces 2 <> str ");"
   <^> spaces 2 <> showComment "Declarations"
@@ -228,43 +230,43 @@ resetRegister width reg init =
 -- instantiation helpers
 --------------------------------------------------------------------------------
 instPrefixOp op net =
-      str "assign" <+> showWire (netInstId net, 0, netNameHints net) <+> equals
+      str "assign" <+> showWire (netInstId net, 0, netName net) <+> equals
   <+> str op <> parens (showNetInput (netInputs net !! 0)) <> semi
 instInfixOp op net =
-      str "assign" <+> showWire (netInstId net, 0, netNameHints net) <+> equals
+      str "assign" <+> showWire (netInstId net, 0, netName net) <+> equals
   <+> showNetInput (netInputs net !! 0)
   <+> str op <+> showNetInput (netInputs net !! 1) <> semi
 instShift w op net =
-      str "assign" <+> showWire (netInstId net, 0, netNameHints net) <+> equals
+      str "assign" <+> showWire (netInstId net, 0, netName net) <+> equals
   <+> a0 <+> str op <+> showNetInput (netInputs net !! 1) <> semi
   where a0 = if op == ">>>" then str "$signed" <> parens a0name
                             else a0name
         a0name = showNetInput (netInputs net !! 0)
 instReplicate w net =
-      str "assign" <+> showWire (netInstId net, 0, netNameHints net) <+> equals
+      str "assign" <+> showWire (netInstId net, 0, netName net) <+> equals
   <+> braces (shows w <> braces (showNetInput (netInputs net !! 0))) <> semi
 instMux net =
-      str "assign" <+> showWire (netInstId net, 0, netNameHints net) <+> equals
+      str "assign" <+> showWire (netInstId net, 0, netName net) <+> equals
   <+> showNetInput (netInputs net !! 0) <+> chr '?'
   <+> showNetInput (netInputs net !! 1) <+> colon
   <+> showNetInput (netInputs net !! 2) <> semi
 instConcat net =
-      str "assign" <+> showWire (netInstId net, 0, netNameHints net) <+> equals
+      str "assign" <+> showWire (netInstId net, 0, netName net) <+> equals
   <+> braces ( showNetInput (netInputs net !! 0) <> comma <+>
                showNetInput (netInputs net !! 1)) <> semi
 instSelectBits net hi lo =
-      str "assign" <+> showWire (netInstId net, 0, netNameHints net) <+> equals
+      str "assign" <+> showWire (netInstId net, 0, netName net) <+> equals
   <+> sel (netInputs net !! 0) <> semi
   where sel (InputWire w) = showWire w <> brackets (shows hi <> colon <> shows lo)
         sel (InputExpr (Const _ v :< [])) = showIntLit width ((v `shiftR` lo) .&. ((2^width)-1))
         sel (InputExpr (ConstBits _ b :< [])) = showBitLit width b
         width = hi+1-lo
 instZeroExtend net wi wo =
-      str "assign" <+> showWire (netInstId net, 0, netNameHints net) <+> equals
+      str "assign" <+> showWire (netInstId net, 0, netName net) <+> equals
   <+> braces (braces (shows (wo-wi) <> braces (str "1'b0"))
   <>  comma <+> showNetInput (netInputs net !! 0)) <> semi
 instSignExtend net wi wo =
-      str "assign" <+> showWire (netInstId net, 0, netNameHints net) <+> equals
+      str "assign" <+> showWire (netInstId net, 0, netName net) <+> equals
   <+> braces (braces (shows (wo-wi) <> braces (showNetInput (netInputs net !! 0)
   <>  brackets (shows (wi-1)))) <> comma
   <+> showNetInput (netInputs net !! 0)) <> semi
@@ -275,7 +277,7 @@ instCustom net name ins outs params =
         showParams = if numParams == 0 then space
                      else str "# (" <^> argStyle 4 allParams <^> spaces 2 <> str ")"
         allParams = [ dot <> str key <> parens (str val) | (key :-> val, i) <- zip params [1..] ]
-        args = zip ins (netInputs net) ++ [ (o, InputWire (nId, n, netNameHints net))
+        args = zip ins (netInputs net) ++ [ (o, InputWire (nId, n, netName net))
                                           | (o, n) <- zip (map fst outs) [0..] ]
         numArgs  = length args
         showArgs = argStyle 4 $ str ".clock(clock)" 
@@ -289,7 +291,7 @@ instTestPlusArgs wId s =
 instOutput net s =
   str "assign" <+> str s <+> equals <+> showNetInput (netInputs net !! 0) <> semi
 instInput net s =
-  str "assign" <+> showWire (netInstId net, 0, netNameHints net) <+> equals <+> str s <> semi
+  str "assign" <+> showWire (netInstId net, 0, netName net) <+> equals <+> str s <> semi
 instRAM net i aw dw =
       str "BlockRAM# (" <^> argStyle 6 ramParams
   <^> spaces 4 <> str ") ram" <> shows nId <+> chr '('
@@ -301,7 +303,7 @@ instRAM net i aw dw =
                     , str ".DI"   <> parens (showNetInput (netInputs net !! 1))
                     , str ".ADDR" <> parens (showNetInput (netInputs net !! 0))
                     , str ".WE"   <> parens (showNetInput (netInputs net !! 2))
-                    , str ".DO"   <> parens (showWire (nId, 0, netNameHints net)) ]
+                    , str ".DO"   <> parens (showWire (nId, 0, netName net)) ]
         nId = netInstId net
 instTrueDualRAM net i aw dw =
       str "BlockRAMTrueDual# (" <^> (argStyle 6 ramParams)
@@ -314,23 +316,23 @@ instTrueDualRAM net i aw dw =
                     , str ".DI_A"   <> parens (showNetInput (netInputs net !! 1))
                     , str ".ADDR_A" <> parens (showNetInput (netInputs net !! 0))
                     , str ".WE_A"   <> parens (showNetInput (netInputs net !! 2))
-                    , str ".DO_A"   <> parens (showWire (nId, 0, netNameHints net))
+                    , str ".DO_A"   <> parens (showWire (nId, 0, netName net))
                     , str ".DI_B"   <> parens (showNetInput (netInputs net !! 4))
                     , str ".ADDR_B" <> parens (showNetInput (netInputs net !! 3))
                     , str ".WE_B"   <> parens (showNetInput (netInputs net !! 5))
-                    , str ".DO_B"   <> parens (showWire (nId, 1, netNameHints net)) ]
+                    , str ".DO_B"   <> parens (showWire (nId, 1, netName net)) ]
         nId = netInstId net
 instRegFileRead id net =
-      str "assign" <+> showWire (netInstId net, 0, netNameHints net) <+> equals
+      str "assign" <+> showWire (netInstId net, 0, netName net) <+> equals
   <+> str "rf" <> shows id <> brackets (showNetInput (netInputs net !! 0)) <> semi
 
 -- always block helpers
 --------------------------------------------------------------------------------
-alwsRegister net = showWire (netInstId net, 0, netNameHints net) <+> str "<="
+alwsRegister net = showWire (netInstId net, 0, netName net) <+> str "<="
                <+> showNetInput (netInputs net !! 0) <> semi
 alwsRegisterEn net =
       str "if" <+> parens (showNetInput (netInputs net !! 0) <+> str "== 1")
-  <+> showWire (netInstId net, 0, netNameHints net) <+> str "<=" <+> showNetInput (netInputs net !! 1)
+  <+> showWire (netInstId net, 0, netName net) <+> str "<=" <+> showNetInput (netInputs net !! 1)
   <>  semi
 alwsDisplay args net =
       str "if" <+> parens (showNetInput (netInputs net !! 0) <+> str "== 1")
@@ -350,7 +352,7 @@ alwsRegFileWrite id net =
 
 -- generate NetVerilog
 --------------------------------------------------------------------------------
-genNetVerilog :: Net String -> NetVerilog
+genNetVerilog :: Net -> NetVerilog
 genNetVerilog net = case netPrim net of
   Add w                   -> dfltNV { decl = Just $ declWire w wId
                                     , inst = Just $ instInfixOp "+" net }
@@ -428,7 +430,7 @@ genNetVerilog net = case netPrim net of
   --Const w i               -> dfltNV
   --ConstBits w b           -> dfltNV
   where nId = netInstId net
-        nName = netNameHints net
+        nName = netName net
         wId = (nId, 0, nName)
         dfltNV = NetVerilog { decl = Nothing
                             , inst = Nothing
