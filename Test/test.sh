@@ -34,18 +34,39 @@ fi
 
 for E in "${EXAMPLES[@]}"; do
   cd $BLARNEY_ROOT/Examples/$E
-  make -s &> /dev/null
-  if [ $? != 0 ]; then
-    echo Failed to build $E
-    exit -1
+  # previous 'stack build' run already created the executables
+  if [ "$BLARNEY_TEST_USING_STACK_BUILD" == 1 ]; then
+    # nop - built with 'stack build' already
+    echo "" >/dev/null
+  else
+    # uses Scripts/blc to compile
+    make -s &> /dev/null
+    if [ $? != 0 ]; then
+      echo Failed to build $E
+      exit -1
+    fi
   fi
   for O in $(ls *.out); do
     TEST=$(basename $O .out)
     echo -ne "$TEST: "
-    ./$TEST
+    if [ "$BLARNEY_TEST_USING_STACK_BUILD" == 1 ]; then
+      # run from local-install-root directory
+      # ('stack build' created the bin/blarney-example-* binarys)
+      SP=$(stack path | grep local-install-root | cut -d " " -f 2)
+      if [ -f $SP/bin/blarney-example-$TEST ]; then
+        $SP/bin/blarney-example-$TEST
+      else
+        echo "Please run 'stack build' to create the example/test binaries first."
+        exit 1
+      fi
+    else	
+      ./$TEST
+    fi
     cd $TEST-Verilog
     make -s &> /dev/null
-    ./top | head -n -1 > $TEST.got
+    # Using 'sed \$d' to print all but the last line (works on Linux and OSX)
+    # ('head -n -1' isn't available on OSX)
+    ./top | sed \$d > $TEST.got
     cd ..
     cmp -s $TEST.out $TEST-Verilog/$TEST.got
     if [ $? == 0 ]; then

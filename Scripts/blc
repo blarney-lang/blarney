@@ -10,7 +10,11 @@ if [ -z "$1" ]; then
   exit 1
 fi
 
-GHC="ghc --make"
+if [ "$BLARNEY_BLC_USING_STACK" == 1 ]; then
+  GHC="stack ghc -- --make"
+else
+  GHC="ghc --make"
+fi
 OPT="-O"
 if [ `basename $0` == "blci" ]; then
   GHC="ghci"
