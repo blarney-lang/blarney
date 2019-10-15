@@ -27,13 +27,16 @@ import Blarney.SourceSink
 import Data.Proxy
 
 -- | Queue interface
-data Queue a = Queue { notEmpty :: Bit 1
-                     , notFull  :: Bit 1
-                     , enq      :: a -> Action ()
-                     , deq      :: Action ()
-                     , canDeq   :: Bit 1
-                     , first    :: a
-                     }
+data Queue a =
+  Queue {
+      notEmpty :: Bit 1
+    , notFull  :: Bit 1
+    , enq      :: a -> Action ()
+    , deq      :: Action ()
+    , canDeq   :: Bit 1
+    , first    :: a
+  }
+  deriving (Generic, Interface)
 
 -- | ToSource instance for Queue
 instance ToSource (Queue t) t where
