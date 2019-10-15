@@ -274,17 +274,14 @@ instCustom net name ins outs params =
       str name <> showParams <+> str name <> chr '_' <> shows nId
   <+> chr '(' <^> showArgs <^> spaces 2 <> str ");"
   where numParams = length params
-        showParams =
-          if numParams == 0 then space
-            else str "# (" <^> argStyle 4 allParams <^> spaces 2 <> str ")"
-        allParams = [ dot <> str key <> parens (str val)
-                    | (key :-> val, i) <- zip params [1..] ]
+        showParams = if numParams == 0 then space
+                     else str "# (" <^> argStyle 4 allParams <^> spaces 2 <> str ")"
+        allParams = [ dot <> str key <> parens (str val) | (key :-> val, i) <- zip params [1..] ]
         args = zip ins (netInputs net) ++ [ (o, InputWire (nId, n, netName net))
                                           | (o, n) <- zip (map fst outs) [0..] ]
         numArgs  = length args
-        showArgs = argStyle 4 $ [str ".clock(clock)"]
-                             ++ [str ".reset(reset)" | "reset" `notElem` ins]
-                             ++ allArgs
+        showArgs = argStyle 4 $ str ".clock(clock)" 
+                              : str ".reset(reset)" : allArgs
         allArgs  = [ dot <> str name <> parens (showNetInput netInput)
                    | ((name, netInput), i) <- zip args [1..] ]
         nId = netInstId net

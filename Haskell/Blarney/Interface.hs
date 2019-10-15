@@ -34,9 +34,7 @@ module Blarney.Interface
   , Modular(..)   -- Class of types that can be turned into Verilog modules
   , makeModule    -- Convert a Blarney function to a Verilog module
   , makeInstance  -- Instantiate a Verilog module in a Blarney description
-  , InstOpts(..)  -- Instance options
-  , makeInstanceWithOpts 
-  , makeInstanceWithReset
+  , makeInstanceWithParams  -- Allow synthesis-time Verilog parameters
   ) where
 
 -- Standard imports
@@ -101,26 +99,15 @@ liftModule m = Ifc $ \r -> do
   res <- m
   return ([], res)
 
--- |Instantiation options
-data InstOpts =
-  InstOpts {
-    -- Instance parameters
-    instParams :: [Param]
-    -- Additional instance arguments
-    -- (Can insert alternative "reset" here)
-  , instArgs :: [(String, BV)]
-  }
-
 -- |Create an instance of a module
-instantiate :: String -> InstOpts -> Ifc a -> Module a
-instantiate name opts ifc = do
+instantiate :: String -> [Param] -> Ifc a -> Module a
+instantiate name params ifc = do
     rec (w, a) <- runIfc ifc (custom w)
     addRoots [x | (s, WritePin x) <- w]
     return a
   where
-    params = instParams opts
     custom w =
-      let inputs  = [(s, x) | (s, WritePin x) <- w] ++ instArgs opts
+      let inputs  = [(s, x) | (s, WritePin x) <- w]
           outputs = [(s, fromInteger n) | (s, ReadPin n) <- w]
           prim    = Custom name (map fst inputs) outputs params
       in  zip (map fst outputs)
@@ -328,14 +315,14 @@ instance Interface a => GInterface (K1 i a) where
 -- separate compilation.
 class Modular a where
   makeMod :: a -> Module ()
-  makeInst :: String -> InstOpts -> a
+  makeInst :: String -> [Param] -> a
 
 instance Interface a => Modular (Module a) where
   makeMod m = modularise $ do
     a <- liftModule m
     writePort "out" a
 
-  makeInst s opts = instantiate s opts $ do
+  makeInst s ps = instantiate s ps $ do
     a <- readPort "out"
     return a
 
@@ -345,8 +332,8 @@ instance (Interface a, Interface b) => Modular (a -> Module b) where
     b <- liftModule (f a)
     writePort "out" b
 
-  makeInst s opts = \a ->
-    instantiate s opts $ do
+  makeInst s ps = \a ->
+    instantiate s ps $ do
       writePort "in" a
       b <- readPort "out"
       return b
@@ -354,28 +341,23 @@ instance (Interface a, Interface b) => Modular (a -> Module b) where
 instance (Interface a, Interface b, Interface c) =>
          Modular (a -> b -> Module c) where
   makeMod f = makeMod (\(a, b) -> f a b)
-  makeInst s opts = \a b -> makeInst s opts (a, b)
+  makeInst s ps = \a b -> makeInst s ps (a, b)
 
 instance (Interface a, Interface b, Interface c, Interface d) =>
          Modular (a -> b -> c -> Module d) where
   makeMod f = makeMod (\(a, b, c) -> f a b c)
-  makeInst s opts = \a b c -> makeInst s opts (a, b, c)
+  makeInst s ps = \a b c -> makeInst s ps (a, b, c)
 
 instance (Interface a, Interface b, Interface c, Interface d, Interface e) =>
          Modular (a -> b -> c -> d -> Module e) where
   makeMod f = makeMod (\(a, b, c, d) -> f a b c d)
-  makeInst s opts = \a b c d -> makeInst s opts (a, b, c, d)
+  makeInst s ps = \a b c d -> makeInst s ps (a, b, c, d)
 
 makeModule :: Modular a => a -> Module ()
 makeModule = makeMod
 
 makeInstance :: Modular a => String -> a
-makeInstance s = makeInst s opts
-  where opts = InstOpts { instParams = [], instArgs = [] }
+makeInstance s = makeInst s []
 
-makeInstanceWithReset :: Modular a => String -> Bit 1 -> a
-makeInstanceWithReset s reset = makeInst s opts
-  where opts = InstOpts { instParams = [], instArgs = [("reset", toBV reset)] }
-
-makeInstanceWithOpts :: Modular a => String -> InstOpts -> a
-makeInstanceWithOpts s opts = makeInst s opts
+makeInstanceWithParams :: Modular a => String -> [Param] -> a
+makeInstanceWithParams s ps = makeInst s ps
