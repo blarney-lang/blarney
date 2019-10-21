@@ -270,7 +270,7 @@ instSignExtend net wi wo =
   <+> braces (braces (shows (wo-wi) <> braces (showNetInput (netInputs net !! 0)
   <>  brackets (shows (wi-1)))) <> comma
   <+> showNetInput (netInputs net !! 0)) <> semi
-instCustom net name ins outs params =
+instCustom net name ins outs params clked =
       str name <> showParams <+> str name <> chr '_' <> shows nId
   <+> chr '(' <^> showArgs <^> spaces 2 <> str ");"
   where numParams = length params
@@ -280,8 +280,9 @@ instCustom net name ins outs params =
         args = zip ins (netInputs net) ++ [ (o, InputWire (nId, n, netName net))
                                           | (o, n) <- zip (map fst outs) [0..] ]
         numArgs  = length args
-        showArgs = argStyle 4 $ str ".clock(clock)" 
-                              : str ".reset(reset)" : allArgs
+        showArgs = argStyle 4 $ [ str ".clock(clock)" | clked ]
+                             ++ [ str ".reset(reset)" | clked ]
+                             ++ allArgs
         allArgs  = [ dot <> str name <> parens (showNetInput netInput)
                    | ((name, netInput), i) <- zip args [1..] ]
         nId = netInstId net
@@ -423,9 +424,9 @@ genNetVerilog net = case netPrim net of
   RegFileRead w vId       -> dfltNV { decl = Just $ declWire w wId
                                     , inst = Just $ instRegFileRead vId net }
   RegFileWrite _ _ vId    -> dfltNV { alws = Just $ alwsRegFileWrite vId net }
-  Custom p is os ps       -> dfltNV { decl = Just $ sep [ declWire w (nId, n, nName)
+  Custom p is os ps clked -> dfltNV { decl = Just $ sep [ declWire w (nId, n, nName)
                                                         | ((o, w), n) <- zip os [0..] ]
-                                    , inst = Just $ instCustom net p is os ps }
+                                    , inst = Just $ instCustom net p is os ps clked }
   _                       -> dfltNV
   --Const w i               -> dfltNV
   --ConstBits w b           -> dfltNV

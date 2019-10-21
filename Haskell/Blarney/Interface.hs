@@ -109,7 +109,7 @@ instantiate name params ifc = do
     custom w =
       let inputs  = [(s, x) | (s, WritePin x) <- w]
           outputs = [(s, fromInteger n) | (s, ReadPin n) <- w]
-          prim    = Custom name (map fst inputs) outputs params
+          prim    = Custom name (map fst inputs) outputs params True
       in  zip (map fst outputs)
               (makePrim prim (map snd inputs) (map snd outputs))
 
