@@ -11,6 +11,54 @@ import CSR
 import DataMem
 import Pipeline
 
+-- helpers
+
+type ExceptionCode = Bit 31
+instrAddrMissaligned    :: ExceptionCode = 0
+instrAccessFault        :: ExceptionCode = 1
+illegalInstr            :: ExceptionCode = 2
+breakpoint              :: ExceptionCode = 3
+loadAddrMissaligned     :: ExceptionCode = 4
+loadAccessFault         :: ExceptionCode = 5
+storeAMOAddrMissaligned :: ExceptionCode = 6
+storeAMOAccessFault     :: ExceptionCode = 7
+eCallFromU              :: ExceptionCode = 8
+eCallFromS              :: ExceptionCode = 9
+e_res10                 :: ExceptionCode = 10
+eCallFromM              :: ExceptionCode = 11
+instrPageFault          :: ExceptionCode = 12
+loadPageFault           :: ExceptionCode = 13
+e_res14                 :: ExceptionCode = 14
+storeAMOPageFault       :: ExceptionCode = 15
+
+type InterruptCode = Bit 31
+i_res0       :: InterruptCode = 0
+softIrqS     :: InterruptCode = 1
+i_res2       :: InterruptCode = 2
+softIrqM     :: InterruptCode = 3
+i_res4       :: InterruptCode = 4
+timerIrqS    :: InterruptCode = 5
+i_res6       :: InterruptCode = 6
+timerIrqM    :: InterruptCode = 7
+i_res8       :: InterruptCode = 8
+externalIrqS :: InterruptCode = 9
+i_res10      :: InterruptCode = 10
+externalIrqM :: InterruptCode = 11
+
+data TrapCode = Exception ExceptionCode | Interrupt InterruptCode
+
+toCause :: TrapCode -> Bit 32
+toCause (Exception e) = 0b0 # e
+toCause (Interrupt i) = 0b1 # i
+
+trap :: State -> CSRUnit -> TrapCode -> Action ()
+trap s csr c = do csr.mcause <== toCause c
+                  s.pc <== csr.mepc.val
+                  -- TODO: handle pc writing from other pipeline stages
+                  -- TODO: deal with mstatus
+
+-- RISCV I instructions
+
 addi :: State -> Bit 12 -> Action ()
 addi s imm = s.result <== s.opA + signExtend imm
 
@@ -126,16 +174,17 @@ memWrite s mem imm width = do
 fence :: State -> Bit 4 -> Bit 4 -> Bit 4 -> Action ()
 fence s fm pred succ = display "fence not implemented"
 
-ecall :: State -> Action ()
-ecall s = display "ecall not implemented"
+ecall :: State -> CSRUnit -> Action ()
+ecall s csr = trap s csr (Exception eCallFromU)
 
-ebreak :: State -> Action ()
-ebreak s = display "ebreak not implemented"
+ebreak :: State -> CSRUnit -> Action ()
+ebreak s csr = trap s csr (Exception breakpoint)
 
 csrrw :: State -> CSRUnit -> Bit 12 -> Action ()
 csrrw s csrUnit csr = do
   readCSR csrUnit csr (s.result)
   writeCSR csrUnit csr (s.opA)
+  -- TODO edge cases when certain sources are 0 etc...
 
 -- RV32I CPU, with UART input and output channels
 makePebbles :: Bool -> Stream (Bit 8) -> Module (Stream (Bit 8))
@@ -176,8 +225,8 @@ makePebbles sim uartIn = do
         , "imm[11:0] <5> <3> <5> 0000011" ==> memRead_1 s mem
         , "imm[11:5] <5> <5> 0 w<2> imm[4:0] 0100011" ==> memWrite s mem
         , "fm[3:0] pred[3:0] succ[3:0] <5> 000 <5> 0001111" ==> fence s
-        , "000000000000 <5> 000 <5> 1110011" ==> ecall s
-        , "000000000001 <5> 000 <5> 1110011" ==> ebreak s
+        , "000000000000 <5> 000 <5> 1110011" ==> ecall s csrUnit
+        , "000000000001 <5> 000 <5> 1110011" ==> ebreak s csrUnit
         , "csr<12> <5> 001 <5> 1110011" ==> csrrw s csrUnit
         ]
 
