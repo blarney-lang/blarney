@@ -2,14 +2,17 @@ module Pebbles where
 
 -- Blarney imports
 import Blarney
+import Blarney.Queue
 import Blarney.Stream
 import Blarney.BitScan
-import Blarney.Queue
 
 -- Pebbles imports
 import CSR
+import Trap
 import DataMem
 import Pipeline
+
+-- RISCV I instructions
 
 addi :: State -> Bit 12 -> Action ()
 addi s imm = s.result <== s.opA + signExtend imm
@@ -126,14 +129,15 @@ memWrite s mem imm width = do
 fence :: State -> Bit 4 -> Bit 4 -> Bit 4 -> Action ()
 fence s fm pred succ = display "fence not implemented"
 
-ecall :: State -> Action ()
-ecall s = display "ecall not implemented"
+ecall :: State -> CSRUnit -> Action ()
+ecall s csrUnit = trap s csrUnit (Exception exc_eCallFromU)
 
-ebreak :: State -> Action ()
-ebreak s = display "ebreak not implemented"
+ebreak :: State -> CSRUnit -> Action ()
+ebreak s csrUnit = trap s csrUnit (Exception exc_breakpoint)
 
 csrrw :: State -> CSRUnit -> Bit 12 -> Action ()
 csrrw s csrUnit csr = do
+  -- Simple treatment of CSRs for now
   readCSR csrUnit csr (s.result)
   writeCSR csrUnit csr (s.opA)
 
@@ -176,8 +180,8 @@ makePebbles sim uartIn = do
         , "imm[11:0] <5> <3> <5> 0000011" ==> memRead_1 s mem
         , "imm[11:5] <5> <5> 0 w<2> imm[4:0] 0100011" ==> memWrite s mem
         , "fm[3:0] pred[3:0] succ[3:0] <5> 000 <5> 0001111" ==> fence s
-        , "000000000000 <5> 000 <5> 1110011" ==> ecall s
-        , "000000000001 <5> 000 <5> 1110011" ==> ebreak s
+        , "000000000000 <5> 000 <5> 1110011" ==> ecall s csrUnit
+        , "000000000001 <5> 000 <5> 1110011" ==> ebreak s csrUnit
         , "csr<12> <5> 001 <5> 1110011" ==> csrrw s csrUnit
         ]
 

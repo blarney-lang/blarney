@@ -32,7 +32,11 @@ update-mif:
 	quartus_asm DE5.qpf
 
 .PHONY: clean
-clean:
-	rm -f *.mif *.rpt *.msg *.summary *.sld *.sopcinfo *.jdi
+clean: clean-mif
+	rm -f *.rpt *.msg *.summary *.sld *.sopcinfo *.jdi
 	rm -f *.pin *.done *.qws *.sof *.csv *.qws *.smsg
 	rm -rf dse* db incremental_db SoC .qsys_edit reconfig_mif SoC .qsys-edit
+
+.PHONY: clean-mif
+clean-mif:
+	rm -f *.mif
