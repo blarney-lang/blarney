@@ -52,7 +52,7 @@ module Blarney.Module
     RTL.Wire(..), makeWire, makeWireU,
 
     -- * Read-Write and Write-Only interfaces
-    ReadWrite(..), ToReadWrite(..), WriteOnly(..), ToWriteOnly(..),
+    ReadWrite(..), WriteOnly(..),
 
     -- * Register files
     RegFile(..), makeRegFileInit, makeRegFile,
@@ -180,29 +180,20 @@ data ReadWrite a =
     rwReadVal :: a,
     rwWriteVal :: a -> Action ()
   }
+
 instance Val (ReadWrite t) t where
   val = rwReadVal
 instance Assign ReadWrite where
   (<==) = rwWriteVal
-
-class ToReadWrite a b | a -> b where
-  toReadWrite :: a -> ReadWrite b
-instance Bits a => ToReadWrite (RTL.Reg a) a where
-  toReadWrite x = ReadWrite { rwReadVal  = RTL.regVal x
-                            , rwWriteVal = (x <==) }
 
 -- |Write-Only interface
 data WriteOnly a =
   WriteOnly {
     woWriteVal :: a -> Action ()
   }
+
 instance Assign WriteOnly where
   (<==) = woWriteVal
-
-class ToWriteOnly a b | a -> b where
-  toWriteOnly :: a -> WriteOnly b
-instance (Assign t, Bits a) => ToWriteOnly (t a) a where
-  toWriteOnly x = WriteOnly { woWriteVal = (x <==) }
 
 -- |A DReg holds the assigned value only for one cycle.
 -- At all other times, it has the given default value.

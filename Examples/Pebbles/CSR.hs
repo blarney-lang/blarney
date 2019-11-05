@@ -25,10 +25,9 @@ type CSRIdx = Bit 12
 
 -- CSR unit, providing ability to read and write CSRs
 data CSRUnit =
-  CSRUnit { mstatus :: ReadWrite (Bit 32)
-          , mepc    :: ReadWrite (Bit 32)
-          , mcause  :: ReadWrite (Bit 32)
-            --
+  CSRUnit { mstatus  :: Reg (Bit 32)
+          , mepc     :: Reg (Bit 32)
+          , mcause   :: Reg (Bit 32)
           , writeCSR :: CSRIdx -> Bit 32 -> Action ()
           , readCSR  :: CSRIdx -> WriteOnly (Bit 32) -> Action ()
           }
@@ -71,9 +70,9 @@ makeCSRUnit uartIn = do
                        uartIn.consume
         ]
 
-  return (uartOut.toStream, CSRUnit { mstatus  = toReadWrite mstatus
-                                    , mepc     = toReadWrite mepc
-                                    , mcause   = toReadWrite mcause
+  return (uartOut.toStream, CSRUnit { mstatus  = mstatus
+                                    , mepc     = mepc
+                                    , mcause   = mcause
                                     , writeCSR = writeCSR
                                     , readCSR  = readCSR
                                     })

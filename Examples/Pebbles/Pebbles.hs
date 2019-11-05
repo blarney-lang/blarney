@@ -2,60 +2,15 @@ module Pebbles where
 
 -- Blarney imports
 import Blarney
+import Blarney.Queue
 import Blarney.Stream
 import Blarney.BitScan
-import Blarney.Queue
 
 -- Pebbles imports
 import CSR
+import Trap
 import DataMem
 import Pipeline
-
--- helpers
-
-type ExceptionCode = Bit 31
-instrAddrMissaligned    :: ExceptionCode = 0
-instrAccessFault        :: ExceptionCode = 1
-illegalInstr            :: ExceptionCode = 2
-breakpoint              :: ExceptionCode = 3
-loadAddrMissaligned     :: ExceptionCode = 4
-loadAccessFault         :: ExceptionCode = 5
-storeAMOAddrMissaligned :: ExceptionCode = 6
-storeAMOAccessFault     :: ExceptionCode = 7
-eCallFromU              :: ExceptionCode = 8
-eCallFromS              :: ExceptionCode = 9
-e_res10                 :: ExceptionCode = 10
-eCallFromM              :: ExceptionCode = 11
-instrPageFault          :: ExceptionCode = 12
-loadPageFault           :: ExceptionCode = 13
-e_res14                 :: ExceptionCode = 14
-storeAMOPageFault       :: ExceptionCode = 15
-
-type InterruptCode = Bit 31
-i_res0       :: InterruptCode = 0
-softIrqS     :: InterruptCode = 1
-i_res2       :: InterruptCode = 2
-softIrqM     :: InterruptCode = 3
-i_res4       :: InterruptCode = 4
-timerIrqS    :: InterruptCode = 5
-i_res6       :: InterruptCode = 6
-timerIrqM    :: InterruptCode = 7
-i_res8       :: InterruptCode = 8
-externalIrqS :: InterruptCode = 9
-i_res10      :: InterruptCode = 10
-externalIrqM :: InterruptCode = 11
-
-data TrapCode = Exception ExceptionCode | Interrupt InterruptCode
-
-toCause :: TrapCode -> Bit 32
-toCause (Exception e) = 0b0 # e
-toCause (Interrupt i) = 0b1 # i
-
-trap :: State -> CSRUnit -> TrapCode -> Action ()
-trap s csr c = do csr.mcause <== toCause c
-                  s.pc <== csr.mepc.val
-                  -- TODO: handle pc writing from other pipeline stages
-                  -- TODO: deal with mstatus
 
 -- RISCV I instructions
 
@@ -175,16 +130,16 @@ fence :: State -> Bit 4 -> Bit 4 -> Bit 4 -> Action ()
 fence s fm pred succ = display "fence not implemented"
 
 ecall :: State -> CSRUnit -> Action ()
-ecall s csr = trap s csr (Exception eCallFromU)
+ecall s csrUnit = trap s csrUnit (Exception exc_eCallFromU)
 
 ebreak :: State -> CSRUnit -> Action ()
-ebreak s csr = trap s csr (Exception breakpoint)
+ebreak s csrUnit = trap s csrUnit (Exception exc_breakpoint)
 
 csrrw :: State -> CSRUnit -> Bit 12 -> Action ()
 csrrw s csrUnit csr = do
+  -- Simple treatment of CSRs for now
   readCSR csrUnit csr (s.result)
   writeCSR csrUnit csr (s.opA)
-  -- TODO edge cases when certain sources are 0 etc...
 
 -- RV32I CPU, with UART input and output channels
 makePebbles :: Bool -> Stream (Bit 8) -> Module (Stream (Bit 8))
