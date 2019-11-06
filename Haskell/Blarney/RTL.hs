@@ -202,10 +202,6 @@ ifThenElseRTL c a b =
      local (r { cond = cond r .&. c }) a
      local (r { cond = cond r .&. inv c }) b
 
--- |Overloaded if-then-else
-instance IfThenElse (Bit 1) (RTL ()) where
-  ifThenElse = ifThenElseRTL
-
 -- |RTL switch statement
 switch :: Bits a => a -> [(a, RTL ())] -> RTL ()
 switch subject alts =
