@@ -101,10 +101,17 @@ nullSource = Source { canPeek = false
                     , peek    = dontCare
                     , consume = noAction
                     }
+-- | \"Null\" 'Source' 'Module' that never produces any valid output.
+makeNullSource :: (Bits t) => Module (Source t)
+makeNullSource = return nullSource
 
 -- | \"Null\" 'Sink' that always consumes its input.
 nullSink :: Sink t
 nullSink = Sink { put = \x -> do return true }
+
+-- | \"Null\" 'Sink' 'Module' that always consumes its input.
+makeNullSink :: Module (Sink t)
+makeNullSink = return nullSink
 
 -- | Wraps a 'Source' 't' with some debug info.
 debugSource :: (FShow t) => Source t -- ^ The 'Source' to debug
