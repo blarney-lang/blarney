@@ -45,6 +45,10 @@ newtype Bit (n :: Nat) = FromBV { toBV :: BV }
 widthOf :: KnownNat n => Bit n -> Int
 widthOf v = fromInteger (natVal v)
 
+-- |Convert type Nat to Ingeter value
+valueOf :: forall n. (KnownNat n) => Int
+valueOf = fromInteger (natVal @n Proxy)
+
 -- |Constant bit-vector
 constant :: KnownNat n => Integer -> Bit n
 constant i = result
