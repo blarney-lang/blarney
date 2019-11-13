@@ -308,6 +308,11 @@ instance Interface a => GInterface (K1 i a) where
     x <- readPort s
     return (K1 x)
 
+-- Standard instances
+-- ==================
+
+instance (Bits t, Interface t) => Interface (Reg t)
+
 -- Modular class
 -- =============
 

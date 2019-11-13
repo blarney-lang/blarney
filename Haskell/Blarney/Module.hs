@@ -1,11 +1,12 @@
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE RankNTypes                 #-}
+{-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE BlockArguments             #-}
 {-# LANGUAGE NoDeriveAnyClass           #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FunctionalDependencies     #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 {-|
 Module      : Blarney.Module
@@ -46,7 +47,7 @@ module Blarney.Module
     withNewName, withExtendedName,
 
     -- * Registers
-    RTL.Reg(..), makeReg, makeRegU, makeDReg,
+    Reg(..), makeReg, makeRegU, makeDReg,
 
     -- * Wires
     RTL.Wire(..), makeWire, makeWireU,
@@ -81,6 +82,7 @@ import qualified Blarney.JList as JL
 import Prelude
 import Data.IORef
 import GHC.TypeLits
+import GHC.Generics
 import Control.Monad.Fix
 import Control.Monad hiding (when)
 
@@ -158,13 +160,27 @@ instance Val (RTL.Wire t) t where
 instance Assign RTL.Wire where
   v <== x = A (RTL.writeWire v x)
 
+-- | Blarney's register Module type
+data Reg t = Reg { -- | read method
+                   readReg :: t
+                   -- | write method
+                 , writeReg :: t -> Action ()
+                 } deriving (Generic)
+instance Val (Reg t) t where
+  val reg = readReg reg
+instance Assign Reg where
+  reg <== x = writeReg reg x
+fromRTLReg :: Bits t => RTL.Reg t -> Reg t
+fromRTLReg r = Reg { readReg  = val r
+                   , writeReg = \x -> r <== x
+                   }
 -- |Create register with initial value
-makeReg :: Bits a => a -> Module (RTL.Reg a)
-makeReg init = M (RTL.makeReg init)
+makeReg :: Bits a => a -> Module (Reg a)
+makeReg init = M (fromRTLReg <$> RTL.makeReg init)
 
 -- |Create wire with don't care initial value
-makeRegU :: Bits a => Module (RTL.Reg a)
-makeRegU = M RTL.makeRegU
+makeRegU :: Bits a => Module (Reg a)
+makeRegU = M (fromRTLReg <$> RTL.makeRegU)
 
 -- |Create wire with default value
 makeWire :: Bits a => a -> Module (RTL.Wire a)
@@ -197,8 +213,8 @@ instance Assign WriteOnly where
 
 -- |A DReg holds the assigned value only for one cycle.
 -- At all other times, it has the given default value.
-makeDReg :: Bits a => a -> Module (RTL.Reg a)
-makeDReg defaultVal = M (RTL.makeDReg defaultVal)
+makeDReg :: Bits a => a -> Module (Reg a)
+makeDReg defaultVal = M (fromRTLReg <$> RTL.makeDReg defaultVal)
 
 -- |External input declaration
 input :: KnownNat n => String -> Module (Bit n)
