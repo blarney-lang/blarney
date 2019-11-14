@@ -8,8 +8,6 @@
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-
--- Check again we need this here
 {-# LANGUAGE UndecidableInstances  #-}
 
 {-|
