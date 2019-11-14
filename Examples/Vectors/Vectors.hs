@@ -19,6 +19,12 @@ testVecReg = genWithM (makeReg `o` fromInteger)
 
 top :: Module ()
 top = do
+  -- check zipAny type errors
+  let a :: Vec 4 () = newVec
+  let b :: Vec 5 () = newVec
+  let c :: Vec 6 () = newVec
+  let x :: Vec 4 _ = zipWithAny3 (\x y z -> ()) a b c
+  -- check instance of Vector of Sources
   cycleCount :: Reg (Bit 4) <- makeReg 0
   srcs <- testVecModule
   always do

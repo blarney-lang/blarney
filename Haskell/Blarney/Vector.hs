@@ -81,6 +81,9 @@ module Blarney.Vector (
 , Blarney.Vector.zipWithM_
 , Blarney.Vector.zipWith3
 , Blarney.Vector.zipWith3M
+, Blarney.Vector.zipAny
+, Blarney.Vector.zipWithAny
+, Blarney.Vector.zipWithAny3
 --
 , Blarney.Vector.foldr
 , Blarney.Vector.foldl
@@ -95,10 +98,7 @@ module Blarney.Vector (
 -- toChunks
 -- shiftInAtN, shiftOutFrom0, shiftOutFromN
 -- findElem, findIndex, rotateBitsBy, countOnesAlt
--- zipAny
 -- transpose, transposeLN
--- zipWithAny3
--- zipWithAny
 -- mapPairs, joinActions
 -- mapAccumL, mapAccumR
 ) where
@@ -109,6 +109,8 @@ import Blarney.BV
 import Blarney.Option
 
 import qualified Data.List as L
+import qualified Data.Type.Bool as B
+import Data.Type.Equality
 
 -- | 'Vec' type
 data Vec (n :: Nat) a = Vec { toList :: [a] } deriving (Generic, FShow)
@@ -327,11 +329,14 @@ zip3 xs ys zs = Vec $ L.zip3 (toList xs) (toList ys) (toList zs)
 zip4 :: Vec n a -> Vec n b -> Vec n c -> Vec n d -> Vec n (a, b, c, d)
 zip4 ws xs ys zs = Vec $ L.zip4 (toList ws) (toList xs) (toList ys) (toList zs)
 
--- TODO handle Min
+-- type family helper: Min
+type family Min (x :: Nat) (y::Nat) :: Nat where
+  Min x y = B.If (CmpNat x y == LT) x y
+
 -- | Return a 'Vec' of pairs of elements at the same index in both given 'Vec's
 --   with the resulting 'Vec' being as long as the smaller input 'Vec'
---zipAny :: Vec n a -> Vec m b -> Vec (Min n m) (a, b)
---zipAny xs ys = Vec $ L.zip (toList xs) (toList ys)
+zipAny :: Vec n a -> Vec m b -> Vec (Min n m) (a, b)
+zipAny xs ys = Vec $ L.zip (toList xs) (toList ys)
 
 -- | Return a pair of 'Vec' from a given 'Vec' of pairs
 unzip :: Vec n (a, b) -> (Vec n a, Vec n b)
@@ -355,7 +360,6 @@ mapM_ f xs = do
 -- | Return a 'Vec', result of mapping a function over the two input 'Vec's
 zipWith :: (a -> b -> c) -> Vec n a -> Vec n b -> Vec n c
 zipWith f xs ys = Vec $ L.map (uncurry f) (L.zip (toList xs) (toList ys))
---TODO zipWithAny
 
 zipWithM :: Monad m => (a -> b -> m c) -> Vec n a -> Vec n b -> m (Vec n c)
 zipWithM f xs ys = do
@@ -367,11 +371,15 @@ zipWithM_ f xs ys = do
   _ <- Blarney.mapM (uncurry f) (L.zip (toList xs) (toList ys))
   return ()
 
+-- | Return a 'Vec', result of mapping a function over the two input 'Vec's,
+--   truncated to the length of the shortest one
+zipWithAny :: (a -> b -> c) -> Vec n a -> Vec m b -> Vec (Min n m) c
+zipWithAny f xs ys = Vec $ L.map (uncurry f) (L.zip (toList xs) (toList ys))
+
 -- | Return a 'Vec', result of mapping a function over the three input 'Vec's
 zipWith3 :: (a -> b -> c -> d) -> Vec n a -> Vec n b -> Vec n c -> Vec n d
 zipWith3 f xs ys zs = Vec $ L.map (\(x, y, z) -> f x y z)
                                   (L.zip3 (toList xs) (toList ys) (toList zs))
---TODO zipWithAny3
 
 zipWith3M :: Monad m => (a -> b -> c -> m d) -> Vec n a -> Vec n b -> Vec n c
                         -> m (Vec n d)
@@ -379,6 +387,13 @@ zipWith3M f xs ys zs = do
   res <- Blarney.mapM (\(x, y, z) -> f x y z)
                       (L.zip3 (toList xs) (toList ys) (toList zs))
   return $ Vec res
+
+-- | Return a 'Vec', result of mapping a function over the three input 'Vec's,
+--   truncated to the length of the shortest one
+zipWithAny3 :: (a -> b -> c -> d) -> Vec n0 a -> Vec n1 b -> Vec n2 c
+            -> Vec (Min n0 (Min n1 n2)) d
+zipWithAny3 f xs ys zs = Vec $ L.map (\(x, y, z) -> f x y z)
+                               (L.zip3 (toList xs) (toList ys) (toList zs))
 
 -- | Reduce a 'Vec' using the given function, starting with a provided seed and
 --   the last element of the 'Vec'
