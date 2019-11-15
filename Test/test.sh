@@ -46,7 +46,9 @@ for E in "${EXAMPLES[@]}"; do
     ./$TEST
     cd $TEST-Verilog
     make -s &> /dev/null
-    ./top | head -n -1 > $TEST.got
+    # Using 'sed \$d' to print all but the last line (works on Linux and OSX)
+    # ('head -n -1' isn't available on OSX)
+    ./top | sed \$d > $TEST.got
     cd ..
     cmp -s $TEST.out $TEST-Verilog/$TEST.got
     if [ $? == 0 ]; then
