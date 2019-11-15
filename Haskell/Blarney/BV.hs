@@ -34,7 +34,6 @@ module Blarney.BV
   , BitIndex       -- For indexing a bit vector
   , RegFileId      -- Identifier for register file primitiveA
   , Prim(..)       -- Primitive components
-  , ConstBit(..)   -- Constant bit (0, 1, or don't care)
   , DisplayArg(..) -- Arguments to display primitive
   , Param(..)      -- Compile-time parameters
   , lookupParam    -- Given a parameter name, return the parameter value
@@ -59,7 +58,7 @@ module Blarney.BV
 
     -- * Bit-vector primitives
   , constBV        -- :: Width -> Integer -> BV
-  , constBitsBV    -- :: Width -> ConstBit -> BV
+  , dontCareBV     -- :: Width -> BV
   , addBV          -- :: BV -> BV -> BV
   , subBV          -- :: BV -> BV -> BV
   , mulBV          -- :: BV -> BV -> BV
@@ -140,8 +139,8 @@ data Prim =
     -- |Constant value (0 inputs, 1 output)
     Const OutputWidth Integer
 
-    -- |Vector of constant bits
-  | ConstBits OutputWidth ConstBit
+    -- |Don't care value (0 input, 1 output)
+  | DontCare OutputWidth
 
     -- |Adder (2 inputs, 1 output)
   | Add OutputWidth
@@ -241,10 +240,6 @@ data Prim =
   | RegFileWrite InputWidth InputWidth RegFileId
   deriving Show
 
--- |A constant bit is a 0, 1, or don't care
-data ConstBit = Zero | One | DontCare
-  deriving (Eq, Show)
-
 -- |For the Display primitive:
 -- display a string literal or a bit-vector value of a given width
 data DisplayArg =
@@ -324,7 +319,9 @@ data NetInput = InputWire WireId
               deriving Show
 
 -- |An expression used as a 'Net' input
-data Expr = Prim :< [Expr] deriving Show
+data Expr = ConstE OutputWidth Integer
+          | DontCareE OutputWidth
+          deriving Show
 
 -- |A wire is uniquely identified by an instance id and an output number
 type WireId = (InstId, OutputNumber, Name)
@@ -375,8 +372,8 @@ doIO m = Flatten $ \r -> do
 
 -- |Flatten bit vector to netlist
 flatten :: BV -> Flatten NetInput
-flatten BV{bvPrim=x@(Const _ _)} = return $ InputExpr (x :< [])
-flatten BV{bvPrim=x@(ConstBits _ _)} = return $ InputExpr (x :< [])
+flatten BV{bvPrim=x@(Const w v)} = return $ InputExpr (ConstE w v)
+flatten BV{bvPrim=x@(DontCare w)} = return $ InputExpr (DontCareE w)
 flatten b@BV{bvName=name,bvInstRef=instRef} = do
   -- handle inst id traversal
   instIdVal <- doIO (readIORef instRef)
@@ -400,9 +397,9 @@ flatten b@BV{bvName=name,bvInstRef=instRef} = do
 constBV :: Width -> Integer -> BV
 constBV w i = makePrim1 (Const w i) [] w
 
--- |Bit vector of constant bits
-constBitsBV :: Width -> ConstBit -> BV
-constBitsBV w b = makePrim1 (ConstBits w b) [] w
+-- |Don't care of given width
+dontCareBV :: Width -> BV
+dontCareBV w = makePrim1 (DontCare w) [] w
 
 -- |Adder
 addBV :: BV -> BV -> BV
@@ -578,9 +575,7 @@ getInitBV = eval
     eval a =
       case bvPrim a of
         Const _ i -> i
-        ConstBits w One -> (2^w) - 1
-        ConstBits w Zero -> 0
-        ConstBits w DontCare -> 0  -- TODO: do better here
+        DontCare w -> 0  -- TODO: do better here
         Concat wx wy ->
           let x = eval (bvInputs a !! 0)
               y = eval (bvInputs a !! 1)

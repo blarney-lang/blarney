@@ -152,17 +152,17 @@ sGTE x y = invMSB (pack x) .>=. invMSB (pack y)
 
 -- |All 0's
 zero :: forall a. Bits a => a
-zero = unpack $ FromBV $ constBitsBV w Zero
+zero = unpack $ FromBV $ constBV w 0
   where w = sizeOf (error "_|_" :: a)
 
 -- |All 1's
 ones :: forall a. Bits a => a
-ones = unpack $ FromBV $ constBitsBV w One
+ones = unpack $ FromBV $ constBV w ((2^w) - 1)
   where w = sizeOf (error "_|_" :: a)
 
 -- |Don't care
 dontCare :: forall a. Bits a => a
-dontCare = unpack $ FromBV $ constBitsBV w DontCare
+dontCare = unpack $ FromBV $ dontCareBV w
   where w = sizeOf (error "_|_" :: a)
 
 -- |Generic register

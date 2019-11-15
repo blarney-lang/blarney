@@ -147,16 +147,11 @@ argStyle n as =
 --------------------------------------------------------------------------------
 showIntLit :: Int -> Integer -> ShowS
 showIntLit w v = shows w <> str "'h" <> showHex v
-showBitLit :: Int -> ConstBit -> ShowS
-showBitLit w b = shows w <> str "'b" <> str bitStr
-                 where bitStr = replicate w $ bitChar b
-                       bitChar Zero = '0'
-                       bitChar One = '1'
-                       bitChar DontCare = 'x'
+showDontCare :: Int -> ShowS
+showDontCare w = shows w <> str "'b" <> str (replicate w 'x')
 showExpr :: Expr -> ShowS
-showExpr (Const w v :< []) = showIntLit w v
-showExpr (ConstBits w b :< []) = showBitLit w b
-showExpr x = error $ "Unsupported Expr " ++ show x
+showExpr (ConstE w v) = showIntLit w v
+showExpr (DontCareE w) = showDontCare w
 showWire :: (InstId, Int, Name) -> ShowS
 showWire (iId, nOut, Final nm) =    str nm
                                  <> chr '_' <> shows iId
@@ -258,8 +253,8 @@ instSelectBits net hi lo =
       str "assign" <+> showWire (netInstId net, 0, netName net) <+> equals
   <+> sel (netInputs net !! 0) <> semi
   where sel (InputWire w) = showWire w <> brackets (shows hi <> colon <> shows lo)
-        sel (InputExpr (Const _ v :< [])) = showIntLit width ((v `shiftR` lo) .&. ((2^width)-1))
-        sel (InputExpr (ConstBits _ b :< [])) = showBitLit width b
+        sel (InputExpr (ConstE _ v)) = showIntLit width ((v `shiftR` lo) .&. ((2^width)-1))
+        sel (InputExpr (DontCareE _)) = showDontCare width
         width = hi+1-lo
 instZeroExtend net wi wo =
       str "assign" <+> showWire (netInstId net, 0, netName net) <+> equals
@@ -429,7 +424,7 @@ genNetVerilog net = case netPrim net of
                                     , inst = Just $ instCustom net p is os ps clked }
   _                       -> dfltNV
   --Const w i               -> dfltNV
-  --ConstBits w b           -> dfltNV
+  --DontCare w              -> dfltNV
   where nId = netInstId net
         nName = netName net
         wId = (nId, 0, nName)
