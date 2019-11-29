@@ -934,12 +934,15 @@ suggesting this feature!
 ## Example 16: CPUs
 
 As a way of briging together a number of the ideas introduced above,
-we have developed a couple of simple microprocessors in Blarney:
+we have developed a few simple microprocessors in Blarney:
 
-1. [Simple](https://github.com/POETSII/blarney/blob/master/Examples/CPU/CPU.hs)
+1. [Simple](https://github.com/mn416/blarney/blob/master/Examples/CPU/CPU.hs)
 4-stage 8-bit CPU, with just 4 instructions, which resolves
 both control and data hazards.
 
-2. [Pebbles](https://github.com/POETSII/blarney/blob/master/Examples/Pebbles/)
+2. [Pebbles](https://github.com/mn416/blarney/blob/master/Examples/Pebbles/)
 is a 5-stage 32-bit RISC-V core which cleanly separates the
 definitions of the ISA and the pipeline microarchitecture.
+
+3. [Actora](https://github.com/POETSII/actora/) is a 3-stage stack
+machine that runs code written a subset of Erlang.
