@@ -162,13 +162,13 @@ top = do
   -- Timer
   timer :: Reg (Bit 32) <- makeReg 0
 
+  -- Flood a 4x4 mesh
+  testMesh (4, 4)
+
   -- Simulate for 1000 cycles
   always do
     timer <== timer.val + 1
     when (timer.val .==. 10000) finish
-
-  -- Flood a 4x4 mesh
-  testMesh (4, 4)
 
 -- Main
 main :: IO ()

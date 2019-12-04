@@ -98,11 +98,6 @@ type W = JL.JList RTLAction
 -- |RTL actions
 data RTLAction =
     RTLAssign Assign
-  | RTLDisplay (Bit 1, Format)
-  | RTLOutput (Width, String, BV)
-  | RTLInput (Width, String)
-  | RTLRegFileCreate (String, VarId, Width, Width)
-  | RTLRegFileUpdate (VarId, Bit 1, Int, Int, BV, BV)
   | RTLRoots [BV]
 
 -- |Variable identifiers
@@ -131,7 +126,7 @@ instance Monad RTL where
   return a = RTL (\r s -> (s, JL.Zero, a))
   m >>= f = RTL (\r s -> let (s0, w0, a) = runRTL m r s
                              (s1, w1, b) = runRTL (f a) r s0
-                         in  (s1, w1 JL.++ w0, b))
+                         in  (s1, w0 JL.++ w1, b))
 
 instance Applicative RTL where
   pure = return
@@ -326,9 +321,15 @@ class Displayable a where
 -- |Base case
 instance Displayable (RTL a) where
   disp x suffix = do
-     r <- ask
-     write (RTLDisplay (cond r, x <> suffix))
-     return (error "Return value of 'display' should be ignored")
+      r <- ask
+      let Format items = x <> suffix
+      let prim = Display (map toDisplayArg items)
+      let inps = toBV (cond r) : [b | FormatBit w b <- items]
+      write (RTLRoots [makePrimRoot prim inps])
+      return (error "Return value of 'display' should be ignored")
+    where
+      toDisplayArg (FormatString s) = DisplayArgString s
+      toDisplayArg (FormatBit w b) = DisplayArgBit w
 
 -- |Recursive case
 instance (FShow b, Displayable a) => Displayable (b -> a) where
@@ -344,28 +345,26 @@ display_ = disp (Format []) (Format [])
 
 -- |RTL external input declaration
 input :: KnownNat n => String -> RTL (Bit n)
-input str =
-    do write (RTLInput (w, str))
-       return inp
-  where
-    inp = FromBV (inputPinBV w str)
-    w = widthOf inp
+input str = mdo
+  x <- FromBV <$> inputBV str (widthOf x)
+  return x
 
 -- |RTL external input declaration (untyped)
 inputBV :: String -> Width -> RTL BV
-inputBV str w =
-    do write (RTLInput (w, str))
-       return (inputPinBV w str)
+inputBV str w = do
+  let bv = inputPinBV w str
+  write (RTLRoots [bv])
+  return bv
 
 -- |RTL external output declaration
 output :: String -> Bit n -> RTL ()
-output str out = do
-  let bv = toBV out
-  write (RTLOutput (bvWidth bv, str, bv))
+output str out = outputBV str (toBV out)
 
 -- |RTL external output declaration (untyped)
 outputBV :: String -> BV -> RTL ()
-outputBV str bv = write (RTLOutput (bvWidth bv, str, bv))
+outputBV str bv = do
+  let root = makePrimRoot (Output (bvWidth bv) str) [bv]
+  write (RTLRoots [root])
 
 -- Register files
 -- ==============
@@ -389,7 +388,8 @@ makeRegFileInit initFile = do
   let dw = sizeOf (error "_|_" :: d)
 
   -- Record register file for netlist generation
-  write $ RTLRegFileCreate (initFile, id, aw, dw)
+  let root = makePrimRoot (RegFileMake initFile aw dw id) []
+  write (RTLRoots [root])
 
   return $
     RegFileRTL {
@@ -397,8 +397,9 @@ makeRegFileInit initFile = do
         unpack $ FromBV $ regFileReadBV id dw $ toBV (pack a)
     , updateRTL = \a d -> do
         r <- ask
-        write $
-          RTLRegFileUpdate (id, cond r, aw, dw, toBV (pack a), toBV (pack d))
+        let rootInps = [toBV (cond r), toBV (pack a), toBV (pack d)]
+        let root = makePrimRoot (RegFileWrite aw dw id) rootInps
+        write (RTLRoots [root])
     }
 
 -- |Create uninitialised register file
@@ -407,76 +408,6 @@ makeRegFile = makeRegFileInit ""
 
 -- Netlist generation
 -- ==================
-
--- Add display primitive to netlist
-addDisplayPrim :: (Bit 1, [FormatItem]) -> Flatten ()
-addDisplayPrim (cond, items) = do
-    c <- flatten (toBV cond)
-    ins <- mapM flatten [b | FormatBit w b <- items]
-    id <- freshInstId
-    let net = Net { netPrim = Display args
-                  , netInstId = id
-                  , netInputs = c:ins
-                  , netOutputWidths = []
-                  , netName = Hints empty
-                  }
-    addNet net
-  where
-    args = map toDisplayArg items
-    toDisplayArg (FormatString s) = DisplayArgString s
-    toDisplayArg (FormatBit w b) = DisplayArgBit w
-
--- Add output primitive to netlist
-addOutputPrim :: (Width, String, BV) -> Flatten ()
-addOutputPrim (w, str, value) = do
-  c <- flatten value
-  id <- freshInstId
-  let net = Net { netPrim = Output w str
-                , netInstId = id
-                , netInputs = [c]
-                , netOutputWidths = []
-                , netName = Hints empty
-                }
-  addNet net
-
--- Add input primitive to netlist
-addInputPrim :: (Width, String) -> Flatten ()
-addInputPrim (w, str) = do
-  id <- freshInstId
-  let net = Net { netPrim = Input w str
-                , netInstId = id
-                , netInputs = []
-                , netOutputWidths = [w]
-                , netName = Hints empty
-                }
-  addNet net
-
--- Add RegFile primitives to netlist
-addRegFilePrim :: (String, VarId, Width, Width) -> Flatten ()
-addRegFilePrim (initFile, regFileId, aw, dw) = do
-  id <- freshInstId
-  let net = Net { netPrim = RegFileMake initFile aw dw regFileId
-                , netInstId = id
-                , netInputs = []
-                , netOutputWidths = []
-                , netName = Hints empty
-                }
-  addNet net
-
--- Add RegFile primitives to netlist
-addRegFileUpdatePrim :: (VarId, Bit 1, Int, Int, BV, BV) -> Flatten ()
-addRegFileUpdatePrim (regFileId, c, aw, dw, a, d) = do
-  cf <- flatten (toBV c)
-  af <- flatten a
-  df <- flatten d
-  id <- freshInstId
-  let net = Net { netPrim = RegFileWrite aw dw regFileId
-                , netInstId = id
-                , netInputs = [cf, af, df]
-                , netOutputWidths = []
-                , netName = Hints empty
-                }
-  addNet net
 
 -- |Add netlist roots
 addRoots :: [BV] -> RTL ()
@@ -543,18 +474,9 @@ netlist rtl = do
   nl' <- getElems netlist''
   return $ catMaybes nl'
   where
-    (_, actsJL, _) = runRTL rtl (R { nameHints = empty, cond = 1, assigns = assignMap }) 0
+    (_, actsJL, _) = runRTL rtl (R { nameHints = empty
+                                   , cond = 1
+                                   , assigns = assignMap }) 0
     acts = JL.toList actsJL
     assignMap = fromListWith (++) [(lhs a, [a]) | RTLAssign a <- acts]
-    disps = reverse [(go, items) | RTLDisplay (go, Format items) <- acts]
-    outs  = [out | RTLOutput out <- acts]
-    inps  = [out | RTLInput out <- acts]
-    rfs   = [out | RTLRegFileCreate out <- acts]
-    rfus  = [out | RTLRegFileUpdate out <- acts]
-    rts   = concat [roots | RTLRoots roots <- acts]
-    roots = do mapM_ addDisplayPrim disps
-               mapM_ addOutputPrim outs
-               mapM_ addInputPrim inps
-               mapM_ addRegFilePrim rfs
-               mapM_ addRegFileUpdatePrim rfus
-               mapM_ flatten rts
+    roots = mapM_ flatten (concat [roots | RTLRoots roots <- acts])

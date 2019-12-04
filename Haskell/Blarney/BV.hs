@@ -307,18 +307,7 @@ makePrim1 prim ins width = head (makePrim prim ins [width])
 
 -- |Create instance of primitive component which is a root
 makePrimRoot :: Prim -> [BV] -> BV
-makePrimRoot prim ins =
-  BV { bvPrim    = prim
-     , bvInputs  = ins
-     , bvOutNum  = 0
-     , bvWidth   = 0
-     , bvWidths  = []
-     , bvName    = Hints empty
-     , bvInstRef = instIdRef
-     }
-  where
-    -- |For Observable Sharing.
-    instIdRef = unsafePerformIO (newIORef Nothing)
+makePrimRoot prim ins = head (makePrim prim ins [0])
 
 -- |Netlists are lists of nets
 data Net = Net { netPrim         :: Prim
