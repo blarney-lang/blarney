@@ -44,6 +44,7 @@ module Blarney.BV
   , addBVNameHint  -- Add a name hint to a 'BV'
   , makePrim       -- Create instance of primitive component
   , makePrim1      -- Common case: single-output components
+  , makePrimRoot   -- Instance of primitive component that is a root
 
     -- * Netlists
   , Net(..)          -- Netlists are lists of Nets
@@ -298,12 +299,26 @@ makePrim prim ins outWidths = [ BV { bvPrim    = prim
                                 | (i, w) <- zip [0..] outWidths ]
                                 where
                                   -- |For Observable Sharing.
-                                  --{-# NOINLINE instIdRef #-}
                                   instIdRef = unsafePerformIO (newIORef Nothing)
 
 -- |Create instance of primitive component which has one output
 makePrim1 :: Prim -> [BV] -> Int -> BV
 makePrim1 prim ins width = head (makePrim prim ins [width])
+
+-- |Create instance of primitive component which is a root
+makePrimRoot :: Prim -> [BV] -> BV
+makePrimRoot prim ins =
+  BV { bvPrim    = prim
+     , bvInputs  = ins
+     , bvOutNum  = 0
+     , bvWidth   = 0
+     , bvWidths  = []
+     , bvName    = Hints empty
+     , bvInstRef = instIdRef
+     }
+  where
+    -- |For Observable Sharing.
+    instIdRef = unsafePerformIO (newIORef Nothing)
 
 -- |Netlists are lists of nets
 data Net = Net { netPrim         :: Prim

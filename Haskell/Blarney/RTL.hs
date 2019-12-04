@@ -99,7 +99,6 @@ type W = JL.JList RTLAction
 data RTLAction =
     RTLAssign Assign
   | RTLDisplay (Bit 1, Format)
-  | RTLFinish (Bit 1)
   | RTLOutput (Width, String, BV)
   | RTLInput (Width, String)
   | RTLRegFileCreate (String, VarId, Width, Width)
@@ -317,7 +316,8 @@ makeDReg defaultVal = do
 finish :: RTL ()
 finish = do
   r <- ask
-  write (RTLFinish (cond r))
+  let root = makePrimRoot Finish [toBV (cond r)]
+  write (RTLRoots [root])
 
 -- |To support a display statement with variable number of arguments
 class Displayable a where
@@ -425,19 +425,6 @@ addDisplayPrim (cond, items) = do
     args = map toDisplayArg items
     toDisplayArg (FormatString s) = DisplayArgString s
     toDisplayArg (FormatBit w b) = DisplayArgBit w
-
--- Add finish primitive to netlist
-addFinishPrim :: Bit 1 -> Flatten ()
-addFinishPrim cond = do
-  c <- flatten (toBV cond)
-  id <- freshInstId
-  let net = Net { netPrim = Finish
-                , netInstId = id
-                , netInputs = [c]
-                , netOutputWidths = []
-                , netName = Hints empty
-                }
-  addNet net
 
 -- Add output primitive to netlist
 addOutputPrim :: (Width, String, BV) -> Flatten ()
@@ -560,14 +547,12 @@ netlist rtl = do
     acts = JL.toList actsJL
     assignMap = fromListWith (++) [(lhs a, [a]) | RTLAssign a <- acts]
     disps = reverse [(go, items) | RTLDisplay (go, Format items) <- acts]
-    fins  = [go | RTLFinish go <- acts]
     outs  = [out | RTLOutput out <- acts]
     inps  = [out | RTLInput out <- acts]
     rfs   = [out | RTLRegFileCreate out <- acts]
     rfus  = [out | RTLRegFileUpdate out <- acts]
     rts   = concat [roots | RTLRoots roots <- acts]
     roots = do mapM_ addDisplayPrim disps
-               mapM_ addFinishPrim fins
                mapM_ addOutputPrim outs
                mapM_ addInputPrim inps
                mapM_ addRegFilePrim rfs
