@@ -464,6 +464,27 @@ finaliseNames = mapArray inner
 foldConstants :: IOArray InstId (Maybe Net) -> IO (IOArray InstId (Maybe Net))
 foldConstants = mapArray (fmap evalConstNet)
 
+-- | Constant propagation pass
+propagateConstants :: IOArray InstId (Maybe Net) -> IO (IOArray InstId (Maybe Net))
+propagateConstants arr = do
+  pairs <- getAssocs arr
+  forM_ [(a,b) | x@(a, Just b) <- pairs] $ \(idx, net) -> do
+    -- fold constant InputWire as InputExpr in current net inputs
+    netInputs' <- forM (netInputs net) $ \inpt -> do
+      case inpt of
+        InputWire (instId, _, _) -> do
+          inptNet <- fromMaybe (error "encountered InstId with no matching Net")
+                           <$> (readArray arr instId)
+          return $ case netPrim inptNet of
+                     Const w i  -> InputExpr $ ConstE w i
+                     DontCare w -> InputExpr $ DontCareE w
+                     _          -> inpt
+        _ -> return inpt
+    -- update the current net
+    writeArray arr idx (Just net { netInputs = netInputs' })
+  -- return mutated netlist
+  return arr
+
 -- |Convert RTL monad to a netlist
 netlist :: RTL () -> IO [Net]
 netlist rtl = do
@@ -472,12 +493,17 @@ netlist rtl = do
   maxId <- readIORef i
   let netlist = listArray (0, maxId) (replicate (maxId+1) Nothing)
                 // [(netInstId n, Just n) | n <- JL.toList nl]
+
   netlist' <- thaw netlist
-  netlist'' <- finaliseNames netlist'
-  --netlist''' <- foldConstants netlist''
+  netlist' <- finaliseNames netlist'
+
+  --let constElim lst i = do tmp <- foldConstants lst
+  --                         tmp <- propagateConstants tmp
+  --                         return tmp
+  --netlist' <- foldM constElim netlist' [0..100]
+
   undo
-  nl' <- getElems netlist''
-  --nl' <- getElems netlist'''
+  nl' <- getElems netlist'
   return $ catMaybes nl'
   where
     (_, actsJL, _) = runRTL rtl (R { nameHints = empty
