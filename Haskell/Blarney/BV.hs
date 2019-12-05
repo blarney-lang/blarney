@@ -291,18 +291,20 @@ addBVNameHint _ nm =
 {-# NOINLINE makePrim #-}
 -- |Helper function for creating an instance of a primitive component
 makePrim :: Prim -> [BV] -> [Int] -> [BV]
-makePrim prim ins outWidths = [ BV { bvPrim    = prim
-                                   , bvInputs  = ins
-                                   , bvOutNum  = i
-                                   , bvWidth   = w
-                                   , bvWidths  = outWidths
-                                   , bvName    = Hints empty
-                                   , bvInstRef = instIdRef
-                                   }
-                                | (i, w) <- zip [0..] outWidths ]
-                                where
-                                  -- |For Observable Sharing.
-                                  instIdRef = unsafePerformIO (newIORef Nothing)
+makePrim prim ins outWidths
+  | Prelude.null outWidths = [bv]
+  | otherwise = [ bv { bvOutNum = i, bvWidth = w }
+                | (i, w) <- zip [0..] outWidths ]
+  where bv = BV { bvPrim    = prim
+                , bvInputs  = ins
+                , bvOutNum  = 0
+                , bvWidth   = 0
+                , bvWidths  = outWidths
+                , bvName    = Hints empty
+                , bvInstRef = instIdRef
+                }
+        -- |For Observable Sharing.
+        instIdRef = unsafePerformIO (newIORef Nothing)
 
 -- |Create instance of primitive component which has one output
 makePrim1 :: Prim -> [BV] -> Int -> BV
@@ -310,7 +312,7 @@ makePrim1 prim ins width = head (makePrim prim ins [width])
 
 -- |Create instance of primitive component which is a root
 makePrimRoot :: Prim -> [BV] -> BV
-makePrimRoot prim ins = head (makePrim prim ins [0])
+makePrimRoot prim ins = head (makePrim prim ins [])
 
 -- |Netlists are lists of nets
 data Net = Net { netPrim         :: Prim

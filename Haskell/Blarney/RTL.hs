@@ -485,6 +485,26 @@ propagateConstants arr = do
   -- return mutated netlist
   return arr
 
+-- | Dead Net elimination pass
+eliminateDeadNet :: IOArray InstId (Maybe Net) -> IO (IOArray InstId (Maybe Net))
+eliminateDeadNet arr = do
+  bounds <- getBounds arr
+  refCounts :: IOArray InstId Int <- newArray bounds 0
+  pairs <- getAssocs arr
+  -- count references for each Net
+  forM_ [(a,b) | x@(a, Just b) <- pairs] $ \(idx, net) -> do
+    forM_ [wId | x@(InputWire wId) <- netInputs net] $ \(instId, _, _) -> do
+      cnt <- readArray refCounts instId
+      writeArray refCounts instId (cnt + 1)
+  -- kill Nets with a null reference count
+  forM_ [(a,b) | x@(a, Just b) <- pairs] $ \(idx, net) -> do
+    refCnt <- readArray refCounts idx
+    if (refCnt == 0 && not (null $ netOutputWidths net))
+      then writeArray arr idx Nothing
+      else return ()
+  -- return mutated netlist
+  return arr
+
 -- |Convert RTL monad to a netlist
 netlist :: RTL () -> IO [Net]
 netlist rtl = do
@@ -501,6 +521,8 @@ netlist rtl = do
   --                         tmp <- propagateConstants tmp
   --                         return tmp
   --netlist' <- foldM constElim netlist' [0..100]
+
+  netlist' <- eliminateDeadNet netlist'
 
   undo
   nl' <- getElems netlist'
