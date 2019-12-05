@@ -11,14 +11,21 @@ Stability   : experimental
 -}
 
 module Blarney.Net (
-  Net(..)      -- Netlists are lists of Nets
-, NetInput(..) -- Net inputs type
-, WireId       -- Nets are connected by wires
-, Expr(..)     -- Net inputs can also be an expression
-, evalConstNet -- Net -> Net
+  Net(..)            -- Netlists are lists of Nets
+, NetInput(..)       -- Net inputs type
+, WireId             -- Nets are connected by wires
+, Expr(..)           -- Net inputs can also be an expression
+, evalConstNet       -- Turn a Net with const inputs into a Const Net
+, finaliseNames      -- Netlist pass to name Net
+, foldConstants      -- Netlist pass to reduce Net with constant inputs
+, propagateConstants -- Netlist pass to propagate constant Net
+, eliminateDeadNet   -- Netlist pass to eliminate unreferenced non-root Nets
 ) where
 
 import Prelude
+import Data.Maybe
+import Control.Monad
+import Data.Array.IO
 import qualified Data.Bits as B
 
 import Blarney.BV
@@ -107,3 +114,95 @@ evalConstNet n@Net{ netPrim = CountOnes w, netInputs = [Lit a0] } =
 evalConstNet n@Net{ netPrim = Identity w, netInputs = [Lit a0] } =
   n { netPrim   = Const w a0, netInputs = [] }
 evalConstNet n = n
+
+-- | Finalise 'Name's in netlist to "v_"
+finaliseNames :: IOArray InstId (Maybe Net) -> IO (IOArray InstId (Maybe Net))
+finaliseNames = mapArray inner
+  where inner (Just net) = Just net { netInputs = map f (netInputs net)
+                                    , netName   = Final "v"
+                                    }
+        inner Nothing = Nothing
+        f (InputWire (i, n, _)) = InputWire (i, n, Final "v")
+        f i = i
+
+-- | Finalise names in Netlist preserving name hints
+--finaliseNames :: IOArray InstId (Maybe Net) -> IO (IOArray InstId (Maybe Net))
+--finaliseNames arr = do
+--  bounds <- getBounds arr
+--  names :: IOArray InstId (Set String) <- newArray bounds empty
+--  pairs <- getAssocs arr
+--  -- accumulate names for each Net
+--  forM_ [(a,b) | x@(a, Just b) <- pairs] $ \(idx, net) -> do
+--    -- update names with current netName
+--    updt names idx (netName net)
+--    -- update names with current net's input wires
+--    forM_ [wId | x@(InputWire wId) <- netInputs net] $ \(i, n, nm) -> do
+--      updt names i nm
+--  -- fold names back into Netlist
+--  forM_ [(a,b) | x@(a, Just b) <- pairs] $ \(idx, net) -> do
+--    -- prepare new netInputs
+--    netInputs' <- forM (netInputs net) $ \inpt -> do
+--      case inpt of
+--        InputWire (i, n, _) -> do nm <- liftM genName (readArray names i)
+--                                  return $ InputWire (i, n, Final nm)
+--        x -> return x
+--    -- prepare new netName
+--    netName' <- liftM genName (readArray names idx)
+--    -- update the current net
+--    writeArray arr idx (Just net { netInputs = netInputs'
+--                                 , netName   = Final netName'
+--                                 })
+--  -- return mutated netlist
+--  return arr
+--  -- inner helpers
+--  where updt names i nm = do old <- readArray names i
+--                             case nm of
+--                               Hints nms -> writeArray names i (union nms old)
+--                               Final nm  -> writeArray names i (insert nm old)
+--        genName hints = if null hints then "v"
+--                        else intercalate "_" (toList hints)
+
+-- | Constant folding pass
+foldConstants :: IOArray InstId (Maybe Net) -> IO (IOArray InstId (Maybe Net))
+foldConstants = mapArray (fmap evalConstNet)
+
+-- | Constant propagation pass
+propagateConstants :: IOArray InstId (Maybe Net) -> IO (IOArray InstId (Maybe Net))
+propagateConstants arr = do
+  pairs <- getAssocs arr
+  forM_ [(a,b) | x@(a, Just b) <- pairs] $ \(idx, net) -> do
+    -- fold constant InputWire as InputExpr in current net inputs
+    netInputs' <- forM (netInputs net) $ \inpt -> do
+      case inpt of
+        InputWire (instId, _, _) -> do
+          inptNet <- fromMaybe (error "encountered InstId with no matching Net")
+                           <$> (readArray arr instId)
+          return $ case netPrim inptNet of
+                     Const w i  -> InputExpr $ ConstE w i
+                     DontCare w -> InputExpr $ DontCareE w
+                     _          -> inpt
+        _ -> return inpt
+    -- update the current net
+    writeArray arr idx (Just net { netInputs = netInputs' })
+  -- return mutated netlist
+  return arr
+
+-- | Dead Net elimination pass
+eliminateDeadNet :: IOArray InstId (Maybe Net) -> IO (IOArray InstId (Maybe Net))
+eliminateDeadNet arr = do
+  bounds <- getBounds arr
+  refCounts :: IOArray InstId Int <- newArray bounds 0
+  pairs <- getAssocs arr
+  -- count references for each Net
+  forM_ [(a,b) | x@(a, Just b) <- pairs] $ \(idx, net) -> do
+    forM_ [wId | x@(InputWire wId) <- netInputs net] $ \(instId, _, _) -> do
+      cnt <- readArray refCounts instId
+      writeArray refCounts instId (cnt + 1)
+  -- kill Nets with a null reference count
+  forM_ [(a,b) | x@(a, Just b) <- pairs] $ \(idx, net) -> do
+    refCnt <- readArray refCounts idx
+    if (refCnt == 0 && not (null $ netOutputWidths net))
+      then writeArray arr idx Nothing
+      else return ()
+  -- return mutated netlist
+  return arr
