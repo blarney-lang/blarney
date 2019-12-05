@@ -28,3 +28,4 @@ clean:
 	make -C Pebbles clean
 	make -C Stack clean
 	make -C Background clean
+	make -C Vectors clean
