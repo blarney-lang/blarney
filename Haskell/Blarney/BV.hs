@@ -22,6 +22,7 @@ are primitive component instances and whose edges are connections.
 1. K. Claessen, D. Sands.  Observable Sharing for Functional Circuit
 Description, ASIAN 1999.
 -}
+
 module Blarney.BV
   (
     -- * Primitive component types
@@ -45,17 +46,6 @@ module Blarney.BV
   , makePrim       -- Create instance of primitive component
   , makePrim1      -- Common case: single-output components
   , makePrimRoot   -- Instance of primitive component that is a root
-
-    -- * Netlists
-  , Net(..)          -- Netlists are lists of Nets
-  , NetInput(..)     -- Net inputs type
-  , WireId           -- Nets are connected by wires
-  , Expr(..)         -- Net inputs can also be an expression
-  , Flatten(..)      -- Monad for flattening a circuit (BV) to a netlist
-  , doIO             -- Lift an IO computation to a Flatten computation
-  , freshInstId      -- Obtain a fresh instance id
-  , addNet           -- Add a net to the netlist
-  , flatten          -- Flatten a bit vector to a netlist
 
     -- * Bit-vector primitives
   , constBV        -- :: Width -> Integer -> BV
@@ -96,9 +86,6 @@ module Blarney.BV
 
 import Prelude
 
--- For join lists
-import qualified Blarney.JList as JL
-
 -- For Observable Sharing
 import Data.IORef
 import System.IO.Unsafe(unsafePerformIO)
@@ -108,7 +95,6 @@ import Data.Set
 import Data.List (intercalate)
 
 -- Standard imports
-import Control.Monad
 import qualified Data.Bits as B
 
 -- |Every instance of a component in the circuit has a unique id
@@ -288,18 +274,20 @@ addBVNameHint _ nm =
 {-# NOINLINE makePrim #-}
 -- |Helper function for creating an instance of a primitive component
 makePrim :: Prim -> [BV] -> [Int] -> [BV]
-makePrim prim ins outWidths = [ BV { bvPrim    = prim
-                                   , bvInputs  = ins
-                                   , bvOutNum  = i
-                                   , bvWidth   = w
-                                   , bvWidths  = outWidths
-                                   , bvName    = Hints empty
-                                   , bvInstRef = instIdRef
-                                   }
-                                | (i, w) <- zip [0..] outWidths ]
-                                where
-                                  -- |For Observable Sharing.
-                                  instIdRef = unsafePerformIO (newIORef Nothing)
+makePrim prim ins outWidths
+  | Prelude.null outWidths = [bv]
+  | otherwise = [ bv { bvOutNum = i, bvWidth = w }
+                | (i, w) <- zip [0..] outWidths ]
+  where bv = BV { bvPrim    = prim
+                , bvInputs  = ins
+                , bvOutNum  = 0
+                , bvWidth   = 0
+                , bvWidths  = outWidths
+                , bvName    = Hints empty
+                , bvInstRef = instIdRef
+                }
+        -- |For Observable Sharing.
+        instIdRef = unsafePerformIO (newIORef Nothing)
 
 -- |Create instance of primitive component which has one output
 makePrim1 :: Prim -> [BV] -> Int -> BV
@@ -307,95 +295,7 @@ makePrim1 prim ins width = head (makePrim prim ins [width])
 
 -- |Create instance of primitive component which is a root
 makePrimRoot :: Prim -> [BV] -> BV
-makePrimRoot prim ins = head (makePrim prim ins [0])
-
--- |Netlists are lists of nets
-data Net = Net { netPrim         :: Prim
-               , netInstId       :: InstId
-               , netInputs       :: [NetInput]
-               , netOutputWidths :: [Width]
-               , netName         :: Name
-               } deriving Show
-
--- |A Net input can be: a wire, an int literal or a bit literal
-data NetInput = InputWire WireId
-              | InputExpr Expr
-              deriving Show
-
--- |An expression used as a 'Net' input
-data Expr = ConstE OutputWidth Integer
-          | DontCareE OutputWidth
-          deriving Show
-
--- |A wire is uniquely identified by an instance id and an output number
-type WireId = (InstId, OutputNumber, Name)
-
--- |A reader/writer monad for accumulating the netlist
-newtype Flatten a = Flatten { runFlatten :: FlattenR -> IO (FlattenW, a) }
-
--- |The reader component contains an IORef containing the next unique net id
-type FlattenR = IORef Int
-
--- |The writer component contains the netlist and
--- an "undo" computation, which unperforms all IORef assignments.
-type FlattenW = (JL.JList Net, IO ())
-
-instance Monad Flatten where
-  return a = Flatten (\r -> return ((JL.Zero, return ()), a))
-  m >>= f  = Flatten (\r -> do ((w0, u0), a) <- runFlatten m r
-                               ((w1, u1), b) <- runFlatten (f a) r
-                               return ((w0 JL.:+: w1, u0 >> u1), b))
-
-instance Applicative Flatten where
-  pure = return
-  (<*>) = ap
-
-instance Functor Flatten where
-  fmap = liftM
-
--- |Obtain a fresh 'InstId' with the next available id
-freshInstId :: Flatten InstId
-freshInstId = Flatten $ \r -> do
-  id <- readIORef r
-  writeIORef r (id+1)
-  return ((JL.Zero, return ()), id)
-
--- |Add a net to the netlist
-addNet :: Net -> Flatten ()
-addNet net = Flatten $ \r -> return ((JL.One net, return ()), ())
-
--- |Add an "undo" computation
-addUndo :: IO () -> Flatten ()
-addUndo undo = Flatten $ \r -> return ((JL.Zero, undo), ())
-
--- |Lift an IO computation to a Flatten computation
-doIO :: IO a -> Flatten a
-doIO m = Flatten $ \r -> do
-  a <- m
-  return ((JL.Zero, return ()), a)
-
--- |Flatten bit vector to netlist
-flatten :: BV -> Flatten NetInput
-flatten BV{bvPrim=x@(Const w v)} = return $ InputExpr (ConstE w v)
-flatten BV{bvPrim=x@(DontCare w)} = return $ InputExpr (DontCareE w)
-flatten b@BV{bvName=name,bvInstRef=instRef} = do
-  -- handle inst id traversal
-  instIdVal <- doIO (readIORef instRef)
-  case instIdVal of
-    Nothing -> do
-      id <- freshInstId
-      doIO (writeIORef instRef (Just id))
-      addUndo (writeIORef instRef Nothing)
-      ins <- mapM flatten (bvInputs b)
-      let net = Net { netPrim         = bvPrim b
-                    , netInstId       = id
-                    , netInputs       = ins
-                    , netOutputWidths = (bvWidths b)
-                    , netName         = name
-                    }
-      addNet net
-      return $ InputWire (id, bvOutNum b, name)
-    Just id -> return $ InputWire (id, bvOutNum b, name)
+makePrimRoot prim ins = head (makePrim prim ins [])
 
 -- |Constant bit vector of given width
 constBV :: Width -> Integer -> BV

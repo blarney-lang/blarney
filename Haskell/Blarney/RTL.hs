@@ -11,6 +11,7 @@
 Module      : Blarney.RTL
 Description : Register-transfer-level descriptions
 Copyright   : (c) Matthew Naylor, 2019
+                  Alexandre Joannou, 2019
 License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
@@ -65,6 +66,8 @@ module Blarney.RTL
 
 -- Blarney imports
 import Blarney.BV
+import Blarney.Net
+import Blarney.Flatten
 import Blarney.Bit
 import Blarney.Bits
 import Blarney.FShow
@@ -74,18 +77,16 @@ import qualified Blarney.JList as JL
 
 -- Standard imports
 import Prelude
+import Data.Array
+import Data.Maybe
 import Data.IORef
 import GHC.TypeLits
+import Data.Array.IO
+import Data.Set (Set, empty, insert, singleton, toList)
 import Control.Monad.Fix
+import Data.List (intercalate)
 import Control.Monad hiding (when)
 import Data.Map (Map, findWithDefault, fromListWith)
-import Data.Array
-import Data.Array.IO
-import Data.Maybe
-
--- For name hints
-import Data.Set (Set, empty, singleton, insert, toList, union)
-import Data.List (intercalate)
 
 -- |The RTL monad, for register-transfer-level descriptions,
 -- is a fairly standard reader-writer-state monad.
@@ -413,65 +414,19 @@ makeRegFile = makeRegFileInit ""
 addRoots :: [BV] -> RTL ()
 addRoots roots = write (RTLRoots roots)
 
--- | Finalise 'Name's in netlist to "v_"
-finaliseNames :: IOArray InstId (Maybe Net) -> IO (IOArray InstId (Maybe Net))
-finaliseNames = mapArray inner
-  where inner (Just net) = Just net { netInputs = map f (netInputs net)
-                                    , netName   = Final "v"
-                                    }
-        inner Nothing = Nothing
-        f (InputWire (i, n, _)) = InputWire (i, n, Final "v")
-        f i = i
-
--- | Finalise names in Netlist preserving name hints
---finaliseNames :: IOArray InstId (Maybe Net) -> IO (IOArray InstId (Maybe Net))
---finaliseNames arr = do
---  bounds <- getBounds arr
---  names :: IOArray InstId (Set String) <- newArray bounds empty
---  pairs <- getAssocs arr
---  -- accumulate names for each Net
---  forM_ [(a,b) | x@(a, Just b) <- pairs] $ \(idx, net) -> do
---    -- update names with current netName
---    updt names idx (netName net)
---    -- update names with current net's input wires
---    forM_ [wId | x@(InputWire wId) <- netInputs net] $ \(i, n, nm) -> do
---      updt names i nm
---  -- fold names back into Netlist
---  forM_ [(a,b) | x@(a, Just b) <- pairs] $ \(idx, net) -> do
---    -- prepare new netInputs
---    netInputs' <- forM (netInputs net) $ \inpt -> do
---      case inpt of
---        InputWire (i, n, _) -> do nm <- liftM genName (readArray names i)
---                                  return $ InputWire (i, n, Final nm)
---        x -> return x
---    -- prepare new netName
---    netName' <- liftM genName (readArray names idx)
---    -- update the current net
---    writeArray arr idx (Just net { netInputs = netInputs'
---                                 , netName   = Final netName'
---                                 })
---  -- return mutated netlist
---  return arr
---  -- inner helpers
---  where updt names i nm = do old <- readArray names i
---                             case nm of
---                               Hints nms -> writeArray names i (union nms old)
---                               Final nm  -> writeArray names i (insert nm old)
---        genName hints = if null hints then "v"
---                        else intercalate "_" (toList hints)
-
 -- |Convert RTL monad to a netlist
 netlist :: RTL () -> IO [Net]
 netlist rtl = do
   i <- newIORef (0 :: InstId)
   ((nl, undo), _) <- runFlatten roots i
   maxId <- readIORef i
-  let netlist = listArray (0, maxId) (replicate (maxId+1) Nothing)
-                // [(netInstId n, Just n) | n <- JL.toList nl]
-  netlist' <- thaw netlist
-  netlist'' <- finaliseNames netlist'
+  netlist <- thaw $ listArray (0, maxId) (replicate (maxId+1) Nothing)
+                    // [(netInstId n, Just n) | n <- JL.toList nl]
+
+  netlist' <- netlistPasses netlist
+
   undo
-  nl' <- getElems netlist''
+  nl' <- getElems netlist'
   return $ catMaybes nl'
   where
     (_, actsJL, _) = runRTL rtl (R { nameHints = empty

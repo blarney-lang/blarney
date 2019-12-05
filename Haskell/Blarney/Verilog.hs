@@ -25,6 +25,7 @@ import System.Process
 
 -- Blarney imports
 import Blarney.BV
+import Blarney.Net
 import Blarney.Module
 import Blarney.Interface
 import Blarney.IfThenElse
@@ -200,6 +201,8 @@ showVerilogModule modName netlst =
 declWire width wId = str "wire" <+> showWireWidth width wId <> semi
 declWireInit width wId init =     str "wire" <+> showWireWidth width wId
                               <+> equals <+> showIntLit width init <> semi
+declWireDontCare width wId  =     str "wire" <+> showWireWidth width wId
+                              <+> equals <+> showDontCare width <> semi
 declReg width reg = str "reg" <+> showWireWidth width reg <> semi
 declRegInit width reg init =     str "reg" <+> showWireWidth width reg
                              <+> equals <+> showIntLit width init <> semi
@@ -422,9 +425,9 @@ genNetVerilog net = case netPrim net of
   Custom p is os ps clked -> dfltNV { decl = Just $ sep [ declWire w (nId, n, nName)
                                                         | ((o, w), n) <- zip os [0..] ]
                                     , inst = Just $ instCustom net p is os ps clked }
-  _                       -> dfltNV
-  --Const w i               -> dfltNV
-  --DontCare w              -> dfltNV
+  Const w i               -> dfltNV { decl = Just $ declWireInit w wId i }
+  DontCare w              -> dfltNV { decl = Just $ declWireDontCare w wId }
+  --_                       -> dfltNV
   where nId = netInstId net
         nName = netName net
         wId = (nId, 0, nName)
