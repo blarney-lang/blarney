@@ -77,18 +77,16 @@ import qualified Blarney.JList as JL
 
 -- Standard imports
 import Prelude
+import Data.Array
+import Data.Maybe
 import Data.IORef
 import GHC.TypeLits
+import Data.Array.IO
+import Data.Set (Set, empty, insert, singleton, toList)
 import Control.Monad.Fix
+import Data.List (intercalate)
 import Control.Monad hiding (when)
 import Data.Map (Map, findWithDefault, fromListWith)
-import Data.Array
-import Data.Array.IO
-import Data.Maybe
-
--- For name hints
-import Data.Set (Set, empty, singleton, insert, toList, union)
-import Data.List (intercalate)
 
 -- |The RTL monad, for register-transfer-level descriptions,
 -- is a fairly standard reader-writer-state monad.
@@ -422,18 +420,10 @@ netlist rtl = do
   i <- newIORef (0 :: InstId)
   ((nl, undo), _) <- runFlatten roots i
   maxId <- readIORef i
-  let netlist = listArray (0, maxId) (replicate (maxId+1) Nothing)
-                // [(netInstId n, Just n) | n <- JL.toList nl]
+  netlist <- thaw $ listArray (0, maxId) (replicate (maxId+1) Nothing)
+                    // [(netInstId n, Just n) | n <- JL.toList nl]
 
-  netlist' <- thaw netlist
-  netlist' <- finaliseNames netlist'
-
-  --let constElim lst i = do tmp <- foldConstants lst
-  --                         tmp <- propagateConstants tmp
-  --                         return tmp
-  --netlist' <- foldM constElim netlist' [0..100]
-
-  netlist' <- eliminateDeadNet netlist'
+  netlist' <- netlistPasses netlist
 
   undo
   nl' <- getElems netlist'
