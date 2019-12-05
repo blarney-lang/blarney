@@ -65,6 +65,7 @@ module Blarney.RTL
 
 -- Blarney imports
 import Blarney.BV
+import Blarney.Net
 import Blarney.Bit
 import Blarney.Bits
 import Blarney.FShow

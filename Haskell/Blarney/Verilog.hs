@@ -25,6 +25,7 @@ import System.Process
 
 -- Blarney imports
 import Blarney.BV
+import Blarney.Net
 import Blarney.Module
 import Blarney.Interface
 import Blarney.IfThenElse
