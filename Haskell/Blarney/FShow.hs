@@ -53,7 +53,7 @@ class FShow a where
 newtype Format = Format [FormatItem]
 
 -- | Allow displaying of bit vectors and strings
-data FormatItem = 
+data FormatItem =
     FormatBit Int BV
   | FormatString String
 
