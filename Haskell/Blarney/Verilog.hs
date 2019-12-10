@@ -134,9 +134,6 @@ showIntLit :: Int -> Integer -> Doc
 showIntLit w v = int w <> text "'h" <> hexInt v
 showDontCare :: Int -> Doc
 showDontCare w = int w <> text "'b" <> text (replicate w 'x')
-showExpr :: Expr -> Doc
-showExpr (ConstE w v) = showIntLit w v
-showExpr (DontCareE w) = showDontCare w
 showWire :: (InstId, Int, Name) -> Doc
 showWire (iId, nOut, Final nm) =    text nm
                                  <> char '_' <> int iId
@@ -144,9 +141,72 @@ showWire (iId, nOut, Final nm) =    text nm
 showWire (iId, nOut, _) = error "Name must be Final"
 showWireWidth :: Int -> (InstId, Int, Name) -> Doc
 showWireWidth width wId = brackets (int (width-1) <> text ":0") <+> showWire wId
+
+showPrim :: Prim -> [NetInput] -> Doc
+showPrim (Const w v) [] = showIntLit w v
+showPrim (DontCare w) [] = showDontCare w
+showPrim (Add _) [e0, e1] = showNetInput e0 <+> char '+' <+> showNetInput e1
+showPrim (Sub _) [e0, e1] = showNetInput e0 <+> char '-' <+> showNetInput e1
+showPrim (Mul _) [e0, e1] = showNetInput e0 <+> char '*' <+> showNetInput e1
+showPrim (Div _) [e0, e1] = showNetInput e0 <+> char '/' <+> showNetInput e1
+showPrim (Mod _) [e0, e1] = showNetInput e0 <+> char '%' <+> showNetInput e1
+showPrim (And _) [e0, e1] = showNetInput e0 <+> char '&' <+> showNetInput e1
+showPrim (Or _)  [e0, e1] = showNetInput e0 <+> char '|' <+> showNetInput e1
+showPrim (Xor _) [e0, e1] = showNetInput e0 <+> char '^' <+> showNetInput e1
+showPrim (Not _) [e0]     = char '~' <> showNetInput e0
+showPrim (ShiftLeft _) [e0, e1] =
+  showNetInput e0 <+> text "<<" <+> showNetInput e1
+showPrim (ShiftRight _) [e0, e1] =
+  showNetInput e0 <+> text ">>" <+> showNetInput e1
+showPrim (ArithShiftRight _) [e0, e1] =
+  text "$signed" <> parens (showNetInput e0) <+> text ">>>" <+> showNetInput e1
+showPrim (Equal _) [e0, e1] = showNetInput e0 <+> text "==" <+> showNetInput e1
+showPrim (NotEqual _) [e0, e1] =
+  showNetInput e0 <+> text "!=" <+> showNetInput e1
+showPrim (LessThan _) [e0, e1] =
+  showNetInput e0 <+> char '<' <+> showNetInput e1
+showPrim (LessThanEq _) [e0, e1] =
+  showNetInput e0 <+> text "<=" <+> showNetInput e1
+showPrim (ReplicateBit w) [e0] = braces $ int w <> braces (showNetInput e0)
+showPrim (ZeroExtend iw ow) [e0] =
+  braces $ (braces $ int (ow-iw) <> braces (text "1'b0"))
+        <> comma <+> showNetInput e0
+showPrim (SignExtend iw ow) [e0] =
+  braces $ (braces $ int (ow-iw)
+                  <> braces (showNetInput e0 <> brackets (int (iw-1))))
+           <> comma <+> showNetInput e0
+showPrim (SelectBits _ hi lo) [e0] = case e0 of
+  InputWire wId -> showWire wId <> brackets (int hi <> colon <> int lo)
+  InputTree (Const _ v) [] ->
+    showIntLit width ((v `shiftR` lo) .&. ((2^width)-1))
+  InputTree (DontCare _) [] -> showDontCare width
+  x -> error $
+    "unsupported " ++ show x ++ " for SelectBits in Verilog generation"
+  where width = hi+1-lo
+showPrim (Concat w0 w1) [e0, e1] =
+  braces $ showNetInput e0 <> comma <+> showNetInput e1
+showPrim (Mux w) [sel, e0, e1] =
+  showNetInput sel <+> char '?'
+                   <+> showNetInput e0 <+> colon <+> showNetInput e1
+showPrim (CountOnes w) [e0] = text "$countones" <> parens (showNetInput e0)
+showPrim (Identity w) [e0] = showNetInput e0
+showPrim p _ = error $
+  "unsupported Prim '" ++ show p ++ "' encountered in Verilog generation"
+
 showNetInput :: NetInput -> Doc
 showNetInput (InputWire wId) = showWire wId
-showNetInput (InputExpr expr) = showExpr expr
+showNetInput (InputTree p@(Const _ _) ins) = showPrim p ins
+showNetInput (InputTree p@(DontCare _) ins) = showPrim p ins
+showNetInput (InputTree p@(Not _) ins) = showPrim p ins
+showNetInput (InputTree p@(ReplicateBit _) ins) = showPrim p ins
+showNetInput (InputTree p@(ZeroExtend _ _) ins) = showPrim p ins
+showNetInput (InputTree p@(SignExtend _ _) ins) = showPrim p ins
+showNetInput (InputTree p@(SelectBits _ _ _) ins) = showPrim p ins
+showNetInput (InputTree p@(Concat _ _) ins) = showPrim p ins
+showNetInput (InputTree p@(CountOnes _) ins) = showPrim p ins
+showNetInput (InputTree p@(Identity _) ins) = showPrim p ins
+showNetInput (InputTree p ins) = parens $ showPrim p ins
+
 showVerilogModule :: String -> [Net] -> Doc
 showVerilogModule modName netlst =
       hang (hang (text "module" <+> text modName) 2 (parens (showIOs)) <> semi)
@@ -216,48 +276,9 @@ resetRegister width reg init =
 
 -- instantiation helpers
 --------------------------------------------------------------------------------
-instPrefixOp op net =
+instPrim net =
       text "assign" <+> showWire (netInstId net, 0, netName net) <+> equals
-  <+> text op <> parens (showNetInput (netInputs net !! 0)) <> semi
-instInfixOp op net =
-      text "assign" <+> showWire (netInstId net, 0, netName net) <+> equals
-  <+> showNetInput (netInputs net !! 0)
-  <+> text op <+> showNetInput (netInputs net !! 1) <> semi
-instShift w op net =
-      text "assign" <+> showWire (netInstId net, 0, netName net) <+> equals
-  <+> a0 <+> text op <+> showNetInput (netInputs net !! 1) <> semi
-  where a0 = if op == ">>>" then text "$signed" <> parens a0name
-                            else a0name
-        a0name = showNetInput (netInputs net !! 0)
-instReplicate w net =
-      text "assign" <+> showWire (netInstId net, 0, netName net) <+> equals
-  <+> braces (int w <> braces (showNetInput (netInputs net !! 0))) <> semi
-instMux net =
-      text "assign" <+> showWire (netInstId net, 0, netName net) <+> equals
-  <+> showNetInput (netInputs net !! 0) <+> char '?'
-  <+> showNetInput (netInputs net !! 1) <+> colon
-  <+> showNetInput (netInputs net !! 2) <> semi
-instConcat net =
-      text "assign" <+> showWire (netInstId net, 0, netName net) <+> equals
-  <+> braces ( showNetInput (netInputs net !! 0) <> comma <+>
-               showNetInput (netInputs net !! 1)) <> semi
-instSelectBits net hi lo =
-      text "assign" <+> showWire (netInstId net, 0, netName net) <+> equals
-  <+> sel (netInputs net !! 0) <> semi
-  where sel (InputWire w) = showWire w <> brackets (int hi <> colon <> int lo)
-        sel (InputExpr (ConstE _ v)) =
-          showIntLit width ((v `shiftR` lo) .&. ((2^width)-1))
-        sel (InputExpr (DontCareE _)) = showDontCare width
-        width = hi+1-lo
-instZeroExtend net wi wo =
-      text "assign" <+> showWire (netInstId net, 0, netName net) <+> equals
-  <+> braces (braces (int (wo-wi) <> braces (text "1'b0"))
-  <>  comma <+> showNetInput (netInputs net !! 0)) <> semi
-instSignExtend net wi wo =
-      text "assign" <+> showWire (netInstId net, 0, netName net) <+> equals
-  <+> braces (braces (int (wo-wi) <> braces (showNetInput (netInputs net !! 0)
-  <>  brackets (int (wi-1)))) <> comma
-  <+> showNetInput (netInputs net !! 0)) <> semi
+  <+> showPrim (netPrim net) (netInputs net) <> semi
 instCustom net name ins outs params clked
   | numParams == 0 = hang (text name) 2 showInst
   | otherwise = hang (hang (text (name ++ "#")) 2 (parens $ argStyle allParams))
@@ -346,38 +367,32 @@ alwsRegFileWrite id net =
 --------------------------------------------------------------------------------
 genNetVerilog :: Net -> NetVerilog
 genNetVerilog net = case netPrim net of
-  Add w                   -> dfltNV { decl = Just $ declWire w wId
-                                    , inst = Just $ instInfixOp "+" net }
-  Sub w                   -> dfltNV { decl = Just $ declWire w wId
-                                    , inst = Just $ instInfixOp "-" net }
-  Mul w                   -> dfltNV { decl = Just $ declWire w wId
-                                    , inst = Just $ instInfixOp "*" net }
-  Div w                   -> dfltNV { decl = Just $ declWire w wId
-                                    , inst = Just $ instInfixOp "/" net }
-  Mod w                   -> dfltNV { decl = Just $ declWire w wId
-                                    , inst = Just $ instInfixOp "%" net }
-  Not w                   -> dfltNV { decl = Just $ declWire w wId
-                                    , inst = Just $ instPrefixOp "~" net }
-  And w                   -> dfltNV { decl = Just $ declWire w wId
-                                    , inst = Just $ instInfixOp "&" net }
-  Or w                    -> dfltNV { decl = Just $ declWire w wId
-                                    , inst = Just $ instInfixOp "|" net }
-  Xor w                   -> dfltNV { decl = Just $ declWire w wId
-                                    , inst = Just $ instInfixOp "^" net }
-  ShiftLeft w             -> dfltNV { decl = Just $ declWire w wId
-                                    , inst = Just $ instShift w "<<" net }
-  ShiftRight w            -> dfltNV { decl = Just $ declWire w wId
-                                    , inst = Just $ instShift w ">>" net }
-  ArithShiftRight w       -> dfltNV { decl = Just $ declWire w wId
-                                    , inst = Just $ instShift w ">>>" net }
-  Equal w                 -> dfltNV { decl = Just $ declWire 1 wId
-                                    , inst = Just $ instInfixOp "==" net }
-  NotEqual w              -> dfltNV { decl = Just $ declWire 1 wId
-                                    , inst = Just $ instInfixOp "!=" net }
-  LessThan w              -> dfltNV { decl = Just $ declWire 1 wId
-                                    , inst = Just $ instInfixOp "<" net }
-  LessThanEq w            -> dfltNV { decl = Just $ declWire 1 wId
-                                    , inst = Just $ instInfixOp "<=" net }
+  Add w                   -> primNV { decl = Just $ declWire w wId }
+  Sub w                   -> primNV { decl = Just $ declWire w wId }
+  Mul w                   -> primNV { decl = Just $ declWire w wId }
+  Div w                   -> primNV { decl = Just $ declWire w wId }
+  Mod w                   -> primNV { decl = Just $ declWire w wId }
+  Not w                   -> primNV { decl = Just $ declWire w wId }
+  And w                   -> primNV { decl = Just $ declWire w wId }
+  Or w                    -> primNV { decl = Just $ declWire w wId }
+  Xor w                   -> primNV { decl = Just $ declWire w wId }
+  ShiftLeft w             -> primNV { decl = Just $ declWire w wId }
+  ShiftRight w            -> primNV { decl = Just $ declWire w wId }
+  ArithShiftRight w       -> primNV { decl = Just $ declWire w wId }
+  Equal w                 -> primNV { decl = Just $ declWire 1 wId }
+  NotEqual w              -> primNV { decl = Just $ declWire 1 wId }
+  LessThan w              -> primNV { decl = Just $ declWire 1 wId }
+  LessThanEq w            -> primNV { decl = Just $ declWire 1 wId }
+  ReplicateBit w          -> primNV { decl = Just $ declWire w wId }
+  ZeroExtend wi wo        -> primNV { decl = Just $ declWire wo wId }
+  SignExtend wi wo        -> primNV { decl = Just $ declWire wo wId }
+  SelectBits w hi lo      -> primNV { decl = Just $ declWire (1+hi-lo) wId }
+  Concat aw bw            -> primNV { decl = Just $ declWire (aw+bw) wId }
+  Mux w                   -> primNV { decl = Just $ declWire w wId }
+  CountOnes w             -> primNV { decl = Just $ declWire w wId }
+  Identity w              -> primNV { decl = Just $ declWire w wId }
+  Const w i               -> dfltNV { decl = Just $ declWireInit w wId i }
+  DontCare w              -> dfltNV { decl = Just $ declWireDontCare w wId }
   Register i w            -> dfltNV { decl = Just $ declRegInit w wId i
                                     , alws = Just $ alwsRegister net
                                     , rst  = Just $ resetRegister w wId i }
@@ -388,22 +403,6 @@ genNetVerilog net = case netPrim net of
                                     , inst = Just $ instRAM net i aw dw }
   TrueDualBRAM i aw dw    -> dfltNV { decl = Just $ declRAM i 2 aw dw nId nName
                                     , inst = Just $ instTrueDualRAM net i aw dw }
-  ReplicateBit w          -> dfltNV { decl = Just $ declWire w wId
-                                    , inst = Just $ instReplicate w net }
-  ZeroExtend wi wo        -> dfltNV { decl = Just $ declWire wo wId
-                                    , inst = Just $ instZeroExtend net wi wo }
-  SignExtend wi wo        -> dfltNV { decl = Just $ declWire wo wId
-                                    , inst = Just $ instSignExtend net wi wo }
-  SelectBits w hi lo      -> dfltNV { decl = Just $ declWire (1+hi-lo) wId
-                                    , inst = Just $ instSelectBits net hi lo }
-  Concat aw bw            -> dfltNV { decl = Just $ declWire (aw+bw) wId
-                                    , inst = Just $ instConcat net }
-  Mux w                   -> dfltNV { decl = Just $ declWire w wId
-                                    , inst = Just $ instMux net }
-  CountOnes w             -> dfltNV { decl = Just $ declWire w wId
-                                    , inst = Just $ instPrefixOp "$countones" net }
-  Identity w              -> dfltNV { decl = Just $ declWire w wId
-                                    , inst = Just $ instPrefixOp "" net }
   Display args            -> dfltNV { alws = Just $ alwsDisplay args net }
   Finish                  -> dfltNV { alws = Just $ alwsFinish net }
   TestPlusArgs s          -> dfltNV { decl = Just $ declWire 1 wId
@@ -418,8 +417,6 @@ genNetVerilog net = case netPrim net of
   Custom p is os ps clked -> dfltNV { decl = Just $ sep [ declWire w (nId, n, nName)
                                                         | ((o, w), n) <- zip os [0..] ]
                                     , inst = Just $ instCustom net p is os ps clked }
-  Const w i               -> dfltNV { decl = Just $ declWireInit w wId i }
-  DontCare w              -> dfltNV { decl = Just $ declWireDontCare w wId }
   --_                       -> dfltNV
   where nId = netInstId net
         nName = netName net
@@ -428,3 +425,4 @@ genNetVerilog net = case netPrim net of
                             , inst = Nothing
                             , alws = Nothing
                             , rst  = Nothing }
+        primNV = dfltNV { inst = Just $ instPrim net }

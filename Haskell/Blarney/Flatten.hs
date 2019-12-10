@@ -72,8 +72,8 @@ doIO m = Flatten $ \r -> do
 
 -- |Flatten bit vector to netlist
 flatten :: BV -> Flatten NetInput
-flatten BV{bvPrim=Const w v} = return $ InputExpr (ConstE w v)
-flatten BV{bvPrim=DontCare w} = return $ InputExpr (DontCareE w)
+flatten BV{bvPrim=p@(Const w v)} = return $ InputTree p []
+flatten BV{bvPrim=p@(DontCare w)} = return $ InputTree p []
 flatten b@BV{bvName=name,bvInstRef=instRef} = do
   -- handle inst id traversal
   instIdVal <- doIO (readIORef instRef)
