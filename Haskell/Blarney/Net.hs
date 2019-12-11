@@ -14,7 +14,6 @@ module Blarney.Net (
   Net(..)            -- Netlists are lists of Nets
 , NetInput(..)       -- Net inputs type
 , WireId             -- Nets are connected by wires
-, Expr(..)           -- Net inputs can also be an expression
 , evalConstNet       -- Turn a Net with const inputs into a Const Net
 , netlistPasses      -- Toplevel function running the netlist passes
 ) where
@@ -38,21 +37,16 @@ data Net = Net { netPrim         :: Prim
                , netName         :: Name
                } deriving Show
 
--- |A Net input can be: a wire, an int literal or a bit literal
-data NetInput = InputWire WireId
-              | InputExpr Expr
-              deriving Show
-
 -- |A wire is uniquely identified by an instance id and an output number
 type WireId = (InstId, OutputNumber, Name)
 
--- |An expression used as a 'Net' input
-data Expr = ConstE OutputWidth Integer
-          | DontCareE OutputWidth
-          deriving Show
+-- |A Net input can be a wire, or a complex expression (constructors with E)
+data NetInput = InputWire WireId
+              | InputTree Prim [NetInput]
+              deriving Show
 
--- Integer Constant Input Expr pattern helper
-pattern Lit i <- InputExpr (ConstE _ i)
+-- pattern helper for ConstE NetInput
+pattern Lit i <- InputTree (Const _ i) []
 -- | Evaluate constant Net
 evalConstNet :: Net -> Net
 evalConstNet n@Net{ netPrim = Add w, netInputs = [Lit a0, Lit a1] } =
@@ -114,6 +108,21 @@ evalConstNet n@Net{ netPrim = Identity w, netInputs = [Lit a0] } =
   n { netPrim   = Const w a0, netInputs = [] }
 evalConstNet n = n
 
+-- | Net reference counting helper
+countNetRef :: IOArray InstId (Maybe Net) -> IO (IOArray InstId Int)
+countNetRef arr = do
+  bounds <- getBounds arr
+  refCounts :: IOArray InstId Int <- newArray bounds 0
+  es <- getElems arr
+  -- count references for each Net
+  let innerCount (InputWire (instId, _, _)) = do
+        cnt <- readArray refCounts instId
+        writeArray refCounts instId (cnt + 1)
+      innerCount (InputTree _ inpts) = mapM_ innerCount inpts
+  forM_ [e | Just e <- es] $ \net -> mapM_ innerCount (netInputs net)
+  -- return reference counts
+  return refCounts
+
 -- | Finalise 'Name's in netlist to "v_"
 finaliseNamesSimple :: IOArray InstId (Maybe Net)
                     -> IO (IOArray InstId (Maybe Net))
@@ -171,19 +180,65 @@ propagateConstants :: IOArray InstId (Maybe Net) -> IO (IOArray InstId (Maybe Ne
 propagateConstants arr = do
   pairs <- getAssocs arr
   forM_ [(a,b) | x@(a, Just b) <- pairs] $ \(idx, net) -> do
-    -- fold constant InputWire as InputExpr in current net inputs
+    -- fold constant InputWire as a InputTree Const/DontCare in current net inputs
     netInputs' <- forM (netInputs net) $ \inpt -> do
       case inpt of
         InputWire (instId, _, _) -> do
           inptNet <- fromMaybe (error "encountered InstId with no matching Net")
                            <$> (readArray arr instId)
           return $ case netPrim inptNet of
-                     Const w i  -> InputExpr $ ConstE w i
-                     DontCare w -> InputExpr $ DontCareE w
-                     _          -> inpt
+                     p@(Const _ _)  -> InputTree p []
+                     p@(DontCare _) -> InputTree p []
+                     _              -> inpt
         _ -> return inpt
     -- update the current net
     writeArray arr idx (Just net { netInputs = netInputs' })
+  -- return mutated netlist
+  return arr
+
+-- | Helper to tell whether a 'Prim' is inlineable
+canInline :: Prim -> Bool
+canInline Register{}     = False
+canInline RegisterEn{}   = False
+canInline BRAM{}         = False
+canInline TrueDualBRAM{} = False
+canInline Custom{}       = False
+canInline Input{}        = False
+canInline Output{}       = False
+canInline Display{}      = False
+canInline Finish         = False
+canInline TestPlusArgs{} = False
+canInline RegFileMake{}  = False
+canInline RegFileRead{}  = False
+canInline RegFileWrite{} = False
+canInline _ = True
+-- | Helper to tell whether a 'Prim' inputs can be inlined
+canInlineInput SelectBits{} = False
+canInlineInput SignExtend{} = False
+canInlineInput _ = True
+-- | Single reference 'Net' inlining pass
+inlineSingleRefNet :: IOArray InstId (Maybe Net)
+                   -> IO (IOArray InstId (Maybe Net))
+inlineSingleRefNet arr = do
+  -- compute reference count of 'Net's in 'arr'
+  refCounts <- countNetRef arr
+  pairs <- getAssocs arr
+  let inlineInputs inpt@(InputWire (instId, _, _)) = do
+        cnt <- readArray refCounts instId
+        inptNet <- fromMaybe (error "encountered InstId with no matching Net")
+                         <$> (readArray arr instId)
+        return $ if cnt == 1 && canInline (netPrim inptNet) then
+                   InputTree (netPrim inptNet) (netInputs inptNet)
+                 else inpt
+      inlineInputs (InputTree prim inpts) = do
+        inpts' <- mapM inlineInputs inpts
+        return $ InputTree prim inpts'
+  -- inline "inlinable" (that is with a supported combinational underlying
+  -- primitive) 'Net's with a single reference
+  forM_ [(a,b) | x@(a, Just b) <- pairs, canInlineInput (netPrim b)] $
+    \(idx, net) -> do netInputs' <- mapM inlineInputs (netInputs net)
+                      -- update the current net
+                      writeArray arr idx (Just net { netInputs = netInputs' })
   -- return mutated netlist
   return arr
 
@@ -191,15 +246,10 @@ propagateConstants arr = do
 eliminateDeadNet :: IOArray InstId (Maybe Net)
                  -> IO (IOArray InstId (Maybe Net))
 eliminateDeadNet arr = do
-  bounds <- getBounds arr
-  refCounts :: IOArray InstId Int <- newArray bounds 0
-  pairs <- getAssocs arr
-  -- count references for each Net
-  forM_ [(a,b) | x@(a, Just b) <- pairs] $ \(idx, net) -> do
-    forM_ [wId | x@(InputWire wId) <- netInputs net] $ \(instId, _, _) -> do
-      cnt <- readArray refCounts instId
-      writeArray refCounts instId (cnt + 1)
+  -- compute reference count of Nets in arr
+  refCounts <- countNetRef arr
   -- kill Nets with a null reference count
+  pairs <- getAssocs arr
   forM_ [(a,b) | x@(a, Just b) <- pairs] $ \(idx, net) -> do
     refCnt <- readArray refCounts idx
     if (refCnt == 0 && not (null $ netOutputWidths net))
@@ -208,7 +258,7 @@ eliminateDeadNet arr = do
   -- return mutated netlist
   return arr
 
--- | Dead Net elimination pass
+-- | All netlist passes
 netlistPasses :: IOArray InstId (Maybe Net) -> IO (IOArray InstId (Maybe Net))
 netlistPasses arr = do
   tmpNetList <- finaliseNamesSimple arr
@@ -216,5 +266,6 @@ netlistPasses arr = do
   --                         tmp <- propagateConstants tmp
   --                         return tmp
   --tmpNetList <- foldM constElim tmpNetList [0..100]
+  --tmpNetList <- inlineSingleRefNet tmpNetList
   --tmpNetList <- eliminateDeadNet tmpNetList
   return tmpNetList
