@@ -312,6 +312,7 @@ instance Interface a => GInterface (K1 i a) where
 -- ==================
 
 instance (Bits t, Interface t) => Interface (Reg t)
+instance (Bits t, Interface t) => Interface (Wire t)
 
 -- Modular class
 -- =============

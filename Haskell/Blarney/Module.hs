@@ -50,7 +50,7 @@ module Blarney.Module
     Reg(..), makeReg, makeRegU, makeDReg,
 
     -- * Wires
-    RTL.Wire(..), makeWire, makeWireU,
+    Wire(..), makeWire, makeWireU,
 
     -- * Read-Write and Write-Only interfaces
     ReadWrite(..), WriteOnly(..),
@@ -183,13 +183,31 @@ makeReg init = M (fromRTLReg <$> RTL.makeReg init)
 makeRegU :: Bits a => Module (Reg a)
 makeRegU = M (fromRTLReg <$> RTL.makeRegU)
 
+-- | Blarney's wire Module type
+data Wire t = Wire { -- | read method
+                     readWire :: t
+                     -- | write method
+                   , writeWire :: t -> Action ()
+                     -- | active method
+                   , active :: Bit 1
+                   } deriving (Generic)
+instance Val (Wire t) t where
+  val wire = readWire wire
+instance Assign Wire where
+  wire <== x = writeWire wire x
+fromRTLWire :: Bits t => RTL.Wire t -> Wire t
+fromRTLWire w = Wire { readWire  = val w
+                     , writeWire = \x -> w <== x
+                     , active    = RTL.active w
+                     }
+
 -- |Create wire with default value
-makeWire :: Bits a => a -> Module (RTL.Wire a)
-makeWire init = M (RTL.makeWire init)
+makeWire :: Bits a => a -> Module (Wire a)
+makeWire init = M (fromRTLWire <$> RTL.makeWire init)
 
 -- |Create wire with don't care default value
-makeWireU :: Bits a => Module (RTL.Wire a)
-makeWireU = M RTL.makeWireU
+makeWireU :: Bits a => Module (Wire a)
+makeWireU = M (fromRTLWire <$> RTL.makeWireU)
 
 -- |Read-Write interface
 data ReadWrite a =
