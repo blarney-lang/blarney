@@ -16,14 +16,15 @@ module Blarney.Verilog
 
 -- Standard imports
 import Prelude hiding ((<>))
-import Data.List
-import Numeric (showHex)
-import System.IO
+import qualified Data.Set as Set
 import Data.Bits
+import Data.List
+import System.IO
 import Data.Maybe
-import Data.Array.IArray
 import System.Process
 import Text.PrettyPrint
+import Numeric (showHex)
+import Data.Array.IArray
 
 -- Blarney imports
 import Blarney.BV
@@ -233,19 +234,21 @@ genNetVerilog netlist net = case netPrim net of
   primNV = dfltNV { inst = Just $ instPrim net }
   -- general helpers
   --------------------------------------------------------------------------------
+  genName :: Name -> String
+  genName nm = if Set.null hints then "v"
+               else intercalate "_" (Set.toList hints)
+               where hints = nameHints nm
   showIntLit :: Int -> Integer -> Doc
   showIntLit w v = int w <> text "'h" <> hexInt v
   showDontCare :: Int -> Doc
   showDontCare w = int w <> text "'b" <> text (replicate w 'x')
   showWire :: (InstId, Int) -> Doc
-  showWire (iId, nOut) =  text nm <> char '_' <> int iId
-                                  <> char '_' <> int nOut
+  showWire (iId, nOut) =  text name <> char '_' <> int iId
+                                    <> char '_' <> int nOut
                           where wNet = fromMaybe
                                   (error "Trying to show non existing Net")
                                   (netlist Data.Array.IArray.! iId)
-                                nm = genName $ netName wNet
-                                genName (Final name) = name
-                                genName _ = error "should have finalised names"
+                                name = genName $ netName wNet
   showWireWidth :: Int -> (InstId, Int) -> Doc
   showWireWidth width wId = brackets (int (width-1) <> text ":0") <+> showWire wId
 

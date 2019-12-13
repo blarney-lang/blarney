@@ -101,7 +101,7 @@ import qualified Data.Bits as B
 type InstId = Int
 
 -- | A 'Name' type that handles name hints
-data Name = Hints (Set String) | Final String deriving Show
+data Name = Name { nameHints :: Set String } deriving Show
 
 -- |Each output from a primitive component is numbered
 type OutputNumber = Int
@@ -267,9 +267,8 @@ data BV = BV {
 
 -- | A name hint to the 'BV'
 addBVNameHint :: BV -> String -> BV
-addBVNameHint bv@BV{bvName=Hints hs} nm = bv { bvName = Hints $ insert nm hs }
-addBVNameHint _ nm =
-  error "addBVNameHint should only be used on BVs with Hints name"
+addBVNameHint bv@BV{ bvName = name@Name{ nameHints = hs } } nm =
+  bv { bvName = name { nameHints = insert nm hs } }
 
 {-# NOINLINE makePrim #-}
 -- |Helper function for creating an instance of a primitive component
@@ -283,9 +282,10 @@ makePrim prim ins outWidths
                 , bvOutNum  = 0
                 , bvWidth   = 0
                 , bvWidths  = outWidths
-                , bvName    = Hints empty
+                , bvName    = dfltName
                 , bvInstRef = instIdRef
                 }
+        dfltName = Name { nameHints = empty }
         -- |For Observable Sharing.
         instIdRef = unsafePerformIO (newIORef Nothing)
 

@@ -65,7 +65,7 @@ module Blarney.RTL
   ) where
 
 -- Blarney imports
-import Blarney.BV
+import Blarney.BV hiding (nameHints)
 import Blarney.Net
 import Blarney.Flatten
 import Blarney.Bit

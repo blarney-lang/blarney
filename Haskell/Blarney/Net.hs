@@ -26,7 +26,6 @@ import Data.Array.IO
 import Control.Monad
 import Data.List (intercalate)
 import qualified Data.Bits as B
-import Data.Set (Set, empty, insert, toList, union)
 
 import Blarney.BV
 import Blarney.IfThenElse
@@ -136,16 +135,6 @@ countNetRef arr = do
   -- return reference counts
   return refCounts
 
--- | Finalise 'Name's in netlist preserving name hints
-finaliseNames :: MNetlist -> IO ()
-finaliseNames = mapMNetlist_ inner
-  where inner _ (Just net) = Just net { netName = Final $ genName (netName net) }
-        inner _ Nothing = Nothing
-        genName (Hints hints) = if null hints then "v"
-                                else intercalate "_" (toList hints)
-        genName (Final _) =
-          error "should not finalise names on Net with already Final name"
-
 -- | Constant folding pass
 foldConstants :: MNetlist -> IO ()
 foldConstants = mapMNetlist_ (\_ -> fmap evalConstNet)
@@ -228,10 +217,9 @@ eliminateDeadNet arr = do
 -- | All netlist passes
 netlistPasses :: MNetlist -> IO Netlist
 netlistPasses nl = do
-  finaliseNames nl
   --let constElim i = do foldConstants nl
   --                     propagateConstants nl
   --replicateM_ 100 $ constElim nl
   --replicateM_ 100 $ inlineSingleRefNet nl
   --eliminateDeadNet nl
-  return =<< freeze nl
+  freeze nl
