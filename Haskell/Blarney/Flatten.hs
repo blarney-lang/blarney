@@ -75,20 +75,20 @@ flatten :: BV -> Flatten NetInput
 flatten BV{bvPrim=p@(Const w v)} = return $ InputTree p []
 flatten BV{bvPrim=p@(DontCare w)} = return $ InputTree p []
 flatten b@BV{bvName=name,bvInstRef=instRef} = do
-  -- handle inst id traversal
+  -- handle instId traversal
   instIdVal <- doIO (readIORef instRef)
   case instIdVal of
     Nothing -> do
-      id <- freshInstId
-      doIO (writeIORef instRef (Just id))
+      instId <- freshInstId
+      doIO (writeIORef instRef (Just instId))
       addUndo (writeIORef instRef Nothing)
       ins <- mapM flatten (bvInputs b)
       let net = Net { netPrim         = bvPrim b
-                    , netInstId       = id
+                    , netInstId       = instId
                     , netInputs       = ins
                     , netOutputWidths = (bvWidths b)
                     , netName         = name
                     }
       addNet net
-      return $ InputWire (id, bvOutNum b, name)
-    Just id -> return $ InputWire (id, bvOutNum b, name)
+      return $ InputWire (instId, bvOutNum b)
+    Just instId -> return $ InputWire (instId, bvOutNum b)

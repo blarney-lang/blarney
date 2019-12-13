@@ -415,19 +415,18 @@ addRoots :: [BV] -> RTL ()
 addRoots roots = write (RTLRoots roots)
 
 -- |Convert RTL monad to a netlist
-netlist :: RTL () -> IO [Net]
+netlist :: RTL () -> IO Netlist
 netlist rtl = do
   i <- newIORef (0 :: InstId)
   ((nl, undo), _) <- runFlatten roots i
   maxId <- readIORef i
   netlist <- thaw $ listArray (0, maxId) (replicate (maxId+1) Nothing)
                     // [(netInstId n, Just n) | n <- JL.toList nl]
-
   netlist' <- netlistPasses netlist
 
   undo
-  nl' <- getElems netlist'
-  return $ catMaybes nl'
+
+  return netlist'
   where
     (_, actsJL, _) = runRTL rtl (R { nameHints = empty
                                    , cond = 1
