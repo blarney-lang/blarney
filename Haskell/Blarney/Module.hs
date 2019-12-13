@@ -82,6 +82,7 @@ import qualified Blarney.JList as JL
 -- Standard imports
 import Prelude
 import Data.IORef
+import Data.Array
 import GHC.TypeLits
 import GHC.Generics
 import Control.Monad.Fix
@@ -282,5 +283,5 @@ addRoots :: [BV] -> Module ()
 addRoots roots = M (RTL.addRoots roots)
 
 -- |Convert module to a netlist
-netlist :: Module () -> IO [Net]
+netlist :: Module () -> IO Netlist
 netlist m = RTL.netlist (runModule m)
