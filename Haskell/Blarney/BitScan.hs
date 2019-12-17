@@ -43,6 +43,7 @@ top = do
 module Blarney.BitScan
   ( (==>)
   , match
+  , matchDefault
   ) where
 
 import Blarney
@@ -196,14 +197,23 @@ instance (RHS f, KnownNat n) => RHS (Bit n -> f) where
   apply f (arg:args) = apply (f (fromBitList arg)) args
 
 -- |Case statement, with a subject and a list of alternatives
-match :: KnownNat n => Bit n -> [Bit n -> Action ()] -> Action ()
+match :: KnownNat n => Bit n -> [Bit n -> Action (Bit 1)] -> Action ()
 match subj alts = sequence_ [alt subj | alt <- alts]
+
+-- |Case statement, with a default case
+matchDefault :: KnownNat n => Bit n -> [Bit n -> Action (Bit 1)] ->
+                  Action () -> Action ()
+matchDefault subj alts def = do
+  bs <- sequence [alt subj | alt <- alts]
+  when (inv (orList bs)) def
 
 -- |Case alternative
 infix 1 ==>
-(==>) :: (KnownNat n, RHS rhs) => String -> rhs -> Bit n -> Action ()
+(==>) :: (KnownNat n, RHS rhs) => String -> rhs -> Bit n -> Action (Bit 1)
 fmt ==> rhs = \subj -> do
-  let subj' = toBitList subj
-  when (matches subj' toks) $
-    apply rhs (args subj' (tag toks))
-  where toks = tokenise fmt
+    let subj' = toBitList subj
+    let matching = matches subj' toks
+    when matching $ apply rhs (args subj' (tag toks))
+    return matching
+  where
+    toks = tokenise fmt
