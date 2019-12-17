@@ -25,11 +25,11 @@ data Config =
     -- Get destination register
   , dst :: Instr -> RegId
     -- Dispatch rules for pre-execute stage
-  , preExecRules :: State -> [Instr -> Action ()]
+  , preExecRules :: State -> [Instr -> Action (Bit 1)]
     -- Dispatch rules for execute stage
-  , execRules :: State -> [Instr -> Action ()]
+  , execRules :: State -> [Instr -> Action (Bit 1)]
     -- Dispatch rules for post-execute stage
-  , postExecRules :: State -> [Instr -> Action ()]
+  , postExecRules :: State -> [Instr -> Action (Bit 1)]
   }
 
 -- Pipeline state, visisble to the ISA
