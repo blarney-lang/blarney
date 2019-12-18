@@ -1,11 +1,12 @@
 {-# LANGUAGE DataKinds             #-}
-{-# LANGUAGE KindSignatures        #-}
+{-# LANGUAGE RecursiveDo           #-}
 {-# LANGUAGE TypeOperators         #-}
-{-# LANGUAGE RebindableSyntax      #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE RebindableSyntax      #-}
 {-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 {-|
 Module      : Blarney.RTL
@@ -420,9 +421,7 @@ netlist rtl = do
   i <- newIORef (0 :: InstId)
   ((nl, undo), _) <- runFlatten roots i
   maxId <- readIORef i
-  netlist <- thaw $ listArray (0, maxId) (replicate (maxId+1) Nothing)
-                    // [(netInstId n, Just n) | n <- JL.toList nl]
-  netlist' <- netlistPasses netlist
+  netlist' <- netlistPasses =<< toMNetlist nl maxId
 
   undo
 

@@ -1,12 +1,13 @@
-{-# LANGUAGE KindSignatures        #-}
-{-# LANGUAGE TypeOperators         #-}
-{-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE Rank2Types            #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE KindSignatures        #-}
+{-# LANGUAGE TypeApplications      #-}
+{-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE AllowAmbiguousTypes   #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
-{-# LANGUAGE DataKinds             #-}
-{-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 {-|

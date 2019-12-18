@@ -1,4 +1,6 @@
-{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE PatternSynonyms     #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 {-|
 Module      : Blarney.Net
@@ -9,15 +11,17 @@ License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
 
-The 'Blarney.Net' module provides types and functions to represent circuits
-as 'Netlist's that can then be rendered as Verilog or in other formats...
+This module provides types and functions to represent circuits as 'Netlist's
+that can then be rendered as Verilog or in other formats...
 
 -}
 
 module Blarney.Net (
   Net(..)        -- 'Net' type to represent 'Netlist' nodes
-, Netlist(..)    -- 'Netlist' type to represent a circuit
+, Netlist        -- 'Netlist' type to represent a circuit
 , NetInput(..)   -- 'NetInput' type to represent inputs to 'Net's
+, MNetlist       -- 'MNetlist' type, mutable netlist
+, toMNetlist     -- Helper function to create an 'MNetlist'
 , WireId         -- 'WireId' type to uniquely identify wires
 , netlistPasses  -- Toplevel function for 'Netlist' transformation passes
 ) where
@@ -32,21 +36,22 @@ import Data.List (intercalate)
 import qualified Data.Bits as B
 
 import Blarney.BV
+import qualified Blarney.JList as JL
 import Blarney.IfThenElse
 
 -- General type definitions and helpers
 --------------------------------------------------------------------------------
 
 -- | 'Net' type representing a 'Netlist' node
-data Net = Net { -- | The 'Net''s 'Prim'itive
+data Net = Net { -- | The 'Net' 's 'Prim'itive
                  netPrim         :: Prim
-                 -- | The 'Net''s 'InstId' identifier
+                 -- | The 'Net' 's 'InstId' identifier
                , netInstId       :: InstId
-                 -- | The 'Net''s list of 'NetInput' inputs
+                 -- | The 'Net' 's list of 'NetInput' inputs
                , netInputs       :: [NetInput]
-                 -- | The 'Net''s list of 'Width' output widths
+                 -- | The 'Net' 's list of 'Width' output widths
                , netOutputWidths :: [Width]
-                 -- | The 'Net''s 'Name'
+                 -- | The 'Net' 's 'Name'
                , netName         :: Name
                } deriving Show
 
@@ -66,6 +71,11 @@ type Netlist = Array InstId (Maybe Net)
 
 -- | A helper type for mutable 'Netlist'
 type MNetlist = IOArray InstId (Maybe Net)
+
+-- | A helper function to create an 'MNetlist'
+toMNetlist :: JL.JList Net -> InstId -> IO MNetlist
+toMNetlist nl maxId = thaw $ listArray (0, maxId) (replicate (maxId+1) Nothing)
+                             // [(netInstId n, Just n) | n <- JL.toList nl]
 
 -- | A helper type for 'Net' reference counting
 type NetCounts = IOArray InstId Int
