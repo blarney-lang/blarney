@@ -11,9 +11,10 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 {-|
-Module      : Blarney.Bit
+Module      : Blarney.Core.Bit
 Description : Typed bit-vectors and circuit primitives
 Copyright   : (c) Matthew Naylor, 2019
+              (c) Alexandre Joannou, 2019
 License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
@@ -22,13 +23,13 @@ This module provides size-typed bit vectors and circuit primitives,
 on top of Blarney's untyped bit vectors and circuit primitives.
 Hardware developers should always use the typed versions!
 -}
-module Blarney.Bit where
+module Blarney.Core.Bit where
 
 -- Untyped bit-vectors
-import Blarney.BV
+import Blarney.Core.BV
 
 -- Utils
-import Blarney.Util
+import Blarney.Core.Utils
 
 -- Standard imports
 import Prelude

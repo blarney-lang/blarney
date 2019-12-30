@@ -1,5 +1,5 @@
 import Blarney
-import Blarney.RAM
+import Blarney.Recipe
 
 top :: Module ()
 top = do
@@ -8,7 +8,7 @@ top = do
 
   vecCNoPipe :: RAM (Bit 8) (Bit 32) <-makeRAM
   vecCPipe :: RAM (Bit 8) (Bit 32) <-makeRAM
-  
+
   globalTime :: Reg (Bit 32) <- makeReg 0
 
   i :: Reg (Bit 8) <- makeReg 0
@@ -40,7 +40,7 @@ top = do
                  i <== i.val + 1
             ]
           ),
-  
+
           Do [
             display "un-pipelined loop ending at %d" (globalTime.val),
             i <== 0,
@@ -67,7 +67,7 @@ top = do
             ]
           ),
 
-        
+
           Do [
             i <== 0,
             display "Running pipelined vector add...",
@@ -109,7 +109,7 @@ top = do
 
   always do
     globalTime <== globalTime.val + 1
-  
+
   done <- run (reg 1 0) testSeq
 
   always (when done finish)

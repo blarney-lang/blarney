@@ -12,9 +12,10 @@
 {-# LANGUAGE PartialTypeSignatures #-}
 
 {-|
-Module      : Blarney.Bits
+Module      : Blarney.Core.Bits
 Description : Convert types to bit vectors and back
 Copyright   : (c) Matthew Naylor, 2019
+              (c) Alexandre Joannou, 2019
 License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
@@ -24,10 +25,10 @@ For example, values of a type in the 'Bits' class can be stored in a
 register, or carried along a wire.  The 'Bits' class supports generic
 deriving.
 -}
-module Blarney.Bits where
+module Blarney.Core.Bits where
 
 -- Typed bit vectors
-import Blarney.Bit
+import Blarney.Core.Bit
 
 -- Standard imports
 import Prelude

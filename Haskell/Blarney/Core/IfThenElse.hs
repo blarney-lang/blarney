@@ -3,14 +3,15 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 {-|
-Module      : Blarney.IfThenElse
+Module      : Blarney.Core.IfThenElse
 Description : Overloaded if-then-else
 Copyright   : (c) Matthew Naylor, 2019
+              (c) Alexandre Joannou, 2019
 License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
 -}
-module Blarney.IfThenElse where
+module Blarney.Core.IfThenElse where
 
 import Prelude
 

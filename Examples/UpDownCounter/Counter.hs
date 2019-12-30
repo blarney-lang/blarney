@@ -1,4 +1,5 @@
 import Blarney
+import Blarney.Recipe
 
 data Counter n =
   Counter {

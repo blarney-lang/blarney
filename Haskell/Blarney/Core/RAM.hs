@@ -2,42 +2,42 @@
 {-# LANGUAGE DataKinds           #-}
 
 {-|
-Module      : Blarney.RAM
+Module      : Blarney.Core.RAM
 Description : Library of various block RAM components
 Copyright   : (c) Matthew Naylor, 2019
+              (c) Alexandre Joannou, 2019
 License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
 -}
-module Blarney.RAM 
-  (
-    -- * Block RAM primitives
-    ram                 -- Block RAM primitive
-  , ramInit             -- Initialised block RAM primitive
-  , ramTrueDual         -- True dual-port block RAM primitive
-  , ramTrueDualInit     -- Initialised true dual-port block RAM primitive
+module Blarney.Core.RAM (
+  -- * Block RAM primitives
+  ram                 -- Block RAM primitive
+, ramInit             -- Initialised block RAM primitive
+, ramTrueDual         -- True dual-port block RAM primitive
+, ramTrueDualInit     -- Initialised true dual-port block RAM primitive
 
-    -- * RTL block RAM interface
-  , RAM(..)             -- Block RAM interface
-  , makeRAM             -- Block RAM
-  , makeRAMInit         -- Initialised block RAM
-  , makeTrueDualRAM     -- True dual-port block RAM
-  , makeTrueDualRAMInit -- Initialised true dual-port block RAM
-  , makeDualRAM         -- Dual-port block RAM
-  , makeDualRAMInit     -- Initialised dual-port block RAM
-  , makeDualRAMForward  -- Forwarding dual-port block RAM
-  , makeDualRAMForwardInit -- Initialised forwarding dual-port block RAM
-  ) where
+  -- * RTL block RAM interface
+, RAM(..)             -- Block RAM interface
+, makeRAM             -- Block RAM
+, makeRAMInit         -- Initialised block RAM
+, makeTrueDualRAM     -- True dual-port block RAM
+, makeTrueDualRAMInit -- Initialised true dual-port block RAM
+, makeDualRAM         -- Dual-port block RAM
+, makeDualRAMInit     -- Initialised dual-port block RAM
+, makeDualRAMForward  -- Forwarding dual-port block RAM
+, makeDualRAMForwardInit -- Initialised forwarding dual-port block RAM
+) where
 
 -- Standard imports
 import Prelude
 
 -- Blarney imports
-import Blarney.BV
-import Blarney.Bit
-import Blarney.Bits
-import Blarney.Module
-import Blarney.Prelude
+import Blarney.Core.BV
+import Blarney.Core.Bit
+import Blarney.Core.Bits
+import Blarney.Core.Module
+import Blarney.Core.Prelude
 
 -- RAM primitive (for internal use only)
 -- (Read during write: reads "dont care")

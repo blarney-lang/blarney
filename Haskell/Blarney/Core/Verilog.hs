@@ -1,7 +1,8 @@
 {-|
-Module      : Blarney.Verilog
+Module      : Blarney.Core.Verilog
 Description : Verilog generation
 Copyright   : (c) Matthew Naylor, 2019
+              (c) Alexandre Joannou, 2019
 License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
@@ -9,7 +10,7 @@ Stability   : experimental
 Convert Blarney functions to Verilog modules.
 -}
 
-module Blarney.Verilog
+module Blarney.Core.Verilog
   ( writeVerilogModule  -- Generate Verilog module
   , writeVerilogTop     -- Generate Verilog top-level module
   ) where
@@ -27,11 +28,11 @@ import Numeric (showHex)
 import Data.Array.IArray
 
 -- Blarney imports
-import Blarney.BV
-import Blarney.Net
-import Blarney.Module
-import Blarney.Interface
-import Blarney.IfThenElse
+import Blarney.Core.BV
+import Blarney.Core.Net
+import Blarney.Core.Module
+import Blarney.Core.Interface
+import Blarney.Core.IfThenElse
 
 -- Toplevel API
 --------------------------------------------------------------------------------

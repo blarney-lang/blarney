@@ -12,9 +12,10 @@
 {-# LANGUAGE ConstraintKinds      #-}
 
 {-|
-Module      : Blarney.FShow
+Module      : Blarney.Core.FShow
 Description : For implementing display statements
 Copyright   : (c) Matthew Naylor, 2019
+              (c) Alexandre Joannou, 2019
 License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
@@ -23,11 +24,11 @@ Blarney's 'Blarney.RTL.display' statement can display values of any
 types in the 'FShow' class.  The 'FShow' class supports generic
 deriving.
 -}
-module Blarney.FShow where
+module Blarney.Core.FShow where
 
 -- Blarney imports
-import Blarney.BV
-import Blarney.Bit
+import Blarney.Core.BV
+import Blarney.Core.Bit
 
 -- Standard imports
 import Prelude

@@ -1,7 +1,7 @@
 -- This module implements a full-throughput dual-port stack.
 
 import Blarney
-import Blarney.RAM
+import Blarney.Recipe
 
 -- Interface
 -- =========
@@ -128,7 +128,7 @@ top = do
   stk :: Stack 8 (Bit 8) <- makeStack
 
   -- Sample test sequence
-  let test = 
+  let test =
         Seq [
           Action do
             push2 stk 1
