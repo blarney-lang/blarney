@@ -1,0 +1,45 @@
+opt = Option ((1,00000000)), noopt = 0
+cnt = 0
+opt = Option ((0,00000000)), noopt = 1
+cnt = 1
+opt = Option ((0,00000000)), noopt = 2
+cnt = 1
+opt = Option ((0,00000000)), noopt = 3
+cnt = 1
+opt = Option ((0,00000000)), noopt = 4
+cnt = 1
+opt = Option ((1,00000005)), noopt = 5
+cnt = 1
+opt = Option ((0,00000000)), noopt = 6
+cnt = 2
+opt = Option ((0,00000000)), noopt = 7
+cnt = 2
+opt = Option ((0,00000000)), noopt = 8
+cnt = 2
+opt = Option ((0,00000000)), noopt = 9
+cnt = 2
+opt = Option ((1,0000000a)), noopt = 10
+cnt = 2
+opt = Option ((0,00000000)), noopt = 11
+cnt = 3
+opt = Option ((0,00000000)), noopt = 12
+cnt = 3
+opt = Option ((0,00000000)), noopt = 13
+cnt = 3
+opt = Option ((0,00000000)), noopt = 14
+cnt = 3
+opt = Option ((1,0000000f)), noopt = 15
+cnt = 3
+opt = Option ((0,00000000)), noopt = 16
+cnt = 4
+opt = Option ((0,00000000)), noopt = 17
+cnt = 4
+opt = Option ((0,00000000)), noopt = 18
+cnt = 4
+opt = Option ((0,00000000)), noopt = 19
+cnt = 4
+opt = Option ((1,00000014)), noopt = 20
+cnt = 4
+opt = Option ((0,00000000)), noopt = 21
+cnt = 5
+Finished

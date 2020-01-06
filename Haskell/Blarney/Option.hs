@@ -25,10 +25,18 @@ module Blarney.Option
 import Blarney
 
 {- |
-'Option' type to wrap a value. An 'Option' 't' is represented as a pair of a
-'Bit' 1 indicating whether the value held is valid, and a value of type 't'.
+'Option' type to wrap a value. An 'Option t' is represented as a pair of a
+'Bit 1' indicating whether the value held is valid, and a value of type 't'.
 -}
 newtype Option t = Option (Bit 1, t) deriving (Generic, Bits, FShow)
+instance (Interface t, Bits t) => Interface (Option t) where
+  writePort s opt = do
+    writePort (s ++ "_valid") (opt.valid)
+    writePort (s ++ "_val") (opt.val)
+  readPort s = do
+    t0 <- readPort (s ++ "_valid")
+    t1 <- readPort (s ++ "_val")
+    return $ Option (t0, t1)
 
 -- | 'Valid' instance for the 'Option' type
 instance  Valid (Option t) where

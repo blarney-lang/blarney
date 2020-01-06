@@ -4,6 +4,7 @@
 
 EXAMPLES=(
   BasicRTL
+  OptionExample
   NameBits
   BitPat
   BitScan
