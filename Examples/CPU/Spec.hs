@@ -8,7 +8,6 @@
 -- 11NNNNNN  | Halt
 
 import Blarney
-import Blarney.RAM
 import Blarney.BitPat
 import System.Process
 

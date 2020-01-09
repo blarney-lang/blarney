@@ -15,9 +15,10 @@
 {-# LANGUAGE PartialTypeSignatures #-}
 
 {-|
-Module      : Blarney.Interface
+Module      : Blarney.Core.Interface
 Description : Support for separate compilation
 Copyright   : (c) Matthew Naylor, 2019
+              (c) Alexandre Joannou, 2019
 License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
@@ -28,7 +29,7 @@ Verilog.  This module allows Blarney functions to be turned into
 Verilog modules, and Verilog modules to be instantiated in a
 Blarney description.
 -}
-module Blarney.Interface
+module Blarney.Core.Interface
   ( Ifc           -- Monad for constructing Verilog interfaces
   , Interface(..) -- Class of types that can be converted to Verilog I/O ports
   , Modular(..)   -- Class of types that can be turned into Verilog modules
@@ -45,11 +46,11 @@ import Control.Monad hiding (when)
 import GHC.Generics hiding (R)
 
 -- Blarney imports
-import Blarney.Bit
-import Blarney.BV
-import Blarney.Bits
-import Blarney.Prelude
-import Blarney.Module
+import Blarney.Core.Bit
+import Blarney.Core.BV
+import Blarney.Core.Bits
+import Blarney.Core.Prelude
+import Blarney.Core.Module
 
 -- The Ifc monad
 -- =============

@@ -2,7 +2,6 @@
 module DataMem where
 
 import Blarney
-import Blarney.RAM
 
 -- Data memory size in bytes
 type LogDataMemSize = 16
@@ -49,10 +48,10 @@ writeAlign w d =
   , isByteAccess w --> [b0, b0, b0, b0]
   ]
   where
-    b0 = range @7 @0 d
-    b1 = range @15 @8 d
-    b2 = range @23 @16 d
-    b3 = range @31 @24 d
+    b0 = slice @7 @0 d
+    b1 = slice @15 @8 d
+    b2 = slice @23 @16 d
+    b3 = slice @31 @24 d
 
 -- Write to data memory
 dataMemWrite :: DataMem -> AccessWidth -> Bit 32 -> Bit 32 -> Action ()
@@ -88,9 +87,9 @@ readMux dataMem addr w isUnsigned =
         , a .==. 2 --> b2
         , a .==. 3 --> b3
         ]
-    h = (index @1 a .==. 0) ? (b1 # b0, b3 # b2)
-    bExt = isUnsigned ? (0, signExtend (index @7 b))
-    hExt = isUnsigned ? (0, signExtend (index @15 h))
+    h = (at @1 a .==. 0) ? (b1 # b0, b3 # b2)
+    bExt = isUnsigned ? (0, signExtend (at @7 b))
+    hExt = isUnsigned ? (0, signExtend (at @15 h))
     [b0, b1, b2, b3] = map out dataMem
 
 -- Read from data memory

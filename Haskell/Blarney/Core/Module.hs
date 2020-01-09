@@ -9,9 +9,10 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 {-|
-Module      : Blarney.Module
+Module      : Blarney.Core.Module
 Description : Blarney modules
 Copyright   : (c) Matthew Naylor, 2019
+              (c) Alexandre Joannou, 2019
 License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
@@ -21,7 +22,7 @@ more familar HDL structure in which modules instantiate other modules,
 and express behaviour through 'always' blocks containing actions.
 Actions cannot instantiate modules.
 -}
-module Blarney.Module
+module Blarney.Core.Module
   ( -- * Modules and actions
     Module(..), Action(..),
 
@@ -69,15 +70,15 @@ module Blarney.Module
   ) where
 
 -- Blarney imports
-import Blarney.BV
-import Blarney.Net
-import Blarney.Bit
-import Blarney.Bits
-import Blarney.FShow
-import Blarney.Prelude
-import Blarney.IfThenElse
-import qualified Blarney.RTL as RTL
-import qualified Blarney.JList as JL
+import Blarney.Core.BV
+import Blarney.Core.Net
+import Blarney.Core.Bit
+import Blarney.Core.Bits
+import Blarney.Core.FShow
+import Blarney.Core.Prelude
+import Blarney.Core.IfThenElse
+import qualified Blarney.Core.RTL as RTL
+import qualified Blarney.Core.JList as JL
 
 -- Standard imports
 import Prelude

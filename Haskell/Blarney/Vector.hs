@@ -106,7 +106,7 @@ module Blarney.Vector (
 
 -- Blarney imports
 import Blarney
-import Blarney.BV
+--import Blarney.BV
 import Blarney.Option
 
 import qualified Data.List as L
@@ -115,22 +115,17 @@ import Data.Type.Equality
 
 -- | 'Vec' type
 data Vec (n :: Nat) a = Vec { toList :: [a] } deriving (Generic, FShow)
+-- TODO check how verilog can handle 0 width bit vectors
 --instance (Bits a, KnownNat n) => Bits (Vec n a) where
 instance (Bits a, KnownNat n, 1 <= n) => Bits (Vec n a) where
   type SizeOf (Vec n a) = n * SizeOf a
   sizeOf xs = sum $ fmap sizeOf (toList xs)
-  -- TODO check how verilog can handle 0 width bit vectors
-  --pack x = FromBV $ L.foldr concatBV z bvs
-  --         where bvs = fmap (toBV `o` pack) (toList x)
-  --               z = constBitsBV 0 DontCare
-  pack x = FromBV $ L.foldr1 concatBV bvs
-           where bvs = fmap (toBV `o` pack) (toList x)
+  pack x = unsafeFromBitList $ concatMap (unsafeToBitList`o`pack) (toList x)
   unpack x = Vec xs
              where idxs = L.take (valueOf @n + 1)
-                                 [0, (bvWidth (toBV x) `div` valueOf @n)..]
+                                 [0, (unsafeWidthOf x `div` valueOf @n)..]
                    ranges = L.zip (fmap pred $ L.tail idxs) idxs
-                   bvs = [selectBV range (toBV x) | range <- ranges]
-                   xs = fmap (unpack `o` FromBV) bvs
+                   xs = fmap unpack [unsafeSlice range x | range <- ranges]
   nameBits nm xs = Vec [ nameBits (nm ++ "_vec_" ++ show i) b
                        | (i,b) <- L.zip [0..] (toList xs) ]
 instance (KnownNat n, Interface a) => Interface (Vec n a) where

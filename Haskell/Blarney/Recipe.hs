@@ -13,7 +13,7 @@ Stability   : experimental
 Recipe is a lightweight imperative language, aidingconcise
 definitions of complex state machines.
 -}
-module Blarney.Recipe 
+module Blarney.Recipe
   ( Recipe(..)
   , run
   , runOnce
@@ -24,11 +24,7 @@ import Prelude
 import Data.Maybe
 
 -- Blarney imports
-import Blarney.Bit
-import Blarney.Prelude
-import Blarney.Module
-import Blarney.Bits
-import Blarney.IfThenElse
+import Blarney.Core
 
 infixl 1 :=
 

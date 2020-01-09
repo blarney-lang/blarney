@@ -7,6 +7,7 @@ EXAMPLES=(
   OptionExample
   NameBits
   BitPat
+  Vectors
   BitScan
   CPU
   Derive
@@ -23,7 +24,6 @@ EXAMPLES=(
   NoC
   Background
   Stack
-  Vectors
 )
 
 RED='\033[0;31m'

@@ -9,10 +9,10 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 {-|
-Module      : Blarney.RTL
+Module      : Blarney.Core.RTL
 Description : Register-transfer-level descriptions
 Copyright   : (c) Matthew Naylor, 2019
-                  Alexandre Joannou, 2019
+              (c) Alexandre Joannou, 2019
 License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
@@ -24,7 +24,7 @@ The module defines the RTL monad, supporting:
 3. Simulation-time I/O.
 4. Module input and output declarations.
 -}
-module Blarney.RTL
+module Blarney.Core.RTL
   ( -- * RTL monad
     RTL             -- RTL monad (abstract)
     -- * Conditional statements
@@ -66,15 +66,15 @@ module Blarney.RTL
   ) where
 
 -- Blarney imports
-import Blarney.BV hiding (nameHints)
-import Blarney.Net
-import Blarney.Flatten
-import Blarney.Bit
-import Blarney.Bits
-import Blarney.FShow
-import Blarney.Prelude
-import Blarney.IfThenElse
-import qualified Blarney.JList as JL
+import Blarney.Core.BV hiding (nameHints)
+import Blarney.Core.Net
+import Blarney.Core.Flatten
+import Blarney.Core.Bit
+import Blarney.Core.Bits
+import Blarney.Core.FShow
+import Blarney.Core.Prelude
+import Blarney.Core.IfThenElse
+import qualified Blarney.Core.JList as JL
 
 -- Standard imports
 import Prelude

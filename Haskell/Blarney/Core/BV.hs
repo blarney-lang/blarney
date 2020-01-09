@@ -2,9 +2,10 @@
 {-# OPTIONS_GHC -fno-cse -fno-full-laziness #-}
 
 {-|
-Module      : Blarney.BV
+Module      : Blarney.Core.BV
 Description : Untyped bit vectors and circuit primitives
 Copyright   : (c) Matthew Naylor, 2019
+              (c) Alexandre Joannou, 2019
 License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
@@ -23,7 +24,7 @@ are primitive component instances and whose edges are connections.
 Description, ASIAN 1999.
 -}
 
-module Blarney.BV
+module Blarney.Core.BV
   (
     -- * Primitive component types
     InstId         -- Every component instance has a unique id

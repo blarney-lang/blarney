@@ -3,10 +3,10 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 {-|
-Module      : Blarney.Net
+Module      : Blarney.Core.Net
 Description : Net primitive for Netlist construction
 Copyright   : (c) Matthew Naylor, 2019
-                  Alexandre Joannou, 2019
+              (c) Alexandre Joannou, 2019
 License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
@@ -16,7 +16,7 @@ that can then be rendered as Verilog or in other formats...
 
 -}
 
-module Blarney.Net (
+module Blarney.Core.Net (
   Net(..)        -- 'Net' type to represent 'Netlist' nodes
 , Netlist        -- 'Netlist' type to represent a circuit
 , NetInput(..)   -- 'NetInput' type to represent inputs to 'Net's
@@ -35,9 +35,9 @@ import Control.Monad
 import Data.List (intercalate)
 import qualified Data.Bits as B
 
-import Blarney.BV
-import qualified Blarney.JList as JL
-import Blarney.IfThenElse
+import Blarney.Core.BV
+import Blarney.Core.IfThenElse
+import qualified Blarney.Core.JList as JL
 
 -- General type definitions and helpers
 --------------------------------------------------------------------------------

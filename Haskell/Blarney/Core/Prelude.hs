@@ -8,14 +8,15 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 {-|
-Module      : Blarney.Prelude
+Module      : Blarney.Core.Prelude
 Description : Commonly used HDL functions
 Copyright   : (c) Matthew Naylor, 2019
+              (c) Alexandre Joannou, 2019
 License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
 -}
-module Blarney.Prelude
+module Blarney.Core.Prelude
   ( tree1           -- Tree fold (for non-empty lists)
   , tree            -- Tree fold
   , orList          -- Bitwise-or tree
@@ -44,10 +45,10 @@ module Blarney.Prelude
 import Prelude
 import GHC.TypeLits
 import Data.List (transpose)
-import Blarney.BV
-import Blarney.Bit
-import Blarney.Bits
-import Blarney.IfThenElse
+import Blarney.Core.BV
+import Blarney.Core.Bit
+import Blarney.Core.Bits
+import Blarney.Core.IfThenElse
 
 -- |Parallel reduce for a commutative and associative operator.
 -- Input list must be non-empty.

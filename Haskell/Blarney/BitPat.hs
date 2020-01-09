@@ -12,7 +12,7 @@ Stability   : experimental
 
 Inspired by Morten Rhiger's "Type-Safe Pattern Combinators".
 -}
-module Blarney.BitPat 
+module Blarney.BitPat
   ( BP        -- Bit patterns
   , lit       -- Literal pattern
   , var       -- Variable pattern
@@ -46,7 +46,7 @@ var = one
 -- |Sequentially combine bit patterns
 infixl 9 <#>
 (<#>) :: KnownNat n0 => BP n0 t0 t1 -> BP n1 t1 t2 -> BP (n0+n1) t0 t2
-p0 <#> p1 = \n -> 
+p0 <#> p1 = \n ->
   let (upper, lower) = split n in app (p0 upper) (p1 lower)
 
 -- |A case alternative (pattern plus a right-hand-side)

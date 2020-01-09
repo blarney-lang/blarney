@@ -61,13 +61,13 @@ sub s = s.result <== s.opA - s.opB
 
 left :: State -> Bit 5 -> Bit 1 -> Action ()
 left s imm reg = do
-  let amount = reg ? (range @4 @0 (s.opB), imm)
+  let amount = reg ? (slice @4 @0 (s.opB), imm)
   s.result <== s.opA .<<. amount
 
 right :: State -> Bit 1 -> Bit 5 -> Bit 1 -> Action ()
 right s arith imm reg = do
-  let ext = arith ? (index @31 (s.opA), 0)
-  let amount = reg ? (range @4 @0 (s.opB), imm)
+  let ext = arith ? (at @31 (s.opA), 0)
+  let amount = reg ? (slice @4 @0 (s.opB), imm)
   let value = ext # (s.opA)
   s.result <== truncate (value .>>>. amount)
 
@@ -196,9 +196,9 @@ makePebbles sim uartIn = do
   -- CPU pipeline
   makeCPUPipeline sim $
     Config {
-      srcA = range @19 @15
-    , srcB = range @24 @20
-    , dst  = range @11 @7
+      srcA = slice @19 @15
+    , srcB = slice @24 @20
+    , dst  = slice @11 @7
     , preExecRules = preExecute
     , execRules = execute
     , postExecRules = postExecute

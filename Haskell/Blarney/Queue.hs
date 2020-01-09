@@ -10,6 +10,7 @@
 Module      : Blarney.Queue
 Description : Library of various queue implementations
 Copyright   : (c) Matthew Naylor, 2019
+              (c) Alexandre Joannou, 2019
 License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
@@ -18,8 +19,6 @@ module Blarney.Queue where
 
 -- Blarney imports
 import Blarney
-import Blarney.RAM
-import Blarney.Util
 import Blarney.Stream
 import Blarney.SourceSink
 

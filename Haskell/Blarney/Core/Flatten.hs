@@ -4,13 +4,13 @@
 Module      : Blarney.Flatten
 Description : Flatten BV into Net
 Copyright   : (c) Matthew Naylor, 2019
-                  Alexandre Joannou, 2019
+              (c) Alexandre Joannou, 2019
 License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
 -}
 
-module Blarney.Flatten (
+module Blarney.Core.Flatten (
   Flatten(..) -- Monad for flattening a circuit (BV) to a netlist
 , doIO        -- Lift an IO computation to a Flatten computation
 , freshInstId -- Obtain a fresh instance id
@@ -22,9 +22,9 @@ import Prelude
 import Data.IORef
 import Control.Monad
 
-import Blarney.BV
-import Blarney.Net
-import qualified Blarney.JList as JL
+import Blarney.Core.BV
+import Blarney.Core.Net
+import qualified Blarney.Core.JList as JL
 
 -- |A reader/writer monad for accumulating the netlist
 newtype Flatten a = Flatten { runFlatten :: FlattenR -> IO (FlattenW, a) }

@@ -1,14 +1,15 @@
 {-|
-Module      : Blarney.JList
+Module      : Blarney.Core.JList
 Description : Join lists
 Copyright   : (c) Matthew Naylor, 2019
+              (c) Alexandre Joannou, 2019
 License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
 
 A small library for join-lists, providing constant-time append.
 -}
-module Blarney.JList 
+module Blarney.Core.JList
   ( JList(..)     -- data JList a = Zero | One a | JList a :+: JList a
   , fromList      -- :: [a] -> Jlist a
   , toList        -- :: JList a -> [a]

@@ -11,9 +11,10 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 {-|
-Module      : Blarney.Bit
+Module      : Blarney.Core.Bit
 Description : Typed bit-vectors and circuit primitives
 Copyright   : (c) Matthew Naylor, 2019
+              (c) Alexandre Joannou, 2019
 License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
@@ -22,13 +23,13 @@ This module provides size-typed bit vectors and circuit primitives,
 on top of Blarney's untyped bit vectors and circuit primitives.
 Hardware developers should always use the typed versions!
 -}
-module Blarney.Bit where
+module Blarney.Core.Bit where
 
 -- Untyped bit-vectors
-import Blarney.BV
+import Blarney.Core.BV
 
 -- Utils
-import Blarney.Util
+import Blarney.Core.Utils
 
 -- Standard imports
 import Prelude
@@ -45,6 +46,10 @@ newtype Bit (n :: Nat) = FromBV { toBV :: BV }
 -- |Determine width of bit-vector from type
 widthOf :: KnownNat n => Bit n -> Int
 widthOf v = fromInteger (natVal v)
+
+-- |Determine width of bit-vector from underlying 'BV'
+unsafeWidthOf :: Bit n -> Int
+unsafeWidthOf = bvWidth . toBV
 
 -- |Convert type Nat to Ingeter value
 valueOf :: forall n. (KnownNat n) => Int
@@ -179,21 +184,21 @@ rep :: KnownNat n => Bit 1 -> Bit n
 rep a = result
   where
     result = FromBV $ replicateBV wr (toBV a)
-    wr = fromInteger (natVal result)
+    wr = widthOf result
 
 -- |Zero extension
 zeroExtend :: (KnownNat m, n <= m) => Bit n -> Bit m
 zeroExtend a = result
    where
      result = FromBV $ zeroExtendBV wr (toBV a)
-     wr = fromInteger (natVal result)
+     wr = widthOf result
 
 -- |Sign extension
 signExtend :: (KnownNat m, n <= m) => Bit n -> Bit m
 signExtend a = result
    where
      result = FromBV $ signExtendBV wr (toBV a)
-     wr = fromInteger (natVal result)
+     wr = widthOf result
 
 -- |Bit-vector concatenation
 infixr 8 #
@@ -204,9 +209,9 @@ a # b = FromBV $ concatBV (toBV a) (toBV b)
 upper :: (KnownNat m, m <= n) => Bit n -> Bit m
 upper a = result
    where
-     result = unsafeBits (wa-1, wa-wr) a
-     wa = bvWidth (toBV a)
-     wr = fromInteger (natVal result)
+     result = unsafeSlice (wa-1, wa-wr) a
+     wa = unsafeWidthOf a
+     wr = widthOf result
 
 -- |Extract most significant bits
 truncateLSB :: forall m n. (KnownNat m, m <= n) => Bit n -> Bit m
@@ -216,9 +221,9 @@ truncateLSB = upper
 lower :: (KnownNat m, m <= n) => Bit n -> Bit m
 lower a = result
    where
-     result = unsafeBits (wr-1, 0) a
-     wa = bvWidth (toBV a)
-     wr = fromInteger (natVal result)
+     result = unsafeSlice (wr-1, 0) a
+     wa = unsafeWidthOf a
+     wr = widthOf result
 
 -- |Extract least significant bits
 truncate :: forall m n. (KnownNat m, m <= n) => Bit n -> Bit m
@@ -228,10 +233,10 @@ truncate = lower
 split :: KnownNat n => Bit (n+m) -> (Bit n, Bit m)
 split a = (a0, a1)
   where
-    wa = bvWidth (toBV a)
-    w0 = fromInteger (natVal a0)
-    a0 = unsafeBits (wa-1, wa-w0) a
-    a1 = unsafeBits (wa-w0-1, 0) a
+    wa = unsafeWidthOf a
+    w0 = widthOf a0
+    a0 = unsafeSlice (wa-1, wa-w0) a
+    a1 = unsafeSlice (wa-w0-1, 0) a
 
 -- |Drop most significant bits
 dropBits :: forall d n. KnownNat d => Bit (d+n) -> Bit n
@@ -250,59 +255,55 @@ invMSB a = inv top # bot
 
 -- * Bit-vector selection primitives
 
--- |Dynamically-typed bit selection
-bits :: KnownNat m => (Int, Int) -> Bit n -> Bit m
-bits (hi, lo) a =
+-- | Statically-typed bit selection. Use type application to specify
+--   upper and lower indices.
+slice :: forall (hi :: Nat) (lo :: Nat) i o.
+           (KnownNat hi, KnownNat lo, (lo+o) ~ (hi+1), (hi+1) <= i, o <= i)
+      => Bit i -> Bit o
+slice a = unsafeSlice (valueOf @hi, valueOf @lo) a
+
+-- | Dynamically-typed bit selection
+unsafeCheckedSlice :: KnownNat m => (Int, Int) -> Bit n -> Bit m
+unsafeCheckedSlice (hi, lo) a =
   case lo > hi || (hi+1-lo) /= wr of
     True -> error "Blarney: sub-range does not match bit width"
     False -> result
   where
     result = FromBV $ selectBV (hi, lo) (toBV a)
-    wr = fromInteger (natVal result)
+    wr = widthOf result
 
--- |Untyped bit selection (try to avoid!)
-unsafeBits :: (Int, Int) -> Bit n -> Bit m
-unsafeBits (hi, lo) a = FromBV $ selectBV (hi, lo) (toBV a)
+-- | Untyped bit selection (try to avoid!)
+unsafeSlice :: (Int, Int) -> Bit n -> Bit m
+unsafeSlice (hi, lo) a = FromBV $ selectBV (hi, lo) (toBV a)
 
--- |Statically-typed bit selection.  Use type application to specify
--- upper and lower indices.
-range :: forall (hi :: Nat) (lo :: Nat) i o.
-           (KnownNat hi, KnownNat lo, (lo+o) ~ (hi+1), (hi+1) <= i, o <= i)
-      => Bit i -> Bit o
-range a = unsafeBits (hiVal, loVal) a
-  where
-    hiVal = fromInteger $ natVal (Proxy :: Proxy hi)
-    loVal = fromInteger $ natVal (Proxy :: Proxy lo)
+-- |Statically-typed bit indexing. Use type application to specify index.
+at :: forall (i :: Nat) n. (KnownNat i, (i+1) <= n)
+      => Bit n -> Bit 1
+at a = unsafeAt (valueOf @i) a
 
--- |Dynamically-typed bit indexing
-bit :: Int -> Bit n -> Bit 1
-bit i a =
+-- | Dynamically-typed bit indexing
+unsafeAt :: Int -> Bit n -> Bit 1
+unsafeAt i a =
   case i >= wa of
     True -> error ("Bit index " ++ show i ++ " out of range ["
                                 ++ show (wa-1) ++ ":0]")
     False -> result
   where
-    wa = bvWidth (toBV a)
+    wa = unsafeWidthOf a
     result = FromBV $ selectBV (i, i) (toBV a)
-
--- |Statically-typed bit indexing.  Use type application to specify index.
-index :: forall (i :: Nat) n. (KnownNat i, (i+1) <= n)
-      => Bit n -> Bit 1
-index a = bit idx a
-  where idx = fromInteger $ natVal (Proxy :: Proxy i)
 
 -- * Bit-vector registers
 
 -- |Register
 reg :: Bit n -> Bit n -> Bit n
 reg init a = FromBV $ regBV w (toBV init) (toBV a)
-  where w = bvWidth (toBV init)
+  where w = unsafeWidthOf init
 
 -- |Register with enable wire
 regEn :: Bit n -> Bit 1 -> Bit n -> Bit n
 regEn init en a =
     FromBV $ regEnBV w (toBV init) (toBV en) (toBV a)
-  where w = bvWidth (toBV init)
+  where w = unsafeWidthOf init
 
 -- * Misc. bit-vector operations
 
@@ -314,7 +315,7 @@ mux c (a, b) = FromBV $ muxBV (toBV c) (toBV a, toBV b)
 countOnes :: Bit n -> Bit (Log2 n + 1)
 countOnes a = FromBV $ countOnesBV wr (toBV a)
   where
-    wa = bvWidth (toBV a)
+    wa = unsafeWidthOf a
     wr = log2 wa + 1
 
 -- |Lift integer value to type-level natural
@@ -341,5 +342,15 @@ fromBitList (x:xs)
 
 -- |Convert bit vector to list of bits
 toBitList :: KnownNat n => Bit n -> [Bit 1]
-toBitList vec = [bit i vec | i <- [0..n-1]]
+toBitList vec = [unsafeAt i vec | i <- [0..n-1]]
   where n = widthOf vec
+
+-- | Collapse a '[Bit 1]' of size n to a single 'Bit n'
+unsafeFromBitList :: [Bit 1] -> Bit n
+unsafeFromBitList [] = error "unsafefromBitList: applied to empty list"
+unsafeFromBitList bs = FromBV $ foldr1 concatBV (fmap toBV bs)
+
+-- | Expand a single 'Bit n' to a '[Bit 1]' of size n
+unsafeToBitList :: Bit n -> [Bit 1]
+unsafeToBitList bs = [unsafeAt i bs | i <- [0..size-1]]
+  where size = unsafeWidthOf bs

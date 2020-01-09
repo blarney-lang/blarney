@@ -1,4 +1,5 @@
 import Blarney
+import Blarney.Recipe
 
 fact :: Module ()
 fact = do
@@ -20,7 +21,7 @@ fact = do
             display "fact(10) = %0d" (acc.val)
             finish
         ]
-       
+
   runOnce recipe
 
 main :: IO ()

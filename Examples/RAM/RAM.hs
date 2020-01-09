@@ -1,5 +1,5 @@
 import Blarney
-import Blarney.RAM
+import Blarney.Recipe
 
 -- Top-level module
 top :: Module ()

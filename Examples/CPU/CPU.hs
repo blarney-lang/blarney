@@ -8,7 +8,6 @@
 -- 11NNNNNN  | Halt
 
 import Blarney
-import Blarney.RAM
 import System.Process
 
 -- Instructions
@@ -19,27 +18,27 @@ type RegId = Bit 2
 
 -- Extract opcode
 opcode :: Instr -> Bit 2
-opcode instr = range @7 @6 instr
+opcode instr = slice @7 @6 instr
 
 -- Extract register A
 rA :: Instr -> RegId
-rA instr = range @3 @2 instr
+rA instr = slice @3 @2 instr
 
 -- Extract register B
 rB :: Instr -> RegId
-rB instr = range @1 @0 instr
+rB instr = slice @1 @0 instr
 
 -- Extract destination register
 rD :: Instr -> RegId
-rD instr = range @5 @4 instr
+rD instr = slice @5 @4 instr
 
 -- Extract immediate
 imm :: Instr -> Bit 4
-imm instr = range @3 @0 instr
+imm instr = slice @3 @0 instr
 
 -- Extract branch offset
 offset :: Instr -> Bit 4
-offset instr = range @5 @2 instr
+offset instr = slice @5 @2 instr
 
 -- CPU
 makeCPU :: Module ()
