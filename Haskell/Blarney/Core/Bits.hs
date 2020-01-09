@@ -89,8 +89,8 @@ instance (GBits a, GBits b) => GBits (a :*: b) where
   gpack ~(a :*: b) = gpack a # gpack b
   gunpack bs = a :*: b
     where
-      a  = gunpack (unsafeBits (wa+wb-1, wb) bs)
-      b  = gunpack (unsafeBits (wb-1, 0) bs)
+      a  = gunpack (unsafeSlice (wa+wb-1, wb) bs)
+      b  = gunpack (unsafeSlice (wb-1, 0) bs)
       wa = gsizeOf a
       wb = gsizeOf b
   gnameBits nm ~(a :*: b) = (gnameBits nm a) :*: (gnameBits nm b)
