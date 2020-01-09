@@ -3,7 +3,6 @@ module Pipeline where
 -- 5-stage pipeline for 32-bit 3-operand register-based CPU.
 
 import Blarney
-import Blarney.RAM
 import Blarney.BitScan
 
 -- Instructions
@@ -107,7 +106,7 @@ makeCPUPipeline sim c = do
     pc1 <== pcFetch
 
     -- Index the instruction memory
-    let instrAddr = lower (range @31 @2 pcFetch)
+    let instrAddr = lower (slice @31 @2 pcFetch)
     load instrMem instrAddr
 
     -- Always trigger stage 1, except on first cycle
