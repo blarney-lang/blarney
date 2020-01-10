@@ -571,8 +571,8 @@ upperNibble x = slice @7 @4 x
 ```
 
 For circuit-generation-time indices of type `Int`, we provide
-[bit](http://mn416.github.io/blarney/Blarney-Bit.html#v:unsafeAt) and
-[bits](http://mn416.github.io/blarney/Blarney-Bit.html#v:unsafeSlice):
+[unsafeAt](http://mn416.github.io/blarney/Blarney-Bit.html#v:unsafeAt) and
+[unsafeSlice](http://mn416.github.io/blarney/Blarney-Bit.html#v:unsafeSlice):
 
 ```hs
 -- Extract most-sigificant bit of a byte
