@@ -556,39 +556,38 @@ whether the index (or indices) are type-level numbers or
 circuit-generation-time values:
 
 For type-level indices, we provide functions
-[index](http://mn416.github.io/blarney/Blarney-Bit.html#v:index) and
-[range](http://mn416.github.io/blarney/Blarney-Bit.html#v:range), and
+[at](http://mn416.github.io/blarney/Blarney-Bit.html#v:at) and
+[slice](http://mn416.github.io/blarney/Blarney-Bit.html#v:slice), and
 use type application to specify the type-level indices:
 
 ```hs
 -- Extract most-sigificant bit of a byte
 msb :: Bit 8 -> Bit 1
-msb x = index @7 x
+msb x = at @7 x
 
 -- Extract upper 4 bits of a byte
 upperNibble :: Bit 8 -> Bit 4
-upperNibble x = range @7 @4 x
+upperNibble x = slice @7 @4 x
 ```
 
 For circuit-generation-time indices of type `Int`, we provide
-[bit](http://mn416.github.io/blarney/Blarney-Bit.html#v:bit) and
-[bits](http://mn416.github.io/blarney/Blarney-Bit.html#v:bits):
+[bit](http://mn416.github.io/blarney/Blarney-Bit.html#v:unsafeAt) and
+[bits](http://mn416.github.io/blarney/Blarney-Bit.html#v:unsafeSlice):
 
 ```hs
 -- Extract most-sigificant bit of a byte
 msb :: Bit 8 -> Bit 1
-msb x = bit 7 x
+msb x = unsafeAt 7 x
 
 -- Extract upper 4 bits of a byte
 upperNibble :: Bit 8 -> Bit 4
-upperNibble x = bits (7, 4) x
+upperNibble x = unsafeSlice (7, 4) x
 ```
 
-While `index` and `range` are type-safe, `bit` and `bits` are not.
-For example, the argument to `bit` could be out of range, and the
-result of `bits` could have a different width to that implied by the
-range.  Such cases will lead to confusing error messages at
-circuit-generation time -- so use with care!
+The argument to `unsafeAt` could be out of range, and the result of
+`unsafeSlice` could have a different width to that implied by the
+range.  Such cases will lead to confusing error messages, hence the
+"unsafe" prefix on the function names.
 
 ## Example 11: Block RAMs
 
