@@ -418,18 +418,28 @@ addRoots roots = write (RTLRoots roots)
 -- |Convert RTL monad to a netlist
 netlist :: RTL () -> IO Netlist
 netlist rtl = do
+  -- flatten BVs into a Netlist
   i <- newIORef (0 :: InstId)
-  ((nl, undo), _) <- runFlatten roots i
+  ((nl, nms, undo), _) <- runFlatten flattenRoots i
   maxId <- readIORef i
-  netlist' <- netlistPasses =<< toMNetlist nl maxId
-
+  mnl <- toMNetlist nl maxId
+  -- gather names in the Netlist
+  forM_ nms $ \(idx, nm) -> do
+    mnet <- readArray mnl idx
+    case mnet of
+      Just net -> writeArray mnl idx (Just net { netName = netName net <> nm })
+      _ -> return ()
+  -- run optimisation netlist passes
+  nl' <- netlistPasses mnl
+  -- run undo computations
   undo
-
-  return netlist'
+  -- return final netlist
+  return nl'
+  ------------------------
   where
     (_, actsJL, _) = runRTL rtl (R { nameHints = empty
                                    , cond = 1
                                    , assigns = assignMap }) 0
     acts = JL.toList actsJL
     assignMap = fromListWith (++) [(lhs a, [a]) | RTLAssign a <- acts]
-    roots = mapM_ flatten (concat [roots | RTLRoots roots <- acts])
+    flattenRoots = mapM_ flatten (concat [roots | RTLRoots roots <- acts])

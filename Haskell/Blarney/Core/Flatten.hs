@@ -34,13 +34,13 @@ type FlattenR = IORef Int
 
 -- |The writer component contains the netlist and
 -- an "undo" computation, which unperforms all IORef assignments.
-type FlattenW = (JL.JList Net, IO ())
+type FlattenW = (JL.JList Net, [(InstId, Name)], IO ())
 
 instance Monad Flatten where
-  return a = Flatten (\r -> return ((JL.Zero, return ()), a))
-  m >>= f  = Flatten (\r -> do ((w0, u0), a) <- runFlatten m r
-                               ((w1, u1), b) <- runFlatten (f a) r
-                               return ((w0 JL.:+: w1, u0 >> u1), b))
+  return a = Flatten (\r -> return ((JL.Zero, [], return ()), a))
+  m >>= f  = Flatten (\r -> do ((w0, n0, u0), a) <- runFlatten m r
+                               ((w1, n1, u1), b) <- runFlatten (f a) r
+                               return ((w0 JL.:+: w1, n0 <> n1, u0 >> u1), b))
 
 instance Applicative Flatten where
   pure = return
@@ -54,21 +54,25 @@ freshInstId :: Flatten InstId
 freshInstId = Flatten $ \r -> do
   id <- readIORef r
   writeIORef r (id+1)
-  return ((JL.Zero, return ()), id)
+  return ((JL.Zero, mempty, return ()), id)
 
 -- |Add a net to the netlist
 addNet :: Net -> Flatten ()
-addNet net = Flatten $ \r -> return ((JL.One net, return ()), ())
+addNet net = Flatten $ \r -> return ((JL.One net, mempty, return ()), ())
+
+-- |Add a name to the list
+addName :: (InstId, Name) -> Flatten ()
+addName nm = Flatten $ \r -> return ((JL.Zero, [nm], return ()), ())
 
 -- |Add an "undo" computation
 addUndo :: IO () -> Flatten ()
-addUndo undo = Flatten $ \r -> return ((JL.Zero, undo), ())
+addUndo undo = Flatten $ \r -> return ((JL.Zero, mempty, undo), ())
 
 -- |Lift an IO computation to a Flatten computation
 doIO :: IO a -> Flatten a
 doIO m = Flatten $ \r -> do
   a <- m
-  return ((JL.Zero, return ()), a)
+  return ((JL.Zero, mempty, return ()), a)
 
 -- |Flatten bit vector to netlist
 flatten :: BV -> Flatten NetInput
@@ -77,9 +81,11 @@ flatten BV{bvPrim=p@(DontCare w)} = return $ InputTree p []
 flatten b@BV{bvName=name,bvInstRef=instRef} = do
   -- handle instId traversal
   instIdVal <- doIO (readIORef instRef)
+  let hasNameHints = not $ null (nameHints name)
   case instIdVal of
     Nothing -> do
       instId <- freshInstId
+      when hasNameHints $ addName (instId, name)
       doIO (writeIORef instRef (Just instId))
       addUndo (writeIORef instRef Nothing)
       ins <- mapM flatten (bvInputs b)
@@ -87,8 +93,9 @@ flatten b@BV{bvName=name,bvInstRef=instRef} = do
                     , netInstId       = instId
                     , netInputs       = ins
                     , netOutputWidths = (bvWidths b)
-                    , netName         = name
+                    , netName         = mempty
                     }
       addNet net
       return $ InputWire (instId, bvOutNum b)
-    Just instId -> return $ InputWire (instId, bvOutNum b)
+    Just instId -> do when hasNameHints $ addName (instId, name)
+                      return $ InputWire (instId, bvOutNum b)
