@@ -34,13 +34,14 @@ type FlattenR = IORef Int
 
 -- |The writer component contains the netlist and
 -- an "undo" computation, which unperforms all IORef assignments.
-type FlattenW = (JL.JList Net, [(InstId, Name)], IO ())
+type FlattenW = (JL.JList Net, JL.JList (InstId, Name), IO ())
 
 instance Monad Flatten where
-  return a = Flatten (\r -> return ((JL.Zero, [], return ()), a))
-  m >>= f  = Flatten (\r -> do ((w0, n0, u0), a) <- runFlatten m r
-                               ((w1, n1, u1), b) <- runFlatten (f a) r
-                               return ((w0 JL.:+: w1, n0 <> n1, u0 >> u1), b))
+  return a = Flatten $ \r -> return ((JL.Zero, JL.Zero, return ()), a)
+  m >>= f  = Flatten $ \r ->
+    do ((w0, n0, u0), a) <- runFlatten m r
+       ((w1, n1, u1), b) <- runFlatten (f a) r
+       return ((w0 JL.:+: w1, n0 JL.:+: n1, u0 >> u1), b)
 
 instance Applicative Flatten where
   pure = return
@@ -54,25 +55,25 @@ freshInstId :: Flatten InstId
 freshInstId = Flatten $ \r -> do
   id <- readIORef r
   writeIORef r (id+1)
-  return ((JL.Zero, mempty, return ()), id)
+  return ((JL.Zero, JL.Zero, return ()), id)
 
 -- |Add a net to the netlist
 addNet :: Net -> Flatten ()
-addNet net = Flatten $ \r -> return ((JL.One net, mempty, return ()), ())
+addNet net = Flatten $ \r -> return ((JL.One net, JL.Zero, return ()), ())
 
 -- |Add a name to the list
 addName :: (InstId, Name) -> Flatten ()
-addName nm = Flatten $ \r -> return ((JL.Zero, [nm], return ()), ())
+addName nm = Flatten $ \r -> return ((JL.Zero, JL.One nm, return ()), ())
 
 -- |Add an "undo" computation
 addUndo :: IO () -> Flatten ()
-addUndo undo = Flatten $ \r -> return ((JL.Zero, mempty, undo), ())
+addUndo undo = Flatten $ \r -> return ((JL.Zero, JL.Zero, undo), ())
 
 -- |Lift an IO computation to a Flatten computation
 doIO :: IO a -> Flatten a
 doIO m = Flatten $ \r -> do
   a <- m
-  return ((JL.Zero, mempty, return ()), a)
+  return ((JL.Zero, JL.Zero, return ()), a)
 
 -- |Flatten bit vector to netlist
 flatten :: BV -> Flatten NetInput

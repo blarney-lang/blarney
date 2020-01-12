@@ -424,7 +424,7 @@ netlist rtl = do
   maxId <- readIORef i
   mnl <- toMNetlist nl maxId
   -- gather names in the Netlist
-  forM_ nms $ \(idx, nm) -> do
+  forM_ (JL.toList nms) $ \(idx, nm) -> do
     mnet <- readArray mnl idx
     case mnet of
       Just net -> writeArray mnl idx (Just net { netName = netName net <> nm })
