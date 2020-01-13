@@ -37,6 +37,12 @@ toList a = flatten a []
     flatten (One a) rest = a:rest
     flatten (a :+: b) rest = flatten a (flatten b rest)
 
+instance Semigroup (JList a) where
+  (<>) = (++)
+
+instance Monoid (JList a) where
+  mempty = Zero
+
 instance Functor JList where
   fmap f Zero = Zero
   fmap f (One a) = One (f a)

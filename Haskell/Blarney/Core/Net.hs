@@ -21,7 +21,6 @@ module Blarney.Core.Net (
 , Netlist        -- 'Netlist' type to represent a circuit
 , NetInput(..)   -- 'NetInput' type to represent inputs to 'Net's
 , MNetlist       -- 'MNetlist' type, mutable netlist
-, toMNetlist     -- Helper function to create an 'MNetlist'
 , WireId         -- 'WireId' type to uniquely identify wires
 , netlistPasses  -- Toplevel function for 'Netlist' transformation passes
 ) where
@@ -37,7 +36,6 @@ import qualified Data.Bits as B
 
 import Blarney.Core.BV
 import Blarney.Core.IfThenElse
-import qualified Blarney.Core.JList as JL
 
 -- General type definitions and helpers
 --------------------------------------------------------------------------------
@@ -71,11 +69,6 @@ type Netlist = Array InstId (Maybe Net)
 
 -- | A helper type for mutable 'Netlist'
 type MNetlist = IOArray InstId (Maybe Net)
-
--- | A helper function to create an 'MNetlist'
-toMNetlist :: JL.JList Net -> InstId -> IO MNetlist
-toMNetlist nl maxId = thaw $ listArray (0, maxId) (replicate (maxId+1) Nothing)
-                             // [(netInstId n, Just n) | n <- JL.toList nl]
 
 -- | A helper type for 'Net' reference counting
 type NetCounts = IOArray InstId Int

@@ -125,10 +125,10 @@ data R = R { nameHints :: Set String
 type S = VarId
 
 instance Monad RTL where
-  return a = RTL (\r s -> (s, JL.Zero, a))
+  return a = RTL (\r s -> (s, mempty, a))
   m >>= f = RTL (\r s -> let (s0, w0, a) = runRTL m r s
                              (s1, w1, b) = runRTL (f a) r s0
-                         in  (s1, w0 JL.++ w1, b))
+                         in  (s1, w0 <> w1, b))
 
 instance Applicative RTL where
   pure = return
@@ -142,15 +142,15 @@ instance MonadFix RTL where
 
 -- |Get state component
 get :: RTL S
-get = RTL (\r s -> (s, JL.Zero, s))
+get = RTL (\r s -> (s, mempty, s))
 
 -- |Set state component
 set :: S -> RTL ()
-set s' = RTL (\r s -> (s', JL.Zero, ()))
+set s' = RTL (\r s -> (s', mempty, ()))
 
 -- |Get reader component
 ask :: RTL R
-ask = RTL (\r s -> (s, JL.Zero, r))
+ask = RTL (\r s -> (s, mempty, r))
 
 -- |Execute computation in given environment
 local :: R -> RTL a -> RTL a
@@ -422,7 +422,8 @@ netlist rtl = do
   i <- newIORef (0 :: InstId)
   ((nl, nms, undo), _) <- runFlatten flattenRoots i
   maxId <- readIORef i
-  mnl <- toMNetlist nl maxId
+  mnl <- thaw $ listArray (0, maxId) (replicate (maxId+1) Nothing)
+                // [(netInstId n, Just n) | n <- JL.toList nl]
   -- gather names in the Netlist
   forM_ (JL.toList nms) $ \(idx, nm) -> do
     mnet <- readArray mnl idx
