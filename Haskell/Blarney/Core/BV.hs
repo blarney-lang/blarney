@@ -103,6 +103,10 @@ type InstId = Int
 
 -- | A 'Name' type that handles name hints
 data Name = Name { nameHints :: Set String } deriving Show
+instance Semigroup Name where
+  x <> y = Name { nameHints = nameHints x `union` nameHints y }
+instance Monoid Name where
+  mempty = Name { nameHints = empty }
 
 -- |Each output from a primitive component is numbered
 type OutputNumber = Int
