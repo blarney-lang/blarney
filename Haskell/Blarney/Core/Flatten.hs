@@ -37,11 +37,11 @@ type FlattenR = IORef Int
 type FlattenW = (JL.JList Net, JL.JList (InstId, Name), IO ())
 
 instance Monad Flatten where
-  return a = Flatten $ \r -> return ((mempty, mempty, return ()), a)
+  return a = Flatten $ \r -> return (mempty, a)
   m >>= f  = Flatten $ \r ->
-    do ((w0, n0, u0), a) <- runFlatten m r
-       ((w1, n1, u1), b) <- runFlatten (f a) r
-       return ((w0 <> w1, n0 <> n1, u0 >> u1), b)
+    do (w0, a) <- runFlatten m r
+       (w1, b) <- runFlatten (f a) r
+       return (w0 <> w1, b)
 
 instance Applicative Flatten where
   pure = return
@@ -55,15 +55,15 @@ freshInstId :: Flatten InstId
 freshInstId = Flatten $ \r -> do
   id <- readIORef r
   writeIORef r (id+1)
-  return ((mempty, mempty, return ()), id)
+  return (mempty, id)
 
 -- |Add a net to the netlist
 addNet :: Net -> Flatten ()
-addNet net = Flatten $ \r -> return ((JL.One net, mempty, return ()), ())
+addNet net = Flatten $ \r -> return ((JL.One net, mempty, mempty), ())
 
 -- |Add a name to the list
 addName :: (InstId, Name) -> Flatten ()
-addName nm = Flatten $ \r -> return ((mempty, JL.One nm, return ()), ())
+addName nm = Flatten $ \r -> return ((mempty, JL.One nm, mempty), ())
 
 -- |Add an "undo" computation
 addUndo :: IO () -> Flatten ()
@@ -73,7 +73,7 @@ addUndo undo = Flatten $ \r -> return ((mempty, mempty, undo), ())
 doIO :: IO a -> Flatten a
 doIO m = Flatten $ \r -> do
   a <- m
-  return ((mempty, mempty, return ()), a)
+  return (mempty, a)
 
 -- |Flatten bit vector to netlist
 flatten :: BV -> Flatten NetInput
