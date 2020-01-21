@@ -234,7 +234,8 @@ inlineNetInput nl nc inpt@(InputWire (instId, _)) = do
   -- returning if inlining could happen as a Bool
   if cnt == 1 && canInline prim then do
     (inpts', changes) <- unzip <$> mapM
-      (\x -> if canInlineInput prim then inlineNetInput nl nc x
+      (\x -> if canInlineInput prim then do (x', _) <- inlineNetInput nl nc x
+                                            return (x', True)
              else return (x, False)) inpts
     return (InputTree prim inpts', or changes)
   else return (inpt, False)
@@ -290,5 +291,5 @@ netlistPasses nl = do
   ---- DEBUG HELP -- putStrLn $ "about to inlineSingleRefNet"
   --inlineSingleRefNet nl
   ---- DEBUG HELP -- putStrLn $ "about to eliminateDeadNet"
-  --eliminateDeadNet nl
+  --untilM not $ eliminateDeadNet nl
   freeze nl
