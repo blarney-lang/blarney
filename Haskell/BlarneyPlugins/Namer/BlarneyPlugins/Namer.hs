@@ -64,12 +64,12 @@ tcPass _ modS env = do
   count  <- liftIO $ newIORef 0
   hs_env <- GHC.getTopEnv
   blMod  <- liftIO $ GHC.findImportedModule hs_env
-                    (GHC.mkModuleName "Blarney.Module") Nothing
+                    (GHC.mkModuleName "Blarney.Core.Module") Nothing
   tcg_binds <- SYB.mkM (nameModule count blMod)
                `SYB.everywhereM` GHC.tcg_binds env
   n <- liftIO $ readIORef count
   when (n > 0) $
-    msg $ "\tBlarney's Namer pluging preserved " ++ show n ++ " module name"
+    msg $ "\tBlarney's Namer plugin preserved " ++ show n ++ " instance name"
                                                  ++ if n > 1 then "s" else ""
   --msg $ show (GHC.ms_location modS)
   return $ env { GHC.tcg_binds = tcg_binds }
