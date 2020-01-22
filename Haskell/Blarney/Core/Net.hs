@@ -49,8 +49,8 @@ data Net = Net { -- | The 'Net' 's 'Prim'itive
                , netInputs       :: [NetInput]
                  -- | The 'Net' 's list of 'Width' output widths
                , netOutputWidths :: [Width]
-                 -- | The 'Net' 's 'Name'
-               , netName         :: Name
+                 -- | The 'Net' 's 'NameHints'
+               , netNameHints    :: NameHints
                } deriving Show
 
 -- | A 'WireId' uniquely identify a wire with a 'Net''s instance identifier

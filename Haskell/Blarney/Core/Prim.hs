@@ -26,7 +26,8 @@ module Blarney.Core.Prim (
 , RegFileId      -- Identifier for register file primitiveA
 , DisplayArg(..) -- Arguments to display primitive
 , Param(..)      -- Compile-time parameters
-, Name(..)       -- A 'Name' type that handles name hints
+, NameHint(..)   -- A 'NameHint' type to represent name hints
+, NameHints      -- A 'NameHints' type to gather name hints
 ) where
 
 import Prelude
@@ -34,6 +35,14 @@ import Data.Set
 
 -- | Every instance of a component in the circuit has a unique id
 type InstId = Int
+
+-- | A 'NameHint' type describing name hints
+data NameHint = NmPrefix Int String
+              | NmRoot Int String
+              | NmSuffix Int String
+              deriving (Eq, Ord, Show)
+-- | A 'NameHints' type to gather name hints
+type NameHints = Set NameHint
 
 -- |Each output from a primitive component is numbered
 type OutputNumber = Int
