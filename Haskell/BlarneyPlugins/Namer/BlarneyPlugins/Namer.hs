@@ -7,8 +7,27 @@ License     : MIT
 Maintainer  : alexandre.joannou@gmail.com
 Stability   : experimental
 
-This module defines a Namer ghc plugin for Blarney to preserve names from
-Blarney source code down to generated code.
+This module defines a ghc plugin for Blarney to preserve names from
+Blarney source code down to netlists (and hence, for example,
+generated Verilog code).  We look for monadic bindings of the form
+
+  x <- m
+
+where m has type
+
+  Module a
+
+and we rewrite the binding as
+
+  x <- withNewName "x" m
+
+In this way, all module instances (including registers and wires) will
+be augmented with name information.
+
+This module was developed using Ollie Charle's assert-explainer
+plugin as a guiding example:
+
+  https://github.com/ocharles/assert-explainer
 
 -}
 
