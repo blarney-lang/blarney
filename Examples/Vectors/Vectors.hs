@@ -4,7 +4,7 @@ import Blarney.Vector as V
 
 makeElement :: KnownNat n => Integer -> Module (Source (Bit n))
 makeElement i = do
-  reg :: Reg (Bit n) <- withNewName ("element"++show i) (makeReg $ fromInteger i)
+  reg :: Reg (Bit n) <- makeReg $ fromInteger i
   let src :: Source (Bit n) = Source { canPeek = true
                                      , peek    = reg.val
                                      , consume = reg <== (reg.val) + 1
