@@ -242,9 +242,9 @@ genNetVerilog netlist net = case netPrim net of
                         prefxs = [nm | x@(NmPrefix _ nm) <- nms]
                         roots  = [nm | x@(NmRoot   _ nm) <- nms]
                         sufxs  = [nm | x@(NmSuffix _ nm) <- nms]
-                        prefx  = intercalate "_" $ filter (not . null) prefxs
-                        root   = intercalate "_" $ filter (not . null) roots
-                        sufx   = intercalate "_" $ filter (not . null) sufxs
+                        prefx  = intercalate "_" prefxs
+                        root   = intercalate "_" roots
+                        sufx   = intercalate "_" sufxs
   showIntLit :: Int -> Integer -> Doc
   showIntLit w v = int w <> text "'h" <> hexInt v
   showDontCare :: Int -> Doc
