@@ -476,17 +476,20 @@ netlist :: RTL () -> IO Netlist
 netlist rtl = do
   -- flatten BVs into a Netlist
   i <- newIORef (0 :: InstId)
-  ((nl, nms, undo), _) <- runFlatten flattenRoots i
+  ((nl, nms, undo), roots) <- runFlatten flattenRoots i
   maxId <- readIORef i
   mnl <- thaw $ listArray (0, maxId) (replicate (maxId+1) Nothing)
                 // [(netInstId n, Just n) | n <- JL.toList nl]
-  -- gather names in the Netlist
+  -- update netlist with gathered names
   forM_ (JL.toList nms) $ \(idx, hints) -> do
     mnet <- readArray mnl idx
     case mnet of
       Just net@Net{ netNameHints = oldHints } ->
         writeArray mnl idx (Just net { netNameHints = oldHints <> hints })
       _ -> return ()
+  -- propagates existing names through the netlist
+  print roots
+  propagateNames mnl [x | InputWire x <- roots]
   -- run optimisation netlist passes
   nl' <- netlistPasses mnl
   -- run undo computations
@@ -500,4 +503,4 @@ netlist rtl = do
                                    , assigns = assignMap }) 0
     acts = JL.toList actsJL
     assignMap = fromListWith (++) [(lhs a, [a]) | RTLAssign a <- acts]
-    flattenRoots = mapM_ flatten (concat [roots | RTLRoots roots <- acts])
+    flattenRoots = mapM flatten (concat [rts | RTLRoots rts <- acts])

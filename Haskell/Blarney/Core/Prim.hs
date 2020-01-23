@@ -15,7 +15,7 @@ module Blarney.Core.Prim (
   Prim(..)       -- Primitive components
 , canInline      -- Tell if a 'Prim' can be inlined
 , canInlineInput -- Tell if a 'Prim' inputs can be inlined
-, primStr        -- Returns a 'String' representation fo the given 'Prim'
+, primStr        -- helper to get useful name strings out of a 'Prim'
   -- * Other primitive types
 , InstId         -- Every component instance has a unique id
 , OutputNumber   -- Each output from a component is numbered
@@ -190,9 +190,47 @@ canInline p = inlinable (primInfo p)
 canInlineInput :: Prim -> Bool
 canInlineInput p = inlinableInputs (primInfo p)
 
--- | Helper to return a 'String' representation of the given 'Prim'
+-- | Helper to render a primitive name. Used to generate useful names
 primStr :: Prim -> String
-primStr p = strRep (primInfo p)
+primStr Const{} = "Const"
+primStr DontCare{} = "DontCare"
+primStr Add{} = "Add"
+primStr Sub{} = "Sub"
+primStr Mul{} = "Mul"
+primStr Div{} = "Div"
+primStr Mod{} = "Mod"
+primStr Not{} = "Not"
+primStr And{} = "And"
+primStr Or{} = "Or"
+primStr Xor{} = "Xor"
+primStr ShiftLeft{} = "ShiftLeft"
+primStr ShiftRight{} = "ShiftRight"
+primStr ArithShiftRight{} = "ArithShiftRight"
+primStr Equal{} = "Equal"
+primStr NotEqual{} = "NotEqual"
+primStr LessThan{} = "LessThan"
+primStr LessThanEq{} = "LessThanEq"
+primStr ReplicateBit{} = "ReplicateBit"
+primStr ZeroExtend{} = "ZeroExtend"
+primStr SignExtend{} = "SignExtend"
+primStr SelectBits{} = "SelectBits"
+primStr Concat{} = "Concat"
+primStr Mux{} = "Mux"
+primStr CountOnes{} = "CountOnes"
+primStr Identity{} = "Identity"
+primStr Register{} = "Register"
+primStr RegisterEn{} = "RegisterEn"
+primStr BRAM{} = "BRAM"
+primStr TrueDualBRAM{} = "TrueDualBRAM"
+primStr Custom{ customName = str } = str
+primStr (Input _ str) = str
+primStr (Output _ str) = str
+primStr Display{} = "Display"
+primStr Finish = "Finish"
+primStr (TestPlusArgs str) = "PlusArgs_" ++ str
+primStr RegFileMake{} = "RegFileMake"
+primStr RegFileRead{} = "RegFileRead"
+primStr RegFileWrite{} = "RegFileWrite"
 
 -- | A 'Name' type that handles name hints
 data Name = Name { nameHints :: Set String } deriving Show
