@@ -71,13 +71,13 @@ type Netlist = Array InstId (Maybe Net)
 type MNetlist = IOArray InstId (Maybe Net)
 
 -- | A helper type for 'Net' reference counting
-type NetCounts = IOArray InstId Int
+type NetCounts = IOUArray InstId Int
 
 -- | A 'Net' reference counting helper function
 countNetRef :: MNetlist -> IO NetCounts
 countNetRef arr = do
   bounds <- getBounds arr
-  refCounts :: IOArray InstId Int <- newArray bounds 0
+  refCounts <- newArray bounds 0
   es <- getElems arr
   -- count references for each Net
   let innerCount (InputWire (instId, _)) = do
