@@ -17,12 +17,16 @@ where m has type
 
   Module a
 
-and we rewrite the binding as
+for any a, and we rewrite the binding as
 
   x <- withNewName "x" m
 
-In this way, all module instances (including registers and wires) will
-be augmented with name information.
+Where withNewName is a standard Blarney function.  In this way, module
+instances (including registers and wires, which are modules in
+Blarney) will often be augmented with name information.  This is the
+simplest useful approach we could think of.  In future, we might do
+something similar with other binding forms too, for introducing names
+into pure/combinatorial code.
 
 This module was developed using Ollie Charle's assert-explainer
 plugin as a guiding example:
