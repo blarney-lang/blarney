@@ -74,6 +74,7 @@ import Blarney.Core.BV
 import Blarney.Core.Net
 import Blarney.Core.Bit
 import Blarney.Core.Bits
+import Blarney.Core.Prim
 import Blarney.Core.FShow
 import Blarney.Core.Prelude
 import Blarney.Core.IfThenElse

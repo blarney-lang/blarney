@@ -12,78 +12,65 @@ Stability   : experimental
 
 This module represents the core of the Blarney HDL, upon which all
 hardware description features are built.  It provides untyped bit
-vectors, i.e. bit vectors whose width is not specified in the type,
-and a set of associated circuit primitives.  Hardware developers
-should not use these untyped primitives directly (unless they know
-what they are doing), because width-mistmatches are not checked.  Any
-bit-vector can be evaluated symbolically, using a feature similar to
-Observable Sharing [1], to produce a netlist, i.e. a graph whose nodes
-are primitive component instances and whose edges are connections.
+vectors, i.e. bit vectors whose width is not specified in the type.
+Hardware developers should not use these untyped primitives directly
+(unless they know what they are doing), because width-mistmatches are
+not checked.  Any bit-vector can be evaluated symbolically, using a
+feature similar to Observable Sharing [1], to produce a netlist,
+i.e. a graph whose nodes are primitive component instances and whose
+edges are connections.
 
 1. K. Claessen, D. Sands.  Observable Sharing for Functional Circuit
 Description, ASIAN 1999.
 -}
 
-module Blarney.Core.BV
-  (
-    -- * Primitive component types
-    InstId         -- Every component instance has a unique id
-  , Name(..)       -- A 'Name' type that handles name hints
-  , OutputNumber   -- Each output from a component is numbered
-  , Width          -- Bit vector width
-  , InputWidth     -- Width of an input to a component
-  , OutputWidth    -- Width of an output from a component
-  , BitIndex       -- For indexing a bit vector
-  , RegFileId      -- Identifier for register file primitiveA
-  , Prim(..)       -- Primitive components
-  , DisplayArg(..) -- Arguments to display primitive
-  , Param(..)      -- Compile-time parameters
-  , lookupParam    -- Given a parameter name, return the parameter value
+module Blarney.Core.BV (
+  -- * Untyped bit vectors
+  BV(..)         -- Untyped bit vector
+, makePrim       -- Create instance of primitive component
+, makePrim1      -- Common case: single-output components
+, makePrimRoot   -- Instance of primitive component that is a root
 
+  -- * Bit-vector primitives
+, constBV        -- :: Width -> Integer -> BV
+, dontCareBV     -- :: Width -> BV
+, addBV          -- :: BV -> BV -> BV
+, subBV          -- :: BV -> BV -> BV
+, mulBV          -- :: BV -> BV -> BV
+, divBV          -- :: BV -> BV -> BV
+, modBV          -- :: BV -> BV -> BV
+, invBV          -- :: BV -> BV
+, andBV          -- :: BV -> BV -> BV
+, orBV           -- :: BV -> BV -> BV
+, xorBV          -- :: BV -> BV -> BV
+, leftBV         -- :: BV -> BV -> BV
+, rightBV        -- :: BV -> BV -> BV
+, arithRightBV   -- :: BV -> BV -> BV
+, equalBV        -- :: BV -> BV -> BV
+, notEqualBV     -- :: BV -> BV -> BV
+, lessThanBV     -- :: BV -> BV -> BV
+, lessThanEqBV   -- :: BV -> BV -> BV
+, replicateBV    -- :: Integer -> BV -> BV
+, zeroExtendBV   -- :: OutputWidth -> BV -> BV
+, signExtendBV   -- :: OutputWidth -> BV -> BV
+, selectBV       -- :: (BitIndex, BitIndex) -> BV -> BV
+, concatBV       -- :: BV -> BV -> BV
+, muxBV          -- :: BV -> (BV, BV) -> BV
+, countOnesBV    -- :: OutputWidth -> BV -> BV
+, idBV           -- :: BV -> BV
+, testPlusArgsBV -- :: String -> BV
+, inputPinBV     -- :: String -> BV
+, regBV          -- :: Width -> Integer -> BV -> BV
+, regEnBV        -- :: Width -> Integer -> BV -> BV -> BV
+, ramBV          -- :: OutputWidth -> Maybe String -> (BV, BV, BV) -> BV
+, dualRamBV      -- :: OutputWidth -> Maybe String
+, regFileReadBV  -- :: RegFileId -> OutputWidth -> BV -> BV
+, getInitBV      -- :: BV -> Integer
 
-    -- * Untyped bit vectors
-  , BV(..)         -- Untyped bit vector
-  , addBVNameHint  -- Add a name hint to a 'BV'
-  , makePrim       -- Create instance of primitive component
-  , makePrim1      -- Common case: single-output components
-  , makePrimRoot   -- Instance of primitive component that is a root
-
-    -- * Bit-vector primitives
-  , constBV        -- :: Width -> Integer -> BV
-  , dontCareBV     -- :: Width -> BV
-  , addBV          -- :: BV -> BV -> BV
-  , subBV          -- :: BV -> BV -> BV
-  , mulBV          -- :: BV -> BV -> BV
-  , divBV          -- :: BV -> BV -> BV
-  , modBV          -- :: BV -> BV -> BV
-  , invBV          -- :: BV -> BV
-  , andBV          -- :: BV -> BV -> BV
-  , orBV           -- :: BV -> BV -> BV
-  , xorBV          -- :: BV -> BV -> BV
-  , leftBV         -- :: BV -> BV -> BV
-  , rightBV        -- :: BV -> BV -> BV
-  , arithRightBV   -- :: BV -> BV -> BV
-  , equalBV        -- :: BV -> BV -> BV
-  , notEqualBV     -- :: BV -> BV -> BV
-  , lessThanBV     -- :: BV -> BV -> BV
-  , lessThanEqBV   -- :: BV -> BV -> BV
-  , replicateBV    -- :: Integer -> BV -> BV
-  , zeroExtendBV   -- :: OutputWidth -> BV -> BV
-  , signExtendBV   -- :: OutputWidth -> BV -> BV
-  , selectBV       -- :: (BitIndex, BitIndex) -> BV -> BV
-  , concatBV       -- :: BV -> BV -> BV
-  , muxBV          -- :: BV -> (BV, BV) -> BV
-  , countOnesBV    -- :: OutputWidth -> BV -> BV
-  , idBV           -- :: BV -> BV
-  , testPlusArgsBV -- :: String -> BV
-  , inputPinBV     -- :: String -> BV
-  , regBV          -- :: Width -> Integer -> BV -> BV
-  , regEnBV        -- :: Width -> Integer -> BV -> BV -> BV
-  , ramBV          -- :: OutputWidth -> Maybe String -> (BV, BV, BV) -> BV
-  , dualRamBV      -- :: OutputWidth -> Maybe String
-  , regFileReadBV  -- :: RegFileId -> OutputWidth -> BV -> BV
-  , getInitBV      -- :: BV -> Integer
-  ) where
+-- * Other misc helpers
+, lookupParam    -- Given a parameter name, return the parameter value
+, addBVNameHint  -- Add a name hint to a 'BV'
+) where
 
 import Prelude
 
@@ -92,159 +79,13 @@ import Data.IORef
 import System.IO.Unsafe(unsafePerformIO)
 
 -- For name hints
-import Data.Set
-import Data.List (intercalate)
+import Data.Set (insert, empty)
 
 -- Standard imports
 import qualified Data.Bits as B
 
--- |Every instance of a component in the circuit has a unique id
-type InstId = Int
-
--- | A 'Name' type that handles name hints
-data Name = Name { nameHints :: Set String } deriving Show
-instance Semigroup Name where
-  x <> y = Name { nameHints = nameHints x `union` nameHints y }
-instance Monoid Name where
-  mempty = Name { nameHints = empty }
-
--- |Each output from a primitive component is numbered
-type OutputNumber = Int
-
--- |Bit vector width
-type Width = Int
-
--- |Width of an input to a primitive
-type InputWidth = Int
-
--- |Width of an output from a primitive
-type OutputWidth = Int
-
--- |For indexing a bit vector
-type BitIndex = Int
-
--- |Identifier for register file primitive
-type RegFileId = Int
-
--- |Primitive components
-data Prim =
-    -- |Constant value (0 inputs, 1 output)
-    Const OutputWidth Integer
-
-    -- |Don't care value (0 input, 1 output)
-  | DontCare OutputWidth
-
-    -- |Adder (2 inputs, 1 output)
-  | Add OutputWidth
-    -- |Subtractor (2 inputs, 1 output)
-  | Sub OutputWidth
-    -- |Multiplier (2 inputs, 1 output)
-  | Mul OutputWidth
-    -- |Quotient (2 inputs, 1 output)
-  | Div OutputWidth
-    -- |Remainder (2 inputs, 1 output)
-  | Mod OutputWidth
-
-    -- |Bitwise not (1 input, 1 output)
-  | Not OutputWidth
-    -- |Bitwise and (2 inputs, 1 output)
-  | And OutputWidth
-    -- |Bitwise or (2 inputs, 1 output)
-  | Or OutputWidth
-    -- |Bitwise xor (2 inputs, 1 output)
-  | Xor OutputWidth
-
-    -- |Left shift (2 inputs, 1 output)
-  | ShiftLeft OutputWidth
-    -- |Logical right shift (2 inputs, 1 output)
-  | ShiftRight OutputWidth
-    -- |Arithmetic right shift (2 inputs, 1 output)
-  | ArithShiftRight OutputWidth
-
-    -- |Equality comparator (2 inputs, 1 bit output)
-  | Equal InputWidth
-    -- |Disequality comparator (2 inputs, 1 bit output)
-  | NotEqual InputWidth
-    -- |Less-than comparator (2 inputs, 1 bit output)
-  | LessThan InputWidth
-    -- |Less-than-or-equal comparator (2 inputs, 1 bit output)
-  | LessThanEq InputWidth
-
-    -- |Replicate a bit (1 input, 1 output)
-  | ReplicateBit OutputWidth
-    -- |Zero-extend a bit vector (1 input, 1 output)
-  | ZeroExtend InputWidth OutputWidth
-    -- |Sign-extend a bit vector (1 input, 1 output)
-  | SignExtend InputWidth OutputWidth
-
-    -- |Bit selection (compile-time range, 1 input, 1 output)
-  | SelectBits InputWidth BitIndex BitIndex
-    -- |Bit vector concatenation (2 inputs, 1 output)
-  | Concat InputWidth InputWidth
-
-    -- |Multiplexer (3 inputs, 1 output)
-  | Mux OutputWidth
-    -- |Population count (1 input, 1 output)
-  | CountOnes OutputWidth
-    -- |Identity function (1 input, 1 output)
-  | Identity OutputWidth
-
-    -- |Register with initial value (1 input, 1 output)
-  | Register Integer InputWidth
-    -- |Register with initial value and enable wire (2 inputs, 1 output)
-  | RegisterEn Integer InputWidth
-
-    -- |Single-port block RAM
-  | BRAM { ramInitFile  :: Maybe String
-         , ramAddrWidth :: Width
-         , ramDataWidth :: Width }
-    -- |True dual-port block RAM
-  | TrueDualBRAM { ramInitFile  :: Maybe String
-                 , ramAddrWidth :: Width
-                 , ramDataWidth :: Width }
-
-    -- |Custom component
-  | Custom { customName      :: String          -- component name
-           , customInputs    :: [String]        -- input names
-           , customOutputs   :: [(String, Int)] -- output names/widths
-           , customParams    :: [Param]         -- parameters
-           , customIsClocked :: Bool }          -- pass clock and reset ?
-
-    -- |External input (0 inputs, 1 output)
-  | Input OutputWidth String
-    -- |External output (only used in RTL context, not expression context)
-  | Output InputWidth String
-
-    -- |Simulation-time I/O
-    -- (only used in RTL context, not expression context)
-  | Display [DisplayArg]
-    -- |Finish simulation (input: 1-bit enable wire)
-  | Finish
-    -- |Test presence of plusargs (output: 1-bit boolean)
-  | TestPlusArgs String
-
-    -- |Register file declaration
-    -- (only used in RTL context, not expression context)
-  | RegFileMake String InputWidth InputWidth RegFileId
-    -- |Register file lookup (input: index, output: data)
-  | RegFileRead OutputWidth RegFileId
-    -- |Register file update (inputs: write-enable, address, data)
-  | RegFileWrite InputWidth InputWidth RegFileId
-  deriving Show
-
--- |For the Display primitive:
--- display a string literal or a bit-vector value of a given width
-data DisplayArg =
-    DisplayArgString String
-  | DisplayArgBit InputWidth
-
-instance Show DisplayArg where
-  show (DisplayArgString s) = show s
-  show (DisplayArgBit w) = show w
-
--- |Custom components may have compile-time parameters.
--- A parameter has a name and a value, both represented as strings
-data Param = String :-> String deriving Show
+-- Blarney imports
+import Blarney.Core.Prim
 
 -- |Given a parameter name, return the parameter value
 lookupParam :: [Param] -> String -> String

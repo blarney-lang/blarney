@@ -34,7 +34,7 @@ import Control.Monad
 import Data.List (intercalate)
 import qualified Data.Bits as B
 
-import Blarney.Core.BV
+import Blarney.Core.Prim
 import Blarney.Core.IfThenElse
 
 -- General type definitions and helpers
@@ -201,26 +201,6 @@ propagateConstants nl = do
   -- DEBUG HELP -- putStrLn $ "propagateConstant pass changed? " ++ show x
   readIORef changed
 
--- | Helper to tell whether a 'Prim' is inlineable
-canInline :: Prim -> Bool
-canInline Register{}     = False
-canInline RegisterEn{}   = False
-canInline BRAM{}         = False
-canInline TrueDualBRAM{} = False
-canInline Custom{}       = False
-canInline Input{}        = False
-canInline Output{}       = False
-canInline Display{}      = False
-canInline Finish         = False
-canInline TestPlusArgs{} = False
-canInline RegFileMake{}  = False
-canInline RegFileRead{}  = False
-canInline RegFileWrite{} = False
-canInline _ = True
--- | Helper to tell whether a 'Prim' inputs can be inlined
-canInlineInput SelectBits{} = False
-canInlineInput SignExtend{} = False
-canInlineInput _ = True
 -- | Helper to inline a 'Net''s inputs
 inlineNetInput :: MNetlist -> NetCounts -> NetInput -> IO (NetInput, Bool)
 inlineNetInput nl nc inpt@(InputWire (instId, _)) = do

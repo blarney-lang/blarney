@@ -28,7 +28,7 @@ import Numeric (showHex)
 import Data.Array.IArray
 
 -- Blarney imports
-import Blarney.Core.BV
+import Blarney.Core.Prim
 import Blarney.Core.Net
 import Blarney.Core.Module
 import Blarney.Core.Interface

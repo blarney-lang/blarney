@@ -46,11 +46,12 @@ import Control.Monad hiding (when)
 import GHC.Generics hiding (R)
 
 -- Blarney imports
-import Blarney.Core.Bit
 import Blarney.Core.BV
+import Blarney.Core.Bit
 import Blarney.Core.Bits
-import Blarney.Core.Prelude
+import Blarney.Core.Prim
 import Blarney.Core.Module
+import Blarney.Core.Prelude
 
 -- The Ifc monad
 -- =============
