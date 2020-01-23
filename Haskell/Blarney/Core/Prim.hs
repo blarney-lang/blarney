@@ -174,16 +174,16 @@ data Prim =
 
 -- | Helper to tell whether a 'Prim' can be inlined during Netlist optimisation
 canInline :: Prim -> Bool
-canInline p = inlinable (primMetaData p)
+canInline p = inlinable (primInfo p)
 
 -- | Helper to tell whether a 'Prim' inputs can be inlined during Netlist
 --   optimisation
 canInlineInput :: Prim -> Bool
-canInlineInput p = inlinableInputs (primMetaData p)
+canInlineInput p = inlinableInputs (primInfo p)
 
 -- | Helper to return a 'String' representation of the given 'Prim'
 primStr :: Prim -> String
-primStr p = strRep (primMetaData p)
+primStr p = strRep (primInfo p)
 
 -- | A 'Name' type that handles name hints
 data Name = Name { nameHints :: Set String } deriving Show
@@ -196,126 +196,141 @@ instance Monoid Name where
 --------------------------------------------------------------------------------
 
 -- | Type to hold metadata about a 'Prim'
-data PrimMetaData = PrimMetaData { inlinable :: Bool
-                                 , inlinableInputs :: Bool
-                                 , strRep :: String
-                                 }
+data PrimInfo = PrimInfo { -- | The 'inlinable' field specifies whether a 'Prim'
+                           --   can be inlined during the netlist optimisation
+                           --   passes. When generating verilog, it is useful to
+                           --   avoid inlining of certain primitive such as
+                           --   'Input' or 'Display' or stateful ones like
+                           --   'Register'...
+                           inlinable :: Bool
+                           -- | The 'inlinableInputs' field specifies whether a
+                           --   'Prim' ' inputs can be inlined during the
+                           --   netlist optimisation passes. When generating
+                           --   verilog, it is useful to avoid inlining inputs
+                           --   to 'Prim's involving bit-slicing (specifically,
+                           --   'SelectBits' and 'SignExtend') due to lack of
+                           --   underlying support.
+                         , inlinableInputs :: Bool
+                           -- | The 'strRep' field specifies a 'String'
+                           --   representation of a 'Prim'.
+                         , strRep :: String
+                         }
 -- | Helper getting general metadata about a 'Prim'
-primMetaData :: Prim -> PrimMetaData
-primMetaData (Const _ x) = PrimMetaData { inlinable = True
+primInfo :: Prim -> PrimInfo
+primInfo (Const _ x) = PrimInfo { inlinable = True
+                                , inlinableInputs = True
+                                , strRep = "Const" ++ show x }
+primInfo (DontCare _) = PrimInfo { inlinable = True
+                                 , inlinableInputs = True
+                                 , strRep = "DontCare" }
+primInfo (Add _) = PrimInfo { inlinable = True
+                            , inlinableInputs = True
+                            , strRep = "Add" }
+primInfo (Sub _) = PrimInfo { inlinable = True
+                            , inlinableInputs = True
+                            , strRep = "Sub" }
+primInfo (Mul _) = PrimInfo { inlinable = True
+                            , inlinableInputs = True
+                            , strRep = "Mul" }
+primInfo (Div _) = PrimInfo { inlinable = True
+                            , inlinableInputs = True
+                            , strRep = "Div" }
+primInfo (Mod _) = PrimInfo { inlinable = True
+                            , inlinableInputs = True
+                            , strRep = "Mod" }
+primInfo (Not _) = PrimInfo { inlinable = True
+                            , inlinableInputs = True
+                            , strRep = "Not" }
+primInfo (And _) = PrimInfo { inlinable = True
+                            , inlinableInputs = True
+                            , strRep = "And" }
+primInfo (Or _) = PrimInfo { inlinable = True
+                           , inlinableInputs = True
+                           , strRep = "Or" }
+primInfo (Xor _) = PrimInfo { inlinable = True
+                            , inlinableInputs = True
+                            , strRep = "Xor" }
+primInfo (ShiftLeft _) = PrimInfo { inlinable = True
+                                  , inlinableInputs = True
+                                  , strRep = "ShiftLeft" }
+primInfo (ShiftRight _) = PrimInfo { inlinable = True
+                                   , inlinableInputs = True
+                                   , strRep = "ShiftRight" }
+primInfo (ArithShiftRight _) = PrimInfo { inlinable = True
                                         , inlinableInputs = True
-                                        , strRep = "Const" ++ show x }
-primMetaData (DontCare _) = PrimMetaData { inlinable = True
-                                         , inlinableInputs = True
-                                         , strRep = "DontCare" }
-primMetaData (Add _) = PrimMetaData { inlinable = True
-                                    , inlinableInputs = True
-                                    , strRep = "Add" }
-primMetaData (Sub _) = PrimMetaData { inlinable = True
-                                    , inlinableInputs = True
-                                    , strRep = "Sub" }
-primMetaData (Mul _) = PrimMetaData { inlinable = True
-                                    , inlinableInputs = True
-                                    , strRep = "Mul" }
-primMetaData (Div _) = PrimMetaData { inlinable = True
-                                    , inlinableInputs = True
-                                    , strRep = "Div" }
-primMetaData (Mod _) = PrimMetaData { inlinable = True
-                                    , inlinableInputs = True
-                                    , strRep = "Mod" }
-primMetaData (Not _) = PrimMetaData { inlinable = True
-                                    , inlinableInputs = True
-                                    , strRep = "Not" }
-primMetaData (And _) = PrimMetaData { inlinable = True
-                                    , inlinableInputs = True
-                                    , strRep = "And" }
-primMetaData (Or _) = PrimMetaData { inlinable = True
+                                        , strRep = "ArithShiftRight" }
+primInfo (Equal _) = PrimInfo { inlinable = True
+                              , inlinableInputs = True
+                              , strRep = "Equal" }
+primInfo (NotEqual _) = PrimInfo { inlinable = True
+                                 , inlinableInputs = True
+                                 , strRep = "NotEqual" }
+primInfo (LessThan _) = PrimInfo { inlinable = True
+                                 , inlinableInputs = True
+                                 , strRep = "LessThan" }
+primInfo (LessThanEq _) = PrimInfo { inlinable = True
                                    , inlinableInputs = True
-                                   , strRep = "Or" }
-primMetaData (Xor _) = PrimMetaData { inlinable = True
-                                    , inlinableInputs = True
-                                    , strRep = "Xor" }
-primMetaData (ShiftLeft _) = PrimMetaData { inlinable = True
-                                          , inlinableInputs = True
-                                          , strRep = "ShiftLeft" }
-primMetaData (ShiftRight _) = PrimMetaData { inlinable = True
-                                           , inlinableInputs = True
-                                           , strRep = "ShiftRight" }
-primMetaData (ArithShiftRight _) = PrimMetaData { inlinable = True
-                                                , inlinableInputs = True
-                                                , strRep = "ArithShiftRight" }
-primMetaData (Equal _) = PrimMetaData { inlinable = True
-                                      , inlinableInputs = True
-                                      , strRep = "Equal" }
-primMetaData (NotEqual _) = PrimMetaData { inlinable = True
-                                         , inlinableInputs = True
-                                         , strRep = "NotEqual" }
-primMetaData (LessThan _) = PrimMetaData { inlinable = True
-                                         , inlinableInputs = True
-                                         , strRep = "LessThan" }
-primMetaData (LessThanEq _) = PrimMetaData { inlinable = True
-                                           , inlinableInputs = True
-                                           , strRep = "LessThanEq" }
-primMetaData (ReplicateBit _) = PrimMetaData { inlinable = True
-                                             , inlinableInputs = True
-                                             , strRep = "ReplicateBit" }
-primMetaData (ZeroExtend _ _) = PrimMetaData { inlinable = True
-                                             , inlinableInputs = True
-                                             , strRep = "ZeroExtend" }
-primMetaData (SignExtend _ _) = PrimMetaData { inlinable = True
-                                             , inlinableInputs = False
-                                             , strRep = "SignExtend" }
-primMetaData (SelectBits _ _ _) = PrimMetaData { inlinable = True
-                                             , inlinableInputs = False
-                                             , strRep = "SelectBits" }
-primMetaData (Concat _ _) = PrimMetaData { inlinable = True
-                                         , inlinableInputs = True
-                                         , strRep = "Concat" }
-primMetaData (Mux _) = PrimMetaData { inlinable = True
-                                    , inlinableInputs = True
-                                    , strRep = "Mux" }
-primMetaData (CountOnes _) = PrimMetaData { inlinable = True
-                                          , inlinableInputs = True
-                                          , strRep = "CountOnes" }
-primMetaData (Identity _) = PrimMetaData { inlinable = True
-                                         , inlinableInputs = True
-                                         , strRep = "Identity" }
-primMetaData (Register _ _) = PrimMetaData { inlinable = False
-                                           , inlinableInputs = True
-                                           , strRep = "Register" }
-primMetaData (RegisterEn _ _) = PrimMetaData { inlinable = False
-                                             , inlinableInputs = True
-                                             , strRep = "RegisterEn" }
-primMetaData BRAM{} = PrimMetaData { inlinable = False
+                                   , strRep = "LessThanEq" }
+primInfo (ReplicateBit _) = PrimInfo { inlinable = True
+                                     , inlinableInputs = True
+                                     , strRep = "ReplicateBit" }
+primInfo (ZeroExtend _ _) = PrimInfo { inlinable = True
+                                     , inlinableInputs = True
+                                     , strRep = "ZeroExtend" }
+primInfo (SignExtend _ _) = PrimInfo { inlinable = True
+                                     , inlinableInputs = False
+                                     , strRep = "SignExtend" }
+primInfo (SelectBits _ _ _) = PrimInfo { inlinable = True
+                                       , inlinableInputs = False
+                                       , strRep = "SelectBits" }
+primInfo (Concat _ _) = PrimInfo { inlinable = True
+                                 , inlinableInputs = True
+                                 , strRep = "Concat" }
+primInfo (Mux _) = PrimInfo { inlinable = True
+                            , inlinableInputs = True
+                            , strRep = "Mux" }
+primInfo (CountOnes _) = PrimInfo { inlinable = True
+                                  , inlinableInputs = True
+                                  , strRep = "CountOnes" }
+primInfo (Identity _) = PrimInfo { inlinable = True
+                                 , inlinableInputs = True
+                                 , strRep = "Identity" }
+primInfo (Register _ _) = PrimInfo { inlinable = False
                                    , inlinableInputs = True
-                                   , strRep = "BRAM" }
-primMetaData TrueDualBRAM{} = PrimMetaData { inlinable = False
-                                           , inlinableInputs = True
-                                           , strRep = "TrueDualBRAM" }
-primMetaData Custom{ customName = nm } = PrimMetaData { inlinable = False
-                                                      , inlinableInputs = True
-                                                      , strRep = nm }
-primMetaData (Input _ nm) = PrimMetaData { inlinable = False
-                                         , inlinableInputs = True
-                                         , strRep = nm }
-primMetaData (Output _ nm) = PrimMetaData { inlinable = False
-                                          , inlinableInputs = True
-                                          , strRep = nm }
-primMetaData (Display _) = PrimMetaData { inlinable = False
-                                        , inlinableInputs = True
-                                        , strRep = "Display" }
-primMetaData Finish = PrimMetaData { inlinable = False
+                                   , strRep = "Register" }
+primInfo (RegisterEn _ _) = PrimInfo { inlinable = False
+                                     , inlinableInputs = True
+                                     , strRep = "RegisterEn" }
+primInfo BRAM{} = PrimInfo { inlinable = False
+                           , inlinableInputs = True
+                           , strRep = "BRAM" }
+primInfo TrueDualBRAM{} = PrimInfo { inlinable = False
                                    , inlinableInputs = True
-                                   , strRep = "Finish" }
-primMetaData (TestPlusArgs arg) = PrimMetaData { inlinable = False
-                                               , inlinableInputs = True
-                                               , strRep = "PlusArgs_" ++ arg }
-primMetaData RegFileMake{} = PrimMetaData { inlinable = False
-                                          , inlinableInputs = True
-                                          , strRep = "RegFileMake" }
-primMetaData RegFileRead{} = PrimMetaData { inlinable = False
-                                          , inlinableInputs = True
-                                          , strRep = "RegFileRead" }
-primMetaData RegFileWrite{} = PrimMetaData { inlinable = False
-                                           , inlinableInputs = True
-                                           , strRep = "RegFileWrite" }
+                                   , strRep = "TrueDualBRAM" }
+primInfo Custom{ customName = nm } = PrimInfo { inlinable = False
+                                              , inlinableInputs = True
+                                              , strRep = nm }
+primInfo (Input _ nm) = PrimInfo { inlinable = False
+                                 , inlinableInputs = True
+                                 , strRep = nm }
+primInfo (Output _ nm) = PrimInfo { inlinable = False
+                                  , inlinableInputs = True
+                                  , strRep = nm }
+primInfo (Display _) = PrimInfo { inlinable = False
+                                , inlinableInputs = True
+                                , strRep = "Display" }
+primInfo Finish = PrimInfo { inlinable = False
+                           , inlinableInputs = True
+                           , strRep = "Finish" }
+primInfo (TestPlusArgs arg) = PrimInfo { inlinable = False
+                                       , inlinableInputs = True
+                                       , strRep = "PlusArgs_" ++ arg }
+primInfo RegFileMake{} = PrimInfo { inlinable = False
+                                  , inlinableInputs = True
+                                  , strRep = "RegFileMake" }
+primInfo RegFileRead{} = PrimInfo { inlinable = False
+                                  , inlinableInputs = True
+                                  , strRep = "RegFileRead" }
+primInfo RegFileWrite{} = PrimInfo { inlinable = False
+                                   , inlinableInputs = True
+                                   , strRep = "RegFileWrite" }
