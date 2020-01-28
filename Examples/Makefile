@@ -30,3 +30,4 @@ clean:
 	make -C Background clean
 	make -C Vectors clean
 	make -C OptionExample clean
+	make -C StackTesting clean
