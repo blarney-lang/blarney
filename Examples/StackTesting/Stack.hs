@@ -24,7 +24,7 @@ makeStack logSize = do
   liftNat logSize $ \(_ :: Proxy n) -> do
 
     -- RAM, wide enough to hold entire stack
-    ram :: RAM (Bit n) a <- makeDualRAM
+    ram :: RAM (Bit n) a <- makeDualRAMForward 0
 
     -- Stack pointer
     sp :: Reg (Bit n) <- makeReg 0
@@ -89,7 +89,7 @@ makeStackSpec logSize =
 testBench :: Module ()
 testBench = do
   -- Create 256-element stack
-  stk :: Stack (Bit 8) <- makeStackSpec 8
+  stk :: Stack (Bit 8) <- makeStack 8
 
   -- Sample test sequence
   let test =
