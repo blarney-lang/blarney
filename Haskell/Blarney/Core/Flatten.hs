@@ -24,6 +24,7 @@ import Control.Monad
 
 import Blarney.Core.BV
 import Blarney.Core.Net
+import Blarney.Core.Prim
 import qualified Blarney.Core.JList as JL
 
 -- |A reader/writer monad for accumulating the netlist

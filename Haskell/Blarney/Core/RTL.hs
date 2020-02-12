@@ -66,13 +66,14 @@ module Blarney.Core.RTL
   ) where
 
 -- Blarney imports
-import Blarney.Core.BV hiding (nameHints)
+import Blarney.Core.BV
 import Blarney.Core.Net
-import Blarney.Core.Flatten
 import Blarney.Core.Bit
 import Blarney.Core.Bits
+import Blarney.Core.Prim hiding (nameHints)
 import Blarney.Core.FShow
 import Blarney.Core.Prelude
+import Blarney.Core.Flatten
 import Blarney.Core.IfThenElse
 import qualified Blarney.Core.JList as JL
 
