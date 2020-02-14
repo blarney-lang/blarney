@@ -29,6 +29,7 @@ module Blarney.Core.Bit where
 import Blarney.Core.BV
 
 -- Utils
+import Blarney.Core.Prim
 import Blarney.Core.Utils
 
 -- Standard imports
@@ -64,7 +65,7 @@ constant i = result
 
 -- | Give a name to a 'Bit n' signal
 nameBit :: String -> Bit n -> Bit n
-nameBit nm = FromBV . (flip addBVNameHint $ nm) . toBV
+nameBit nm = FromBV . (flip addBVNameHint $ NmRoot 0 nm) . toBV
 
 -- |Test plusargs
 testPlusArgs :: String -> Bit 1

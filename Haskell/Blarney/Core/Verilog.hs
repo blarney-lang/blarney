@@ -235,10 +235,16 @@ genNetVerilog netlist net = case netPrim net of
   primNV = dfltNV { inst = Just $ instPrim net }
   -- general helpers
   --------------------------------------------------------------------------------
-  genName :: Name -> String
-  genName nm = if Set.null hints then "v"
-               else intercalate "_" (Set.toList hints)
-               where hints = nameHints nm
+  genName :: NameHints -> String
+  genName hints = if Set.null hints then "v"
+                  else intercalate "_" $ filter (not . null) [prefx, root, sufx]
+                  where nms = Set.toList hints
+                        prefxs = [nm | x@(NmPrefix _ nm) <- nms]
+                        roots  = [nm | x@(NmRoot   _ nm) <- nms]
+                        sufxs  = [nm | x@(NmSuffix _ nm) <- nms]
+                        prefx  = intercalate "_" prefxs
+                        root   = intercalate "_" roots
+                        sufx   = intercalate "_" sufxs
   showIntLit :: Int -> Integer -> Doc
   showIntLit w v = int w <> text "'h" <> hexInt v
   showDontCare :: Int -> Doc
@@ -249,7 +255,7 @@ genNetVerilog netlist net = case netPrim net of
                           where wNet = fromMaybe
                                   (error "Trying to show non existing Net")
                                   (netlist Data.Array.IArray.! iId)
-                                name = genName $ netName wNet
+                                name = genName $ netNameHints wNet
   showWireWidth :: Int -> (InstId, Int) -> Doc
   showWireWidth width wId = brackets (int (width-1) <> text ":0") <+> showWire wId
 

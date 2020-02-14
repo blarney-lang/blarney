@@ -19,7 +19,7 @@ where m has type
 
 for any a, and we rewrite the binding as
 
-  x <- withNewName "x" m
+  x <- withName "x" m
 
 Where withNewName is a standard Blarney function.  In this way, module
 instances (including registers and wires, which are modules in
@@ -109,7 +109,7 @@ nameModule count (GHC.Found _ m) e@(GHC.L loc (Expr.BindStmt xbind pat body e0 e
     Just t  -> case Type.splitTyConApp_maybe t of
       Just (tyC, [tyArg]) | GHC.tyConName tyC == blModuleTy -> do
         namer <- GHC.lookupId =<<
-                 GHC.lookupOrig m (GHC.mkVarOcc "withNewName")
+                 GHC.lookupOrig m (GHC.mkVarOcc "withName")
         let isVarPat :: Pat.Pat GHC.GhcTc -> Bool
             isVarPat (Pat.VarPat _ _) = True
             isVarPat _ = False

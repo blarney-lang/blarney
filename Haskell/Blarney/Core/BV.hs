@@ -70,6 +70,7 @@ module Blarney.Core.BV (
 -- * Other misc helpers
 , lookupParam    -- Given a parameter name, return the parameter value
 , addBVNameHint  -- Add a name hint to a 'BV'
+, addBVNameHints -- Add name hints to a 'BV'
 ) where
 
 import Prelude
@@ -96,25 +97,30 @@ lookupParam ps p = case [v | (k :-> v) <- ps, p == k] of
 -- | An untyped bit vector output wire from a primitive component instance
 data BV = BV {
                -- | What kind of primitive produced this bit vector?
-               bvPrim    :: Prim
+               bvPrim      :: Prim
                -- | Inputs to the primitive instance
-             , bvInputs  :: [BV]
+             , bvInputs    :: [BV]
                -- | Output pin number
-             , bvOutNum  :: OutputNumber
+             , bvOutNum    :: OutputNumber
                -- | Width of this output pin
-             , bvWidth   :: Width
+             , bvWidth     :: Width
                -- | Width of each output pin
-             , bvWidths  :: [Width]
+             , bvWidths    :: [Width]
                -- | Name (hints) characterising the 'BV'
-             , bvName    :: Name
+             , bvNameHints :: NameHints
                -- | Unique id of primitive instance
-             , bvInstRef :: IORef (Maybe InstId)
+             , bvInstRef   :: IORef (Maybe InstId)
              }
 
--- | A name hint to the 'BV'
-addBVNameHint :: BV -> String -> BV
-addBVNameHint bv@BV{ bvName = name@Name{ nameHints = hs } } nm =
-  bv { bvName = name { nameHints = insert nm hs } }
+-- | Add a name hint to the 'BV'
+addBVNameHint :: BV -> NameHint -> BV
+addBVNameHint bv@BV{ bvNameHints = hints } hint =
+  bv { bvNameHints = insert hint hints }
+
+-- | Add name hints to the 'BV'
+addBVNameHints :: BV -> NameHints -> BV
+addBVNameHints bv@BV{ bvNameHints = hints } newHints =
+  bv { bvNameHints = hints <> newHints }
 
 {-# NOINLINE makePrim #-}
 -- |Helper function for creating an instance of a primitive component
@@ -123,15 +129,14 @@ makePrim prim ins outWidths
   | Prelude.null outWidths = [bv]
   | otherwise = [ bv { bvOutNum = i, bvWidth = w }
                 | (i, w) <- zip [0..] outWidths ]
-  where bv = BV { bvPrim    = prim
-                , bvInputs  = ins
-                , bvOutNum  = 0
-                , bvWidth   = 0
-                , bvWidths  = outWidths
-                , bvName    = dfltName
-                , bvInstRef = instIdRef
+  where bv = BV { bvPrim      = prim
+                , bvInputs    = ins
+                , bvOutNum    = 0
+                , bvWidth     = 0
+                , bvWidths    = outWidths
+                , bvNameHints = empty
+                , bvInstRef   = instIdRef
                 }
-        dfltName = Name { nameHints = empty }
         -- |For Observable Sharing.
         instIdRef = unsafePerformIO (newIORef Nothing)
 

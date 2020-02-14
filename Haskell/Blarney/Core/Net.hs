@@ -21,6 +21,7 @@ module Blarney.Core.Net (
 , Netlist        -- 'Netlist' type to represent a circuit
 , NetInput(..)   -- 'NetInput' type to represent inputs to 'Net's
 , MNetlist       -- 'MNetlist' type, mutable netlist
+, readNet        -- Helper function to read a 'Net' out of an 'MNetlist'
 , WireId         -- 'WireId' type to uniquely identify wires
 , netlistPasses  -- Toplevel function for 'Netlist' transformation passes
 ) where
@@ -49,8 +50,8 @@ data Net = Net { -- | The 'Net' 's 'Prim'itive
                , netInputs       :: [NetInput]
                  -- | The 'Net' 's list of 'Width' output widths
                , netOutputWidths :: [Width]
-                 -- | The 'Net' 's 'Name'
-               , netName         :: Name
+                 -- | The 'Net' 's 'NameHints'
+               , netNameHints    :: NameHints
                } deriving Show
 
 -- | A 'WireId' uniquely identify a wire with a 'Net''s instance identifier
@@ -69,6 +70,11 @@ type Netlist = Array InstId (Maybe Net)
 
 -- | A helper type for mutable 'Netlist'
 type MNetlist = IOArray InstId (Maybe Net)
+
+-- | A helper function to read a 'Net' from a 'MNetlist'
+readNet :: MNetlist -> InstId -> IO Net
+readNet nl instId = fromMaybe (error "encountered InstId with no matching Net")
+                              <$> (readArray nl instId)
 
 -- | A helper type for 'Net' reference counting
 type NetCounts = IOUArray InstId Int
@@ -186,8 +192,7 @@ propagateConstants nl = do
     inputs' <- forM (netInputs net) $ \inpt -> do
       case inpt of
         InputWire (instId, _) -> do
-          inptNet <- fromMaybe (error "encountered InstId with no matching Net")
-                           <$> (readArray nl instId)
+          inptNet <- readNet nl instId
           -- keep track of change when transforming into an 'InputTree'
           case netPrim inptNet of
             p@(Const _ _)  -> writeIORef changed True >> return (InputTree p [])
@@ -207,9 +212,7 @@ inlineNetInput nl nc inpt@(InputWire (instId, _)) = do
   -- read ref count for our referenced 'Net'
   cnt <- readArray nc instId
   -- read netPrim and netInputs for our referenced 'Net'
-  Net{ netPrim = prim, netInputs = inpts } <- fromMaybe
-        (error "encountered InstId with no matching Net")
-    <$> (readArray nl instId)
+  Net{ netPrim = prim, netInputs = inpts } <- readNet nl instId
   -- attempt inlining our referenced 'Net', and its inputs recursively, also
   -- returning if inlining could happen as a Bool
   if cnt == 1 && canInline prim then do
@@ -262,14 +265,14 @@ eliminateDeadNet nl = do
 -- | All netlist passes
 netlistPasses :: MNetlist -> IO Netlist
 netlistPasses nl = do
-  --let constElim i = do a <- foldConstants nl
-  --                     b <- propagateConstants nl
-  --                     -- DEBUG HELP -- putStrLn $ "constElim " ++ show (a || b)
-  --                     return $ a || b
-  ---- DEBUG HELP -- putStrLn $ "about to untilM constElim"
-  --untilM not $ constElim nl
-  ---- DEBUG HELP -- putStrLn $ "about to inlineSingleRefNet"
-  --inlineSingleRefNet nl
-  ---- DEBUG HELP -- putStrLn $ "about to eliminateDeadNet"
-  --untilM not $ eliminateDeadNet nl
+  let constElim i = do a <- foldConstants nl
+                       b <- propagateConstants nl
+                       -- DEBUG HELP -- putStrLn $ "constElim " ++ show (a || b)
+                       return $ a || b
+  -- DEBUG HELP -- putStrLn $ "about to untilM constElim"
+  untilM not $ constElim nl
+  -- DEBUG HELP -- putStrLn $ "about to inlineSingleRefNet"
+  inlineSingleRefNet nl
+  -- DEBUG HELP -- putStrLn $ "about to eliminateDeadNet"
+  untilM not $ eliminateDeadNet nl
   freeze nl

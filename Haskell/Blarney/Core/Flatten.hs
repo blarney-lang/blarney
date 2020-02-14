@@ -35,7 +35,7 @@ type FlattenR = IORef Int
 
 -- |The writer component contains the netlist and
 -- an "undo" computation, which unperforms all IORef assignments.
-type FlattenW = (JL.JList Net, JL.JList (InstId, Name), IO ())
+type FlattenW = (JL.JList Net, JL.JList (InstId, NameHints), IO ())
 
 instance Monad Flatten where
   return a = Flatten $ \r -> return (mempty, a)
@@ -62,9 +62,9 @@ freshInstId = Flatten $ \r -> do
 addNet :: Net -> Flatten ()
 addNet net = Flatten $ \r -> return ((JL.One net, mempty, mempty), ())
 
--- |Add a name to the list
-addName :: (InstId, Name) -> Flatten ()
-addName nm = Flatten $ \r -> return ((mempty, JL.One nm, mempty), ())
+-- |Add name hints to the list
+addNameHints :: (InstId, NameHints) -> Flatten ()
+addNameHints hints = Flatten $ \r -> return ((mempty, JL.One hints, mempty), ())
 
 -- |Add an "undo" computation
 addUndo :: IO () -> Flatten ()
@@ -80,14 +80,14 @@ doIO m = Flatten $ \r -> do
 flatten :: BV -> Flatten NetInput
 flatten BV{bvPrim=p@(Const w v)} = return $ InputTree p []
 flatten BV{bvPrim=p@(DontCare w)} = return $ InputTree p []
-flatten b@BV{bvName=name,bvInstRef=instRef} = do
+flatten b@BV{bvNameHints=hints,bvInstRef=instRef} = do
   -- handle instId traversal
   instIdVal <- doIO (readIORef instRef)
-  let hasNameHints = not $ null (nameHints name)
+  let hasNameHints = not $ null hints
   case instIdVal of
     Nothing -> do
       instId <- freshInstId
-      when hasNameHints $ addName (instId, name)
+      when hasNameHints $ addNameHints (instId, hints)
       doIO (writeIORef instRef (Just instId))
       addUndo (writeIORef instRef Nothing)
       ins <- mapM flatten (bvInputs b)
@@ -95,9 +95,9 @@ flatten b@BV{bvName=name,bvInstRef=instRef} = do
                     , netInstId       = instId
                     , netInputs       = ins
                     , netOutputWidths = (bvWidths b)
-                    , netName         = mempty
+                    , netNameHints    = mempty
                     }
       addNet net
       return $ InputWire (instId, bvOutNum b)
-    Just instId -> do when hasNameHints $ addName (instId, name)
+    Just instId -> do when hasNameHints $ addNameHints (instId, hints)
                       return $ InputWire (instId, bvOutNum b)

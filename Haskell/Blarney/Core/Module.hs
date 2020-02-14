@@ -45,7 +45,8 @@ module Blarney.Core.Module
     Assign(..),
 
     -- * Naming hints
-    withNewName, withExtendedName,
+    withNameHint,
+    withName,
 
     -- * Registers
     Reg(..), makeReg, makeRegU, makeDReg,
@@ -106,12 +107,12 @@ noAction :: Action ()
 noAction = return ()
 
 -- | Set name hint
-withNewName :: String -> Module a -> Module a
-withNewName str m = M $ RTL.withNewName str (runModule m)
+withNameHint :: NameHint -> Module a -> Module a
+withNameHint hint m = M $ RTL.withNameHint hint (runModule m)
 
--- | Extend name hint
-withExtendedName :: String -> Module a -> Module a
-withExtendedName str m = M $ RTL.withExtendedName str (runModule m)
+-- | Set name hint
+withName :: String -> Module a -> Module a
+withName nm m = withNameHint (NmRoot 10 nm) m
 
 -- |Conditional block over actions
 when :: Bit 1 -> Action () -> Action ()
