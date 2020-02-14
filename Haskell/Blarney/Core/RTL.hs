@@ -466,8 +466,9 @@ netlist rtl = do
   i <- newIORef (0 :: InstId)
   ((nl, nms, undo), roots) <- runFlatten flattenRoots i
   maxId <- readIORef i
-  mnl <- thaw $ listArray (0, maxId) (replicate (maxId+1) Nothing)
-                // [(netInstId n, Just n) | n <- JL.toList nl]
+  mnl :: MNetlist <-
+    thaw $ listArray (0, maxId) (replicate (maxId+1) Nothing)
+        // [(netInstId n, Just n) | n <- JL.toList nl]
   -- update netlist with gathered names
   forM_ (JL.toList nms) $ \(idx, hints) -> do
     mnet <- readArray mnl idx
@@ -478,7 +479,7 @@ netlist rtl = do
   -- propagates existing names through the netlist
   --propagateNames mnl [x | InputWire x <- roots]
   -- run optimisation netlist passes
-  nl' <- netlistPasses mnl
+  nl' <- freeze mnl -- netlistPasses mnl
   -- run undo computations
   undo
   -- return final netlist
