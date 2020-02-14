@@ -122,7 +122,10 @@ nameModule count (GHC.Found _ m) e@(GHC.L loc (Expr.BindStmt xbind pat body e0 e
                           $ GHC.HsString GHC.NoSourceText (GHC.fsLit name)
         let namedE = bLoc $ GHC.HsApp GHC.noExt namerE nameE
         let body'  = bLoc $ GHC.HsApp GHC.noExt namedE body
-        liftIO $ modifyIORef count (+1)
-        return $ GHC.L loc (Expr.BindStmt xbind pat body' e0 e1)
+        case name of
+          '_':_ -> return e
+          other -> do
+            liftIO $ modifyIORef count (+1)
+            return $ GHC.L loc (Expr.BindStmt xbind pat body' e0 e1)
       _ -> return e
 nameModule _ _ e = return e

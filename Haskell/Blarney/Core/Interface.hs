@@ -72,9 +72,9 @@ newtype Ifc a = Ifc { runIfc :: R -> Module (W, a) }
 instance Monad Ifc where
   return a = Ifc $ \r -> return ([], a)
   m >>= f = Ifc $ \r -> do
-    (w0, a) <- runIfc m r
-    (w1, b) <- runIfc (f a) r
-    return (w0 ++ w1, b)
+    (_w0, _a) <- runIfc m r
+    (_w1, _b) <- runIfc (f _a) r
+    return (_w0 ++ _w1, _b)
 
 instance Applicative Ifc where
   pure = return
@@ -98,15 +98,15 @@ readPin s = Ifc $ \r ->
 -- |Lift a Module computation to an Ifc computation
 liftModule :: Module a -> Ifc a
 liftModule m = Ifc $ \r -> do
-  res <- m
-  return ([], res)
+  _res <- m
+  return ([], _res)
 
 -- |Create an instance of a module
 instantiate :: String -> [Param] -> Ifc a -> Module a
 instantiate name params ifc = do
-    rec (w, a) <- runIfc ifc (custom w)
-    addRoots [x | (s, WritePin x) <- w]
-    return a
+    rec (_w, _a) <- runIfc ifc (custom _w)
+    addRoots [x | (s, WritePin x) <- _w]
+    return _a
   where
     custom w =
       let inputs  = [(s, x) | (s, WritePin x) <- w]
@@ -118,16 +118,16 @@ instantiate name params ifc = do
 -- |Create a module that can be instantiated
 modularise :: Ifc a -> Module a
 modularise ifc = mdo
-    (w, a) <- runIfc ifc inps
-    inps <- mod w
-    return a
+    (_w, _a) <- runIfc ifc _inps
+    _inps <- mod _w
+    return _a
   where
     mod w = do
       let outputs = [(s, x) | (s, WritePin x) <- w]
       let inputs  = [(s, fromInteger n) | (s, ReadPin n) <- w]
       mapM (\(s,x) -> outputBV s x) outputs
-      tmps <- mapM (\(s,n) -> inputBV s n) inputs
-      return $ zip (map fst inputs) tmps
+      _tmps <- mapM (\(s,n) -> inputBV s n) inputs
+      return $ zip (map fst inputs) _tmps
 
 -- Interface class
 -- ===============
