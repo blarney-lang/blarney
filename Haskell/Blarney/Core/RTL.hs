@@ -413,40 +413,28 @@ propagateNames :: MNetlist -> [WireId] -> IO ()
 propagateNames nl roots = do
   bounds <- getBounds nl
   visited :: IOUArray InstId Bool <- newArray bounds False
-  --
-  let inner1 destName (instId, _) = do
+  -- Push destination name down through netlist
+  let visit destName (instId, _) = do
       isVisited <- readArray visited instId
-      if (not isVisited) then do
+      if not isVisited then do
         net@Net{ netPrim = prim
                , netInputs = inpts
                , netNameHints = hints
                } <- readNet nl instId
         let inpts' = [w | x@(InputWire w) <- inpts]
         writeArray visited instId True
-        putStrLn $ "--------------------"
-        putStrLn $ "inner1 with " ++ show instId
-        putStrLn $ "isDest? " ++ show (isDest prim)
-        putStrLn $ "diving in " ++ show inpts'
-        if isDest prim then mapM_ (inner1 $ bestName net) inpts'
+        -- Detect new destination and update destination name in recursive call
+        if isDest prim then mapM_ (visit $ bestName net) inpts'
         else do
           let newHints = insert (NmSuffix 10 destName) hints
           writeArray nl instId $ Just net{netNameHints = newHints}
-          mapM_ (inner1 destName) inpts'
-      else do putStrLn $ "------------------"
-              putStrLn $ "inner1 with " ++ show instId
-              putStrLn $ "ALREADY DONE"
+          mapM_ (visit destName) inpts'
+      else return ()
   --
-  let inner0 (instId, _) = do
-      net@Net{ netInputs = inpts
-             , netNameHints = hints
-             } <- readNet nl instId
-      writeArray visited instId True
-      putStrLn $ "------------------------"
-      putStrLn $ "inner0 with " ++ show instId
-      putStrLn $ "diving in " ++ show inpts
-      mapM_ (inner1 $ bestName net) [w | x@(InputWire w) <- inpts]
+  forM_ roots $ \root@(instId, _) -> do
+    net <- readNet nl instId
+    visit (bestName net) root
   --
-  mapM_ inner0 roots
   where bestName Net{ netPrim = prim
                     , netNameHints = hints
                     , netInstId = instId
@@ -488,8 +476,7 @@ netlist rtl = do
         writeArray mnl idx (Just net { netNameHints = oldHints <> hints })
       _ -> return ()
   -- propagates existing names through the netlist
-  print roots
-  propagateNames mnl [x | InputWire x <- roots]
+  --propagateNames mnl [x | InputWire x <- roots]
   -- run optimisation netlist passes
   nl' <- netlistPasses mnl
   -- run undo computations
