@@ -76,28 +76,30 @@ doIO m = Flatten $ \r -> do
   a <- m
   return (mempty, a)
 
--- |Flatten bit vector to netlist
+-- | Flatten a root 'BV' to a netlist
 flatten :: BV -> Flatten NetInput
-flatten BV{bvPrim=p@(Const w v)} = return $ InputTree p []
-flatten BV{bvPrim=p@(DontCare w)} = return $ InputTree p []
-flatten b@BV{bvNameHints=hints,bvInstRef=instRef} = do
-  -- handle instId traversal
-  instIdVal <- doIO (readIORef instRef)
-  let hasNameHints = not $ null hints
-  case instIdVal of
-    Nothing -> do
-      instId <- freshInstId
-      when hasNameHints $ addNameHints (instId, hints)
-      doIO (writeIORef instRef (Just instId))
-      addUndo (writeIORef instRef Nothing)
-      ins <- mapM flatten (bvInputs b)
-      let net = Net { netPrim         = bvPrim b
-                    , netInstId       = instId
-                    , netInputs       = ins
-                    , netOutputWidths = (bvWidths b)
-                    , netNameHints    = mempty
-                    }
-      addNet net
-      return $ InputWire (instId, bvOutNum b)
-    Just instId -> do when hasNameHints $ addNameHints (instId, hints)
-                      return $ InputWire (instId, bvOutNum b)
+flatten b = innerFlatten True b
+  where innerFlatten _ BV{bvPrim=p@(Const w v)} = return $ InputTree p []
+        innerFlatten _ BV{bvPrim=p@(DontCare w)} = return $ InputTree p []
+        innerFlatten isRoot b@BV{bvNameHints=hints,bvInstRef=instRef} = do
+          -- handle instId traversal
+          instIdVal <- doIO (readIORef instRef)
+          let hasNameHints = not $ null hints
+          case instIdVal of
+            Nothing -> do
+              instId <- freshInstId
+              when hasNameHints $ addNameHints (instId, hints)
+              doIO (writeIORef instRef (Just instId))
+              addUndo (writeIORef instRef Nothing)
+              ins <- mapM (innerFlatten False) (bvInputs b)
+              let net = Net { netPrim         = bvPrim b
+                            , netInstId       = instId
+                            , netIsRoot       = isRoot
+                            , netInputs       = ins
+                            , netOutputWidths = (bvWidths b)
+                            , netNameHints    = mempty
+                            }
+              addNet net
+              return $ InputWire (instId, bvOutNum b)
+            Just instId -> do when hasNameHints $ addNameHints (instId, hints)
+                              return $ InputWire (instId, bvOutNum b)

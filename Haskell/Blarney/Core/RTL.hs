@@ -483,8 +483,8 @@ netlist rtl = do
       _ -> return ()
   -- propagates existing names through the netlist
   --propagateNames mnl [x | InputWire x <- roots]
-  -- run optimisation netlist passes
-  nl' <- freeze mnl -- netlistPasses mnl
+  -- run netlist transformation passes with/without optimisation passes
+  nl' <- netlistPasses False mnl
   -- run undo computations
   undo
   -- return final netlist

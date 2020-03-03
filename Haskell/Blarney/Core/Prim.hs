@@ -184,53 +184,16 @@ data Prim =
 
 -- | Helper to tell whether a 'Prim' can be inlined during Netlist optimisation
 canInline :: Prim -> Bool
-canInline p = inlinable (primInfo p)
+canInline = inlinable . primInfo
 
 -- | Helper to tell whether a 'Prim' inputs can be inlined during Netlist
 --   optimisation
 canInlineInput :: Prim -> Bool
-canInlineInput p = inlinableInputs (primInfo p)
+canInlineInput = inlinableInputs . primInfo
 
 -- | Helper to render a primitive name. Used to generate useful names
 primStr :: Prim -> String
-primStr Const{} = "Const"
-primStr DontCare{} = "DontCare"
-primStr Add{} = "Add"
-primStr Sub{} = "Sub"
-primStr Mul{} = "Mul"
-primStr Div{} = "Div"
-primStr Mod{} = "Mod"
-primStr Not{} = "Not"
-primStr And{} = "And"
-primStr Or{} = "Or"
-primStr Xor{} = "Xor"
-primStr ShiftLeft{} = "ShiftLeft"
-primStr ShiftRight{} = "ShiftRight"
-primStr ArithShiftRight{} = "ArithShiftRight"
-primStr Equal{} = "Equal"
-primStr NotEqual{} = "NotEqual"
-primStr LessThan{} = "LessThan"
-primStr LessThanEq{} = "LessThanEq"
-primStr ReplicateBit{} = "ReplicateBit"
-primStr ZeroExtend{} = "ZeroExtend"
-primStr SignExtend{} = "SignExtend"
-primStr SelectBits{} = "SelectBits"
-primStr Concat{} = "Concat"
-primStr Mux{} = "Mux"
-primStr Identity{} = "Identity"
-primStr Register{} = "Register"
-primStr RegisterEn{} = "RegisterEn"
-primStr BRAM{} = "BRAM"
-primStr TrueDualBRAM{} = "TrueDualBRAM"
-primStr Custom{ customName = str } = str
-primStr (Input _ str) = str
-primStr (Output _ str) = str
-primStr Display{} = "Display"
-primStr Finish = "Finish"
-primStr (TestPlusArgs str) = "PlusArgs_" ++ str
-primStr RegFileMake{} = "RegFileMake"
-primStr RegFileRead{} = "RegFileRead"
-primStr RegFileWrite{} = "RegFileWrite"
+primStr = strRep . primInfo
 
 -- | A 'Name' type that handles name hints
 data Name = Name { nameHints :: Set String } deriving Show
