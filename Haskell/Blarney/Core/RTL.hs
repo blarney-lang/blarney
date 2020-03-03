@@ -413,63 +413,12 @@ makeRegFile = makeRegFileInit ""
 addRoots :: [BV] -> RTL ()
 addRoots roots = write (RTLRoots roots)
 
--- | propagate names through the Netlist
-propagateNames :: MNetlist -> [WireId] -> IO ()
-propagateNames nl roots = do
-  bounds <- getBounds nl
-  visited :: IOUArray InstId Bool <- newArray bounds False
-  -- Push destination name down through netlist
-  let visit destName (instId, _) = do
-      isVisited <- readArray visited instId
-      if not isVisited then do
-        net@Net{ netPrim = prim
-               , netInputs = inpts
-               , netNameHints = hints
-               } <- readNet nl instId
-        let inpts' = [w | x@(InputWire w) <- inpts]
-        writeArray visited instId True
-        -- Detect new destination and update destination name in recursive call
-        if isDest prim then mapM_ (visit $ bestName net) inpts'
-        else do
-          let newHints = insert (NmSuffix 10 destName) hints
-          writeArray nl instId $ Just net{netNameHints = newHints}
-          mapM_ (visit destName) inpts'
-      else return ()
-  --
-  forM_ roots $ \root@(instId, _) -> do
-    net <- readNet nl instId
-    visit (bestName net) root
-  --
-  where bestName Net{ netPrim = prim
-                    , netNameHints = hints
-                    , netInstId = instId
-                    } = "DEST_" ++ nm
-                        where nm = if null nms
-                                   then primStr prim ++ "_id" ++ show instId
-                                   else head nms
-                              nms = [y | x@(NmRoot _ y) <- toList hints]
-        --
-        isDest Register{}     = True
-        isDest RegisterEn{}   = True
-        isDest BRAM{}         = True
-        isDest TrueDualBRAM{} = True
-        isDest Custom{}       = True
-        isDest Input{}        = True
-        isDest Output{}       = True
-        isDest Display{}      = True
-        isDest Finish         = True
-        isDest TestPlusArgs{} = True
-        isDest RegFileMake{}  = True
-        isDest RegFileRead{}  = True
-        isDest RegFileWrite{} = True
-        isDest _ = False
-
 -- |Convert RTL monad to a netlist
 netlist :: RTL () -> IO Netlist
 netlist rtl = do
   -- flatten BVs into a Netlist
   i <- newIORef (0 :: InstId)
-  ((nl, nms, undo), roots) <- runFlatten flattenRoots i
+  ((nl, nms, undo), _) <- runFlatten flattenRoots i
   maxId <- readIORef i
   mnl :: MNetlist <-
     thaw $ listArray (0, maxId) (replicate (maxId+1) Nothing)
@@ -481,10 +430,10 @@ netlist rtl = do
       Just net@Net{ netNameHints = oldHints } ->
         writeArray mnl idx (Just net { netNameHints = oldHints <> hints })
       _ -> return ()
-  -- propagates existing names through the netlist
-  --propagateNames mnl [x | InputWire x <- roots]
-  -- run netlist transformation passes with/without optimisation passes
-  nl' <- netlistPasses False mnl
+  -- run netlist transformation passes
+  -- * with/without optimisation passes
+  -- * with/without name propagation pass
+  nl' <- netlistPasses False False mnl
   -- run undo computations
   undo
   -- return final netlist
