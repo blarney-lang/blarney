@@ -12,22 +12,22 @@ This module provides a set of circuit primitives.
 
 module Blarney.Core.Prim (
   -- * 'Prim' primitive type and helpers
-  Prim(..)       -- Primitive components
-, canInline      -- Tell if a 'Prim' can be inlined
-, canInlineInput -- Tell if a 'Prim' inputs can be inlined
-, primStr        -- helper to get useful name strings out of a 'Prim'
+  Prim(..)        -- Primitive components
+, canInline       -- Tell if a 'Prim' can be inlined
+, canInlineInput  -- Tell if a 'Prim' inputs can be inlined
+, primStr         -- helper to get useful name strings out of a 'Prim'
   -- * Other primitive types
-, InstId         -- Every component instance has a unique id
-, OutputNumber   -- Each output from a component is numbered
-, Width          -- Bit vector width
-, InputWidth     -- Width of an input to a component
-, OutputWidth    -- Width of an output from a component
-, BitIndex       -- For indexing a bit vector
-, RegFileId      -- Identifier for register file primitiveA
-, DisplayArg(..) -- Arguments to display primitive
-, Param(..)      -- Compile-time parameters
-, NameHint(..)   -- A 'NameHint' type to represent name hints
-, NameHints      -- A 'NameHints' type to gather name hints
+, InstId          -- Every component instance has a unique id
+, OutputNumber    -- Each output from a component is numbered
+, Width           -- Bit vector width
+, InputWidth      -- Width of an input to a component
+, OutputWidth     -- Width of an output from a component
+, BitIndex        -- For indexing a bit vector
+, RegFileInfo(..) -- Register file primitive parameters
+, DisplayArg(..)  -- Arguments to display primitive
+, Param(..)       -- Compile-time parameters
+, NameHint(..)    -- A 'NameHint' type to represent name hints
+, NameHints       -- A 'NameHints' type to gather name hints
 ) where
 
 import Prelude
@@ -50,17 +50,20 @@ type OutputNumber = Int
 -- | Bit vector width
 type Width = Int
 
+-- | Width of an input to a primitive
+type InputWidth = Width
+
+-- | Width of an output from a primitive
+type OutputWidth = Width
+
 -- | For indexing a bit vector
 type BitIndex = Int
 
--- | Identifier for register file primitive
-type RegFileId = Int
-
--- | Width of an input to a primitive
-type InputWidth = Int
-
--- | Width of an output from a primitive
-type OutputWidth = Int
+-- | Register file primitive parameters
+data RegFileInfo = RegFileInfo { regFileId        :: InstId
+                               , regFileInitFile  :: String
+                               , regFileAddrWidth :: InputWidth
+                               , regFileDataWidth :: Width } deriving Show
 
 -- | Custom components may have compile-time parameters.
 --   A parameter has a name and a value, both represented as strings
@@ -172,11 +175,11 @@ data Prim =
 
     -- | Register file declaration
     --   (only used in RTL context, not expression context)
-  | RegFileMake String InputWidth InputWidth RegFileId
+  | RegFileMake RegFileInfo
     -- | Register file lookup (input: index, output: data)
-  | RegFileRead OutputWidth RegFileId
+  | RegFileRead RegFileInfo
     -- | Register file update (inputs: write-enable, address, data)
-  | RegFileWrite InputWidth InputWidth RegFileId
+  | RegFileWrite RegFileInfo
   deriving Show
 
 -- | Helper to tell whether a 'Prim' can be inlined during Netlist optimisation

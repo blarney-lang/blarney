@@ -63,7 +63,7 @@ module Blarney.Core.BV (
 , regEnBV        -- :: Width -> Integer -> BV -> BV -> BV
 , ramBV          -- :: OutputWidth -> Maybe String -> (BV, BV, BV) -> BV
 , dualRamBV      -- :: OutputWidth -> Maybe String
-, regFileReadBV  -- :: RegFileId -> OutputWidth -> BV -> BV
+, regFileReadBV  -- :: RegFileInfo -> BV -> BV
 , getInitBV      -- :: BV -> Integer
 
 -- * Other misc helpers
@@ -312,9 +312,9 @@ dualRamBV dw initFile (addrA, dataInA, weInA) (addrB, dataInB, weInB) =
                         , ramAddrWidth = bvWidth addrA
                         , ramDataWidth = dw }
 
--- |Read from register file
-regFileReadBV :: RegFileId -> OutputWidth -> BV -> BV
-regFileReadBV id dw a = makePrim1 (RegFileRead dw id) [a] dw
+-- | Read from register file
+regFileReadBV :: RegFileInfo -> BV -> BV
+regFileReadBV inf a = makePrim1 (RegFileRead inf) [a] (regFileDataWidth inf)
 
 -- |Get the value of a constant bit vector,
 -- which may involve bit manipulations.

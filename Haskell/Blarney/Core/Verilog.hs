@@ -215,16 +215,18 @@ genNetVerilog netlist net = case netPrim net of
   Input w s               -> dfltNV { decl = Just $ declWire w wId
                                     , inst = Just $ instInput net s }
   Output w s              -> dfltNV { inst = Just $ instOutput net s }
-  RegFileMake f aw dw vId -> dfltNV { decl = Just $ declRegFile f aw dw vId }
-  RegFileRead w vId       -> dfltNV { decl = Just $ declWire w wId
-                                    , inst = Just $ instRegFileRead vId net }
-  RegFileWrite _ _ vId    -> dfltNV { alws = Just $ alwsRegFileWrite vId net }
-  Custom p is os ps clked -> dfltNV { decl = Just $ sep
-                                               [ declWire w (netInstId net, n)
-                                               | ((o, w), n) <- zip os [0..] ]
-                                    , inst = Just $
-                                               instCustom net p is os ps clked }
-  --_                       -> dfltNV
+  RegFileMake rfinfo
+    -> dfltNV { decl = Just $ declRegFile rfinfo }
+  RegFileRead RegFileInfo{ regFileId = vId, regFileDataWidth = w }
+    -> dfltNV { decl = Just $ declWire w wId
+              , inst = Just $ instRegFileRead vId net }
+  RegFileWrite RegFileInfo{ regFileId = vId }
+    -> dfltNV { alws = Just $ alwsRegFileWrite vId net }
+  Custom p is os ps clked
+    -> dfltNV { decl = Just $ sep [ declWire w (netInstId net, n)
+                                  | ((o, w), n) <- zip os [0..] ]
+              , inst = Just $ instCustom net p is os ps clked }
+  --_ -> dfltNV
   where
   wId = (netInstId net, 0)
   dfltNV = NetVerilog { decl = Nothing
@@ -333,7 +335,10 @@ genNetVerilog netlist net = case netPrim net of
                                <+> equals <+> showIntLit width init <> semi
   declRAM initFile numPorts _ dw net =
     vcat $ map (\n -> declWire dw (netInstId net, n)) [0..numPorts-1]
-  declRegFile initFile aw dw id =
+  declRegFile RegFileInfo{ regFileId        = id
+                         , regFileInitFile  = initFile
+                         , regFileAddrWidth = aw
+                         , regFileDataWidth = dw } =
         text "reg" <+> brackets (int (dw-1) <> text ":0")
     <+> text "rf" <> int id
     <+> brackets (parens (text "2**" <> int aw) <> text "-1" <> text ":0") <> semi

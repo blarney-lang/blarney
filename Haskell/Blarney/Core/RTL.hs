@@ -383,17 +383,21 @@ makeRegFileInit initFile = do
   let dw = sizeOf (error "_|_" :: d)
 
   -- Record register file for netlist generation
-  let root = makePrimRoot (RegFileMake initFile aw dw id) []
+  let rfinfo = RegFileInfo{ regFileId = id
+                          , regFileInitFile = initFile
+                          , regFileAddrWidth = aw
+                          , regFileDataWidth = dw }
+  let root = makePrimRoot (RegFileMake rfinfo) []
   write (RTLRoots [root])
 
   return $
     RegFileRTL {
       lookupRTL = \a ->
-        unpack $ FromBV $ regFileReadBV id dw $ toBV (pack a)
+        unpack $ FromBV $ regFileReadBV rfinfo $ toBV (pack a)
     , updateRTL = \a d -> do
         r <- ask
         let rootInps = [toBV (cond r), toBV (pack a), toBV (pack d)]
-        let root = makePrimRoot (RegFileWrite aw dw id) rootInps
+        let root = makePrimRoot (RegFileWrite rfinfo) rootInps
         write (RTLRoots [root])
     }
 
