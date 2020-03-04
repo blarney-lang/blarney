@@ -56,7 +56,6 @@ module Blarney.Core.BV (
 , selectBV       -- :: (BitIndex, BitIndex) -> BV -> BV
 , concatBV       -- :: BV -> BV -> BV
 , muxBV          -- :: BV -> (BV, BV) -> BV
-, countOnesBV    -- :: OutputWidth -> BV -> BV
 , idBV           -- :: BV -> BV
 , testPlusArgsBV -- :: String -> BV
 , inputPinBV     -- :: String -> BV
@@ -267,10 +266,6 @@ concatBV a b = makePrim1 (Concat wa wb) [a, b] (wa+wb)
 muxBV :: BV -> (BV, BV) -> BV
 muxBV sel (a, b) = makePrim1 (Mux w) [sel, a, b] w
   where w = bvWidth a
-
--- |Population count
-countOnesBV :: OutputWidth -> BV -> BV
-countOnesBV w a = makePrim1 (CountOnes w) [a] w
 
 -- |Identity function
 idBV :: BV -> BV

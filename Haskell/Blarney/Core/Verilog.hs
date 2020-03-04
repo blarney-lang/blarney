@@ -195,7 +195,6 @@ genNetVerilog netlist net = case netPrim net of
   SelectBits w hi lo      -> primNV { decl = Just $ declWire (1+hi-lo) wId }
   Concat aw bw            -> primNV { decl = Just $ declWire (aw+bw) wId }
   Mux w                   -> primNV { decl = Just $ declWire w wId }
-  CountOnes w             -> primNV { decl = Just $ declWire w wId }
   Identity w              -> primNV { decl = Just $ declWire w wId }
   Const w i               -> dfltNV { decl = Just $ declWireInit w wId i }
   DontCare w              -> dfltNV { decl = Just $ declWireDontCare w wId }
@@ -305,7 +304,6 @@ genNetVerilog netlist net = case netPrim net of
   showPrim (Mux w) [sel, e0, e1] =
     showNetInput sel <+> char '?'
                      <+> showNetInput e0 <+> colon <+> showNetInput e1
-  showPrim (CountOnes w) [e0] = text "$countones" <> parens (showNetInput e0)
   showPrim (Identity w) [e0] = showNetInput e0
   showPrim p _ = error $
     "unsupported Prim '" ++ show p ++ "' encountered in Verilog generation"
@@ -320,7 +318,6 @@ genNetVerilog netlist net = case netPrim net of
   showNetInput (InputTree p@(SignExtend _ _) ins) = showPrim p ins
   showNetInput (InputTree p@(SelectBits _ _ _) ins) = showPrim p ins
   showNetInput (InputTree p@(Concat _ _) ins) = showPrim p ins
-  showNetInput (InputTree p@(CountOnes _) ins) = showPrim p ins
   showNetInput (InputTree p@(Identity _) ins) = showPrim p ins
   showNetInput (InputTree p ins) = parens $ showPrim p ins
 

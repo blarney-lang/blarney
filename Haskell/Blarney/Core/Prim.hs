@@ -133,8 +133,6 @@ data Prim =
 
     -- | Multiplexer (3 inputs, 1 output)
   | Mux OutputWidth
-    -- | Population count (1 input, 1 output)
-  | CountOnes OutputWidth
     -- | Identity function (1 input, 1 output)
   | Identity OutputWidth
 
@@ -216,7 +214,6 @@ primStr SignExtend{} = "SignExtend"
 primStr SelectBits{} = "SelectBits"
 primStr Concat{} = "Concat"
 primStr Mux{} = "Mux"
-primStr CountOnes{} = "CountOnes"
 primStr Identity{} = "Identity"
 primStr Register{} = "Register"
 primStr RegisterEn{} = "RegisterEn"
@@ -336,9 +333,6 @@ primInfo (Concat _ _) = PrimInfo { inlinable = True
 primInfo (Mux _) = PrimInfo { inlinable = True
                             , inlinableInputs = True
                             , strRep = "Mux" }
-primInfo (CountOnes _) = PrimInfo { inlinable = True
-                                  , inlinableInputs = True
-                                  , strRep = "CountOnes" }
 primInfo (Identity _) = PrimInfo { inlinable = True
                                  , inlinableInputs = True
                                  , strRep = "Identity" }

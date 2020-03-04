@@ -312,13 +312,6 @@ regEn init en a =
 mux :: Bit 1 -> (Bit n, Bit n) -> Bit n
 mux c (a, b) = FromBV $ muxBV (toBV c) (toBV a, toBV b)
 
--- |Population count
-countOnes :: Bit n -> Bit (Log2 n + 1)
-countOnes a = FromBV $ countOnesBV wr (toBV a)
-  where
-    wa = unsafeWidthOf a
-    wr = log2 wa + 1
-
 -- |Lift integer value to type-level natural
 liftNat :: Int -> (forall n. KnownNat n => Proxy n -> a) -> a
 liftNat nat k =
