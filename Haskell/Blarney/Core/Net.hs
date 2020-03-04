@@ -261,9 +261,9 @@ zeroWidthNetTransform net@Net{ netPrim = LessThanEq 0 } =
 zeroWidthNetTransform net@Net{ netPrim = ZeroExtend 0 w } =
   (net { netPrim = Const w 0, netInputs = [] }, True)
 zeroWidthNetTransform net@Net{ netPrim = SignExtend 0 w } =
-  (net { netPrim = DontCare w, netInputs = [] }, True)
+  (net { netPrim = Const w 0, netInputs = [] }, True)
 zeroWidthNetTransform net@Net{ netPrim = SelectBits 0 hi lo } =
-  (net { netPrim = DontCare (hi-lo), netInputs = [] }, True)
+  (net { netPrim = Const (hi-lo) 0, netInputs = [] }, True)
 zeroWidthNetTransform net@Net{ netPrim = Concat w0 w1, netInputs = [i0, i1] }
   | w0 == 0 && w1 /= 0 = (net { netPrim = Identity w1, netInputs = [i1] }, True)
   | w0 /= 0 && w1 == 0 = (net { netPrim = Identity w0, netInputs = [i0] }, True)
@@ -275,17 +275,19 @@ zeroWidthNetTransform net@Net{ netPrim = Display args, netInputs = inpts } =
       (tmps, changes) = unzip $ zipWith f bitArgs (tail inpts)
       inpts' = head inpts : tmps
   in (net { netInputs = inpts' }, or changes)
+zeroWidthNetTransform net@Net{ netPrim = BRAM { ramAddrWidth = 0
+                                              , ramDataWidth = w } } =
+  (net { netPrim = Const w 0, netInputs = [] }, True)
+zeroWidthNetTransform net@Net{ netPrim = TrueDualBRAM { ramAddrWidth = 0
+                                                      , ramDataWidth = w } } =
+  (net { netPrim = Const w 0, netInputs = [] }, True)
+zeroWidthNetTransform
+  net@Net{ netPrim = RegFileRead RegFileInfo{ regFileAddrWidth = 0
+                                            , regFileDataWidth = w } } =
+    (net { netPrim = Const w 0, netInputs = [] }, True)
 -- TODO currently unsupported cases that could be transformed
---zeroWidthNetTransform net@Net{ netPrim = CountOnes _ } =
---  error "zeroWidthNetTransform unsupported on CountOnes Prim"
---zeroWidthNetTransform net@Net{ netPrim = BRAM {} } =
---  error "zeroWidthNetTransform unsupported on BRAM Prim"
---zeroWidthNetTransform net@Net{ netPrim = TrueDualBRAM {} } =
---  error "zeroWidthNetTransform unsupported on TrueDualBRAM Prim"
 --zeroWidthNetTransform net@Net{ netPrim = Custom {} } =
 --  error "zeroWidthNetTransform unsupported on Custom Prim"
---zeroWidthNetTransform net@Net{ netPrim = RegFileRead {} } =
---  error "zeroWidthNetTransform unsupported on RegFileRead Prim"
 -- do nothing cases for all others
 zeroWidthNetTransform net = (net, False)
 
@@ -304,8 +306,8 @@ ignoreZeroWidthNet nl = do
   pairs <- getAssocs nl -- list of nets with their index
   changed <- newIORef False -- keep track of modifications to the 'Netlist'
   -- For each 'Net' (in particular, those with a non-zero-width output) with at
-  -- least a zero-width input, transform it into a 'Net' with no reference to
-  -- any other zero-width output Net.
+  -- least one zero-width input, transform it into a 'Net' with no reference to
+  -- any zero-width output 'Net'.
   forM_ [(a,b) | x@(a, Just b) <- pairs] $ \(idx, net@Net{netPrim = prim}) -> do
     let (net', netChanged) = zeroWidthNetTransform net
     when netChanged $ do writeArray nl idx (Just net')
