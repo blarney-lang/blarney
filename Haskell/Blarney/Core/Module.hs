@@ -47,6 +47,7 @@ module Blarney.Core.Module
     -- * Naming hints
     withNameHint,
     withName,
+    noName,
 
     -- * Registers
     Reg(..), makeReg, makeRegU, makeDReg,
@@ -113,6 +114,10 @@ withNameHint hint m = M $ RTL.withNameHint hint (runModule m)
 -- | Set name hint
 withName :: String -> Module a -> Module a
 withName nm m = withNameHint (NmRoot 10 nm) m
+
+-- | Tell plugin not to generate name
+noName :: Module a -> Module a
+noName m = m
 
 -- |Conditional block over actions
 when :: Bit 1 -> Action () -> Action ()

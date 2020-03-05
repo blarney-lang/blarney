@@ -21,7 +21,7 @@ for any a, and we rewrite the binding as
 
   x <- withName "x" m
 
-Where withNewName is a standard Blarney function.  In this way, module
+Where withName is a standard Blarney function.  In this way, module
 instances (including registers and wires, which are modules in
 Blarney) will often be augmented with name information.  This is the
 simplest useful approach we could think of.  In future, we might do
@@ -36,6 +36,7 @@ plugin as a guiding example:
 -}
 
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE RankNTypes #-}
 
 module BlarneyPlugins.Namer (plugin) where
 
@@ -73,6 +74,16 @@ ppr = GHC.showPpr GHC.unsafeGlobalDynFlags
 pprMsg :: GHC.Outputable a => a -> GHC.TcM ()
 pprMsg = msg . ppr
 
+-- | SYB sadly doesn't define this
+everywhereButM :: forall m. Monad m => SYB.GenericQ Bool
+               -> SYB.GenericM m -> SYB.GenericM m
+everywhereButM q f = go
+  where
+    go :: SYB.GenericM m
+    go x
+      | q x       = return x
+      | otherwise = SYB.gmapM go x >>= f
+
 -- | The exported 'GHC.Plugin'. Defines a custom type checker pass.
 plugin :: GHC.Plugin
 plugin = GHC.defaultPlugin {
@@ -88,14 +99,24 @@ tcPass _ modS env = do
   hs_env <- GHC.getTopEnv
   blMod  <- liftIO $ GHC.findImportedModule hs_env
                     (GHC.mkModuleName "Blarney.Core.Module") Nothing
-  tcg_binds <- SYB.mkM (nameModule count blMod)
-               `SYB.everywhereM` GHC.tcg_binds env
-  n <- liftIO $ readIORef count
-  when (n > 0) $
-    msg $ "\tBlarney's Namer plugin preserved " ++ show n ++ " instance name"
-                                                 ++ if n > 1 then "s" else ""
-  --msg $ show (GHC.ms_location modS)
-  return $ env { GHC.tcg_binds = tcg_binds }
+  case blMod of
+    GHC.Found _ m -> do
+      blNoNameVar <- GHC.lookupOrig m (GHC.mkVarOcc "noName")
+      tcg_binds <- everywhereButM (SYB.mkQ False (dontName blNoNameVar))
+                     (SYB.mkM (nameModule count blMod)) (GHC.tcg_binds env)
+      n <- liftIO $ readIORef count
+      when (n > 0) $
+        msg $ "\tBlarney's Namer plugin preserved "
+            ++ show n ++ " instance name"
+            ++ if n > 1 then "s" else ""
+      return $ env { GHC.tcg_binds = tcg_binds }
+    _ -> return env
+
+-- | Avoid traversing into applications of function with given name
+dontName :: GHC.Name -> Expr.HsExpr GHC.GhcTc -> Bool
+dontName x (GHC.HsApp _ (GHC.L _ (GHC.HsWrap _ _
+             (GHC.HsVar _ (GHC.L _ y)))) e) | x == GHC.varName y = True
+dontName x other = False
 
 -- | Helper function to preserve Blarney modules' instance name.
 nameModule :: IORef Int ->  GHC.FindResult -> Expr.ExprLStmt GHC.GhcTc
