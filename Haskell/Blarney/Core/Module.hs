@@ -123,11 +123,11 @@ whenR :: Bit 1 -> Action a -> Action a
 whenR c a = A (RTL.whenR c (runAction a))
 
 -- |If-then-else statement for actions
-ifThenElseAction :: Bit 1 -> Action () -> Action () -> Action ()
+ifThenElseAction :: Bits a => Bit 1 -> Action a -> Action a -> Action a
 ifThenElseAction c a b = A (RTL.ifThenElseRTL c (runAction a) (runAction b))
 
 -- |Overloaded if-then-else
-instance IfThenElse (Bit 1) (Action ()) where
+instance Bits a => IfThenElse (Bit 1) (Action a) where
   ifThenElse = ifThenElseAction
 
 -- |Switch statement over actions
@@ -277,7 +277,7 @@ finish :: Action ()
 finish = A RTL.finish
 
 -- |Display statement
-instance RTL.Displayable (Action a) where
+instance a ~ () => RTL.Displayable (Action a) where
   disp x suffix = A (RTL.disp x suffix)
 
 -- |Add roots

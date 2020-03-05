@@ -186,11 +186,12 @@ whenR c a = do
   local (r { cond = c .&. cond r }) a
 
 -- |If-then-else statement for RTL
-ifThenElseRTL :: Bit 1 -> RTL () -> RTL () -> RTL ()
+ifThenElseRTL :: Bits a => Bit 1 -> RTL a -> RTL a -> RTL a
 ifThenElseRTL c a b =
   do r <- ask
-     local (r { cond = cond r .&. c }) a
-     local (r { cond = cond r .&. inv c }) b
+     ra <- local (r { cond = cond r .&. c }) a
+     rb <- local (r { cond = cond r .&. inv c }) b
+     return $ cond r ? (ra, rb)
 
 -- |RTL switch statement
 switch :: Bits a => a -> [(a, RTL ())] -> RTL ()
