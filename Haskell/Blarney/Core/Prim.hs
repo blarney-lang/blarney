@@ -60,7 +60,7 @@ type OutputWidth = Width
 type BitIndex = Int
 
 -- | Register file primitive parameters
-data RegFileInfo = RegFileInfo { regFileId        :: InstId
+data RegFileInfo = RegFileInfo { regFileId        :: Int
                                , regFileInitFile  :: String
                                , regFileAddrWidth :: InputWidth
                                , regFileDataWidth :: Width } deriving Show
