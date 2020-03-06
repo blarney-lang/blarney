@@ -154,11 +154,11 @@ data Prim =
                  , ramDataWidth :: Width }
 
     -- | Custom component
-  | Custom { customName      :: String          -- component name
-           , customInputs    :: [String]        -- input names
-           , customOutputs   :: [(String, Int)] -- output names/widths
-           , customParams    :: [Param]         -- parameters
-           , customIsClocked :: Bool }          -- pass clock and reset ?
+  | Custom { customName      :: String                  -- component name
+           , customInputs    :: [(String, InputWidth)]  -- input names
+           , customOutputs   :: [(String, OutputWidth)] -- output names/widths
+           , customParams    :: [Param]                 -- parameters
+           , customIsClocked :: Bool }                  -- pass clock (reset?)
 
     -- | External input (0 inputs, 1 output)
   | Input OutputWidth String

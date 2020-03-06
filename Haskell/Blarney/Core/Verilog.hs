@@ -369,8 +369,8 @@ genNetVerilog netlist net = case netPrim net of
           showInst = hang (text (name ++ "_") <> int nId) 2 (showArgs <> semi)
           allParams = [ dot <> text key <> parens (text val)
                       | (key :-> val, i) <- zip params [1..] ]
-          args = zip ins (netInputs net) ++ [ (o, InputWire (nId, n))
-                                            | (o, n) <- zip (map fst outs) [0..] ]
+          args = zip (map fst ins) (netInputs net) ++ [ (o, InputWire (nId, n))
+                                                      | (o, n) <- zip (map fst outs) [0..] ]
           numArgs  = length args
           showArgs = parens $ argStyle $ [ text ".clock(clock)" | clked ]
                                       ++ [ text ".reset(reset)" | clked ]

@@ -103,15 +103,16 @@ liftModule m = Ifc $ \r -> noName do
 
 -- |Create an instance of a module
 instantiate :: String -> [Param] -> Ifc a -> Module a
-instantiate name params ifc = noName do
-    rec (w, a) <- runIfc ifc (custom w)
+instantiate name params ifc = noName mdo
+    (w, a) <- runIfc ifc (custom w)
     addRoots [x | (s, WritePin x) <- w]
     return a
   where
     custom w =
       let inputs  = [(s, x) | (s, WritePin x) <- w]
           outputs = [(s, fromInteger n) | (s, ReadPin n) <- w]
-          prim    = Custom name (map fst inputs) outputs params True
+          prim    = Custom name [(s, bvWidth x) | (s, x) <- inputs]
+                           outputs params True
       in  zip (map fst outputs)
               (makePrim prim (map snd inputs) (map snd outputs))
 

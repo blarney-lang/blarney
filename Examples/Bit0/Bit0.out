@@ -1,0 +1,8 @@
+Bit 0 .==. true
+Bit 0 .!=. false
+Bit 0 .<. false
+Bit 0 .<=. true
+concat (10 :: Bit 8) with a Bit 0: 10
+zeroExtend a Bit 0 to a Bit 4: 0
+signExtend a Bit 0 to a Bit 4: 0
+displaying a Bit 0: 0

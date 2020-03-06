@@ -8,6 +8,7 @@ EXAMPLES=(
   NameBits
   BitPat
   Vectors
+  Bit0
   BitScan
   CPU
   Derive
