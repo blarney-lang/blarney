@@ -192,7 +192,13 @@ twoSort (a, b) = a .<. b ? ((a, b), (b, a))
 ```
 
 Indeed, this would be the type inferred by the Haskell compiler if no
-type signature was supplied.
+type signature was supplied.  Thanks to rebindable syntax in Haskell,
+we can also write:
+
+```hs
+twoSort :: (Bits a, Cmp a) => (a, a) -> (a, a)
+twoSort (a, b) = if a .<. b then (a, b) else (b, a)
+```
 
 ## Example 4: Mutable registers
 
