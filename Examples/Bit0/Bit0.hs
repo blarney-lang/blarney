@@ -13,8 +13,7 @@ top :: Module ()
 top = do
   let a :: Bit 0 = dontCare
   let b :: Bit 0 = dontCare
-  --someInst <- makeTestMyIfc 10
-  let c :: Bit 8 = 10
+  someInst <- makeTestMyIfc 10
 
   always do
     if a .==. b then display "Bit 0 .==. true"
@@ -25,8 +24,7 @@ top = do
                 else display "Bit 0 .<. false"
     if a .<=. b then display "Bit 0 .<=. true"
                 else display "Bit 0 .<=. false"
-    --display "concat (10 :: Bit 8) with a Bit 0: %0d" ((someInst.meh8) # a)
-    display "concat (10 :: Bit 8) with a Bit 0: %0d" (c # a)
+    display "concat (10 :: Bit 8) with a Bit 0: %0d" ((someInst.meh8) # a)
     display "zeroExtend a Bit 0 to a Bit 4: " (zeroExtend a :: Bit 4)
     display "signExtend a Bit 0 to a Bit 4: " (signExtend a :: Bit 4)
     display "displaying a Bit 0: %0d" a

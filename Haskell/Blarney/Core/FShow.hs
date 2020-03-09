@@ -71,7 +71,7 @@ instance FShow Char where
   fshowList cs = Format [FormatString cs]
 
 instance FShow (Bit n) where
-  fshow b = Format [FormatBit (bvWidth ub) ub]
+  fshow b = Format [FormatBit (bvPrimOutWidth ub) ub]
     where ub = toBV b
 
 instance FShow Int where

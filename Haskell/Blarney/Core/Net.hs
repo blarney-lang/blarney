@@ -50,15 +50,13 @@ data Net = Net { -- | The 'Net' 's 'Prim'itive
                , netIsRoot       :: Bool
                  -- | The 'Net' 's list of 'NetInput' inputs
                , netInputs       :: [NetInput]
-                 -- | The 'Net' 's list of 'Width' output widths
-               , netOutputWidths :: [Width]
                  -- | The 'Net' 's 'NameHints'
                , netNameHints    :: NameHints
                } deriving Show
 
 -- | A 'WireId' uniquely identify a wire with a 'Net''s instance identifier
---   ('InstId') and an output number ('OutputNumber')
-type WireId = (InstId, OutputNumber)
+--   ('InstId') and an output name ('OutputName')
+type WireId = (InstId, OutputName)
 
 -- | A 'Net''s input ('NetInput') can be:
 --   - a wire, using the 'InputWire' constructor
@@ -275,16 +273,20 @@ zeroWidthNetTransform net@Net{ netPrim = Display args, netInputs = inpts } =
       (tmps, changes) = unzip $ zipWith f bitArgs (tail inpts)
       inpts' = head inpts : tmps
   in (net { netInputs = inpts' }, or changes)
-zeroWidthNetTransform net@Net{ netPrim   = prim@Custom{ customInputs = primIns }
+zeroWidthNetTransform net@Net{ netPrim = prim@Custom{ customInputs = primIns
+                                                    , customOutputs = primOuts }
                              , netInputs = netIns }
-  | any (\(_, x) -> x == 0) primIns =
-    ( net { netPrim = prim { customInputs = primIns' }
+  | any (\(_, x) -> x == 0) primIns ||
+    any (\(_, y) -> y == 0) primOuts =
+    ( net { netPrim = prim { customInputs = primIns'
+                           , customOutputs = primOuts' }
           , netInputs = netIns' }
     , True )
   | otherwise = (net, False)
   where ins = zip netIns primIns
         ins' = [x | x@(_, (_, w)) <- ins, w /= 0]
         (netIns', primIns') = unzip ins'
+        primOuts' = [x | x@(_, w) <- primOuts, w /= 0]
 -- TODO currently unsupported cases that could be transformed
 zeroWidthNetTransform net@Net{ netPrim = BRAM { ramAddrWidth = 0 } } =
   error "zeroWidthNetTransform unsupported on BRAM Prim"
@@ -335,7 +337,7 @@ eliminateDeadNet nl = do
   -- kill Nets with a null reference count
   forM_ [(a,b) | x@(a, Just b) <- pairs] $ \(idx, net) -> do
     refCnt <- readArray refCounts idx
-    when (refCnt == 0 && not (null $ netOutputWidths net)) $ do
+    when (refCnt == 0 && not (netIsRoot net)) $ do
       writeArray nl idx Nothing
       writeIORef changed True
   -- finish pass

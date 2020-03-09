@@ -223,12 +223,12 @@ genNetVerilog netlist net = case netPrim net of
   RegFileWrite RegFileInfo{ regFileId = vId }
     -> dfltNV { alws = Just $ alwsRegFileWrite vId net }
   Custom p is os ps clked
-    -> dfltNV { decl = Just $ sep [ declWire w (netInstId net, n)
-                                  | ((o, w), n) <- zip os [0..] ]
+    -> dfltNV { decl = Just $ sep [ declWire w (netInstId net, Just nm)
+                                  | (nm, w) <- os ]
               , inst = Just $ instCustom net p is os ps clked }
   --_ -> dfltNV
   where
-  wId = (netInstId net, 0)
+  wId = (netInstId net, Nothing)
   dfltNV = NetVerilog { decl = Nothing
                       , inst = Nothing
                       , alws = Nothing
@@ -250,15 +250,16 @@ genNetVerilog netlist net = case netPrim net of
   showIntLit w v = int w <> text "'h" <> hexInt v
   showDontCare :: Int -> Doc
   showDontCare w = int w <> text "'b" <> text (replicate w 'x')
-  showWire :: (InstId, Int) -> Doc
-  showWire (iId, nOut) =  text name <> char '_' <> int iId
-                                    <> char '_' <> int nOut
-                          where wNet = fromMaybe
-                                  (error "Trying to show non existing Net")
-                                  (netlist Data.Array.IArray.! iId)
-                                name = genName $ netNameHints wNet
-  showWireWidth :: Int -> (InstId, Int) -> Doc
-  showWireWidth width wId = brackets (int (width-1) <> text ":0") <+> showWire wId
+  showWire :: (InstId, OutputName) -> Doc
+  showWire (iId, m_nm) = text name <> case m_nm of Just nm -> text nm
+                                                   _       -> mempty
+                                   <> char '_' <> int iId
+                            where wNet = fromMaybe
+                                    (error "Trying to show non existing Net")
+                                    (netlist Data.Array.IArray.! iId)
+                                  name = genName $ netNameHints wNet
+  showWireWidth :: Int -> (InstId, OutputName) -> Doc
+  showWireWidth w wId = brackets (int (w-1) <> text ":0") <+> showWire wId
 
   showPrim :: Prim -> [NetInput] -> Doc
   showPrim (Const w v) [] = showIntLit w v
@@ -333,8 +334,11 @@ genNetVerilog netlist net = case netPrim net of
   declReg width reg = text "reg" <+> showWireWidth width reg <> semi
   declRegInit width reg init =     text "reg" <+> showWireWidth width reg
                                <+> equals <+> showIntLit width init <> semi
-  declRAM initFile numPorts _ dw net =
-    vcat $ map (\n -> declWire dw (netInstId net, n)) [0..numPorts-1]
+  declRAM initFile 1 _ dw net =
+    vcat $ map (\n -> declWire dw (netInstId net, n)) [Nothing]
+  declRAM initFile 2 _ dw net =
+    vcat $ map (\n -> declWire dw (netInstId net, n)) [Just "dataA", Just "dataB"]
+  declRAM _ _ _ _ _ = error "cannot declare RAM with more than 2 ports"
   declRegFile RegFileInfo{ regFileId        = id
                          , regFileInitFile  = initFile
                          , regFileAddrWidth = aw
@@ -359,7 +363,7 @@ genNetVerilog netlist net = case netPrim net of
   -- instantiation helpers
   --------------------------------------------------------------------------------
   instPrim net =
-        text "assign" <+> showWire (netInstId net, 0) <+> equals
+        text "assign" <+> showWire (netInstId net, Nothing) <+> equals
     <+> showPrim (netPrim net) (netInputs net) <> semi
   instCustom net name ins outs params clked
     | numParams == 0 = hang (text name) 2 showInst
@@ -369,8 +373,8 @@ genNetVerilog netlist net = case netPrim net of
           showInst = hang (text (name ++ "_") <> int nId) 2 (showArgs <> semi)
           allParams = [ dot <> text key <> parens (text val)
                       | (key :-> val, i) <- zip params [1..] ]
-          args = zip (map fst ins) (netInputs net) ++ [ (o, InputWire (nId, n))
-                                                      | (o, n) <- zip (map fst outs) [0..] ]
+          args = zip (map fst ins) (netInputs net) ++ [ (nm, InputWire (nId, Just nm))
+                                                      | nm <- map fst outs ]
           numArgs  = length args
           showArgs = parens $ argStyle $ [ text ".clock(clock)" | clked ]
                                       ++ [ text ".reset(reset)" | clked ]
@@ -384,7 +388,7 @@ genNetVerilog netlist net = case netPrim net of
     <+> text "== 0 ? 0 : 1;"
   instOutput net s =     text "assign" <+> text s
                      <+> equals <+> showNetInput (netInputs net !! 0) <> semi
-  instInput net s =     text "assign" <+> showWire (netInstId net, 0)
+  instInput net s =     text "assign" <+> showWire (netInstId net, Nothing)
                     <+> equals <+> text s <> semi
   instRAM net i aw dw =
         hang (hang (text "BlockRAM#") 2 (parens $ argStyle ramParams)) 2
@@ -396,7 +400,7 @@ genNetVerilog netlist net = case netPrim net of
                       , text ".DI"   <> parens (showNetInput (netInputs net !! 1))
                       , text ".ADDR" <> parens (showNetInput (netInputs net !! 0))
                       , text ".WE"   <> parens (showNetInput (netInputs net !! 2))
-                      , text ".DO"   <> parens (showWire (nId, 0)) ]
+                      , text ".DO"   <> parens (showWire (nId, Nothing)) ]
           nId = netInstId net
   instTrueDualRAM net i aw dw =
         hang (hang (text "BlockRAMTrueDual#") 2 (parens $ argStyle ramParams)) 2
@@ -408,24 +412,24 @@ genNetVerilog netlist net = case netPrim net of
                       , text ".DI_A"   <> parens (showNetInput (netInputs net !! 1))
                       , text ".ADDR_A" <> parens (showNetInput (netInputs net !! 0))
                       , text ".WE_A"   <> parens (showNetInput (netInputs net !! 2))
-                      , text ".DO_A"   <> parens (showWire (nId, 0))
+                      , text ".DO_A"   <> parens (showWire (nId, Just "dataA"))
                       , text ".DI_B"   <> parens (showNetInput (netInputs net !! 4))
                       , text ".ADDR_B" <> parens (showNetInput (netInputs net !! 3))
                       , text ".WE_B"   <> parens (showNetInput (netInputs net !! 5))
-                      , text ".DO_B"   <> parens (showWire (nId, 1)) ]
+                      , text ".DO_B"   <> parens (showWire (nId, Just "dataB")) ]
           nId = netInstId net
   instRegFileRead id net =
-        text "assign" <+> showWire (netInstId net, 0)
+        text "assign" <+> showWire (netInstId net, Nothing)
     <+> equals <+> text "rf" <> int id
     <>  brackets (showNetInput (netInputs net !! 0)) <> semi
 
   -- always block helpers
   --------------------------------------------------------------------------------
-  alwsRegister net = showWire (netInstId net, 0) <+> text "<="
+  alwsRegister net = showWire (netInstId net, Nothing) <+> text "<="
                  <+> showNetInput (netInputs net !! 0) <> semi
   alwsRegisterEn net =
         text "if" <+> parens (showNetInput (netInputs net !! 0) <+> text "== 1")
-    <+> showWire (netInstId net, 0)
+    <+> showWire (netInstId net, Nothing)
     <+> text "<=" <+> showNetInput (netInputs net !! 1) <>  semi
   alwsDisplay args net =
         hang (    text "if"

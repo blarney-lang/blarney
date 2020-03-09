@@ -28,8 +28,8 @@ module Blarney.Core.BV (
   -- * Untyped bit vectors
   BV(..)         -- Untyped bit vector
 , makePrim       -- Create instance of primitive component
+, makePrim0      -- Common case: no-output components
 , makePrim1      -- Common case: single-output components
-, makePrimRoot   -- Instance of primitive component that is a root
 
   -- * Bit-vector primitives
 , constBV        -- :: Width -> Integer -> BV
@@ -67,6 +67,7 @@ module Blarney.Core.BV (
 , getInitBV      -- :: BV -> Integer
 
 -- * Other misc helpers
+, bvPrimOutWidth -- get the 'OutputWidth' of the 'Prim' of a 'BV'
 , lookupParam    -- Given a parameter name, return the parameter value
 , addBVNameHint  -- Add a name hint to a 'BV'
 , addBVNameHints -- Add name hints to a 'BV'
@@ -99,12 +100,8 @@ data BV = BV {
                bvPrim      :: Prim
                -- | Inputs to the primitive instance
              , bvInputs    :: [BV]
-               -- | Output pin number
-             , bvOutNum    :: OutputNumber
-               -- | Width of this output pin
-             , bvWidth     :: Width
-               -- | Width of each output pin
-             , bvWidths    :: [Width]
+               -- | Output
+             , bvOutput    :: OutputName
                -- | Name (hints) characterising the 'BV'
              , bvNameHints :: NameHints
                -- | Unique id of primitive instance
@@ -122,180 +119,181 @@ addBVNameHints bv@BV{ bvNameHints = hints } newHints =
   bv { bvNameHints = hints <> newHints }
 
 {-# NOINLINE makePrim #-}
--- |Helper function for creating an instance of a primitive component
-makePrim :: Prim -> [BV] -> [Int] -> [BV]
-makePrim prim ins outWidths
-  | Prelude.null outWidths = [bv]
-  | otherwise = [ bv { bvOutNum = i, bvWidth = w }
-                | (i, w) <- zip [0..] outWidths ]
+-- | Helper function for creating an instance of a primitive component
+makePrim :: Prim -> [BV] -> [OutputName] -> [BV]
+makePrim prim ins outs
+  | Prelude.null outs = [bv]
+  | otherwise = [ bv { bvOutput = o } | o <- outs ]
   where bv = BV { bvPrim      = prim
                 , bvInputs    = ins
-                , bvOutNum    = 0
-                , bvWidth     = 0
-                , bvWidths    = outWidths
+                , bvOutput    = Nothing
                 , bvNameHints = empty
                 , bvInstRef   = instIdRef
                 }
-        -- |For Observable Sharing.
+        -- | For Observable Sharing.
         instIdRef = unsafePerformIO (newIORef Nothing)
 
--- |Create instance of primitive component which has one output
-makePrim1 :: Prim -> [BV] -> Int -> BV
-makePrim1 prim ins width = head (makePrim prim ins [width])
+-- | helper to get the 'OutputWidth' of the 'Prim' of a 'BV'
+bvPrimOutWidth :: BV -> OutputWidth
+bvPrimOutWidth BV{bvPrim=prim,bvOutput=out} = primOutWidth prim out
 
--- |Create instance of primitive component which is a root
-makePrimRoot :: Prim -> [BV] -> BV
-makePrimRoot prim ins = head (makePrim prim ins [])
+-- | Create instance of primitive component with no output
+makePrim0 :: Prim -> [BV] -> BV
+makePrim0 prim ins = head $ makePrim prim ins []
+
+-- | Create instance of primitive component which has one output
+makePrim1 :: Prim -> [BV] -> BV
+makePrim1 prim ins = head $ makePrim prim ins [Nothing]
 
 -- |Constant bit vector of given width
 constBV :: Width -> Integer -> BV
-constBV w i = makePrim1 (Const w i) [] w
+constBV w i = makePrim1 (Const w i) []
 
 -- |Don't care of given width
 dontCareBV :: Width -> BV
-dontCareBV w = makePrim1 (DontCare w) [] w
+dontCareBV w = makePrim1 (DontCare w) []
 
--- |Adder
+-- | Adder
 addBV :: BV -> BV -> BV
-addBV a b = makePrim1 (Add w) [a, b] w
-  where w = bvWidth a
+addBV a b = makePrim1 (Add w) [a, b]
+  where w = bvPrimOutWidth a
 
 -- |Subtractor
 subBV :: BV -> BV -> BV
-subBV a b = makePrim1 (Sub w) [a, b] w
-  where w = bvWidth a
+subBV a b = makePrim1 (Sub w) [a, b]
+  where w = bvPrimOutWidth a
 
 -- |Multiplier
 mulBV :: BV -> BV -> BV
-mulBV a b = makePrim1 (Mul w) [a, b] w
-  where w = bvWidth a
+mulBV a b = makePrim1 (Mul w) [a, b]
+  where w = bvPrimOutWidth a
 
 -- |Quotient
 divBV :: BV -> BV -> BV
-divBV a b = makePrim1 (Div w) [a, b] w
-  where w = bvWidth a
+divBV a b = makePrim1 (Div w) [a, b]
+  where w = bvPrimOutWidth a
 
 -- |Remainder
 modBV :: BV -> BV -> BV
-modBV a b = makePrim1 (Mod w) [a, b] w
-  where w = bvWidth a
+modBV a b = makePrim1 (Mod w) [a, b]
+  where w = bvPrimOutWidth a
 
 -- |Bitwise not
 invBV :: BV -> BV
-invBV a = makePrim1 (Not w) [a] w
-  where w = bvWidth a
+invBV a = makePrim1 (Not w) [a]
+  where w = bvPrimOutWidth a
 
 -- |Bitwise and
 andBV :: BV -> BV -> BV
-andBV a b = makePrim1 (And w) [a, b] w
-  where w = bvWidth a
+andBV a b = makePrim1 (And w) [a, b]
+  where w = bvPrimOutWidth a
 
 -- |Bitwise or
 orBV :: BV -> BV -> BV
-orBV a b = makePrim1 (Or w) [a, b] w
-  where w = bvWidth a
+orBV a b = makePrim1 (Or w) [a, b]
+  where w = bvPrimOutWidth a
 
 -- |Bitwise xor
 xorBV :: BV -> BV -> BV
-xorBV a b = makePrim1 (Xor w) [a, b] w
-  where w = bvWidth a
+xorBV a b = makePrim1 (Xor w) [a, b]
+  where w = bvPrimOutWidth a
 
 -- |Left shift
 leftBV :: BV -> BV -> BV
-leftBV a b = makePrim1 (ShiftLeft w) [a, b] w
-  where w = bvWidth a
+leftBV a b = makePrim1 (ShiftLeft w) [a, b]
+  where w = bvPrimOutWidth a
 
 -- |Right shift
 rightBV :: BV -> BV -> BV
-rightBV a b = makePrim1 (ShiftRight w) [a, b] w
-  where w = bvWidth a
+rightBV a b = makePrim1 (ShiftRight w) [a, b]
+  where w = bvPrimOutWidth a
 
 -- |Right shift
 arithRightBV :: BV -> BV -> BV
-arithRightBV a b = makePrim1 (ArithShiftRight w) [a, b] w
-  where w = bvWidth a
+arithRightBV a b = makePrim1 (ArithShiftRight w) [a, b]
+  where w = bvPrimOutWidth a
 
 -- |Equality comparator
 equalBV :: BV -> BV -> BV
-equalBV a b = makePrim1 (Equal w) [a, b] 1
-  where w = bvWidth a
+equalBV a b = makePrim1 (Equal w) [a, b]
+  where w = bvPrimOutWidth a
 
 -- |Disequality comparator
 notEqualBV :: BV -> BV -> BV
-notEqualBV a b = makePrim1 (NotEqual w) [a, b] 1
-  where w = bvWidth a
+notEqualBV a b = makePrim1 (NotEqual w) [a, b]
+  where w = bvPrimOutWidth a
 
 -- |Less-than comparator
 lessThanBV :: BV -> BV -> BV
-lessThanBV a b = makePrim1 (LessThan w) [a, b] 1
-  where w = bvWidth a
+lessThanBV a b = makePrim1 (LessThan w) [a, b]
+  where w = bvPrimOutWidth a
 
 -- |Less-than-or-equal comparator
 lessThanEqBV :: BV -> BV -> BV
-lessThanEqBV a b = makePrim1 (LessThanEq w) [a, b] 1
-  where w = bvWidth a
+lessThanEqBV a b = makePrim1 (LessThanEq w) [a, b]
+  where w = bvPrimOutWidth a
 
 -- |Replicate a bit
 replicateBV :: Int -> BV -> BV
-replicateBV w a = makePrim1 (ReplicateBit w) [a] w
+replicateBV w a = makePrim1 (ReplicateBit w) [a]
 
 -- |Zero-extend a bit vector
 zeroExtendBV :: OutputWidth -> BV -> BV
-zeroExtendBV ow a = makePrim1 (ZeroExtend iw ow) [a] ow
-  where iw = bvWidth a
+zeroExtendBV ow a = makePrim1 (ZeroExtend iw ow) [a]
+  where iw = bvPrimOutWidth a
 
 -- |Sign-extend a bit vector
 signExtendBV :: OutputWidth -> BV -> BV
-signExtendBV ow a = makePrim1 (SignExtend iw ow) [a] ow
-  where iw = bvWidth a
+signExtendBV ow a = makePrim1 (SignExtend iw ow) [a]
+  where iw = bvPrimOutWidth a
 
 -- |Bit selection
 selectBV :: (BitIndex, BitIndex) -> BV -> BV
 selectBV (upper, lower) a =
-    makePrim1 (SelectBits w upper lower) [a] (upper+1-lower)
-  where w = bvWidth a
+    makePrim1 (SelectBits w upper lower) [a]
+  where w = bvPrimOutWidth a
 
 -- |Bit vector concatenation
 concatBV :: BV -> BV -> BV
-concatBV a b = makePrim1 (Concat wa wb) [a, b] (wa+wb)
+concatBV a b = makePrim1 (Concat wa wb) [a, b]
   where
-    wa = bvWidth a
-    wb = bvWidth b
+    wa = bvPrimOutWidth a
+    wb = bvPrimOutWidth b
 
 -- |Multiplexer
 muxBV :: BV -> (BV, BV) -> BV
-muxBV sel (a, b) = makePrim1 (Mux w) [sel, a, b] w
-  where w = bvWidth a
+muxBV sel (a, b) = makePrim1 (Mux w) [sel, a, b]
+  where w = bvPrimOutWidth a
 
 -- |Identity function
 idBV :: BV -> BV
-idBV a = makePrim1 (Identity w) [a] w
-  where w = bvWidth a
+idBV a = makePrim1 (Identity w) [a]
+  where w = bvPrimOutWidth a
 
 -- |Test plusargs
 testPlusArgsBV :: String -> BV
-testPlusArgsBV str = makePrim1 (TestPlusArgs str) [] 1
+testPlusArgsBV str = makePrim1 (TestPlusArgs str) []
 
 -- |Input pin (named Verilog pin)
 inputPinBV :: Width -> String -> BV
-inputPinBV w s = makePrim1 (Input w s) [] w
+inputPinBV w s = makePrim1 (Input w s) []
 
 -- |Register of given width with initial value
 regBV :: Width -> BV -> BV -> BV
-regBV w i a = makePrim1 (Register (getInitBV i) w) [a] w
+regBV w i a = makePrim1 (Register (getInitBV i) w) [a]
 
 -- |Register of given width with initial value and enable wire
 regEnBV :: Width -> BV -> BV -> BV -> BV
-regEnBV w i en a = makePrim1 (RegisterEn (getInitBV i) w) [en, a] w
+regEnBV w i en a = makePrim1 (RegisterEn (getInitBV i) w) [en, a]
 
 -- |Single-port block RAM.
 -- Input: one triple (address, data, write-enable)
 ramBV :: OutputWidth -> Maybe String -> (BV, BV, BV) -> BV
 ramBV dw initFile (addr, dataIn, weIn) =
-    makePrim1 prim [addr, dataIn, weIn] dw
+    makePrim1 prim [addr, dataIn, weIn]
   where
     prim = BRAM { ramInitFile  = initFile
-                , ramAddrWidth = bvWidth addr
+                , ramAddrWidth = bvPrimOutWidth addr
                 , ramDataWidth = dw }
 
 -- |True dual-port block RAM.
@@ -305,16 +303,17 @@ dualRamBV :: OutputWidth -> Maybe String
           -> (BV, BV, BV)
           -> (BV, BV)
 dualRamBV dw initFile (addrA, dataInA, weInA) (addrB, dataInB, weInB) =
-    (outs !! 0, outs !! 1)
+    (bvOuts !! 0, bvOuts !! 1)
   where
-    outs = makePrim prim [addrA, dataInA, weInA, addrB, dataInB, weInB] [dw,dw]
+    outs = [Just "dataA", Just "dataB"]
+    bvOuts = makePrim prim [addrA, dataInA, weInA, addrB, dataInB, weInB] outs
     prim = TrueDualBRAM { ramInitFile  = initFile
-                        , ramAddrWidth = bvWidth addrA
+                        , ramAddrWidth = bvPrimOutWidth addrA
                         , ramDataWidth = dw }
 
 -- | Read from register file
 regFileReadBV :: RegFileInfo -> BV -> BV
-regFileReadBV inf a = makePrim1 (RegFileRead inf) [a] (regFileDataWidth inf)
+regFileReadBV inf a = makePrim1 (RegFileRead inf) [a]
 
 -- |Get the value of a constant bit vector,
 -- which may involve bit manipulations.

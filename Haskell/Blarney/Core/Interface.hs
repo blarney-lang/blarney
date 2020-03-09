@@ -62,7 +62,7 @@ import Blarney.Core.Prelude
 -- |The reader part provides component outputs or module inputs
 type R = [(String, BV)]
 
--- |The writer part collects component/module inputs and outputs
+-- | The writer part collects component/module inputs and outputs
 data Pin = WritePin BV | ReadPin Integer
 type W = [(String, Pin)]
 
@@ -109,12 +109,12 @@ instantiate name params ifc = noName mdo
     return a
   where
     custom w =
-      let inputs  = [(s, x) | (s, WritePin x) <- w]
-          outputs = [(s, fromInteger n) | (s, ReadPin n) <- w]
-          prim    = Custom name [(s, bvWidth x) | (s, x) <- inputs]
+      let inputs   = [(s, x) | (s, WritePin x) <- w]
+          outputs  = [(s, fromInteger n) | (s, ReadPin n) <- w]
+          outNames = map fst outputs
+          prim     = Custom name [(s, bvPrimOutWidth x) | (s, x) <- inputs]
                            outputs params True
-      in  zip (map fst outputs)
-              (makePrim prim (map snd inputs) (map snd outputs))
+      in  zip outNames (makePrim prim (map snd inputs) (map Just outNames))
 
 -- |Create a module that can be instantiated
 modularise :: Ifc a -> Module a

@@ -307,7 +307,7 @@ makeDReg defaultVal = do
 finish :: RTL ()
 finish = do
   r <- ask
-  let root = makePrimRoot Finish [toBV (cond r)]
+  let root = makePrim0 Finish [toBV (cond r)]
   write (RTLRoots [root])
 
 -- |To support a display statement with variable number of arguments
@@ -321,7 +321,7 @@ instance Displayable (RTL a) where
       let Format items = x <> suffix
       let prim = Display (map toDisplayArg items)
       let inps = toBV (cond r) : [b | FormatBit w b <- items]
-      write (RTLRoots [makePrimRoot prim inps])
+      write (RTLRoots [makePrim0 prim inps])
       return (error "Return value of 'display' should be ignored")
     where
       toDisplayArg (FormatString s) = DisplayArgString s
@@ -359,7 +359,7 @@ output str out = outputBV str (toBV out)
 -- |RTL external output declaration (untyped)
 outputBV :: String -> BV -> RTL ()
 outputBV str bv = do
-  let root = makePrimRoot (Output (bvWidth bv) str) [bv]
+  let root = makePrim0 (Output (bvPrimOutWidth bv) str) [bv]
   write (RTLRoots [root])
 
 -- Register files
@@ -388,7 +388,7 @@ makeRegFileInit initFile = do
                           , regFileInitFile = initFile
                           , regFileAddrWidth = aw
                           , regFileDataWidth = dw }
-  let root = makePrimRoot (RegFileMake rfinfo) []
+  let root = makePrim0 (RegFileMake rfinfo) []
   write (RTLRoots [root])
 
   return $
@@ -398,7 +398,7 @@ makeRegFileInit initFile = do
     , updateRTL = \a d -> do
         r <- ask
         let rootInps = [toBV (cond r), toBV (pack a), toBV (pack d)]
-        let root = makePrimRoot (RegFileWrite rfinfo) rootInps
+        let root = makePrim0 (RegFileWrite rfinfo) rootInps
         write (RTLRoots [root])
     }
 

@@ -15,13 +15,14 @@ module Blarney.Core.Prim (
   Prim(..)        -- Primitive components
 , canInline       -- Tell if a 'Prim' can be inlined
 , canInlineInput  -- Tell if a 'Prim' inputs can be inlined
-, primStr         -- helper to get useful name strings out of a 'Prim'
+, primStr         -- get useful name strings out of a 'Prim'
+, primOutWidth    -- get 'OutputWidth' for a given named output of a 'Prim'
   -- * Other primitive types
 , InstId          -- Every component instance has a unique id
-, OutputNumber    -- Each output from a component is numbered
 , Width           -- Bit vector width
 , InputWidth      -- Width of an input to a component
 , OutputWidth     -- Width of an output from a component
+, OutputName      -- Reference to a named output of a 'Prim'
 , BitIndex        -- For indexing a bit vector
 , RegFileInfo(..) -- Register file primitive parameters
 , DisplayArg(..)  -- Arguments to display primitive
@@ -32,6 +33,7 @@ module Blarney.Core.Prim (
 
 import Prelude
 import Data.Set
+import Data.Maybe
 
 -- | Every instance of a component in the circuit has a unique id
 type InstId = Int
@@ -44,9 +46,6 @@ data NameHint = NmPrefix Int String
 -- | A 'NameHints' type to gather name hints
 type NameHints = Set NameHint
 
--- |Each output from a primitive component is numbered
-type OutputNumber = Int
-
 -- | Bit vector width
 type Width = Int
 
@@ -55,6 +54,9 @@ type InputWidth = Width
 
 -- | Width of an output from a primitive
 type OutputWidth = Width
+
+-- | Reference to a named output of a 'Prim'
+type OutputName = Maybe String
 
 -- | For indexing a bit vector
 type BitIndex = Int
@@ -195,6 +197,10 @@ canInlineInput = inlinableInputs . primInfo
 primStr :: Prim -> String
 primStr = strRep . primInfo
 
+-- | Helper to get the 'OutputWidth' for a given named output of a 'Prim'
+primOutWidth :: Prim -> OutputName -> OutputWidth
+primOutWidth prim out = outputWidth (primInfo prim) out
+
 -- | A 'Name' type that handles name hints
 data Name = Name { nameHints :: Set String } deriving Show
 instance Semigroup Name where
@@ -224,120 +230,174 @@ data PrimInfo = PrimInfo { -- | The 'inlinable' field specifies whether a 'Prim'
                            -- | The 'strRep' field specifies a 'String'
                            --   representation of a 'Prim'.
                          , strRep :: String
+                           -- | Return the 'OutputWidth' for a named output
+                           --   of a 'Prim'. Usually ignores requested
+                           --   'OutputName' for single output 'Prim' and return
+                           --   the unambiguous output width. For multiple
+                           --   output 'Prim', the 'OutputName' argument can be
+                           --   used to select the desired output
+                         , outputWidth :: OutputName -> OutputWidth
                          }
 -- | Helper getting general metadata about a 'Prim'
 primInfo :: Prim -> PrimInfo
-primInfo (Const _ x) = PrimInfo { inlinable = True
+primInfo (Const w x) = PrimInfo { inlinable = True
                                 , inlinableInputs = True
-                                , strRep = "Const" ++ show x }
-primInfo (DontCare _) = PrimInfo { inlinable = True
+                                , strRep = "Const" ++ show x
+                                , outputWidth = \_ -> w }
+primInfo (DontCare w) = PrimInfo { inlinable = True
                                  , inlinableInputs = True
-                                 , strRep = "DontCare" }
-primInfo (Add _) = PrimInfo { inlinable = True
+                                 , strRep = "DontCare"
+                                 , outputWidth = \_ -> w }
+primInfo (Add w) = PrimInfo { inlinable = True
                             , inlinableInputs = True
-                            , strRep = "Add" }
-primInfo (Sub _) = PrimInfo { inlinable = True
+                            , strRep = "Add"
+                            , outputWidth = \_ -> w }
+primInfo (Sub w) = PrimInfo { inlinable = True
                             , inlinableInputs = True
-                            , strRep = "Sub" }
-primInfo (Mul _) = PrimInfo { inlinable = True
+                            , strRep = "Sub"
+                            , outputWidth = \_ -> w }
+primInfo (Mul w) = PrimInfo { inlinable = True
                             , inlinableInputs = True
-                            , strRep = "Mul" }
-primInfo (Div _) = PrimInfo { inlinable = True
+                            , strRep = "Mul"
+                            , outputWidth = \_ -> w }
+primInfo (Div w) = PrimInfo { inlinable = True
                             , inlinableInputs = True
-                            , strRep = "Div" }
-primInfo (Mod _) = PrimInfo { inlinable = True
+                            , strRep = "Div"
+                            , outputWidth = \_ -> w }
+primInfo (Mod w) = PrimInfo { inlinable = True
                             , inlinableInputs = True
-                            , strRep = "Mod" }
-primInfo (Not _) = PrimInfo { inlinable = True
+                            , strRep = "Mod"
+                            , outputWidth = \_ -> w }
+primInfo (Not w) = PrimInfo { inlinable = True
                             , inlinableInputs = True
-                            , strRep = "Not" }
-primInfo (And _) = PrimInfo { inlinable = True
+                            , strRep = "Not"
+                            , outputWidth = \_ -> w }
+primInfo (And w) = PrimInfo { inlinable = True
                             , inlinableInputs = True
-                            , strRep = "And" }
-primInfo (Or _) = PrimInfo { inlinable = True
+                            , strRep = "And"
+                            , outputWidth = \_ -> w }
+primInfo (Or w) = PrimInfo { inlinable = True
                            , inlinableInputs = True
-                           , strRep = "Or" }
-primInfo (Xor _) = PrimInfo { inlinable = True
+                           , strRep = "Or"
+                           , outputWidth = \_ -> w }
+primInfo (Xor w) = PrimInfo { inlinable = True
                             , inlinableInputs = True
-                            , strRep = "Xor" }
-primInfo (ShiftLeft _) = PrimInfo { inlinable = True
+                            , strRep = "Xor"
+                            , outputWidth = \_ -> w }
+primInfo (ShiftLeft w) = PrimInfo { inlinable = True
                                   , inlinableInputs = True
-                                  , strRep = "ShiftLeft" }
-primInfo (ShiftRight _) = PrimInfo { inlinable = True
+                                  , strRep = "ShiftLeft"
+                                  , outputWidth = \_ -> w }
+primInfo (ShiftRight w) = PrimInfo { inlinable = True
                                    , inlinableInputs = True
-                                   , strRep = "ShiftRight" }
-primInfo (ArithShiftRight _) = PrimInfo { inlinable = True
+                                   , strRep = "ShiftRight"
+                                   , outputWidth = \_ -> w }
+primInfo (ArithShiftRight w) = PrimInfo { inlinable = True
                                         , inlinableInputs = True
-                                        , strRep = "ArithShiftRight" }
-primInfo (Equal _) = PrimInfo { inlinable = True
+                                        , strRep = "ArithShiftRight"
+                                        , outputWidth = \_ -> w }
+primInfo (Equal w) = PrimInfo { inlinable = True
                               , inlinableInputs = True
-                              , strRep = "Equal" }
-primInfo (NotEqual _) = PrimInfo { inlinable = True
+                              , strRep = "Equal"
+                              , outputWidth = \_ -> 1 }
+primInfo (NotEqual w) = PrimInfo { inlinable = True
                                  , inlinableInputs = True
-                                 , strRep = "NotEqual" }
-primInfo (LessThan _) = PrimInfo { inlinable = True
+                                 , strRep = "NotEqual"
+                                 , outputWidth = \_ -> 1 }
+primInfo (LessThan w) = PrimInfo { inlinable = True
                                  , inlinableInputs = True
-                                 , strRep = "LessThan" }
-primInfo (LessThanEq _) = PrimInfo { inlinable = True
+                                 , strRep = "LessThan"
+                                 , outputWidth = \_ -> 1 }
+primInfo (LessThanEq w) = PrimInfo { inlinable = True
                                    , inlinableInputs = True
-                                   , strRep = "LessThanEq" }
-primInfo (ReplicateBit _) = PrimInfo { inlinable = True
+                                   , strRep = "LessThanEq"
+                                   , outputWidth = \_ -> 1 }
+primInfo (ReplicateBit w) = PrimInfo { inlinable = True
                                      , inlinableInputs = True
-                                     , strRep = "ReplicateBit" }
-primInfo (ZeroExtend _ _) = PrimInfo { inlinable = True
-                                     , inlinableInputs = True
-                                     , strRep = "ZeroExtend" }
-primInfo (SignExtend _ _) = PrimInfo { inlinable = True
-                                     , inlinableInputs = False
-                                     , strRep = "SignExtend" }
-primInfo (SelectBits _ _ _) = PrimInfo { inlinable = True
+                                     , strRep = "ReplicateBit"
+                                     , outputWidth = \_ -> w }
+primInfo (ZeroExtend iw ow) = PrimInfo { inlinable = True
+                                       , inlinableInputs = True
+                                       , strRep = "ZeroExtend"
+                                       , outputWidth = \_ -> ow }
+primInfo (SignExtend iw ow) = PrimInfo { inlinable = True
                                        , inlinableInputs = False
-                                       , strRep = "SelectBits" }
-primInfo (Concat _ _) = PrimInfo { inlinable = True
-                                 , inlinableInputs = True
-                                 , strRep = "Concat" }
-primInfo (Mux _) = PrimInfo { inlinable = True
+                                       , strRep = "SignExtend"
+                                       , outputWidth = \_ -> ow }
+primInfo (SelectBits iw hi lo) = PrimInfo { inlinable = True
+                                          , inlinableInputs = False
+                                          , strRep = "SelectBits"
+                                          , outputWidth = \_ -> hi - lo + 1 }
+primInfo (Concat w0 w1) = PrimInfo { inlinable = True
+                                   , inlinableInputs = True
+                                   , strRep = "Concat"
+                                   , outputWidth = \_ -> w0 + w1 }
+primInfo (Mux w) = PrimInfo { inlinable = True
                             , inlinableInputs = True
-                            , strRep = "Mux" }
-primInfo (Identity _) = PrimInfo { inlinable = True
+                            , strRep = "Mux"
+                            , outputWidth = \_ -> w }
+primInfo (Identity w) = PrimInfo { inlinable = True
                                  , inlinableInputs = True
-                                 , strRep = "Identity" }
-primInfo (Register _ _) = PrimInfo { inlinable = False
+                                 , strRep = "Identity"
+                                 , outputWidth = \_ -> w }
+primInfo (Register _ w) = PrimInfo { inlinable = False
                                    , inlinableInputs = True
-                                   , strRep = "Register" }
-primInfo (RegisterEn _ _) = PrimInfo { inlinable = False
+                                   , strRep = "Register"
+                                   , outputWidth = \_ -> w }
+primInfo (RegisterEn _ w) = PrimInfo { inlinable = False
                                      , inlinableInputs = True
-                                     , strRep = "RegisterEn" }
-primInfo BRAM{} = PrimInfo { inlinable = False
-                           , inlinableInputs = True
-                           , strRep = "BRAM" }
-primInfo TrueDualBRAM{} = PrimInfo { inlinable = False
-                                   , inlinableInputs = True
-                                   , strRep = "TrueDualBRAM" }
-primInfo Custom{ customName = nm } = PrimInfo { inlinable = False
-                                              , inlinableInputs = True
-                                              , strRep = nm }
-primInfo (Input _ nm) = PrimInfo { inlinable = False
+                                     , strRep = "RegisterEn"
+                                     , outputWidth = \_ -> w }
+primInfo BRAM{ ramDataWidth = w } = PrimInfo { inlinable = False
+                                             , inlinableInputs = True
+                                             , strRep = "BRAM"
+                                             , outputWidth = \_ -> w }
+primInfo TrueDualBRAM{ ramDataWidth = w } =
+  PrimInfo { inlinable = False
+           , inlinableInputs = True
+           , strRep = "TrueDualBRAM"
+           , outputWidth = \_ -> w }
+primInfo Custom{ customName = custNm
+               , customOutputs = outs } =
+  PrimInfo { inlinable = False
+           , inlinableInputs = True
+           , strRep = custNm
+           , outputWidth = f
+           }
+  where f (Just nm) = fromMaybe (error $ nm ++ " is not a valid "
+                                            ++ custNm ++ "output")
+                                (lookup nm outs)
+        f _ = error "OutputName must be specified to call outputWidth on Custom"
+primInfo (Input w nm) = PrimInfo { inlinable = False
                                  , inlinableInputs = True
-                                 , strRep = nm }
+                                 , strRep = nm
+                                 , outputWidth = \_ -> w }
 primInfo (Output _ nm) = PrimInfo { inlinable = False
                                   , inlinableInputs = True
-                                  , strRep = nm }
+                                  , strRep = nm
+                                  , outputWidth = error "outputWidth not supported on Output" }
 primInfo (Display _) = PrimInfo { inlinable = False
                                 , inlinableInputs = True
-                                , strRep = "Display" }
+                                , strRep = "Display"
+                                , outputWidth = error "outputWidth not supported on Display" }
 primInfo Finish = PrimInfo { inlinable = False
                            , inlinableInputs = True
-                           , strRep = "Finish" }
+                           , strRep = "Finish"
+                           , outputWidth = error "outputWidth not supported on Finish" }
 primInfo (TestPlusArgs arg) = PrimInfo { inlinable = False
                                        , inlinableInputs = True
-                                       , strRep = "PlusArgs_" ++ arg }
+                                       , strRep = "PlusArgs_" ++ arg
+                                       , outputWidth = \_ -> 1 }
 primInfo RegFileMake{} = PrimInfo { inlinable = False
                                   , inlinableInputs = True
-                                  , strRep = "RegFileMake" }
-primInfo RegFileRead{} = PrimInfo { inlinable = False
-                                  , inlinableInputs = True
-                                  , strRep = "RegFileRead" }
+                                  , strRep = "RegFileMake"
+                                  , outputWidth = error "outputWidth not supported on RegFileMake" }
+primInfo (RegFileRead RegFileInfo{ regFileDataWidth = w }) =
+  PrimInfo { inlinable = False
+           , inlinableInputs = True
+           , strRep = "RegFileRead"
+           , outputWidth = \_ -> w }
 primInfo RegFileWrite{} = PrimInfo { inlinable = False
                                    , inlinableInputs = True
-                                   , strRep = "RegFileWrite" }
+                                   , strRep = "RegFileWrite"
+                                   , outputWidth = error "outputWidth not supported on RegFileWrite" }

@@ -78,10 +78,10 @@ doIO m = Flatten $ \r -> do
 
 -- | Flatten a root 'BV' to a netlist
 flatten :: BV -> Flatten NetInput
-flatten b = innerFlatten True b
+flatten bv = innerFlatten True bv
   where innerFlatten _ BV{bvPrim=p@(Const w v)} = return $ InputTree p []
         innerFlatten _ BV{bvPrim=p@(DontCare w)} = return $ InputTree p []
-        innerFlatten isRoot b@BV{bvNameHints=hints,bvInstRef=instRef} = do
+        innerFlatten isRoot bv@BV{bvNameHints=hints,bvInstRef=instRef} = do
           -- handle instId traversal
           instIdVal <- doIO (readIORef instRef)
           let hasNameHints = not $ null hints
@@ -91,15 +91,14 @@ flatten b = innerFlatten True b
               when hasNameHints $ addNameHints (instId, hints)
               doIO (writeIORef instRef (Just instId))
               addUndo (writeIORef instRef Nothing)
-              ins <- mapM (innerFlatten False) (bvInputs b)
-              let net = Net { netPrim         = bvPrim b
+              ins <- mapM (innerFlatten False) (bvInputs bv)
+              let net = Net { netPrim         = bvPrim bv
                             , netInstId       = instId
                             , netIsRoot       = isRoot
                             , netInputs       = ins
-                            , netOutputWidths = (bvWidths b)
                             , netNameHints    = mempty
                             }
               addNet net
-              return $ InputWire (instId, bvOutNum b)
+              return $ InputWire (instId, bvOutput bv)
             Just instId -> do when hasNameHints $ addNameHints (instId, hints)
-                              return $ InputWire (instId, bvOutNum b)
+                              return $ InputWire (instId, bvOutput bv)
