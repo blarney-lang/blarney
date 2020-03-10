@@ -14,4 +14,4 @@ de5-clean:
 clean:
 	make -C Boot clean
 	make -C Tests clean
-	rm -rf *.o *.hi Pebbles Pebbles-Verilog
+	rm -rf *.o *.hi DE5-Net/*.mif Pebbles Pebbles-Verilog
