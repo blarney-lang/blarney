@@ -32,6 +32,7 @@ import Data.IORef
 import Data.Array
 import Data.Array.IO
 import Control.Monad
+import Data.Set (insert, toList)
 import Data.List (intercalate)
 import qualified Data.Bits as B
 
@@ -102,6 +103,58 @@ untilM pred act =
 -- Netlist transformation passes
 --------------------------------------------------------------------------------
 
+-- | propagate names through the Netlist
+propagateNames :: MNetlist -> IO ()
+propagateNames nl = do
+  bounds <- getBounds nl
+  visited :: IOUArray InstId Bool <- newArray bounds False
+  -- Push destination name down through netlist
+  let visit destName instId = do
+      isVisited <- readArray visited instId
+      if not isVisited then do
+        net@Net{ netPrim = prim
+               , netInputs = inpts
+               , netNameHints = hints
+               } <- readNet nl instId
+        let inpts' = [instId | x@(InputWire (instId, _)) <- inpts]
+        writeArray visited instId True
+        -- Detect new destination and update destination name in recursive call
+        if isDest prim then mapM_ (visit $ bestName net) inpts'
+        else do
+          let newHints = insert (NmSuffix 10 destName) hints
+          writeArray nl instId $ Just net{netNameHints = newHints}
+          mapM_ (visit destName) inpts'
+      else return ()
+  --
+  pairs <- getAssocs nl -- list of nets with their index
+  forM_ [i | x@(i, Just n) <- pairs, netIsRoot n] $ \instId -> do
+    net <- readNet nl instId
+    visit (bestName net) instId
+  --
+  where bestName Net{ netPrim = prim
+                    , netNameHints = hints
+                    , netInstId = instId
+                    } = "DEST_" ++ nm
+                        where nm = if null nms
+                                   then primStr prim ++ "_id" ++ show instId
+                                   else head nms
+                              nms = [y | x@(NmRoot _ y) <- toList hints]
+        --
+        isDest Register{}     = True
+        isDest RegisterEn{}   = True
+        isDest BRAM{}         = True
+        isDest TrueDualBRAM{} = True
+        isDest Custom{}       = True
+        isDest Input{}        = True
+        isDest Output{}       = True
+        isDest Display{}      = True
+        isDest Finish         = True
+        isDest TestPlusArgs{} = True
+        isDest RegFileMake{}  = True
+        isDest RegFileRead{}  = True
+        isDest RegFileWrite{} = True
+        isDest _ = False
+
 -- pattern helper to identify constant InputTree NetInputs
 pattern Lit i <- InputTree (Const _ i) []
 -- | Helper to evaluate constant Net
@@ -164,6 +217,7 @@ evalConstNet n@Net{ netPrim = Mux w, netInputs = [Lit s, Lit a0, Lit a1] } =
 evalConstNet n@Net{ netPrim = Identity w, netInputs = [Lit a0] } =
   (n { netPrim   = Const w a0, netInputs = [] }, True)
 evalConstNet n = (n, False)
+
 -- | Constant folding pass
 foldConstants :: MNetlist -> IO Bool
 foldConstants nl = do
@@ -223,6 +277,7 @@ inlineNetInput nl nc inpt@(InputWire (instId, _)) = do
 inlineNetInput nl nc (InputTree prim inpts) = do
   (inpts', changes) <- unzip <$> mapM (inlineNetInput nl nc) inpts
   return $ (InputTree prim inpts', or changes)
+
 -- | Single reference 'Net' inlining pass
 inlineSingleRefNet :: MNetlist -> IO Bool
 inlineSingleRefNet nl = do
@@ -346,12 +401,12 @@ eliminateDeadNet nl = do
   readIORef changed
 
 -- | Run netlist transformation passes
-netlistPasses :: Bool -> MNetlist -> IO Netlist
-netlistPasses optimise nl = do
+netlistPasses :: Bool -> Bool -> MNetlist -> IO Netlist
+netlistPasses doOptim doPropNm nl = do
   -- remove 'Bit 0' instances
   ignoreZeroWidthNet nl
   -- netlist optimisation passes
-  when optimise $ do
+  when doOptim $ do
     let constElim i = do a <- foldConstants nl
                          b <- propagateConstants nl
                          -- DEBUG HELP
@@ -362,8 +417,10 @@ netlistPasses optimise nl = do
     -- DEBUG HELP -- putStrLn $ "about to inlineSingleRefNet"
     inlineSingleRefNet nl
     return ()
-
-  -- eliminate 'Net' entries in the netlist for 'Net's that got removed
+  -- propagates existing names through the netlist
+  when doPropNm $ propagateNames nl
+  -- eliminate 'Net' entries in the netlist for 'Net's that are no longer
+  -- referenced
   -- DEBUG HELP -- putStrLn $ "about to eliminateDeadNet"
   untilM not $ eliminateDeadNet nl
   -- turn the final netlist immutable
