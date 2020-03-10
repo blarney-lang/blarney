@@ -200,18 +200,21 @@ xorBV a b = makePrim1 (Xor w) [a, b]
 
 -- |Left shift
 leftBV :: BV -> BV -> BV
-leftBV a b = makePrim1 (ShiftLeft w) [a, b]
-  where w = bvPrimOutWidth a
+leftBV a b = makePrim1 (ShiftLeft iw ow) [a, b]
+  where ow = bvPrimOutWidth a
+        iw = bvPrimOutWidth b
 
 -- |Right shift
 rightBV :: BV -> BV -> BV
-rightBV a b = makePrim1 (ShiftRight w) [a, b]
-  where w = bvPrimOutWidth a
+rightBV a b = makePrim1 (ShiftRight iw ow) [a, b]
+  where ow = bvPrimOutWidth a
+        iw = bvPrimOutWidth b
 
 -- |Right shift
 arithRightBV :: BV -> BV -> BV
-arithRightBV a b = makePrim1 (ArithShiftRight w) [a, b]
-  where w = bvPrimOutWidth a
+arithRightBV a b = makePrim1 (ArithShiftRight iw ow) [a, b]
+  where ow = bvPrimOutWidth a
+        iw = bvPrimOutWidth b
 
 -- |Equality comparator
 equalBV :: BV -> BV -> BV

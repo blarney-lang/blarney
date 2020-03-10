@@ -182,9 +182,9 @@ genNetVerilog netlist net = case netPrim net of
   And w                   -> primNV { decl = Just $ declWire w wId }
   Or w                    -> primNV { decl = Just $ declWire w wId }
   Xor w                   -> primNV { decl = Just $ declWire w wId }
-  ShiftLeft w             -> primNV { decl = Just $ declWire w wId }
-  ShiftRight w            -> primNV { decl = Just $ declWire w wId }
-  ArithShiftRight w       -> primNV { decl = Just $ declWire w wId }
+  ShiftLeft _ w           -> primNV { decl = Just $ declWire w wId }
+  ShiftRight _ w          -> primNV { decl = Just $ declWire w wId }
+  ArithShiftRight _ w     -> primNV { decl = Just $ declWire w wId }
   Equal w                 -> primNV { decl = Just $ declWire 1 wId }
   NotEqual w              -> primNV { decl = Just $ declWire 1 wId }
   LessThan w              -> primNV { decl = Just $ declWire 1 wId }
@@ -273,11 +273,11 @@ genNetVerilog netlist net = case netPrim net of
   showPrim (Or _)  [e0, e1] = showNetInput e0 <+> char '|' <+> showNetInput e1
   showPrim (Xor _) [e0, e1] = showNetInput e0 <+> char '^' <+> showNetInput e1
   showPrim (Not _) [e0]     = char '~' <> showNetInput e0
-  showPrim (ShiftLeft _) [e0, e1] =
+  showPrim (ShiftLeft _ _) [e0, e1] =
     showNetInput e0 <+> text "<<" <+> showNetInput e1
-  showPrim (ShiftRight _) [e0, e1] =
+  showPrim (ShiftRight _ _) [e0, e1] =
     showNetInput e0 <+> text ">>" <+> showNetInput e1
-  showPrim (ArithShiftRight _) [e0, e1] =
+  showPrim (ArithShiftRight _ _) [e0, e1] =
     text "$signed" <> parens (showNetInput e0) <+> text ">>>" <+> showNetInput e1
   showPrim (Equal _) [e0, e1] = showNetInput e0 <+> text "==" <+> showNetInput e1
   showPrim (NotEqual _) [e0, e1] =

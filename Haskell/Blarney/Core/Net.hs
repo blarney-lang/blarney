@@ -47,8 +47,6 @@ data Net = Net { -- | The 'Net' 's 'Prim'itive
                  netPrim         :: Prim
                  -- | The 'Net' 's 'InstId' identifier
                , netInstId       :: InstId
-                 -- | Is the 'Net' a root of the Netlist
-               , netIsRoot       :: Bool
                  -- | The 'Net' 's list of 'NetInput' inputs
                , netInputs       :: [NetInput]
                  -- | The 'Net' 's 'NameHints'
@@ -71,6 +69,14 @@ type Netlist = Array InstId (Maybe Net)
 
 -- | A helper type for mutable 'Netlist'
 type MNetlist = IOArray InstId (Maybe Net)
+
+-- | A helper function to tell if a 'Net' is a netlist root
+netIsRoot :: Net -> Bool
+netIsRoot Net{netPrim=prim} = primIsRoot prim
+
+-- | A helper function to tell if a 'Net' should not be optimised away
+netDontKill :: Net -> Bool
+netDontKill Net{netPrim=prim} = primDontKill prim
 
 -- | A helper function to read a 'Net' from a 'MNetlist'
 readNet :: MNetlist -> InstId -> IO Net
@@ -177,7 +183,7 @@ evalConstNet n@Net{ netPrim = Or w, netInputs = [Lit a0, Lit a1] } =
   (n { netPrim = Const w (a0 B..|. a1), netInputs = [] }, True)
 evalConstNet n@Net{ netPrim = Xor w, netInputs = [Lit a0, Lit a1] } =
   (n { netPrim = Const w (a0 `B.xor` a1), netInputs = [] }, True)
-evalConstNet n@Net{ netPrim = ShiftLeft w, netInputs = [Lit a0, Lit a1] } =
+evalConstNet n@Net{ netPrim = ShiftLeft _ w, netInputs = [Lit a0, Lit a1] } =
   (n { netPrim = Const w (a0 `B.shiftL` fromInteger (a1))
      , netInputs = [] }, True)
 -- TODO XXX FORCE UNSIGNED FOR NON ARITHMETIC SHIFTS
@@ -353,14 +359,13 @@ zeroWidthNetTransform
 -- do nothing cases for all others
 zeroWidthNetTransform net = (net, False)
 
--- | Tell if a 'Net' is a zero-width root 'Net' (in practice, only the 'Input'
---   and 'Output' 'Prim's)
-isZeroWidthRootNet :: Net -> Bool
-isZeroWidthRootNet Net{ netIsRoot = True
-                      , netPrim = Input 0 _ } = True
-isZeroWidthRootNet Net{ netIsRoot = True
-                      , netPrim = Output 0 _ } = True
-isZeroWidthRootNet _ = False
+-- | Tell if a root 'Net' can be optimized away during zero-witdh elimination,
+-- that is a root 'Net' with no non-zero-width inputs or outputs
+zeroWidthRootNetEliminationRule Net{ netPrim = prim } =
+  primIsRoot prim && not (primDontKill prim) &&
+  not (any (\(_, w) -> w /= 0) ins || any (\(_, w) -> w /= 0) outs)
+  where ins = primInputs prim
+        outs = primOutputs prim
 
 -- | Ignore 0-width Nets pass
 ignoreZeroWidthNet :: MNetlist -> IO Bool
@@ -375,7 +380,8 @@ ignoreZeroWidthNet nl = do
     when netChanged $ do writeArray nl idx (Just net')
                          writeIORef changed True
   -- Remove each zero-width root 'Net'
-  forM_ [i | x@(i, Just n) <- pairs, isZeroWidthRootNet n] $ \idx -> do
+  forM_ [ i | x@(i, Just n) <- pairs
+            , zeroWidthRootNetEliminationRule n ] $ \idx -> do
     writeArray nl idx Nothing
     writeIORef changed True
   -- finish pass
@@ -392,13 +398,16 @@ eliminateDeadNet nl = do
   -- kill Nets with a null reference count
   forM_ [(a,b) | x@(a, Just b) <- pairs] $ \(idx, net) -> do
     refCnt <- readArray refCounts idx
-    when (refCnt == 0 && not (netIsRoot net)) $ do
+    when (refCnt == 0 && (not . netIsRoot) net && (not . netDontKill) net) $ do
       writeArray nl idx Nothing
       writeIORef changed True
   -- finish pass
   -- DEBUG HELP -- x <- readIORef changed
   -- DEBUG HELP -- putStrLn $ "eliminateDeadNet pass changed? " ++ show x
   readIORef changed
+  where alsoDontKill Net{netPrim=Output _ _} = True
+        alsoDontKill Net{netPrim=RegFileWrite _} = True
+        alsoDontKill _ = False
 
 -- | Run netlist transformation passes
 netlistPasses :: Bool -> Bool -> MNetlist -> IO Netlist
