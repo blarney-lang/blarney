@@ -50,7 +50,7 @@ widthOf v = fromInteger (natVal v)
 
 -- |Determine width of bit-vector from underlying 'BV'
 unsafeWidthOf :: Bit n -> Int
-unsafeWidthOf = bvWidth . toBV
+unsafeWidthOf = bvPrimOutWidth . toBV
 
 -- |Convert type Nat to Ingeter value
 valueOf :: forall n. (KnownNat n) => Int
