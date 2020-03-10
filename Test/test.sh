@@ -35,29 +35,44 @@ if [ -z "$BLARNEY_ROOT" ]; then
   echo Please set BLARNEY_ROOT environment variable
 fi
 
-for E in "${EXAMPLES[@]}"; do
-  cd $BLARNEY_ROOT/Examples/$E
-  make -s &> /dev/null
-  if [ $? != 0 ]; then
-    echo Failed to build $E
-    exit -1
+testConfig() {
+  CONF=""
+  if [ ! -z "$1" ]; then
+    CONF="BLARNEY_CONF=$1"
   fi
-  for O in $(ls *.out); do
-    TEST=$(basename $O .out)
-    echo -ne "$TEST: "
-    ./$TEST
-    cd $TEST-Verilog
-    make -s &> /dev/null
-    # Using 'sed \$d' to print all but the last line (works on Linux and OSX)
-    # ('head -n -1' isn't available on OSX)
-    ./top | sed \$d > $TEST.got
-    cd ..
-    cmp -s $TEST.out $TEST-Verilog/$TEST.got
-    if [ $? == 0 ]; then
-      echo -e "${GREEN}Passed${NC}"
-    else
-      echo -e "${RED}Failed${NC}"
+  for E in "${EXAMPLES[@]}"; do
+    cd $BLARNEY_ROOT/Examples/$E
+    eval $CONF make -s &> /dev/null
+    if [ $? != 0 ]; then
+      echo Failed to build $E
       exit -1
     fi
+    for O in $(ls *.out); do
+      TEST=$(basename $O .out)
+      echo -ne "$TEST: "
+      eval $CONF ./$TEST
+      cd $TEST-Verilog
+      make -s &> /dev/null
+      # Using 'sed \$d' to print all but the last line (works on Linux and OSX)
+      # ('head -n -1' isn't available on OSX)
+      ./top | sed \$d > $TEST.got
+      cd ..
+      cmp -s $TEST.out $TEST-Verilog/$TEST.got
+      if [ $? == 0 ]; then
+        echo -e "${GREEN}Passed${NC}"
+      else
+        echo -e "${RED}Failed${NC}"
+        exit -1
+      fi
+    done
   done
-done
+}
+
+make -s -C $BLARNEY_ROOT clean
+echo Default config:
+testConfig ""
+
+make -s -C $BLARNEY_ROOT clean
+echo
+echo Config namer.conf:
+testConfig "$BLARNEY_ROOT/Test/namer.conf"

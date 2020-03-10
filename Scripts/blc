@@ -5,13 +5,27 @@ if [ -z "$BLARNEY_ROOT" ]; then
   exit 1
 fi
 
+# Default options
+EnableNamerPlugin=No
+
+# Override defaults using config file, if available
+if [ -f "$BLARNEY_CONF" ]; then
+  source "$BLARNEY_CONF"
+elif [ -f "$BLARNEY_ROOT/blarney.conf" ]; then
+  source "$BLARNEY_ROOT/blarney.conf"
+fi
+
 # Extract command-line flags/arguments
 POSITIONAL=()
 while [[ $# -gt 0 ]]; do
   key="$1"
   case $key in
     --enable-namer-plugin)
-    USE_NAMER_PLUGIN="YES"
+    EnableNamerPlugin=Yes
+    shift # past argument
+    ;;
+    --disable-namer-plugin)
+    EnableNamerPlugin=No
     shift # past argument
     ;;
     *)
@@ -26,6 +40,7 @@ if [ -z "$1" ]; then
   echo "Usage: blc [FLAGS] [FILE].hs"
   echo "Supported flags:"
   echo "  --enable-namer-plugin              Enable Namer plugin"
+  echo "  --disable-namer-plugin             Disable Namer plugin"
   exit 1
 fi
 
@@ -45,7 +60,7 @@ EXTS="$EXTS -XDuplicateRecordFields"
 EXTS="$EXTS -XNoStarIsType"
 WARN="-Wno-partial-type-signatures"
 FLAGS="-fno-cse -fno-full-laziness"
-if [ "$USE_NAMER_PLUGIN" = "YES" ]; then
+if [ "$EnableNamerPlugin" = "Yes" ]; then
   FLAGS="$FLAGS -package blarney-plugins-namer -fplugin=BlarneyPlugins.Namer"
 fi
 INC="$BLARNEY_ROOT/Haskell"
