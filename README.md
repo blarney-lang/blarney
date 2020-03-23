@@ -1,4 +1,4 @@
-# Blarney
+# <img src="logo.png">
 
 Blarney is a Haskell library for hardware description that builds a
 range of HDL abstractions on top of a small set of core circuit
@@ -183,7 +183,7 @@ So `.<.` can be used on any type in the
 [Cmp](http://mn416.github.io/blarney/Blarney-Bit.html#t:Cmp)
 (comparator) class.  Similarly `?` can be used on any type in the
 [Bits](http://mn416.github.io/blarney/Blarney-Bits.html#t:Bits)
-class (which allows serialisation to a bit vector and back
+class (which allows packing to a bit vector and back
 again). So a more generic definition of `twoSort` would be:
 
 ```hs
