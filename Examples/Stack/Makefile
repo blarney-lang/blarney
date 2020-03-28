@@ -1,6 +1,6 @@
 .PHONEY: all
 all:
-	blc Stack.hs
+	blc $(BLC_FLAGS) Stack.hs
 
 clean:
 	rm -rf *.o *.hi Stack Stack-Verilog

@@ -11,8 +11,10 @@ Convert Blarney functions to Verilog modules.
 -}
 
 module Blarney.Core.Verilog
-  ( writeVerilogModule  -- Generate Verilog module
-  , writeVerilogTop     -- Generate Verilog top-level module
+  ( writeVerilogModule     -- Generate Verilog module
+  , writeVerilogTop        -- Generate Verilog top-level module
+  , writeVerilogModuleOpts -- Generate Verilog module (with options)
+  , writeVerilogTopOpts    -- Generate Verilog top-level module (with options)
   ) where
 
 -- Standard imports
@@ -28,8 +30,9 @@ import Numeric (showHex)
 import Data.Array.IArray
 
 -- Blarney imports
-import Blarney.Core.Prim
 import Blarney.Core.Net
+import Blarney.Core.Opts
+import Blarney.Core.Prim
 import Blarney.Core.Module
 import Blarney.Core.Interface
 import Blarney.Core.IfThenElse
@@ -38,25 +41,37 @@ import Blarney.Core.IfThenElse
 --------------------------------------------------------------------------------
 
 -- | Convert given Blarney function to a Verilog module
+writeVerilogModuleOpts :: Modular a
+                       => Opts       -- ^ Options
+                       -> a          -- ^ Blarney function
+                       -> String     -- ^ Module name
+                       -> String     -- ^ Output directory
+                       -> IO ()
+writeVerilogModuleOpts opts top mod dir =
+    do system ("mkdir -p " ++ dir)
+       nl <- netlist opts (makeModule top)
+       writeVerilog fileName mod nl
+  where
+    fileName = dir ++ "/" ++ mod ++ ".v"
+
+-- | Convert given Blarney function to a Verilog module using default options
 writeVerilogModule :: Modular a
                    => a          -- ^ Blarney function
                    -> String     -- ^ Module name
                    -> String     -- ^ Output directory
                    -> IO ()
-writeVerilogModule top mod dir =
-    do system ("mkdir -p " ++ dir)
-       nl <- netlist (makeModule top)
-       writeVerilog fileName mod nl
-  where
-    fileName = dir ++ "/" ++ mod ++ ".v"
+writeVerilogModule top mod dir = do
+  (opts, unused) <- getOpts
+  writeVerilogModuleOpts opts top mod dir
 
 -- | Convert given Blarney function to a top-level Verilog module
-writeVerilogTop :: Module ()  -- ^ Blarney module
-                -> String     -- ^ Top-level module name
-                -> String     -- ^ Output directory
-                -> IO ()
-writeVerilogTop top mod dir =
-    do nl <- netlist top
+writeVerilogTopOpts :: Opts       -- ^ Options
+                    -> Module ()  -- ^ Blarney module
+                    -> String     -- ^ Top-level module name
+                    -> String     -- ^ Output directory
+                    -> IO ()
+writeVerilogTopOpts opts top mod dir =
+    do nl <- netlist opts top
        system ("mkdir -p " ++ dir)
        writeVerilog (dir ++ "/" ++ mod ++ ".v") mod nl
        writeFile (dir ++ "/" ++ mod ++ ".cpp") simCode
@@ -108,6 +123,15 @@ writeVerilogTop top mod dir =
       ]
 
     makefileCode = "include *.mk"
+
+-- | Convert Blarney function to top-level Verilog module with default options
+writeVerilogTop :: Module ()  -- ^ Blarney module
+                -> String     -- ^ Top-level module name
+                -> String     -- ^ Output directory
+                -> IO ()
+writeVerilogTop top mod dir = do
+  (opts, unused) <- getOpts
+  writeVerilogTopOpts opts top mod dir
 
 writeVerilog :: String -> String -> Netlist -> IO ()
 writeVerilog fileName modName netlist = do

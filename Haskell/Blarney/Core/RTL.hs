@@ -68,6 +68,7 @@ module Blarney.Core.RTL
 import Blarney.Core.BV
 import Blarney.Core.Net
 import Blarney.Core.Bit
+import Blarney.Core.Opts
 import Blarney.Core.Bits
 import Blarney.Core.Prim hiding (nameHints)
 import Blarney.Core.FShow
@@ -414,8 +415,8 @@ addRoots :: [BV] -> RTL ()
 addRoots roots = write (RTLRoots roots)
 
 -- |Convert RTL monad to a netlist
-netlist :: RTL () -> IO Netlist
-netlist rtl = do
+netlist :: Opts -> RTL () -> IO Netlist
+netlist opts rtl = do
   -- flatten BVs into a Netlist
   i <- newIORef (0 :: InstId)
   ((nl, nms, undo), _) <- runFlatten flattenRoots i
@@ -431,9 +432,7 @@ netlist rtl = do
         writeArray mnl idx (Just net { netNameHints = oldHints <> hints })
       _ -> return ()
   -- run netlist transformation passes
-  -- * with/without optimisation passes
-  -- * with/without name propagation pass
-  nl' <- netlistPasses False False mnl
+  nl' <- netlistPasses opts mnl
   -- run undo computations
   undo
   -- return final netlist

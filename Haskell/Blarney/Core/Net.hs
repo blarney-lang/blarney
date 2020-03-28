@@ -36,6 +36,7 @@ import Data.Set (insert, toList)
 import Data.List (intercalate)
 import qualified Data.Bits as B
 
+import Blarney.Core.Opts
 import Blarney.Core.Prim
 import Blarney.Core.IfThenElse
 
@@ -410,12 +411,12 @@ eliminateDeadNet nl = do
         alsoDontKill _ = False
 
 -- | Run netlist transformation passes
-netlistPasses :: Bool -> Bool -> MNetlist -> IO Netlist
-netlistPasses doOptim doPropNm nl = do
+netlistPasses :: Opts -> MNetlist -> IO Netlist
+netlistPasses opts nl = do
   -- remove 'Bit 0' instances
   ignoreZeroWidthNet nl
   -- netlist optimisation passes
-  when doOptim $ do
+  when (optEnableSimplifier opts) $ do
     let constElim i = do a <- foldConstants nl
                          b <- propagateConstants nl
                          -- DEBUG HELP
@@ -427,7 +428,7 @@ netlistPasses doOptim doPropNm nl = do
     inlineSingleRefNet nl
     return ()
   -- propagates existing names through the netlist
-  when doPropNm $ propagateNames nl
+  when (optEnableNamePropagation opts) $ propagateNames nl
   -- eliminate 'Net' entries in the netlist for 'Net's that are no longer
   -- referenced
   -- DEBUG HELP -- putStrLn $ "about to eliminateDeadNet"

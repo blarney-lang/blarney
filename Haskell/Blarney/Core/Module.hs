@@ -75,6 +75,7 @@ module Blarney.Core.Module
 import Blarney.Core.BV
 import Blarney.Core.Net
 import Blarney.Core.Bit
+import Blarney.Core.Opts
 import Blarney.Core.Bits
 import Blarney.Core.Prim
 import Blarney.Core.FShow
@@ -290,5 +291,5 @@ addRoots :: [BV] -> Module ()
 addRoots roots = M (RTL.addRoots roots)
 
 -- |Convert module to a netlist
-netlist :: Module () -> IO Netlist
-netlist m = RTL.netlist (runModule m)
+netlist :: Opts -> Module () -> IO Netlist
+netlist opts m = RTL.netlist opts (runModule m)
