@@ -1,6 +1,6 @@
 .PHONEY: all
 all:
-	blc BasicRTL.hs
+	blc $(BLC_FLAGS) BasicRTL.hs
 
 clean:
 	rm -rf *.o *.hi BasicRTL BasicRTL-Verilog

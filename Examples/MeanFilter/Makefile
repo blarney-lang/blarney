@@ -1,5 +1,5 @@
 Fact:
-	blc Heat.hs
+	blc $(BLC_FLAGS) Heat.hs
 
 clean:
 	rm -rf *.o *.hi Heat Heat-Verilog

@@ -35,9 +35,19 @@ if [ -z "$BLARNEY_ROOT" ]; then
   echo Please set BLARNEY_ROOT environment variable
 fi
 
+# Fresh start
+make -s -C $BLARNEY_ROOT clean
+
+# Test plugins and netlist passes?
+if [ "$1" == "full" ]; then
+  echo "Testing plugins and netlist passes"
+  BLC_FLAGS="--enable-namer-plugin"
+  GEN_FLAGS="--enable-name-prop --enable-simplifier"
+fi
+
 for E in "${EXAMPLES[@]}"; do
   cd $BLARNEY_ROOT/Examples/$E
-  make -s &> /dev/null
+  make BLC_FLAGS=$BLC_FLAGS -s &> /dev/null
   if [ $? != 0 ]; then
     echo Failed to build $E
     exit -1
@@ -45,7 +55,7 @@ for E in "${EXAMPLES[@]}"; do
   for O in $(ls *.out); do
     TEST=$(basename $O .out)
     echo -ne "$TEST: "
-    ./$TEST
+    ./$TEST $GEN_FLAGS
     cd $TEST-Verilog
     make -s &> /dev/null
     # Using 'sed \$d' to print all but the last line (works on Linux and OSX)

@@ -1,6 +1,6 @@
 .PHONEY: all
 all:
-	blc Sorter.hs
+	blc $(BLC_FLAGS) Sorter.hs
 
 clean:
 	rm -rf *.o *.hi Sorter Sorter-Verilog

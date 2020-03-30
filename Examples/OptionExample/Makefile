@@ -1,6 +1,6 @@
 .PHONEY: all
 all:
-	blc OptionExample.hs
+	blc $(BLC_FLAGS) OptionExample.hs
 
 clean:
 	rm -rf *.o *.hi OptionExample OptionExample-Verilog

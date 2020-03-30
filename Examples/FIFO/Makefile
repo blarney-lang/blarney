@@ -1,6 +1,6 @@
 .PHONEY: all
 all:
-	blc FIFO.hs
+	blc $(BLC_FLAGS) FIFO.hs
 
 clean:
 	rm -rf *.o *.hi FIFO FIFO-Verilog

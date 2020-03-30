@@ -1,6 +1,6 @@
 .PHONEY: all
 all:
-	blc Derive.hs
+	blc $(BLC_FLAGS) Derive.hs
 
 clean:
 	rm -rf *.o *.hi Derive Derive-Verilog

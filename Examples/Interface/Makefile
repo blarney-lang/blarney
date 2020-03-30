@@ -1,6 +1,6 @@
 .PHONEY: all
 all:
-	blc Interface.hs
+	blc $(BLC_FLAGS) Interface.hs
 
 clean:
 	rm -rf *.o *.hi *.v Interface Interface-Verilog
