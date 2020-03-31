@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE RankNTypes                 #-}
+{-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE BlockArguments             #-}
 {-# LANGUAGE NoDeriveAnyClass           #-}

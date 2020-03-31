@@ -1,3 +1,5 @@
+{-# LANGUAGE BlockArguments #-}
+
 {-|
 Module      : Blarney.Core.Opts
 Description : Blarney options and command-line parser
