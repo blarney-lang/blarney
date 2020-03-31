@@ -953,12 +953,11 @@ machine that runs code written a subset of Erlang.
 ## Example 17: Namer plugin
 
 One of the classic limitations of Lava is that identifier names are
-lost when the netlist is generated in Verilog format, or any other
-format for that matter.  In particular, this is problematic when you
-want to analyse, say, the critical-path of your circuit using a
-third-party tool, but there is no way to map the Verilog names
-reported by the tool back to the Lava names in your high-level circuit
-description.
+lost when the netlist is generated.  In particular, this is
+problematic when you want to analyse, say, the critical-path of your
+circuit using a third-party tool, but there is no way to map the
+netlist names reported by the tool back to the Lava names in your
+original description.
 
 Blarney provides a solution to this problem in the form of the [Namer
 plugin](Haskell/BlarneyPlugins/Namer).  This is a simple GHC plugin
@@ -980,15 +979,15 @@ where
 is a Blarney primitive that introduces name information inside `m`
 This simple approach captures quite a lot of useful names.
 
-Use of this plugin is *completely optional*, and disabled by default.
-To enable it, first install the plugin
+The plugin is *completely optional*, and disabled by default.  To
+enable it, first install using cabal
 
 ```
 cd Haskell/BlarneyPlugins/Namer
 cabal install
 ```
 
-and then pass the `--enable-namer-plugin` to `blc`.
+and then pass the `--enable-namer-plugin` flag to `blc`.
 
 To further improve the readability of generated code, you can also
 pass the `--enable-name-prop` and `--enable-simplifier` options to
