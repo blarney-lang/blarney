@@ -262,10 +262,6 @@ data PrimInfo = PrimInfo {
 , inputs :: [(String, InputWidth)]
   -- | Tells the number and widths of outputs of a 'Prim'
 , outputs :: [(String, OutputWidth)]
-  -- | Return the 'OutputWidth' for a named output of a 'Prim'. Usually ignores
-  -- requested 'OutputName' for single output 'Prim' and return the unambiguous
-  -- output width. For multiple output 'Prim', the 'OutputName' argument can be
-  -- used to select the desired output
 }
 -- | Helper getting general metadata about a 'Prim'
 primInfo :: Prim -> PrimInfo

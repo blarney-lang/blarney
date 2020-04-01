@@ -26,6 +26,7 @@ docs](http://mn416.github.io/blarney/index.html).
 * [Example 14: Master-slave pattern](#example-14-master-slave-pattern)
 * [Example 15: Bit-string pattern matching](#example-15-bit-string-pattern-matching)
 * [Example 16: CPUs](#example-16-cpus)
+* [Example 17: Namer plugin](#example-17-namer-plugin)
 
 ## Example 1: Two-sort
 
@@ -901,7 +902,7 @@ import Blarney.BitScan
 -- Semantics of add instruction
 add :: Bit 5 -> Bit 5 -> Bit 5 -> Action ()
 add rs2 rs1 rd =
-  display "add r%0d" (rd.val) ", r%0d" (rs1.val) ", r%0d" (rs1.val)
+  display "add r%0d" (rd.val) ", r%0d" (rs1.val) ", r%0d" (rs2.val)
 
 -- Semantics of addi instruction
 addi :: Bit 12 -> Bit 5 -> Bit 5 -> Action ()
@@ -938,16 +939,57 @@ suggesting this feature!
 
 ## Example 16: CPUs
 
-As a way of briging together a number of the ideas introduced above,
-we have developed a few simple microprocessors in Blarney:
+A few processor cores have been implemented in Blarney:
 
-1. [Simple](https://github.com/mn416/blarney/blob/master/Examples/CPU/CPU.hs)
+* [Simple](https://github.com/mn416/blarney/blob/master/Examples/CPU/CPU.hs):
 4-stage 8-bit CPU, with just 4 instructions, which resolves
 both control and data hazards.
-
-2. [Pebbles](https://github.com/mn416/blarney/blob/master/Examples/Pebbles/)
-is a 5-stage 32-bit RISC-V core which cleanly separates the
-definitions of the ISA and the pipeline microarchitecture.
-
-3. [Actora](https://github.com/POETSII/actora/) is a 3-stage stack
+* [Pebbles](https://github.com/mn416/blarney/blob/master/Examples/Pebbles/):
+5-stage 32-bit RISC-V core separating the ISA from the pipeline
+microarchitecture.
+* [Actora](https://github.com/POETSII/actora/): 3-stage stack
 machine that runs code written a subset of Erlang.
+
+## Example 17: Namer plugin
+
+One of the classic limitations of Lava is that identifier names are
+lost when the netlist is generated.  In particular, this is
+problematic when you want to analyse, say, the critical-path of your
+circuit using a third-party tool, but there is no way to map the
+netlist names reported by the tool back to the Lava names in your
+original description.
+
+Blarney provides a solution to this problem in the form of the [Namer
+plugin](Haskell/BlarneyPlugins/Namer).  This is a simple GHC plugin
+(around 150 lines of code) that looks for monadic bindings of the form
+
+```hs
+  x <- m
+```
+
+where `m` has type `Module a` for any `a`, and automatically rewrites
+the binding as
+
+```hs
+  x <- withName "x" m
+```
+
+where
+[withName](http://mn416.github.io/blarney/Blarney-Core-Module.html#v:withName)
+is a Blarney primitive that introduces name information inside `m`
+This simple approach captures quite a lot of useful names.
+
+The plugin is *completely optional*, and disabled by default.  To
+enable it, first install using cabal
+
+```
+cd Haskell/BlarneyPlugins/Namer
+cabal install
+```
+
+and then pass the `--enable-namer-plugin` flag to `blc`.
+
+To further improve the readability of generated code, you can also
+pass the `--enable-name-prop` and `--enable-simplifier` options to
+your circuit generator.  This will enable the (experimental) name
+propagation and netlist simplification passes respectively.

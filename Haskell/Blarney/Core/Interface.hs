@@ -1,3 +1,4 @@
+{-# LANGUAGE BlockArguments        #-}
 {-# LANGUAGE DefaultSignatures     #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE TypeOperators         #-}
