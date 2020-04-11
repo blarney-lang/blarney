@@ -112,8 +112,8 @@ instance KnownNat n => Num (Bit n) where
   (-)         = (.-.)
   (*)         = (.*.)
   negate a    = inv a .+. 1
-  abs a       = mux (a .<. 0) (negate a, a)
-  signum a    = mux (a .==. 0) (0, mux (a .<. 0) (-1, 1))
+  abs a       = mux (a `sLT` 0) (negate a, a)
+  signum a    = mux (a .==. 0) (0, mux (a `sLT` 0) (-1, 1))
   fromInteger = constant
 
 -- * Bitwise operations on bit-vectors
@@ -177,6 +177,26 @@ instance Cmp (Bit n) where
   a .>=. b = FromBV $ lessThanEqBV (toBV b) (toBV a)
   a .==. b = FromBV $ equalBV (toBV a) (toBV b)
   a .!=. b = FromBV $ notEqualBV (toBV a) (toBV b)
+
+-- |Signed less than
+infixl 8 `sLT`
+sLT :: Bit n -> Bit n -> Bit 1
+sLT x y = invMSB x .<. invMSB y
+
+-- |Signed greater than
+infixl 8 `sGT`
+sGT :: Bit n -> Bit n -> Bit 1
+sGT x y = invMSB x .>. invMSB y
+
+-- |Signed less than or equal
+infixl 8 `sLTE`
+sLTE :: Bit n -> Bit n -> Bit 1
+sLTE x y = invMSB x .<=. invMSB y
+
+-- |Signed greater than or equal
+infixl 8 `sGTE`
+sGTE :: Bit n -> Bit n -> Bit 1
+sGTE x y = invMSB x .>=. invMSB y
 
 -- * Bit-vector width adjustment
 
@@ -250,9 +270,9 @@ dropBitsLSB a = b
   where (b, c) = split a
 
 -- |Invert most significant bit
-invMSB :: Bit (1+n) -> Bit (1+n)
-invMSB a = inv top # bot
-  where (top :: Bit 1, bot) = split a
+invMSB :: Bit n -> Bit n
+invMSB x = twiddle `onBitList` x
+  where twiddle bs = init bs ++ [inv (last bs)]
 
 -- * Bit-vector selection primitives
 
@@ -321,7 +341,7 @@ liftNat nat k =
 
 -- |Convert list of bits to bit vector
 fromBitList :: KnownNat n => [Bit 1] -> Bit n
-fromBitList [] = error "fromList: applied to empty list"
+fromBitList [] = FromBV $ constBV 0 0
 fromBitList (x:xs)
   | length (x:xs) == n = result
   | otherwise =
@@ -341,10 +361,20 @@ toBitList vec = [unsafeAt i vec | i <- [0..n-1]]
 
 -- | Collapse a '[Bit 1]' of size n to a single 'Bit n'
 unsafeFromBitList :: [Bit 1] -> Bit n
-unsafeFromBitList [] = error "unsafefromBitList: applied to empty list"
-unsafeFromBitList bs = FromBV $ foldr1 concatBV (fmap toBV bs)
+unsafeFromBitList [] = FromBV $ constBV 0 0
+unsafeFromBitList bs = FromBV $ foldr1 concatBV (reverse (fmap toBV bs))
 
 -- | Expand a single 'Bit n' to a '[Bit 1]' of size n
 unsafeToBitList :: Bit n -> [Bit 1]
 unsafeToBitList bs = [unsafeAt i bs | i <- [0..size-1]]
   where size = unsafeWidthOf bs
+
+-- | Apply bit-list transformation on bit-vector
+onBitList :: ([Bit 1] -> [Bit 1]) -> Bit n -> Bit n
+onBitList f x
+  | length list /= length list' =
+      error "onBitList: transformation did not preserve length"
+  | otherwise = unsafeFromBitList list'
+  where
+    list = unsafeToBitList x
+    list' = f list
