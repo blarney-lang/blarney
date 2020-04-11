@@ -341,18 +341,13 @@ liftNat nat k =
 
 -- |Convert list of bits to bit vector
 fromBitList :: KnownNat n => [Bit 1] -> Bit n
-fromBitList [] = FromBV $ constBV 0 0
-fromBitList (x:xs)
-  | length (x:xs) == n = result
-  | otherwise =
-     error ("fromList: bit vector width mismatch: " ++ show (n, length (x:xs)))
+fromBitList xs
+  | length xs == n = result
+  | otherwise = error ("fromBitList: width mismatch: " ++
+                          show (length xs, n))
   where
-    n       = widthOf result
-    result  = FromBV (snd $ join (x:xs))
-    join [x] = (1, toBV x)
-    join (x:xs) =
-      let (n, y) = join xs in
-        (n+1, concatBV y (toBV x))
+    n = widthOf result
+    result = unsafeFromBitList xs
 
 -- |Convert bit vector to list of bits
 toBitList :: KnownNat n => Bit n -> [Bit 1]
@@ -372,6 +367,7 @@ unsafeToBitList bs = [unsafeAt i bs | i <- [0..size-1]]
 -- | Apply bit-list transformation on bit-vector
 onBitList :: ([Bit 1] -> [Bit 1]) -> Bit n -> Bit n
 onBitList f x
+  | null list = x
   | length list /= length list' =
       error "onBitList: transformation did not preserve length"
   | otherwise = unsafeFromBitList list'
