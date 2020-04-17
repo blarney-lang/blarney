@@ -181,9 +181,9 @@ uses, we can see that it actually has a more general type.
 ```
 
 So `.<.` can be used on any type in the
-[Cmp](http://mn416.github.io/blarney/Blarney-Bit.html#t:Cmp)
+[Cmp](http://mn416.github.io/blarney/Blarney-Core-Bit.html#t:Cmp)
 (comparator) class.  Similarly `?` can be used on any type in the
-[Bits](http://mn416.github.io/blarney/Blarney-Bits.html#t:Bits)
+[Bits](http://mn416.github.io/blarney/Blarney-Core-Bits.html#t:Bits)
 class (which allows packing to a bit vector and back
 again). So a more generic definition of `twoSort` would be:
 
@@ -492,7 +492,7 @@ simulator.
 ## Example 8: Bits class
 
 Any type in the
-[Bits](http://mn416.github.io/blarney/Blarney-Bits.html)
+[Bits](http://mn416.github.io/blarney/Blarney-Core-Bits.html)
 class can be represented in hardware, e.g.
 stored in a wire, a register, or a RAM.
 
@@ -527,7 +527,7 @@ by Blarney.
 ## Example 9: FShow class
 
 Any type in the
-[FShow](http://mn416.github.io/blarney/Blarney-FShow.html)
+[FShow](http://mn416.github.io/blarney/Blarney-Core-FShow.html)
 class can be passed as arguments to the
 variadic `display` function.
 
@@ -563,8 +563,8 @@ whether the index (or indices) are type-level numbers or
 circuit-generation-time values:
 
 For type-level indices, we provide functions
-[at](http://mn416.github.io/blarney/Blarney-Bit.html#v:at) and
-[slice](http://mn416.github.io/blarney/Blarney-Bit.html#v:slice), and
+[at](http://mn416.github.io/blarney/Blarney-Core-Bit.html#v:at) and
+[slice](http://mn416.github.io/blarney/Blarney-Core-Bit.html#v:slice), and
 use type application to specify the type-level indices:
 
 ```hs
@@ -578,8 +578,8 @@ upperNibble x = slice @7 @4 x
 ```
 
 For circuit-generation-time indices of type `Int`, we provide
-[unsafeAt](http://mn416.github.io/blarney/Blarney-Bit.html#v:unsafeAt) and
-[unsafeSlice](http://mn416.github.io/blarney/Blarney-Bit.html#v:unsafeSlice):
+[unsafeAt](http://mn416.github.io/blarney/Blarney-Core-Bit.html#v:unsafeAt) and
+[unsafeSlice](http://mn416.github.io/blarney/Blarney-Core-Bit.html#v:unsafeSlice):
 
 ```hs
 -- Extract most-sigificant bit of a byte
@@ -600,7 +600,7 @@ range.  Such cases will lead to confusing error messages, hence the
 
 Blarney provides
 [a variety of block RAM
-modules](http://mn416.github.io/blarney/Blarney-RAM.html)
+modules](http://mn416.github.io/blarney/Blarney-Core-RAM.html)
 commonly supported on FPGAs.
 They are all based around the following interface.
 
@@ -646,7 +646,7 @@ top = do
 ```
 
 Somewhat-related to block RAMs are
-[register files](http://mn416.github.io/blarney/Blarney-Module.html#t:RegFile).
+[register files](http://mn416.github.io/blarney/Blarney-Core-Module.html#t:RegFile).
 The difference
 is that a register file allows the value at an address to be
 determined *within* a clock cycle.  It also allows any number of reads
@@ -723,7 +723,7 @@ inc xs = do
 So far we've seen examples of top-level modules, i.e. modules with no
 inputs or outputs, being converted to Verilog.  In fact, any Blarney
 function whose inputs and outputs are members of the
-[Interface](http://mn416.github.io/blarney/Blarney-Interface.html) class
+[Interface](http://mn416.github.io/blarney/Blarney-Core-Interface.html) class
 can be converted to Verilog (and the `Interface` class supports
 generic deriving).  To illustrate, we can convert the function `inc`
 (defined in [Example 12](#example-12-streams)) into a Verilog module
