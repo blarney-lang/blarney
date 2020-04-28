@@ -334,7 +334,7 @@ getInitBV = eval
           in  x `B.shiftL` wy + y
         SelectBits w hi lo ->
           let x = eval (bvInputs a !! 0)
-              mask = (1 `B.shiftL` hi) - 1
+              mask = (1 `B.shiftL` (hi+1)) - 1
           in  (x B..&. mask) `B.shiftR` lo
         ReplicateBit w ->
           let b = eval (bvInputs a !! 0)
