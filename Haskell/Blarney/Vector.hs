@@ -115,9 +115,8 @@ import Data.Type.Equality
 
 -- | 'Vec' type
 data Vec (n :: Nat) a = Vec { toList :: [a] } deriving (Generic, FShow)
--- TODO check how verilog can handle 0 width bit vectors
---instance (Bits a, KnownNat n) => Bits (Vec n a) where
-instance (Bits a, KnownNat n, 1 <= n) => Bits (Vec n a) where
+
+instance (Bits a, KnownNat n) => Bits (Vec n a) where
   type SizeOf (Vec n a) = n * SizeOf a
   sizeOf xs = sum $ fmap sizeOf (toList xs)
   pack x = unsafeFromBitList $ concatMap (unsafeToBitList`o`pack) (toList x)
@@ -128,14 +127,12 @@ instance (Bits a, KnownNat n, 1 <= n) => Bits (Vec n a) where
                    xs = fmap unpack [unsafeSlice range x | range <- ranges]
   nameBits nm xs = Vec [ nameBits (nm ++ "_vec_" ++ show i) b
                        | (i,b) <- L.zip [0..] (toList xs) ]
-instance (KnownNat n, Interface a) => Interface (Vec n a) where
-  writePort s v = do
-    Blarney.Vector.zipWithM_
-      (\i x -> writePort (s ++ "_vec" ++ show i) x) genVec v
-  readPort s = do
-    res <- genWithM (\i -> readPort (s ++ "_vec" ++ show i))
-    return res
 
+instance (KnownNat n, Interface a) => Interface (Vec n a) where
+  toIfcTerm vec = IfcTermProduct (L.map toIfcTerm (toList vec))
+  fromIfcTerm (IfcTermProduct list) = Vec (L.map fromIfcTerm list)
+  toIfcType _ = IfcTypeProduct (L.replicate (valueOf @n) t)
+    where t = toIfcType (undefined :: a)
 
 -- | Generate a 'Vec' of size 'n' initialized with 'undefined' in each element
 newVec :: forall n a. KnownNat n => Vec n a
