@@ -740,9 +740,9 @@ interface:
 ```sv
 module inc(
   input  wire clock
-, output wire [0:0] in_consume_en
-, input  wire [0:0] in_canPeek
-, input  wire [7:0] in_peek
+, output wire [0:0] in0_consume_en
+, input  wire [0:0] in0_canPeek
+, input  wire [7:0] in0_peek
 , input  wire [0:0] out_consume_en
 , output wire [7:0] out_peek
 , output wire [0:0] out_canPeek
@@ -752,14 +752,14 @@ module inc(
 Considering the definition of the `Stream` type, the correspondance
 between the Blarney and the Verilog is quite clear:
 
-Signal           | Description
-------           | -----------
-`in_consume_en`  | Output asserted whenever the module consumes an element from the input stream.
-`in_canPeek`     | Input signalling when there is data available in the input stream.
-`in_peek`        | Input containing the next value in the input stream.
-`out_canPeek`    | Output asserted whenever there is data available in the output stream.
-`out_peek`       | Output containing the next value in the output stream.
-`out_consume_en` | Input signalling when the caller consumes an element from the output stream.
+Signal            | Description
+------            | -----------
+`in0_consume_en`  | Output asserted whenever the module consumes an element from the input stream.
+`in0_canPeek`     | Input signalling when there is data available in the input stream.
+`in0_peek`        | Input containing the next value in the input stream.
+`out_canPeek`     | Output asserted whenever there is data available in the output stream.
+`out_peek`        | Output containing the next value in the output stream.
+`out_consume_en`  | Input signalling when the caller consumes an element from the output stream.
 
 It is also possible to instantiate a Verilog module inside a Blarney
 description.  To illustrate, here is a function that creates an

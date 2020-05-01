@@ -37,7 +37,6 @@ module Blarney.Vector (
 --
 , Blarney.Vector.append
 , Blarney.Vector.concat
-, (Blarney.Vector.!)
 , Blarney.Vector.select
 , Blarney.Vector.split
 , Blarney.Vector.update
@@ -182,13 +181,7 @@ append xs ys = Vec (toList xs ++ toList ys)
 concat :: Vec m (Vec n a) -> Vec (m*n) a
 concat xss = Vec (L.concatMap toList (toList xss))
 
--- | Select the element from a 'Vec' at the given index
-(!) :: Vec n a -> Int -> a
-xs ! idx = toList xs !! idx
-
--- | Same as (!), select the element from a 'Vec' at the given index
---select :: Vec n a -> Integer -> a
---select = (!)
+-- | Select the element from a 'Vec' at the given type-level index
 select :: forall i n a. (KnownNat i, (i+1) <= n) => Vec n a -> a
 select xs = toList xs !! valueOf @i
 
@@ -437,3 +430,15 @@ sscanl :: (b -> a -> b) -> b -> Vec n a -> Vec (n+1) b
 sscanl f seed xs = Vec $ L.tail (L.scanl f seed (toList xs))
 
 -- TODO mapAccumL, mapAccumR
+
+-- |Index a vector using a bit vector
+instance (Interface a, KnownNat n) => Lookup (Vec m a) (Bit n) a where
+  v ! i = toList v ! i
+
+-- |Index a vector using an 'Int'
+instance Lookup (Vec m a) Int a where
+  v ! i = toList v ! i
+
+-- |Index a vector using an 'Integer'
+instance Lookup (Vec m a) Integer a where
+  v ! i = toList v ! fromIntegral i
