@@ -1,12 +1,14 @@
-cycleCount = 0
-cycleCount = 1
-cycleCount = 2
-cycleCount = 3
-cycleCount = 4
-cycleCount = 5
-cycleCount = 6
-cycleCount = 7
-cycleCount = 8
-cycleCount = 9
-cycleCount = 10
+4: 0
+5: 1
+6: 2
+7: 3
+8: 0
+9: 1
+10: 2
+11: 3
+12: 0
+13: 1
+14: 2
+15: 3
+16: 0
 Finished

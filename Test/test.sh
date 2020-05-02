@@ -25,6 +25,7 @@ EXAMPLES=(
   NoC
   Background
   Stack
+  Lookup
 )
 
 RED='\033[0;31m'
