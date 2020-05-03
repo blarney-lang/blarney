@@ -866,9 +866,9 @@ getBit :: Bit 8 -> Bit 3 -> Bit 1
 getBit x i = x!i
 ```
 
-Blarney's generic lookup operator `x!i` returns `i`the element of `x`,
-and works for many different types of `x` and `i`.  See the [Lookup
-class](#class-4-lookup) for more details.
+Blarney's generic lookup operator `x!i` returns the `i`'th element of
+`x`, and works for many different types of `x` and `i`.  See the
+[Lookup class](#class-3-lookup) for more details.
 
 ## Example 14: Bit-string pattern matching
 
