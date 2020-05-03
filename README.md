@@ -421,16 +421,16 @@ however, they can be expressed more neatly in a
 
 ```hs
 data Recipe =
-    Skip
-  | Tick
-  | Action (Action ())
-  | Seq [Recipe]
-  | Par [Recipe]
-  | Wait (Bit 1)
-  | When (Bit 1) Recipe
-  | If (Bit 1) Recipe Recipe
-  | While (Bit 1) Recipe
-  | Background Recipe
+    Skip                         -- Do nothing (in zero cycles)
+  | Tick                         -- Do nothing (in one cycle)
+  | Action (Action ())           -- Perform action (in one cycle)
+  | Seq [Recipe]                 -- Execute recipes in sequence
+  | Par [Recipe]                 -- Fork-join parallelism
+  | Wait (Bit 1)                 -- Block until condition holds
+  | When (Bit 1) Recipe          -- Conditional recipe
+  | If (Bit 1) Recipe Recipe     -- If-then-else recipe
+  | While (Bit 1) Recipe         -- Loop
+  | Background Recipe            -- Run recipe in background
 ```
 
 To illustrate, here is a small state machine that computes the
