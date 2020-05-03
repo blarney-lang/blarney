@@ -10,6 +10,8 @@ docs](http://mn416.github.io/blarney/index.html).
 
 ## Contents
 
+Examples:
+
 * [Example 1: Two-sort](#example-1-two-sort)
 * [Example 2: Bubble sort](#example-2-bubble-sort)
 * [Example 3: Polymorphism](#example-3-polymorphism)
@@ -17,16 +19,21 @@ docs](http://mn416.github.io/blarney/index.html).
 * [Example 5: Queues](#example-5-queues)
 * [Example 6: Mutable wires](#example-6-mutable-wires)
 * [Example 7: Recipes](#example-7-recipes)
-* [Example 8: Bits class](#example-8-bits-class)
-* [Example 9: FShow class](#example-9-fshow-class)
-* [Example 10: Bit selection](#example-10-bit-selection)
-* [Example 11: Block RAMs](#example-11-block-rams)
-* [Example 12: Streams](#example-12-streams)
-* [Example 13: Modular compilation](#example-13-modular-compilation)
-* [Example 14: Master-slave pattern](#example-14-master-slave-pattern)
-* [Example 15: Bit-string pattern matching](#example-15-bit-string-pattern-matching)
-* [Example 16: CPUs](#example-16-cpus)
-* [Example 17: Namer plugin](#example-17-namer-plugin)
+* [Example 8: Block RAMs](#example-8-block-rams)
+* [Example 9: Streams](#example-9-streams)
+* [Example 10: Modular compilation](#example-10-modular-compilation)
+* [Example 11: Master-slave pattern](#example-11-master-slave-pattern)
+* [Example 12: Bit selection and lookuip](#example-12-bit-selection-and-lookup)
+* [Example 13: Bit-string pattern matching](#example-13-bit-string-pattern-matching)
+* [Example 14: CPUs](#example-14-cpus)
+* [Example 15: Namer plugin](#example-15-namer-plugin)
+
+Type classes:
+
+* [Class 1: Bits](#class-1-bits)
+* [Class 2: Interface](#class-2-interface)
+* [Class 3: Lookup](#class-3-lookup)
+* [Class 4: FShow](#class-4-fshow)
 
 ## Example 1: Two-sort
 
@@ -61,12 +68,12 @@ We use Blarney's `always` construct
 always :: Action a -> Module a
 ```
 
-which performs the given action *on every clock cycle*.  Blarney
-actions include statements for displaying values during simulation
+to perform the given action *on every clock cycle*.  Blarney actions
+include statements for displaying values during simulation
 (`display`), terminating the simulator (`finish`), and mutating state
 (see below).  All statements in an `Action` execute in parallel,
-within a clock-cycle.  We can generate Verilog for the test bench as
-follows.
+within an a single cycle of an implicit clock.  We can generate
+Verilog for the test bench as follows.
 
 ```hs
 main :: IO ()
@@ -183,9 +190,8 @@ uses, we can see that it actually has a more general type.
 So `.<.` can be used on any type in the
 [Cmp](http://mn416.github.io/blarney/Blarney-Core-Bit.html#t:Cmp)
 (comparator) class.  Similarly `?` can be used on any type in the
-[Bits](http://mn416.github.io/blarney/Blarney-Core-Bits.html#t:Bits)
-class (which allows packing to a bit vector and back
-again). So a more generic definition of `twoSort` would be:
+[Bits](#class-1-bits) class (which allows packing to a bit vector and
+back again). So a more generic definition of `twoSort` would be:
 
 ```hs
 twoSort :: (Bits a, Cmp a) => (a, a) -> (a, a)
@@ -193,8 +199,8 @@ twoSort (a, b) = a .<. b ? ((a, b), (b, a))
 ```
 
 Indeed, this would be the type inferred by the Haskell compiler if no
-type signature was supplied.  Thanks to rebindable syntax in Haskell,
-we can also write:
+type signature was supplied.  We can also use `if`-`then`-`else`
+instead of the ternary conditional operator:
 
 ```hs
 twoSort :: (Bits a, Cmp a) => (a, a) -> (a, a)
@@ -204,7 +210,7 @@ twoSort (a, b) = if a .<. b then (a, b) else (b, a)
 ## Example 4: Mutable registers
 
 So far, we've only seen `display` and `finish` actions inside a
-Blarney module.  It also supports creation and assignment of
+Blarney module.  Also supported are creation and assignment of
 registers.  To illustrate, here is a module that creates a 4-bit
 `cycleCount` register, increments it on each cycle, stopping when it
 reaches 10.
@@ -233,8 +239,9 @@ creates a register, initialised to the given value; `val` returns the
 value of a register; the `.` operator is defined by Blarney as
 *reverse function application* rather than the usual *function
 composition*; and `when` allows conditional actions to be introduced.
-One can also use `if`/`then`/`else` in an `Action` context, thanks to
-Haskell's rebindable syntax feature.
+In addition to `when`, we can also use `if`-`then`-`else` in an
+`Action` context.  For example, the final three lines above could have
+been written as:
 
 ```hs
   -- Terminate simulation when count reaches 10
@@ -406,10 +413,10 @@ makeCounter = do
 
 State machines are a common way of defining the control-path of a
 circuit.  They are typically expressed by doing case-analysis of the
-current-state and manually setting the next-state.  Quite often
+current state and manually setting the next state.  Quite often
 however, they can be expressed more neatly in a
 [Recipe](http://mn416.github.io/blarney/Blarney-Recipe.html)
--- a simple imperative language with various control-flow statements.
+-- a simple imperative language with various control-flow constructs.
 
 ```hs
 data Recipe = 
@@ -489,114 +496,7 @@ second.  On the third cycle, we both increment and decrement it in
 parallel.  On the fourth cycle, we display the value and terminate the
 simulator.
 
-## Example 8: Bits class
-
-Any type in the
-[Bits](http://mn416.github.io/blarney/Blarney-Core-Bits.html)
-class can be represented in hardware, e.g.
-stored in a wire, a register, or a RAM.
-
-```hs
-class Bits a where
-  type SizeOf a :: Nat
-  sizeOf        :: a -> Int
-  pack          :: a -> Bit (SizeOf a)
-  unpack        :: Bit (SizeOf a) -> a
-```
-
-The `Bits` class supports *generic deriving*.  For example, suppose
-we have a simple data type for memory requests:
-
-```hs
-data MemReq =
-  MemReq {
-    memOp   :: Bit 1    -- Is it a load or a store request?
-  , memAddr :: Bit 32   -- 32-bit address
-  , memData :: Bit 32   -- 32-bit data for stores
-  }
-  deriving (Generic, Bits)
-```
-
-To make this type a member of the `Bits` class, we have suffixed it
-with `derving (Generic, Bits)`.  The generic deriving mechanism for
-`Bits` does not support *sum types*: there is no way to convert a
-bit-vector (run-time circuit value) to a sum type
-(circuit-generation-time value) using the circuit primitives provided
-by Blarney.
-
-## Example 9: FShow class
-
-Any type in the
-[FShow](http://mn416.github.io/blarney/Blarney-Core-FShow.html)
-class can be passed as arguments to the
-variadic `display` function.
-
-```hs
-class FShow a where
-  fshow     :: a -> Format
-  fshowList :: [a] -> Format     -- Has default definition
-
--- Abstract data type for things that can be displayed
-newtype Format
-
--- Format constructors
-mempty :: Format                         -- Empty (from Monoid class)
-(<>)   :: Format -> Format -> Format     -- Append (from Monoid class)
-```
-
-As an example, here is how the `FShow` instance for pairs is defined.
-
-```hs
--- Example instance: displaying pairs
-instance (FShow a, FShow b) => FShow (a, b) where
-  fshow (a, b) = fshow "(" <> fshow a <> fshow "," <> fshow b <> fshow ")"
-```
-
-Like the `Bits` class, the `FShow` class supports *generic deriving*:
-just include `FShow` in the `deriving` clause for the data type.
-
-## Example 10: Bit selection
-
-Bit selection is important when we want to extract a subset of bits
-out of a bit-vector.  There are different flavours, depending on
-whether the index (or indices) are type-level numbers or
-circuit-generation-time values:
-
-For type-level indices, we provide functions
-[at](http://mn416.github.io/blarney/Blarney-Core-Bit.html#v:at) and
-[slice](http://mn416.github.io/blarney/Blarney-Core-Bit.html#v:slice), and
-use type application to specify the type-level indices:
-
-```hs
--- Extract most-sigificant bit of a byte
-msb :: Bit 8 -> Bit 1
-msb x = at @7 x
-
--- Extract upper 4 bits of a byte
-upperNibble :: Bit 8 -> Bit 4
-upperNibble x = slice @7 @4 x
-```
-
-For circuit-generation-time indices of type `Int`, we provide
-[unsafeAt](http://mn416.github.io/blarney/Blarney-Core-Bit.html#v:unsafeAt) and
-[unsafeSlice](http://mn416.github.io/blarney/Blarney-Core-Bit.html#v:unsafeSlice):
-
-```hs
--- Extract most-sigificant bit of a byte
-msb :: Bit 8 -> Bit 1
-msb x = unsafeAt 7 x
-
--- Extract upper 4 bits of a byte
-upperNibble :: Bit 8 -> Bit 4
-upperNibble x = unsafeSlice (7, 4) x
-```
-
-The argument to `unsafeAt` could be out of range, and the result of
-`unsafeSlice` could have a different width to that implied by the
-range.  Such cases will lead to confusing error messages, hence the
-"unsafe" prefix on the function names.
-
-## Example 11: Block RAMs
+## Example 8: Block RAMs
 
 Blarney provides
 [a variety of block RAM
@@ -656,15 +556,17 @@ the following interface.
 ```hs
 data RegFile a d =
   RegFile {
-    (!)    :: a -> d                -- Read
+    index  :: a -> d                -- Read
   , update :: a -> d -> Action()    -- Write
   }
 ```
 
-Unlike block RAMs, register files (especially large ones) do not
-always map efficiently onto hardware, so use with care!
+To read from a register file, use the `index` method or the generic
+lookup operator `!`.  Unlike block RAMs, register files (especially
+large ones) do not always map efficiently onto hardware, so use with
+care!
 
-## Example 12: Streams
+## Example 9: Streams
 
 Streams are another commonly-used abstraction in hardware description.
 They are often used to implement hardware modules that consume data at
@@ -718,7 +620,7 @@ inc xs = do
   return (buffer.toStream)
 ```
 
-## Example 13: Modular compilation
+## Example 10: Modular compilation
 
 So far we've seen examples of top-level modules, i.e. modules with no
 inputs or outputs, being converted to Verilog.  In fact, any Blarney
@@ -726,7 +628,7 @@ function whose inputs and outputs are members of the
 [Interface](http://mn416.github.io/blarney/Blarney-Core-Interface.html) class
 can be converted to Verilog (and the `Interface` class supports
 generic deriving).  To illustrate, we can convert the function `inc`
-(defined in [Example 12](#example-12-streams)) into a Verilog module
+(defined in [Example 9](#example-9-streams)) into a Verilog module
 as follows.
 
 ```hs
@@ -816,7 +718,7 @@ design whenever we generate Verilog, rather than having to flatten it
 to massive netlist.  This technique can also be used to instantaite
 any Verilog module within a Blarney design.
 
-## Example 14: Master-slave pattern
+## Example 11: Master-slave pattern
 
 This is a common pattern in hardware design.  Suppose we wish to move
 multiplication out of a module and into an separate slave module,
@@ -882,7 +784,61 @@ top = mdo
   return ()
 ```
 
-## Example 15: Bit-string pattern matching
+## Example 12: Bit selection and lookup
+
+Bit selection operators are used to extract a subset of bits out of a
+bit-vector.  There are different flavours, depending on whether the
+indices are *type-level* numbers, *elaboration-time* numbers, or
+*circuit-level* numbers.
+
+For type-level indices, we provide functions
+[at](http://mn416.github.io/blarney/Blarney-Core-Bit.html#v:at) and
+[slice](http://mn416.github.io/blarney/Blarney-Core-Bit.html#v:slice), and
+use type application to specify the type-level indices:
+
+```hs
+-- Extract most-sigificant bit of a byte
+msb :: Bit 8 -> Bit 1
+msb x = at @7 x
+
+-- Extract upper 4 bits of a byte
+upperNibble :: Bit 8 -> Bit 4
+upperNibble x = slice @7 @4 x
+```
+
+For elaboration-time indices of type `Int`, we provide
+[unsafeAt](http://mn416.github.io/blarney/Blarney-Core-Bit.html#v:unsafeAt) and
+[unsafeSlice](http://mn416.github.io/blarney/Blarney-Core-Bit.html#v:unsafeSlice):
+
+```hs
+-- Extract most-sigificant bit of a byte
+msb :: Bit 8 -> Bit 1
+msb x = unsafeAt 7 x
+
+-- Extract upper 4 bits of a byte
+upperNibble :: Bit 8 -> Bit 4
+upperNibble x = unsafeSlice (7, 4) x
+```
+
+The argument to `unsafeAt` could be out of range, and the result of
+`unsafeSlice` could have a different width to that implied by the
+range.  Such cases will lead to confusing error messages, hence the
+"unsafe" prefix on the function names.
+
+Finally, for circuit-level indicies of type `Bit n`, the generic
+lookup operator `!` can be used:
+
+```hs
+-- Extract bit from byte at given index
+getBit :: Bit 8 -> Bit 3 -> Bit 1
+getBit x i = x!i
+```
+
+Blarney's generic lookup operator `x!i` returns `i`the element of `x`,
+and works for many different types of `x` and `i`.  See the [Lookup
+class](#class-4-lookup) for more details.
+
+## Example 13: Bit-string pattern matching
 
 Recent work on specifying and implementing ISAs led us to develop two
 libraries for doing bit-string pattern matching.  The first,
@@ -937,7 +893,7 @@ passed to the right-hand-side function.  Scattered immediates appear a
 lot in the RISC-V specification.  Thanks to Jon Woodruff for
 suggesting this feature!
 
-## Example 16: CPUs
+## Example 14: CPUs
 
 A few processor cores have been implemented in Blarney:
 
@@ -950,7 +906,7 @@ microarchitecture.
 * [Actora](https://github.com/POETSII/actora/): 3-stage stack
 machine that runs code written a subset of Erlang.
 
-## Example 17: Namer plugin
+## Example 15: Namer plugin
 
 One of the classic limitations of Lava is that identifier names are
 lost when the netlist is generated.  In particular, this is
@@ -993,3 +949,118 @@ To further improve the readability of generated code, you can also
 pass the `--enable-name-prop` and `--enable-simplifier` options to
 your circuit generator.  This will enable the (experimental) name
 propagation and netlist simplification passes respectively.
+
+## Class 1: Bits
+
+Any type in the
+[Bits](http://mn416.github.io/blarney/Blarney-Core-Bits.html)
+class can be represented in hardware, e.g.
+stored in a wire, a register, or a RAM.
+
+```hs
+class Bits a where
+  type SizeOf a :: Nat
+  sizeOf        :: a -> Int
+  pack          :: a -> Bit (SizeOf a)
+  unpack        :: Bit (SizeOf a) -> a
+```
+
+The `Bits` class supports *generic deriving*.  For example, suppose
+we have a simple data type for memory requests:
+
+```hs
+data MemReq =
+  MemReq {
+    memOp   :: Bit 1    -- Is it a load or a store request?
+  , memAddr :: Bit 32   -- 32-bit address
+  , memData :: Bit 32   -- 32-bit data for stores
+  }
+  deriving (Generic, Bits)
+```
+
+To make this type a member of the `Bits` class, we have suffixed it
+with `derving (Generic, Bits)`.  The generic deriving mechanism for
+`Bits` does not support *sum types*: there is no way to convert a
+bit-vector (run-time circuit value) to a sum type (elaboration-time
+value) using the circuit primitives provided by Blarney.
+
+## Class 2: Interface
+
+Any type in the
+[Interface](http://mn416.github.io/blarney/Blarney-Core-Interface.html)
+class can be used as a module input or output when doing [modular
+compilation](#example-10-modular-compilation).  Furthermore,
+collections of interfaces can be indexed by circuit-time values using
+the `!` operator.  To illustrate, here is an example circuit to split
+a stream of [MemReq](#class-1-bits) into four streams, using the lower
+two bits of the address to decide which output stream to use.
+
+```hs
+split :: Stream MemReq -> Module [Stream MemReq]
+split reqs = do
+  -- Create a list of 4 queues
+  queues :: [Queue MemReq] <- replicateM 4 makeQueue
+
+  always do
+    -- Consume request, and put into appropriate queue
+    when (reqs.canPeek) do
+      let i :: Bit 2 = truncate (reqs.peek.memAddr)
+      when ((queues!i).notFull) do
+        reqs.consume
+        enq (queues!i) (reqs.peek)
+
+  return (map toStream queues)
+```
+
+The `Interface` class supports generic deriving: just add `Interface`
+to the deriving clause for the datatype.  In the above example,
+`MemReq` is an `Interface`, and so too is `Queue a` for any `a` that
+is also an `Interface`.
+
+## Class 3: Lookup
+
+The generic lookup operator `!` is provided by the
+[Lookup](http://mn416.github.io/blarney/Blarney-Core-Lookup.html)
+class.
+
+```hs
+-- Index a collection 'c' of elements 'e' using index 'i' 
+class Lookup c i e | c -> e where
+  (!) : c -> i -> e
+```
+
+A wide range of combinations of types are supported.  Because the
+operator is so general, the types `c` and `i` usually need to be known
+from the context, to avoid ambiguity errors from GHC.  However, due to
+the functional dependency `c -> e`, the return type can be inferred
+from the collection type.
+
+## Class 4: FShow
+
+Any type in the
+[FShow](http://mn416.github.io/blarney/Blarney-Core-FShow.html)
+class can be passed as arguments to the
+variadic `display` function.
+
+```hs
+class FShow a where
+  fshow     :: a -> Format
+  fshowList :: [a] -> Format     -- Has default definition
+
+-- Abstract data type for things that can be displayed
+newtype Format
+
+-- Format constructors
+mempty :: Format                         -- Empty (from Monoid class)
+(<>)   :: Format -> Format -> Format     -- Append (from Monoid class)
+```
+
+As an example, here is how the `FShow` instance for pairs is defined.
+
+```hs
+-- Example instance: displaying pairs
+instance (FShow a, FShow b) => FShow (a, b) where
+  fshow (a, b) = fshow "(" <> fshow a <> fshow "," <> fshow b <> fshow ")"
+```
+
+The `FShow` class supports *generic deriving*.
