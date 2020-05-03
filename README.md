@@ -1061,11 +1061,9 @@ class Lookup c i e | c -> e where
   (!) : c -> i -> e
 ```
 
-A wide range of combinations of types are supported.  Because the
-operator is so general, the types `c` and `i` usually need to be known
-from the context, to avoid ambiguity errors from GHC.  However, due to
-the functional dependency `c -> e`, the return type can be inferred
-from the collection type.
+A wide range of combinations of types are supported.  The functional
+dependency `c -> e` allows the return type to be inferred from the
+collection type.
 
 ## Class 4: FShow
 
