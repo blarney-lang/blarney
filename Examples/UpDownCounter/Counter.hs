@@ -41,15 +41,19 @@ top = do
 
   -- Simple test sequence
   let testSeq =
-        Do [
-          inc counter,
-          inc counter,
-          do { inc counter; dec counter },
-          inc counter,
-          dec counter
+        Seq [
+          Action do counter.inc,
+          Action do counter.inc,
+          Action do 
+            counter.inc
+            counter.dec,
+          Action do
+            counter.inc,
+          Action do
+            counter.dec
         ]
 
-  done <- run (reg 1 0) testSeq
+  done <- runRecipeOn (reg 1 0) testSeq
 
   always do
     when done do
