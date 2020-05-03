@@ -24,7 +24,7 @@ Examples:
 * [Example 10: Streams](#example-10-streams)
 * [Example 11: Modular compilation](#example-11-modular-compilation)
 * [Example 12: Master-slave pattern](#example-12-master-slave-pattern)
-* [Example 13: Bit selection and lookuip](#example-13-bit-selection-and-lookup)
+* [Example 13: Bit selection and lookup](#example-13-bit-selection-and-lookup)
 * [Example 14: Bit-string pattern matching](#example-14-bit-string-pattern-matching)
 * [Example 15: CPUs](#example-15-cpus)
 * [Example 16: Namer plugin](#example-16-namer-plugin)
