@@ -69,7 +69,7 @@ data IfcTerm =
 -- Interface type representation
 data IfcType = 
     IfcTypeUnit
-  | IfcTypeBV Integer
+  | IfcTypeBV Width
   | IfcTypeAction IfcType
   | IfcTypeProduct [IfcType]
   | IfcTypeFun IfcType IfcType
@@ -174,18 +174,22 @@ instance (Interface a, Interface b, Interface c, Interface d,
 instance (Interface a, Bits a) => Interface (Reg a)
 instance (Interface a, Bits a) => Interface (Wire a)
 
--- |Declaration reader/writer monad for declaring named inputs and outputs
+-- |Declaration reader/writer monad for declaring named inputs and outputs.
+-- The writer part of the monad collects declarations.  Any names
+-- declared as inputs are fed cyclically back into the reader part of
+-- the monad in the form of an environment mapping input names to
+-- bit-vectors.
 newtype Declare a =
   Declare {
     runDeclare :: Int -> Scope -> Env -> Module (Int, [Decl], a)
   }
 
--- Environment mapping string names to values
+-- Environment mapping string names to bit-vector values
 type Env = [(String, BV)]
 
 -- Declarations being collected
 -- (A named input with a width, or a named output bit-vector)
-data Decl = DeclInput String Integer | DeclOutput String BV
+data Decl = DeclInput String Width | DeclOutput String BV
 
 -- A scope is a stack of names, used to generate sensible names
 type Scope = [String]
@@ -244,7 +248,7 @@ declareOutputBV suffix bv = do
   addDecl (DeclOutput name bv)
 
 -- Declare a new input bit-vector of given width
-declareInputBV :: String -> Integer -> Declare BV
+declareInputBV :: String -> Width -> Declare BV
 declareInputBV suffix width = do
   nm <- getName
   let name = case suffix of { "" -> nm; other -> nm ++ "_" ++ suffix }
@@ -252,107 +256,104 @@ declareInputBV suffix width = do
   lookupInputBV name
 
 -- Declare an output, generically over any iterface type  
-declareOutput :: IfcTerm -> IfcType -> Declare ()
-declareOutput = decl
-  where
-    decl x (IfcTypeMetaSel selName t) =
-      newScope selName (decl x t)
-    decl IfcTermUnit t = return ()
-    decl (IfcTermBV bv) t =
-      declareOutputBV "" bv
-    decl (IfcTermAction act) (IfcTypeAction t) = do
-      -- Declare input wire to trigger execution of act
-      en <- declareInputBV "en" 1
-      -- Trigger action
-      ret <- liftModule $ always $ whenR (FromBV en :: Bit 1) act
-      -- Declare return value output
-      newScope "ret" (decl ret t)
-      return ()
-    decl (IfcTermProduct xs) (IfcTypeProduct txs) =
-      zipWithM_ decl xs txs
-    decl (IfcTermFun fun) (IfcTypeFun argType retType) = do
-      -- Declare argument as input
-      arg <- newScope "arg" (declareInput argType)
-      -- Apply argument and declare return value as output
-      decl (fun arg) retType
+declareOut :: IfcTerm -> IfcType -> Declare ()
+declareOut x (IfcTypeMetaSel selName t) =
+  newScope selName (declareOut x t)
+declareOut IfcTermUnit _ = return ()
+declareOut (IfcTermBV bv) _ =
+  declareOutputBV "" bv
+declareOut (IfcTermAction act) (IfcTypeAction t) = do
+  -- Declare input wire to trigger execution of act
+  en <- declareInputBV "en" 1
+  -- Trigger action
+  ret <- liftModule $ always $ whenR (FromBV en :: Bit 1) act
+  -- Declare return value output
+  newScope "ret" (declareOut ret t)
+declareOut (IfcTermProduct xs) (IfcTypeProduct txs) =
+  zipWithM_ declareOut xs txs
+declareOut (IfcTermFun fun) (IfcTypeFun argType retType) = do
+  -- Declare argument as input
+  arg <- newScope "" (declareIn argType)
+  -- Apply argument and declare return value as output
+  declareOut (fun arg) retType
 
--- Typed version of 'declareOutput'
-declareTypedOutput :: Interface a => String -> a -> Declare ()
-declareTypedOutput str out = 
-  newScope str (declareOutput (toIfcTerm out) (toIfcType out))
+-- Typed version of 'declareOut'
+declareOutput :: Interface a => String -> a -> Declare ()
+declareOutput str out = 
+  newScope str (declareOut (toIfcTerm out) (toIfcType out))
 
 -- Declare an input, generically over any iterface type
-declareInput :: IfcType -> Declare IfcTerm
-declareInput = decl
+declareIn :: IfcType -> Declare IfcTerm
+declareIn (IfcTypeMetaSel selName t) =
+  newScope selName (declareIn t)
+declareIn IfcTypeUnit = return IfcTermUnit
+declareIn (IfcTypeBV w) = do
+  bv <- declareInputBV "" w
+  return (IfcTermBV bv)
+declareIn (IfcTypeAction t) = do
+  -- Declare return value as input
+  ret <- newScope "ret" (declareIn t)
+  -- Create enable wire
+  enWire :: Wire (Bit 1) <- liftModule (makeWire 0)
+  -- Declare enable signal as output
+  declareOutputBV "en" (toBV (val enWire))
+  -- When action block is called, trigger the enable line
+  return (IfcTermAction $ do { enWire <== 1; return ret })
+declareIn (IfcTypeProduct ts) =
+  IfcTermProduct <$> mapM declareIn ts
+declareIn t@(IfcTypeFun _ _) = do
+  let (argTypes, retType) = flatten t
+  -- The return type must be an action (the Method class captures
+  -- this assumption, but let's check anyway)
+  case retType of
+    IfcTypeAction{} -> do
+      -- Declare return type as input
+      ret <- declareIn retType
+      case ret of
+        IfcTermAction retAct -> do
+          -- Declare each argument as an output
+          drivers <- forM argTypes \argType ->
+            newScope "" (driver argType)
+          -- Construct a function which assigns the args and
+          -- executes the return action
+          let driveArgs act (driver:rest) =
+                IfcTermFun (\x -> driveArgs (driver x >> act) rest)
+              driveArgs act [] = IfcTermAction act
+          return (driveArgs retAct drivers)
+        other -> error "Blarney.Core.Interface: maltyped term"
+    other -> error "Blarney.Core.Interface: method constraint violated"
   where
-    decl (IfcTypeMetaSel selName t) =
-      newScope selName (decl t)
-    decl IfcTypeUnit = return IfcTermUnit
-    decl (IfcTypeBV w) = do
-      bv <- declareInputBV "" w
-      return (IfcTermBV bv)
-    decl (IfcTypeAction t) = do
-      -- Declare return value as input
-      ret <- newScope "ret" (decl t)
-      -- Create enable wire
-      enWire :: Wire (Bit 1) <- liftModule (makeWire 0)
-      -- Declare enable signal as output
-      declareOutputBV "en" (toBV (val enWire))
-      -- When action block is called, trigger the enable line
-      return (IfcTermAction $ do { enWire <== 1; return ret })
-    decl (IfcTypeProduct ts) =
-      IfcTermProduct <$> mapM decl ts
-    decl t@(IfcTypeFun _ _) = do
-      let (argTypes, retType) = flatten t
-      -- The return type must be an action (the Method class captures
-      -- this assumption, but let's check anyway)
-      case retType of
-        IfcTypeAction{} -> do
-          -- Declare return type as input
-          ret <- newScope "ret" (decl retType)
-          case ret of
-            IfcTermAction retAct -> do
-              -- Declare each argument as an output
-              assArgs <- forM argTypes \argType -> do
-                assArg <- newScope "arg" (ass argType)
-                return assArg
-              -- Construct a function which assigns the args and
-              -- executes the return action
-              let assFun act (assArg:rest) =
-                    IfcTermFun (\x -> assFun (assArg x >> act) rest)
-                  assFun act [] = IfcTermAction act
-              return (assFun retAct assArgs)
-            other -> error "Blarney.Core.Interface: maltyped term"
-        other -> error "Blarney.Core.Interface: method constraint violated"
-
     -- Flatten arrow type to a list of argument types and a return type
     flatten :: IfcType -> ([IfcType], IfcType)
-    flatten (IfcTypeFun argType retType) = (argType : args, retType)
+    flatten (IfcTypeFun argType retType) = (argType : args, ret)
       where (args, ret) = flatten retType
     flatten other = ([], other)
 
-    -- Declare an output and return assignment function for that output
-    ass :: IfcType -> Declare (IfcTerm -> Action ())
-    ass (IfcTypeMetaSel selName t) = newScope selName (ass t)
-    ass (IfcTypeBV w) =
-      liftNat (fromInteger w) $ \(_ :: Proxy n) -> do
+    -- Declare an output and return assignment
+    -- function (driver) for that output
+    driver :: IfcType -> Declare (IfcTerm -> Action ())
+    driver (IfcTypeMetaSel selName t) = newScope selName (driver t)
+    driver IfcTypeUnit = return (\x -> return ())
+    driver (IfcTypeBV w) =
+      liftNat w $ \(_ :: Proxy n) -> do
         -- Create assignable wire for this bit-vector
         wire :: Wire (Bit n) <- liftModule (makeWire dontCare)
         -- Declare wire value as an output
         declareOutputBV "" (toBV (val wire))
         -- Return assigner
         return (\(IfcTermBV bv) -> wire <== FromBV bv)
-    ass (IfcTypeProduct ts) = do
-      assigns <- mapM ass ts
-      return (\(IfcTermProduct xs) -> zipWithM_ ($) assigns xs)
-    ass other = return (\x -> return ())
+    driver (IfcTypeProduct ts) = do
+      drivers <- mapM driver ts
+      return (\(IfcTermProduct xs) -> zipWithM_ ($) drivers xs)
+    driver other =
+      error "Blarney.Core.Interface: driver applied to non-Bits type"
 
--- Typed version of 'declareInput'
-declareTypedInput :: forall a. Interface a => String -> Declare a
-declareTypedInput str =
+-- Typed version of 'declareIn'
+declareInput :: forall a. Interface a => String -> Declare a
+declareInput str =
   newScope str do
     let t = toIfcType (undefined :: a)
-    x <- declareInput t
+    x <- declareIn t
     return (fromIfcTerm x)
 
 class Modular a where
@@ -361,16 +362,16 @@ class Modular a where
 
 instance Interface a => Modular (Module a) where
   makeMod count m =
-    liftModule m >>= declareTypedOutput "out"
+    liftModule m >>= declareOutput "out"
   makeInst s ps count m =
-    instantiate s ps (m >> declareTypedInput "out")
+    instantiate s ps (m >> declareInput "out")
 
 instance (Interface a, Modular m) => Modular (a -> m) where
   makeMod count f = do
-    a <- declareTypedInput ("in" ++ show count)
+    a <- declareInput ("in" ++ show count)
     makeMod (count+1) (f a)
   makeInst s ps count m = \a ->
-    makeInst s ps (count+1) (m >> declareTypedOutput ("in" ++ show count) a)
+    makeInst s ps (count+1) (m >> declareOutput ("in" ++ show count) a)
 
 -- Realise declarations to give standalone module
 modularise :: Declare a -> Module a
@@ -381,12 +382,12 @@ modularise ifc = noName mdo
   where
     mod w = noName do
       let outputs = [(s, x) | (DeclOutput s x) <- w]
-      let inputs  = [(s, fromInteger n) | DeclInput s n <- w]
+      let inputs  = [(s, n) | DeclInput s n <- w]
       mapM (\(s,x) -> outputBV s x) outputs
       tmps <- mapM (\(s,n) -> inputBV s n) inputs
       return $ zip (map fst inputs) tmps
 
--- Realise declarations to give standalone module instance
+-- Realise declarations to give module instance
 instantiate :: String -> [Param] -> Declare a -> Module a
 instantiate name params ifc = noName mdo
     (_, w, a) <- runDeclare ifc 0 [] (custom w)
@@ -395,7 +396,7 @@ instantiate name params ifc = noName mdo
   where
     custom w =
       let inputs   = [(s, x) | (DeclOutput s x) <- w]
-          outputs  = [(s, fromInteger n) | DeclInput s n <- w]
+          outputs  = [(s, n) | DeclInput s n <- w]
           outNames = map fst outputs
           prim     = Custom name [(s, bvPrimOutWidth x) | (s, x) <- inputs]
                            outputs params True

@@ -73,29 +73,31 @@ instance KnownNat m => Lookup (Bit n) (Bit m) (Bit 1) where
 
 -- |Index a bit vector using an Int
 instance Lookup (Bit n) Int (Bit 1) where 
-  b ! i = unsafeToBitList b !! i
+  b ! i = unsafeToBitList b ! i
 
 -- |Index a bit vector using an Integer
 instance Lookup (Bit n) Integer (Bit 1) where 
-  b ! i = unsafeToBitList b !! fromIntegral i
+  b ! i = unsafeToBitList b ! i
 
 -- |Index a list of interfaces using bit-vector
 lookupInterface :: (KnownNat n, Interface a) => [a] -> Bit n -> a
 lookupInterface ifcs i = fromIfcTerm (idx [toIfcTerm ifc | ifc <- ifcs])
   where
+    -- All elements in 'ifcs' have the same type, and hence all elements
+    -- in the argument to 'idx' are the same constructor.
     idx [] = error "Blarney.Core.Lookup: looking up an empty list"
-    idx (ifcs@(IfcTermBV{}:rest)) = IfcTermBV $
+    idx (ifcs@(IfcTermBV{}:_)) = IfcTermBV $
       tree1 orBV [ maskBV (i .==. fromInteger j) x
                  | (j, IfcTermBV x) <- zip [0..] ifcs ]
-    idx (ifcs@(IfcTermAction{}:rest)) =
+    idx (ifcs@(IfcTermAction{}:_)) =
       IfcTermAction do
         rets <- sequence
                   [ whenR (i .==. fromInteger j) act
                   | (j, IfcTermAction act) <- zip [0..] ifcs ]
         return (idx rets)
-    idx (ifcs@(IfcTermProduct{}:rest)) =
+    idx (ifcs@(IfcTermProduct{}:_)) =
       IfcTermProduct $ map idx $ transpose [xs | IfcTermProduct xs <- ifcs]
-    idx (ifcs@(IfcTermFun{}:rest)) =
+    idx (ifcs@(IfcTermFun{}:_)) =
       IfcTermFun $ \x -> idx [f x | IfcTermFun f <- ifcs]
 
     maskBV c x = muxBV (toBV c) (x, constBV w 0)
