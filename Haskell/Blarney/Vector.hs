@@ -37,7 +37,6 @@ module Blarney.Vector (
 --
 , Blarney.Vector.append
 , Blarney.Vector.concat
-, (Blarney.Vector.!)
 , Blarney.Vector.select
 , Blarney.Vector.split
 , Blarney.Vector.update
@@ -115,9 +114,8 @@ import Data.Type.Equality
 
 -- | 'Vec' type
 data Vec (n :: Nat) a = Vec { toList :: [a] } deriving (Generic, FShow)
--- TODO check how verilog can handle 0 width bit vectors
---instance (Bits a, KnownNat n) => Bits (Vec n a) where
-instance (Bits a, KnownNat n, 1 <= n) => Bits (Vec n a) where
+
+instance (Bits a, KnownNat n) => Bits (Vec n a) where
   type SizeOf (Vec n a) = n * SizeOf a
   sizeOf xs = sum $ fmap sizeOf (toList xs)
   pack x = unsafeFromBitList $ concatMap (unsafeToBitList`o`pack) (toList x)
@@ -128,14 +126,12 @@ instance (Bits a, KnownNat n, 1 <= n) => Bits (Vec n a) where
                    xs = fmap unpack [unsafeSlice range x | range <- ranges]
   nameBits nm xs = Vec [ nameBits (nm ++ "_vec_" ++ show i) b
                        | (i,b) <- L.zip [0..] (toList xs) ]
-instance (KnownNat n, Interface a) => Interface (Vec n a) where
-  writePort s v = do
-    Blarney.Vector.zipWithM_
-      (\i x -> writePort (s ++ "_vec" ++ show i) x) genVec v
-  readPort s = do
-    res <- genWithM (\i -> readPort (s ++ "_vec" ++ show i))
-    return res
 
+instance (KnownNat n, Interface a) => Interface (Vec n a) where
+  toIfcTerm vec = IfcTermProduct (L.map toIfcTerm (toList vec))
+  fromIfcTerm (IfcTermProduct list) = Vec (L.map fromIfcTerm list)
+  toIfcType _ = IfcTypeProduct (L.replicate (valueOf @n) t)
+    where t = toIfcType (undefined :: a)
 
 -- | Generate a 'Vec' of size 'n' initialized with 'undefined' in each element
 newVec :: forall n a. KnownNat n => Vec n a
@@ -185,13 +181,7 @@ append xs ys = Vec (toList xs ++ toList ys)
 concat :: Vec m (Vec n a) -> Vec (m*n) a
 concat xss = Vec (L.concatMap toList (toList xss))
 
--- | Select the element from a 'Vec' at the given index
-(!) :: Vec n a -> Int -> a
-xs ! idx = toList xs !! idx
-
--- | Same as (!), select the element from a 'Vec' at the given index
---select :: Vec n a -> Integer -> a
---select = (!)
+-- | Select the element from a 'Vec' at the given type-level index
 select :: forall i n a. (KnownNat i, (i+1) <= n) => Vec n a -> a
 select xs = toList xs !! valueOf @i
 
@@ -440,3 +430,15 @@ sscanl :: (b -> a -> b) -> b -> Vec n a -> Vec (n+1) b
 sscanl f seed xs = Vec $ L.tail (L.scanl f seed (toList xs))
 
 -- TODO mapAccumL, mapAccumR
+
+-- |Index a vector using a bit vector
+instance (Interface a, KnownNat n) => Lookup (Vec m a) (Bit n) a where
+  v ! i = toList v ! i
+
+-- |Index a vector using an 'Int'
+instance Lookup (Vec m a) Int a where
+  v ! i = toList v ! i
+
+-- |Index a vector using an 'Integer'
+instance Lookup (Vec m a) Integer a where
+  v ! i = toList v ! fromIntegral i

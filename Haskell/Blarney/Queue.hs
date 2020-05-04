@@ -32,7 +32,7 @@ data Queue a = Queue { notEmpty :: Bit 1
                      , deq      :: Action ()
                      , canDeq   :: Bit 1
                      , first    :: a
-                     }
+                     } deriving (Generic, Interface)
 
 -- | ToSource instance for Queue
 instance ToSource (Queue t) t where
@@ -46,7 +46,6 @@ instance ToSink (Queue t) t where
   toSink q = Sink { put = \x -> do when (q.notFull) do (q.enq) x
                                    return (q.notFull)
                   }
-
 
 -- | ToSP instance for Queue
 instance ToSP (Queue a) a a where

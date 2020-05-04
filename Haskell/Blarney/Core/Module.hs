@@ -263,7 +263,7 @@ outputBV str bv = M (RTL.outputBV str bv)
 
 data RegFile a d =
   RegFile {
-    (!)    :: a -> d
+    index  :: a -> d
   , update :: a -> d -> Action ()
   }
 

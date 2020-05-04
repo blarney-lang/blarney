@@ -31,9 +31,11 @@ Verilog modules, and Verilog modules to be instantiated in a
 Blarney description.
 -}
 module Blarney.Core.Interface
-  ( Ifc           -- Monad for constructing Verilog interfaces
-  , Interface(..) -- Class of types that can be converted to Verilog I/O ports
-  , Modular(..)   -- Class of types that can be turned into Verilog modules
+  ( Interface(..) -- Types that can be converted to Verilog I/O ports
+  , IfcTerm(..)   -- Generic term representation
+  , IfcType(..)   -- Generic type representation
+  , Method(..)    -- Function types that can be converted to Verilog I/O ports
+  , Modular(..)   -- Types that can be turned into Verilog modules
   , makeModule    -- Convert a Blarney function to a Verilog module
   , makeInstance  -- Instantiate a Verilog module in a Blarney description
   , makeInstanceWithParams  -- Allow synthesis-time Verilog parameters
@@ -42,9 +44,11 @@ module Blarney.Core.Interface
 -- Standard imports
 import Prelude
 import GHC.TypeLits
+import GHC.Generics
 import Control.Monad.Fix
 import Control.Monad hiding (when)
-import GHC.Generics hiding (R)
+import Data.List (intersperse)
+import Data.Proxy
 
 -- Blarney imports
 import Blarney.Core.BV
@@ -54,320 +58,355 @@ import Blarney.Core.Prim
 import Blarney.Core.Module
 import Blarney.Core.Prelude
 
--- The Ifc monad
--- =============
+-- Interface term representation
+data IfcTerm =
+    IfcTermUnit
+  | IfcTermBV BV
+  | IfcTermAction (Action IfcTerm)
+  | IfcTermProduct [IfcTerm]
+  | IfcTermFun (IfcTerm -> IfcTerm)
 
--- A reader/writer monad for creating modules and module instances,
--- with named inputs and outputs.
+-- Interface type representation
+data IfcType = 
+    IfcTypeUnit
+  | IfcTypeBV Width
+  | IfcTypeAction IfcType
+  | IfcTypeProduct [IfcType]
+  | IfcTypeFun IfcType IfcType
+    -- Marks new field selector with name
+  | IfcTypeMetaSel String IfcType 
 
--- |The reader part provides component outputs or module inputs
-type R = [(String, BV)]
+class Interface a where
+  toIfcTerm   :: a -> IfcTerm
+  fromIfcTerm :: IfcTerm -> a
+  toIfcType   :: a -> IfcType
 
--- | The writer part collects component/module inputs and outputs
-data Pin = WritePin BV | ReadPin Integer
-type W = [(String, Pin)]
+  -- |For generic deriving
+  default toIfcTerm :: (Generic a, GInterface (Rep a)) => a -> IfcTerm
+  toIfcTerm x = gtoIfcTerm (from x)
+  default fromIfcTerm :: (Generic a, GInterface (Rep a)) => IfcTerm -> a
+  fromIfcTerm x = to (gfromIfcTerm x)
+  default toIfcType :: (Generic a, GInterface (Rep a)) => a -> IfcType
+  toIfcType x = gtoIfcType (from x)
 
--- |The 'Ifc' monad
-newtype Ifc a = Ifc { runIfc :: R -> Module (W, a) }
+instance KnownNat n => Interface (Bit n) where
+  toIfcTerm x = IfcTermBV (toBV x)
+  fromIfcTerm ~(IfcTermBV x) = FromBV x
+  toIfcType x = IfcTypeBV (fromIntegral (widthOf x))
 
-instance Monad Ifc where
-  return a = Ifc $ \r -> return ([], a)
-  m >>= f = Ifc $ \r -> noName do
-    (w0, a) <- runIfc m r
-    (w1, b) <- runIfc (f a) r
-    return (w0 ++ w1, b)
+instance Interface a => Interface (Action a) where
+  toIfcTerm act = IfcTermAction (toIfcTerm <$> act)
+  fromIfcTerm ~(IfcTermAction act) = fromIfcTerm <$> act
+  toIfcType _ = IfcTypeAction (toIfcType (undefined :: a))
 
-instance Applicative Ifc where
+instance (Interface a, Bits a, Method b) => Interface (a -> b) where
+  toIfcTerm = toMethodTerm
+  fromIfcTerm = fromMethodTerm
+  toIfcType = toMethodType
+
+-- |This class defines which functions make a valid 'Interface'.
+-- Specifially, a 'Method' is any function returning an 'Action'
+-- whose arguments are in 'Interface' and 'Bits'.  Note that
+-- we don't actually use the 'Bits' dictionary, but it captures at
+-- the type level the restriction that method arguments must be
+-- assignable at the circuit level.
+class Method a where
+  toMethodTerm :: a -> IfcTerm
+  fromMethodTerm :: IfcTerm -> a
+  toMethodType :: a -> IfcType
+
+instance Interface a => Method (Action a) where
+  toMethodTerm = toIfcTerm
+  fromMethodTerm = fromIfcTerm
+  toMethodType = toIfcType
+
+instance (Interface a, Bits a, Method b) => Method (a -> b) where
+  toMethodTerm f = IfcTermFun (\a -> toMethodTerm (f (fromIfcTerm a)))
+  fromMethodTerm ~(IfcTermFun f) = \a -> fromMethodTerm (f (toIfcTerm a))
+  toMethodType _ = IfcTypeFun (toIfcType (undefined :: a))
+                              (toMethodType (undefined :: b))
+
+-- |For generic deriving of 'Interface'
+class GInterface f where
+  gtoIfcTerm   :: f a -> IfcTerm
+  gfromIfcTerm :: IfcTerm -> f a
+  gtoIfcType   :: f a -> IfcType
+
+instance GInterface U1 where
+  gtoIfcTerm _ = IfcTermUnit
+  gfromIfcTerm _ = U1
+  gtoIfcType _ = IfcTypeUnit
+
+instance (GInterface a, GInterface b) => GInterface (a :*: b) where
+  gtoIfcTerm ~(a :*: b) = IfcTermProduct [gtoIfcTerm a, gtoIfcTerm b]
+  gfromIfcTerm ~(IfcTermProduct [a, b]) = gfromIfcTerm a :*: gfromIfcTerm b
+  gtoIfcType ~(a :*: b) = IfcTypeProduct [gtoIfcType a, gtoIfcType b]
+
+instance (GInterface a, Selector c) => GInterface (M1 S c a) where
+  gtoIfcTerm ~(m@(M1 x)) = gtoIfcTerm x
+  gfromIfcTerm x = M1 (gfromIfcTerm x)
+  gtoIfcType ~(m@(M1 x)) = IfcTypeMetaSel (selName m) (gtoIfcType x)
+
+instance {-# OVERLAPPABLE #-} GInterface a => GInterface (M1 i c a)  where
+  gtoIfcTerm ~(m@(M1 x)) = gtoIfcTerm x
+  gfromIfcTerm x = M1 (gfromIfcTerm x)
+  gtoIfcType ~(m@(M1 x)) = gtoIfcType x
+
+instance Interface a => GInterface (K1 i a) where
+  gtoIfcTerm ~(K1 x) = toIfcTerm x
+  gfromIfcTerm x = K1 (fromIfcTerm x)
+  gtoIfcType ~(K1 x) = toIfcType x
+
+-- Instances
+instance Interface ()
+instance (Interface a, Interface b) => Interface (a, b)
+instance (Interface a, Interface b, Interface c) => Interface (a, b, c)
+instance (Interface a, Interface b, Interface c, Interface d) =>
+  Interface (a, b, c, d)
+instance (Interface a, Interface b, Interface c, Interface d, Interface e) =>
+  Interface (a, b, c, d, e)
+instance (Interface a, Interface b, Interface c, Interface d,
+          Interface e, Interface f) =>
+  Interface (a, b, c, d, e, f)
+instance (Interface a, Interface b, Interface c, Interface d,
+          Interface e, Interface f, Interface g) =>
+  Interface (a, b, c, d, e, f, g)
+instance (Interface a, Bits a) => Interface (Reg a)
+instance (Interface a, Bits a) => Interface (Wire a)
+
+-- |Declaration reader/writer monad for declaring named inputs and outputs.
+-- The writer part of the monad collects declarations.  Any names
+-- declared as inputs are fed cyclically back into the reader part of
+-- the monad in the form of an environment mapping input names to
+-- bit-vectors.
+newtype Declare a =
+  Declare {
+    runDeclare :: Int -> Scope -> Env -> Module (Int, [Decl], a)
+  }
+
+-- Environment mapping string names to bit-vector values
+type Env = [(String, BV)]
+
+-- Declarations being collected
+-- (A named input with a width, or a named output bit-vector)
+data Decl = DeclInput String Width | DeclOutput String BV
+
+-- A scope is a stack of names, used to generate sensible names
+type Scope = [String]
+
+-- Instances of Monad, Applicable, Functor
+instance Monad Declare where
+  return a = Declare \c s e -> return (c, [], a)
+  m >>= f = Declare \c s e -> noName do
+    (c', w0, a) <- runDeclare m c s e
+    (c'', w1, b) <- runDeclare (f a) c' s e
+    return (c'', w0 ++ w1, b)
+
+instance Applicative Declare where
   pure = return
   (<*>) = ap
 
-instance Functor Ifc where
+instance Functor Declare where
   fmap = liftM
 
--- |Write a bit-vector to an interface pin
-writePin :: String -> Bit n -> Ifc ()
-writePin s a = Ifc $ \r -> return ([(s, WritePin (toBV a))], ())
+-- Lookup name in environment
+lookupInputBV :: String -> Declare BV
+lookupInputBV name = Declare $ \c s e ->
+  let bv = case lookup name e of
+             Nothing ->
+               error ("Interface.lookupInputBV: key not found: " ++ name)
+             Just bv -> bv
+  in  return (c, [], bv)
 
--- |Read a bit-vector from an interface pin
-readPin :: KnownNat n => String -> Ifc (Bit n)
-readPin s = Ifc $ \r ->
-  let out = case lookup s r of
-              Nothing -> error ("readPin: unknown id '" ++ s ++ "'")
-              Just x -> FromBV x
-  in  return ([(s, ReadPin (natVal out))], out)
+-- Start a new scope
+newScope :: String -> Declare a -> Declare a
+newScope name m = Declare \c s e -> noName do
+  let name' = case name of { "" -> show c; other -> name }
+  (_, ds, a) <- runDeclare m 0 (name':s) e
+  return (c+1, ds, a)
 
--- |Lift a Module computation to an Ifc computation
-liftModule :: Module a -> Ifc a
-liftModule m = Ifc $ \r -> noName do
-  res <- m
-  return ([], res)
+-- Lift module monad to declare monad
+liftModule :: Module a -> Declare a
+liftModule m = Declare \c s e -> noName do
+  a <- m
+  return (c, [], a)
 
--- |Create an instance of a module
-instantiate :: String -> [Param] -> Ifc a -> Module a
+-- Get a meaningful name with given prefix
+getName :: Declare String
+getName = Declare \c s e ->
+  return (c, [], concat (intersperse "_" (reverse s)))
+
+-- Add a declaration to the collection
+addDecl :: Decl -> Declare ()
+addDecl d = Declare \c s e -> return (c, [d], ())
+
+-- Declare given bit-vector as an output
+declareOutputBV :: String -> BV -> Declare ()
+declareOutputBV suffix bv = do
+  nm <- getName
+  let name = case suffix of { "" -> nm; other -> nm ++ "_" ++ suffix }
+  addDecl (DeclOutput name bv)
+
+-- Declare a new input bit-vector of given width
+declareInputBV :: String -> Width -> Declare BV
+declareInputBV suffix width = do
+  nm <- getName
+  let name = case suffix of { "" -> nm; other -> nm ++ "_" ++ suffix }
+  addDecl (DeclInput name width)
+  lookupInputBV name
+
+-- Declare an output, generically over any iterface type  
+declareOut :: IfcTerm -> IfcType -> Declare ()
+declareOut x (IfcTypeMetaSel selName t) =
+  newScope selName (declareOut x t)
+declareOut IfcTermUnit _ = return ()
+declareOut (IfcTermBV bv) _ =
+  declareOutputBV "" bv
+declareOut (IfcTermAction act) (IfcTypeAction t) = do
+  -- Declare input wire to trigger execution of act
+  en <- declareInputBV "en" 1
+  -- Trigger action
+  ret <- liftModule $ always $ whenR (FromBV en :: Bit 1) act
+  -- Declare return value output
+  newScope "ret" (declareOut ret t)
+declareOut (IfcTermProduct xs) (IfcTypeProduct txs) =
+  zipWithM_ declareOut xs txs
+declareOut (IfcTermFun fun) (IfcTypeFun argType retType) = do
+  -- Declare argument as input
+  arg <- newScope "" (declareIn argType)
+  -- Apply argument and declare return value as output
+  declareOut (fun arg) retType
+
+-- Typed version of 'declareOut'
+declareOutput :: Interface a => String -> a -> Declare ()
+declareOutput str out = 
+  newScope str (declareOut (toIfcTerm out) (toIfcType out))
+
+-- Declare an input, generically over any iterface type
+declareIn :: IfcType -> Declare IfcTerm
+declareIn (IfcTypeMetaSel selName t) =
+  newScope selName (declareIn t)
+declareIn IfcTypeUnit = return IfcTermUnit
+declareIn (IfcTypeBV w) = do
+  bv <- declareInputBV "" w
+  return (IfcTermBV bv)
+declareIn (IfcTypeAction t) = do
+  -- Declare return value as input
+  ret <- newScope "ret" (declareIn t)
+  -- Create enable wire
+  enWire :: Wire (Bit 1) <- liftModule (makeWire 0)
+  -- Declare enable signal as output
+  declareOutputBV "en" (toBV (val enWire))
+  -- When action block is called, trigger the enable line
+  return (IfcTermAction $ do { enWire <== 1; return ret })
+declareIn (IfcTypeProduct ts) =
+  IfcTermProduct <$> mapM declareIn ts
+declareIn t@(IfcTypeFun _ _) = do
+  let (argTypes, retType) = flatten t
+  -- The return type must be an action (the Method class captures
+  -- this assumption, but let's check anyway)
+  case retType of
+    IfcTypeAction{} -> do
+      -- Declare return type as input
+      ret <- declareIn retType
+      case ret of
+        IfcTermAction retAct -> do
+          -- Declare each argument as an output
+          drivers <- forM argTypes \argType ->
+            newScope "" (driver argType)
+          -- Construct a function which assigns the args and
+          -- executes the return action
+          let driveArgs act (driver:rest) =
+                IfcTermFun (\x -> driveArgs (driver x >> act) rest)
+              driveArgs act [] = IfcTermAction act
+          return (driveArgs retAct drivers)
+        other -> error "Blarney.Core.Interface: maltyped term"
+    other -> error "Blarney.Core.Interface: method constraint violated"
+  where
+    -- Flatten arrow type to a list of argument types and a return type
+    flatten :: IfcType -> ([IfcType], IfcType)
+    flatten (IfcTypeFun argType retType) = (argType : args, ret)
+      where (args, ret) = flatten retType
+    flatten other = ([], other)
+
+    -- Declare an output and return assignment
+    -- function (driver) for that output
+    driver :: IfcType -> Declare (IfcTerm -> Action ())
+    driver (IfcTypeMetaSel selName t) = newScope selName (driver t)
+    driver IfcTypeUnit = return (\x -> return ())
+    driver (IfcTypeBV w) =
+      liftNat w $ \(_ :: Proxy n) -> do
+        -- Create assignable wire for this bit-vector
+        wire :: Wire (Bit n) <- liftModule (makeWire dontCare)
+        -- Declare wire value as an output
+        declareOutputBV "" (toBV (val wire))
+        -- Return assigner
+        return (\(IfcTermBV bv) -> wire <== FromBV bv)
+    driver (IfcTypeProduct ts) = do
+      drivers <- mapM driver ts
+      return (\(IfcTermProduct xs) -> zipWithM_ ($) drivers xs)
+    driver other =
+      error "Blarney.Core.Interface: driver applied to non-Bits type"
+
+-- Typed version of 'declareIn'
+declareInput :: forall a. Interface a => String -> Declare a
+declareInput str =
+  newScope str do
+    let t = toIfcType (undefined :: a)
+    x <- declareIn t
+    return (fromIfcTerm x)
+
+class Modular a where
+  makeMod :: Int -> a -> Declare ()
+  makeInst :: String -> [Param] -> Int -> Declare () -> a
+
+instance Interface a => Modular (Module a) where
+  makeMod count m =
+    liftModule m >>= declareOutput "out"
+  makeInst s ps count m =
+    instantiate s ps (m >> declareInput "out")
+
+instance (Interface a, Modular m) => Modular (a -> m) where
+  makeMod count f = do
+    a <- declareInput ("in" ++ show count)
+    makeMod (count+1) (f a)
+  makeInst s ps count m = \a ->
+    makeInst s ps (count+1) (m >> declareOutput ("in" ++ show count) a)
+
+-- Realise declarations to give standalone module
+modularise :: Declare a -> Module a
+modularise ifc = noName mdo
+    (_, w, a) <- runDeclare ifc 0 [] inps
+    inps <- mod w
+    return a
+  where
+    mod w = noName do
+      let outputs = [(s, x) | (DeclOutput s x) <- w]
+      let inputs  = [(s, n) | DeclInput s n <- w]
+      mapM (\(s,x) -> outputBV s x) outputs
+      tmps <- mapM (\(s,n) -> inputBV s n) inputs
+      return $ zip (map fst inputs) tmps
+
+-- Realise declarations to give module instance
+instantiate :: String -> [Param] -> Declare a -> Module a
 instantiate name params ifc = noName mdo
-    (w, a) <- runIfc ifc (custom w)
-    addRoots [x | (s, WritePin x) <- w]
+    (_, w, a) <- runDeclare ifc 0 [] (custom w)
+    addRoots [x | (DeclOutput s x) <- w]
     return a
   where
     custom w =
-      let inputs   = [(s, x) | (s, WritePin x) <- w]
-          outputs  = [(s, fromInteger n) | (s, ReadPin n) <- w]
+      let inputs   = [(s, x) | (DeclOutput s x) <- w]
+          outputs  = [(s, n) | DeclInput s n <- w]
           outNames = map fst outputs
           prim     = Custom name [(s, bvPrimOutWidth x) | (s, x) <- inputs]
                            outputs params True
       in  zip outNames (makePrim prim (map snd inputs) (map Just outNames))
 
--- |Create a module that can be instantiated
-modularise :: Ifc a -> Module a
-modularise ifc = noName mdo
-    (w, a) <- runIfc ifc inps
-    inps <- mod w
-    return a
-  where
-    mod w = noName do
-      let outputs = [(s, x) | (s, WritePin x) <- w]
-      let inputs  = [(s, fromInteger n) | (s, ReadPin n) <- w]
-      mapM (\(s,x) -> outputBV s x) outputs
-      tmps <- mapM (\(s,n) -> inputBV s n) inputs
-      return $ zip (map fst inputs) tmps
-
--- Interface class
--- ===============
-
--- |Any type in this class can be used as an input/output to a
--- module when doing separate compilation.
-class Interface a where
-  writePort :: String -> a -> Ifc ()
-  readPort  :: String -> Ifc a
-
-  -- For generic deriving
-  default writePort :: (Generic a, GInterface (Rep a))
-                    => String -> a -> Ifc ()
-  default readPort :: (Generic a, GInterface (Rep a))
-                   => String -> Ifc a
-  writePort s x = gwritePort s "" (from x)
-  readPort s = do { x <- greadPort s ""; return (to x) }
-
-instance Interface () where
-  writePort s _ = return ()
-  readPort s = return ()
-
-instance KnownNat n => Interface (Bit n) where
-  writePort = writePin
-  readPort = readPin
-
-instance (Bits a, Interface a) => Interface (Action a) where
-  writePort s act = do
-    -- Get enable output
-    enable <- readPort (s ++ "_en")
-    -- Run action block when enabled
-    res <- liftModule (always (whenR enable act))
-    -- Feed action result back as input
-    writePort (s ++ "_res") res
-
-  readPort s = do
-    -- Get result output
-    res <- readPort (s ++ "_res")
-    -- Create enable wire
-    enable :: Wire (Bit 1) <- liftModule (makeWire 0)
-    -- Put enable wire as input
-    writePort (s ++ "_en") (val enable)
-    -- When action block is called, trigger the enable line
-    return (do { enable <== 1; return res })
-
--- Tuple instances
--- ===============
-
-instance (Interface a, Interface b) => Interface (a, b) where
-  writePort s ~(a, b) = do
-    writePort (s ++ "_0") a
-    writePort (s ++ "_1") b
-  readPort s = do
-    t0 <- readPort (s ++ "_0")
-    t1 <- readPort (s ++ "_1")
-    return (t0, t1)
-
-instance (Interface a, Interface b, Interface c) => Interface (a, b, c) where
-  writePort s ~(a, b, c) = do
-    writePort (s ++ "_0") a
-    writePort (s ++ "_1") b
-    writePort (s ++ "_2") c
-  readPort s = do
-    t0 <- readPort (s ++ "_0")
-    t1 <- readPort (s ++ "_1")
-    t2 <- readPort (s ++ "_2")
-    return (t0, t1, t2)
-
-instance (Interface a, Interface b, Interface c, Interface d) =>
-         Interface (a, b, c, d) where
-  writePort s ~(a, b, c, d) = do
-    writePort (s ++ "_0") a
-    writePort (s ++ "_1") b
-    writePort (s ++ "_2") c
-    writePort (s ++ "_3") d
-  readPort s = do
-    t0 <- readPort (s ++ "_0")
-    t1 <- readPort (s ++ "_1")
-    t2 <- readPort (s ++ "_2")
-    t3 <- readPort (s ++ "_3")
-    return (t0, t1, t2, t3)
-
--- Function instances
--- ==================
-
-instance (Bits a, Bits b, Interface a, Interface b) =>
-         Interface (a -> Action b) where
-  writePort s f = do
-    -- Get function argument
-    arg0 <- readPort (s ++ "_arg")
-    -- Apply it
-    writePort s (f arg0)
-
-  readPort s = do
-    -- Function argument is an input
-    arg0 :: Wire a <- liftModule (makeWire dontCare)
-    -- Supply it
-    writePort (s ++ "_arg") (val arg0)
-    -- Function result is an output
-    act <- readPort s
-    -- Return function that assigns argument
-    return $ \a -> do
-      arg0 <== a
-      act
-
-instance (Bits a, Bits b, Bits c,
-          Interface a, Interface b, Interface c) =>
-          Interface (a -> b -> Action c) where
-  writePort s f = do
-    writePort s (\(a, b) -> f a b)
-  readPort s = do
-    f <- readPort s
-    return (\a b -> f (a, b))
-
-instance (Bits a, Bits b, Bits c, Bits d,
-          Interface a, Interface b, Interface c, Interface d) =>
-          Interface (a -> b -> c -> Action d) where
-  writePort s f = do
-    writePort s (\(a, b, c) -> f a b c)
-  readPort s = do
-    f <- readPort s
-    return (\a b c -> f (a, b, c))
-
-instance (Bits a, Bits b, Bits c, Bits d, Bits e, Interface a,
-          Interface b, Interface c, Interface d, Interface e) =>
-          Interface (a -> b -> c -> d -> Action e) where
-  writePort s f = do
-    writePort s (\(a, b, c, d) -> f a b c d)
-  readPort s = do
-    f <- readPort s
-    return (\a b c d -> f (a, b, c, d))
-
--- Generic deriving
--- ================
-
-class GInterface f where
-  gwritePort :: String -> String -> f a -> Ifc ()
-  greadPort  :: String -> String -> Ifc (f a)
-
-instance GInterface U1 where
-  gwritePort s t ~U1 = return ()
-  greadPort s t = return U1
-
-instance (GInterface a, GInterface b) => GInterface (a :*: b) where
-  gwritePort s t ~(x0 :*: x1) = do
-    gwritePort s (t ++ "0") x0
-    gwritePort s (t ++ "1") x1
-  greadPort s t = do
-    x0 <- greadPort s (t ++ "0")
-    x1 <- greadPort s (t ++ "1")
-    return (x0 :*: x1)
-
-instance (GInterface a, Selector c) => GInterface (M1 S c a) where
-  gwritePort s t ~(m@(M1 x)) =
-    case null (selName m) of
-      True -> gwritePort (s ++ "_" ++ t) "" x
-      False -> gwritePort (s ++ "_" ++ selName m) "" x
-  greadPort s t = do
-    let ctr :: M1 S c a _ = undefined
-    x <- case null (selName ctr) of
-           True -> greadPort (s ++ "_" ++ t) ""
-           False -> greadPort (s ++ "_" ++ selName ctr) ""
-    return (M1 x)
-
-instance GInterface a => GInterface (M1 D c a) where
-  gwritePort s t ~(M1 x) = gwritePort s t x
-  greadPort s t = do
-    x <- greadPort s t
-    return (M1 x)
-
-instance GInterface a => GInterface (M1 C c a) where
-  gwritePort s t ~(M1 x) = gwritePort s t x
-  greadPort s t = do
-    x <- greadPort s t
-    return (M1 x)
-
-instance Interface a => GInterface (K1 i a) where
-  gwritePort s t ~(K1 x) = writePort s x
-  greadPort s t = do
-    x <- readPort s
-    return (K1 x)
-
--- Standard instances
--- ==================
-
-instance (Bits t, Interface t) => Interface (Reg t)
-instance (Bits t, Interface t) => Interface (Wire t)
-
--- Modular class
--- =============
-
--- |Any type in this class can be turned into a module when doing
--- separate compilation.
-class Modular a where
-  makeMod :: a -> Module ()
-  makeInst :: String -> [Param] -> a
-
-instance Interface a => Modular (Module a) where
-  makeMod m = modularise $ do
-    a <- liftModule m
-    writePort "out" a
-
-  makeInst s ps = instantiate s ps $ do
-    a <- readPort "out"
-    return a
-
-instance (Interface a, Interface b) => Modular (a -> Module b) where
-  makeMod f = modularise $ do
-    a <- readPort "in"
-    b <- liftModule (f a)
-    writePort "out" b
-
-  makeInst s ps = \a ->
-    instantiate s ps $ do
-      writePort "in" a
-      b <- readPort "out"
-      return b
-
-instance (Interface a, Interface b, Interface c) =>
-         Modular (a -> b -> Module c) where
-  makeMod f = makeMod (\(a, b) -> f a b)
-  makeInst s ps = \a b -> makeInst s ps (a, b)
-
-instance (Interface a, Interface b, Interface c, Interface d) =>
-         Modular (a -> b -> c -> Module d) where
-  makeMod f = makeMod (\(a, b, c) -> f a b c)
-  makeInst s ps = \a b c -> makeInst s ps (a, b, c)
-
-instance (Interface a, Interface b, Interface c, Interface d, Interface e) =>
-         Modular (a -> b -> c -> d -> Module e) where
-  makeMod f = makeMod (\(a, b, c, d) -> f a b c d)
-  makeInst s ps = \a b c d -> makeInst s ps (a, b, c, d)
-
 makeModule :: Modular a => a -> Module ()
-makeModule = makeMod
-
-makeInstance :: Modular a => String -> a
-makeInstance s = makeInst s []
+makeModule a = modularise (makeMod 0 a)
 
 makeInstanceWithParams :: Modular a => String -> [Param] -> a
-makeInstanceWithParams s ps = makeInst s ps
+makeInstanceWithParams s ps = makeInst s ps 0 (return ())
+
+makeInstance :: Modular a => String -> a
+makeInstance s = makeInstanceWithParams s []

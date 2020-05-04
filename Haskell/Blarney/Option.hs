@@ -28,31 +28,28 @@ import Blarney
 'Option' type to wrap a value. An 'Option t' is represented as a pair of a
 'Bit 1' indicating whether the value held is valid, and a value of type 't'.
 -}
-newtype Option t = Option (Bit 1, t) deriving (Generic, Bits, FShow)
-instance (Interface t, Bits t) => Interface (Option t) where
-  writePort s opt = do
-    writePort (s ++ "_valid") (opt.valid)
-    writePort (s ++ "_val") (opt.val)
-  readPort s = do
-    t0 <- readPort (s ++ "_valid")
-    t1 <- readPort (s ++ "_val")
-    return $ Option (t0, t1)
+
+data Option t =
+  Option {
+    optValid :: Bit 1
+  , optValue :: t
+  } deriving (Generic, Bits, Interface, FShow)
 
 -- | 'Valid' instance for the 'Option' type
 instance  Valid (Option t) where
-  valid (Option (x, _)) = x
+  valid = optValid
 
 -- | 'Val' instance for the 'Option' type
 instance Val (Option t) t where
-  val (Option (_, y))= y
+  val = optValue
 
 -- | Builds an 'Option' with a valid value
 some :: Bits t => t -> Option t
-some val = Option (true, val)
+some val = Option true val
 
 -- | Builds an invalid 'Option'
 none :: Bits t => Option t
-none = Option (false, dontCare)
+none = Option false dontCare
 
 -- | Tests if an 'Option' is a 'some'
 isSome :: Bits t => Option t -> Bit 1

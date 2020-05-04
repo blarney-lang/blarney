@@ -31,8 +31,8 @@ top = do
     -- increment cycle count
     cycleCount <== cycleCount.val + 1
     -- consume from each source on each cycle
-    forM_ [0..3] \i -> do
-      (srcs V.! i).consume
+    forM_ [0..3] \(i :: Int) -> do
+      (srcs ! i).consume
     -- terminate simulation when count reaches 10
     when (cycleCount.val .==. 10) do
       display "Finished"

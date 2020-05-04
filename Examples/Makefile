@@ -18,6 +18,7 @@ clean:
 	make -C Factorial clean
 	make -C FIFO clean
 	make -C Interface clean
+	make -C Lookup clean
 	make -C MasterSlave clean
 	make -C MeanFilter clean
 	make -C NameBits clean
