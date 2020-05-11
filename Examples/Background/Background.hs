@@ -1,6 +1,9 @@
 import Blarney
 import Blarney.Recipe
 
+block :: [Action ()] -> Recipe
+block acts = Seq (map Action acts)
+
 top :: Module ()
 top = do
   vecA :: RAM (Bit 8) (Bit 32) <- makeRAM
@@ -18,7 +21,7 @@ top = do
   let testSeq =
         Seq [
           While (i.val .<. 20) (
-            Do [
+            block [
               display "storing %02d" (i.val),
               store vecA (i.val) (i.val.zeroExtend),
               store vecB (i.val) (i.val.zeroExtend),
@@ -26,13 +29,13 @@ top = do
             ]
           ),
 
-          Do [
+          block [
             i <== 0,
             display "starting at %02d" (globalTime.val)
           ],
 
           While (i.val .<. 20) (
-            Do [
+            block [
               do load vecA (i.val)
                  load vecB (i.val)
                  display "loading un-pipelined at time %02d" (globalTime.val),
@@ -41,34 +44,34 @@ top = do
             ]
           ),
 
-          Do [
+          block [
             display "un-pipelined loop ending at %d" (globalTime.val),
             i <== 0,
             display "C values after un-pipelined add"
           ],
 
           While (i.val .<. 20) (
-            Do [
+            block [
               load vecCNoPipe (i.val),
               display "C[%02d]" (i.val) " = %02d" (out vecCNoPipe),
               i <== i.val + 1
             ]
           ),
 
-          Do [
+          block [
             i <== 0,
             display "Clearing C values"
           ],
 
           While (i.val .<. 20) (
-            Do [
+            block [
               store vecCPipe (i.val) 0,
               i <== i.val + 1
             ]
           ),
 
 
-          Do [
+          block [
             i <== 0,
             display "Running pipelined vector add...",
             display "starting pipelined loop at %d" (globalTime.val)
@@ -87,18 +90,18 @@ top = do
                    store vecCPipe (i0.val) (vecA.out + vecB.out)
                ]
              ),
-             Do [i <== i.val + 1]
+             block [i <== i.val + 1]
             ]
           ),
 
-          Do [
+          block [
             display "ending pipelined loop at %d" (globalTime.val),
             i <== 0,
             display "After pipelined add..."
           ],
 
           While (i.val .<. 20) (
-            Do [
+            block [
               load vecCPipe (i.val),
               display "C[%02d]" (i.val) " = %02d" (out vecCPipe),
               i <== i.val + 1
@@ -110,7 +113,7 @@ top = do
   always do
     globalTime <== globalTime.val + 1
 
-  done <- run (reg 1 0) testSeq
+  done <- runRecipeOn (reg 1 0) testSeq
 
   always (when done finish)
 

@@ -19,14 +19,15 @@ Examples:
 * [Example 5: Queues](#example-5-queues)
 * [Example 6: Mutable wires](#example-6-mutable-wires)
 * [Example 7: Recipes](#example-7-recipes)
-* [Example 8: Block RAMs](#example-8-block-rams)
-* [Example 9: Streams](#example-9-streams)
-* [Example 10: Modular compilation](#example-10-modular-compilation)
-* [Example 11: Master-slave pattern](#example-11-master-slave-pattern)
-* [Example 12: Bit selection and lookuip](#example-12-bit-selection-and-lookup)
-* [Example 13: Bit-string pattern matching](#example-13-bit-string-pattern-matching)
-* [Example 14: CPUs](#example-14-cpus)
-* [Example 15: Namer plugin](#example-15-namer-plugin)
+* [Example 8: Statements](#example-8-statements)
+* [Example 9: Block RAMs](#example-9-block-rams)
+* [Example 10: Streams](#example-10-streams)
+* [Example 11: Modular compilation](#example-11-modular-compilation)
+* [Example 12: Master-slave pattern](#example-12-master-slave-pattern)
+* [Example 13: Bit selection and lookup](#example-13-bit-selection-and-lookup)
+* [Example 14: Bit-string pattern matching](#example-14-bit-string-pattern-matching)
+* [Example 15: CPUs](#example-15-cpus)
+* [Example 16: Namer plugin](#example-16-namer-plugin)
 
 Type classes:
 
@@ -419,15 +420,17 @@ however, they can be expressed more neatly in a
 -- a simple imperative language with various control-flow constructs.
 
 ```hs
-data Recipe = 
-    Skip                   -- Do nothing (in zero cycles)
-  | Tick                   -- Do nothing (in one cycle)
-  | Action (Action ())     -- Perform action (in one cycle)
-  | Seq [Recipe]           -- Execute recipes in sequence
-  | Par [Recipe]           -- Fork-join parallelism
-  | If (Bit 1) Recipe      -- Conditional recipe
-  | While (Bit 1) Recipe   -- Loop
-  | Wait (Bit 1)           -- Block until condition holds
+data Recipe =
+    Skip                         -- Do nothing (in zero cycles)
+  | Tick                         -- Do nothing (in one cycle)
+  | Action (Action ())           -- Perform action (in one cycle)
+  | Seq [Recipe]                 -- Execute recipes in sequence
+  | Par [Recipe]                 -- Fork-join parallelism
+  | Wait (Bit 1)                 -- Block until condition holds
+  | When (Bit 1) Recipe          -- Conditional recipe
+  | If (Bit 1) Recipe Recipe     -- If-then-else recipe
+  | While (Bit 1) Recipe         -- Loop
+  | Background Recipe            -- Run recipe in background
 ```
 
 To illustrate, here is a small state machine that computes the
@@ -455,12 +458,12 @@ fact = do
             finish
         ]
        
-  runOnce recipe 
+  runRecipe recipe 
 ```
 
 Blarney provides a lightweight compiler for the `Recipe` language
 (under 100 lines of code), which we invoke above through the call to
-`runOnce`.
+`runRecipe`.
 
 A very common use of recipes is to define test sequences.  For
 example, here is a simple test sequence for the `Counter` module
@@ -488,7 +491,7 @@ top = do
             finish
         ]
 
-  runOnce test
+  runRecipe test
 ```
 
 Here, we increment `counter` on the first cycle, and then again on the
@@ -496,7 +499,43 @@ second.  On the third cycle, we both increment and decrement it in
 parallel.  On the fourth cycle, we display the value and terminate the
 simulator.
 
-## Example 8: Block RAMs
+## Example 8: Statements
+
+For convenience, recipes can also be constucted using `do` notation.
+The [Stmt](http://mn416.github.io/blarney/Blarney-Stmt.html) monad is
+simply a wrapper around `Recipe`, which defines monadic bind as
+sequential composition.  It is entirely syntatic sugar, providing no
+new functionality.
+
+To illustrate, here's the factoral example from earlier, rewritten
+using the `Stmt` monad.
+
+```hs
+fact :: Module ()
+fact = do
+  -- State
+  n   :: Reg (Bit 32) <- makeReg 0
+  acc :: Reg (Bit 32) <- makeReg 1
+
+  -- Compute factorial of 10
+  let stmt = do
+        action do
+          n <== 10
+        while (n.val .>. 0) do
+          action do
+            n <== n.val - 1
+            acc <== acc.val * n.val
+        action do
+          display "fact(10) = %0d" (acc.val)
+          finish
+
+  runStmt stmt
+```
+
+We have found that some users prefer `Recipe` syntax, while others
+prefer `Stmt` syntax, so we offer both.
+
+## Example 9: Block RAMs
 
 Blarney provides
 [a variety of block RAM
@@ -531,18 +570,14 @@ top = do
   ram :: RAM (Bit 8) (Bit 5) <- makeRAM
 
   -- Write 10 to ram[0] and read it back again
-  let test =
-        Seq [
-          Action do
-            store ram 0 10
-        , Action do
-            load ram 0
-        , Action do
-            display "Got 0x%0x" (ram.out)
-            finish
-        ]
-
-  runOnce test
+  runStmt do
+    action do
+      store ram 0 10
+    action do
+      load ram 0
+    action do
+      display "Got 0x%0x" (ram.out)
+      finish
 ```
 
 Somewhat-related to block RAMs are
@@ -566,7 +601,7 @@ lookup operator `!`.  Unlike block RAMs, register files (especially
 large ones) do not always map efficiently onto hardware, so use with
 care!
 
-## Example 9: Streams
+## Example 10: Streams
 
 Streams are another commonly-used abstraction in hardware description.
 They are often used to implement hardware modules that consume data at
@@ -620,7 +655,7 @@ inc xs = do
   return (buffer.toStream)
 ```
 
-## Example 10: Modular compilation
+## Example 11: Modular compilation
 
 So far we've seen examples of top-level modules, i.e. modules with no
 inputs or outputs, being converted to Verilog.  In fact, any Blarney
@@ -628,7 +663,7 @@ function whose inputs and outputs are members of the
 [Interface](http://mn416.github.io/blarney/Blarney-Core-Interface.html) class
 can be converted to Verilog (and the `Interface` class supports
 generic deriving).  To illustrate, we can convert the function `inc`
-(defined in [Example 9](#example-9-streams)) into a Verilog module
+(defined in [Example 10](#example-10-streams)) into a Verilog module
 as follows.
 
 ```hs
@@ -718,7 +753,7 @@ design whenever we generate Verilog, rather than having to flatten it
 to massive netlist.  This technique can also be used to instantaite
 any Verilog module within a Blarney design.
 
-## Example 11: Master-slave pattern
+## Example 12: Master-slave pattern
 
 This is a common pattern in hardware design.  Suppose we wish to move
 multiplication out of a module and into an separate slave module,
@@ -748,26 +783,23 @@ slave reqs = do
 
 The master component produces requests for the slave, and consumes
 responses from the slave.  In the example below, the master simply
-asks the slave to multiply 2 by 2, and then terminates the simulation.
+asks the slave to multiply 2 by 2, waits for the response, and then
+terminates the simulation.
 
 ```hs
 master :: Stream MulResp -> Module (Stream MulReq)
 master resps = do
   reqs <- makeQueue
 
-  let recipe =
-    Seq [
-      Wait (reqs.notFull)
-    , Action do
-        enq reqs (2, 2)
-    , Wait (resps.canPeek)
-    , Action do
-        consume resps
-        display "Result: %0d" (resps.peek)
-        finish
-    ]
-
-  runOnce recipe
+  runStmt do
+    wait (reqs.notFull)
+    action do
+      enq reqs (2, 2)
+    wait (resps.canPeek)
+    action do
+      resps.consume
+      display "Result: %0d" (resps.peek)
+      finish
 
   return (reqs.toStream)
 ```
@@ -784,7 +816,7 @@ top = mdo
   return ()
 ```
 
-## Example 12: Bit selection and lookup
+## Example 13: Bit selection and lookup
 
 Bit selection operators are used to extract a subset of bits out of a
 bit-vector.  There are different flavours, depending on whether the
@@ -834,11 +866,11 @@ getBit :: Bit 8 -> Bit 3 -> Bit 1
 getBit x i = x!i
 ```
 
-Blarney's generic lookup operator `x!i` returns `i`the element of `x`,
-and works for many different types of `x` and `i`.  See the [Lookup
-class](#class-4-lookup) for more details.
+Blarney's generic lookup operator `x!i` returns the `i`'th element of
+`x`, and works for many different types of `x` and `i`.  See the
+[Lookup class](#class-3-lookup) for more details.
 
-## Example 13: Bit-string pattern matching
+## Example 14: Bit-string pattern matching
 
 Recent work on specifying and implementing ISAs led us to develop two
 libraries for doing bit-string pattern matching.  The first,
@@ -893,7 +925,7 @@ passed to the right-hand-side function.  Scattered immediates appear a
 lot in the RISC-V specification.  Thanks to Jon Woodruff for
 suggesting this feature!
 
-## Example 14: CPUs
+## Example 15: CPUs
 
 A few processor cores have been implemented in Blarney:
 
@@ -906,7 +938,7 @@ microarchitecture.
 * [Actora](https://github.com/POETSII/actora/): 3-stage stack
 machine that runs code written a subset of Erlang.
 
-## Example 15: Namer plugin
+## Example 16: Namer plugin
 
 One of the classic limitations of Lava is that identifier names are
 lost when the netlist is generated.  In particular, this is
@@ -989,7 +1021,7 @@ value) using the circuit primitives provided by Blarney.
 Any type in the
 [Interface](http://mn416.github.io/blarney/Blarney-Core-Interface.html)
 class can be used as a module input or output when doing [modular
-compilation](#example-10-modular-compilation).  Furthermore,
+compilation](#example-11-modular-compilation).  Furthermore,
 collections of interfaces can be indexed by circuit-time values using
 the `!` operator.  To illustrate, here is an example circuit to split
 a stream of [MemReq](#class-1-bits) into four streams, using the lower
@@ -1029,11 +1061,9 @@ class Lookup c i e | c -> e where
   (!) : c -> i -> e
 ```
 
-A wide range of combinations of types are supported.  Because the
-operator is so general, the types `c` and `i` usually need to be known
-from the context, to avoid ambiguity errors from GHC.  However, due to
-the functional dependency `c -> e`, the return type can be inferred
-from the collection type.
+A wide range of combinations of types are supported.  The functional
+dependency `c -> e` allows the return type to be inferred from the
+collection type.
 
 ## Class 4: FShow
 
@@ -1063,4 +1093,4 @@ instance (FShow a, FShow b) => FShow (a, b) where
   fshow (a, b) = fshow "(" <> fshow a <> fshow "," <> fshow b <> fshow ")"
 ```
 
-The `FShow` class supports *generic deriving*.
+The `FShow` class supports generic deriving.

@@ -1,5 +1,5 @@
 import Blarney
-import Blarney.Recipe
+import Blarney.Stmt
 
 -- Top-level module
 top :: Module ()
@@ -11,27 +11,21 @@ top = do
   i :: Reg (Bit 8) <- makeReg 0
 
   -- Simple test sequence
-  let testSeq =
-        Seq [
-          While (i.val .<. 100) (
-            Do [
-              store ram (i.val) (1 .<<. i.val),
-              i <== i.val + 1
-            ]
-          ),
-          Do [ i <== 0 ],
-          While (i.val .<. 100) (
-            Do [
-              load ram (val i),
-              display "ram[0x%02x]" (val i) " = 0x%024x" (out ram),
-              i <== val i + 1
-            ]
-          )
-        ]
-
-  done <- run (reg 1 0) testSeq
-
-  always (when done finish)
+  runStmt do
+    while (i.val .<. 100) do
+      action do
+        store ram (i.val) (1 .<<. i.val)
+        i <== i.val + 1
+    action do
+      i <== 0
+    while (i.val .<. 100) do
+      action do
+        load ram (i.val)
+      action do
+        display "ram[0x%02x]" (i.val) " = 0x%024x" (ram.out)
+        i <== i.val + 1
+    action do
+      finish
 
   return ()
 

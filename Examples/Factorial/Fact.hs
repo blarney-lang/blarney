@@ -22,7 +22,7 @@ fact = do
             finish
         ]
 
-  runOnce recipe
+  runRecipe recipe
 
 main :: IO ()
 main = writeVerilogTop fact "top" "Fact-Verilog/"
