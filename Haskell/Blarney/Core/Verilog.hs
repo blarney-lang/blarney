@@ -33,6 +33,7 @@ import Data.Array.IArray
 import Blarney.Core.Net
 import Blarney.Core.Opts
 import Blarney.Core.Prim
+import Blarney.Core.Utils
 import Blarney.Core.Module
 import Blarney.Core.Interface
 import Blarney.Core.IfThenElse
@@ -361,12 +362,16 @@ genNetVerilog netlist net = case netPrim net of
     $+$ text "endfunction"
     where thisMux = text "mux_" <> int (netInstId net)
           header = text "function" <+> brackets (int (w-1) <> text ":0")
-                   <+> thisMux <> parens (text "input" <+> text "sel") <> semi
+                   <+> thisMux <> parens (text "input"
+                                          <+> brackets (int (selw - 1)
+                                          <> text ":0") <+> text "sel") <> semi
           body = hang (text "case" <+> parens (text "sel")) 2
                       (sep [ int i <> colon <+> thisMux
                                    <+> equals <+> showNetInput x <> semi
-                           | (i, x) <- zip [0..] (tail $ netInputs net)])
+                           | (i, x) <- zip [0..] ins])
                  $+$ text "endcase"
+          ins = tail $ netInputs net
+          selw = log2ceil $ length ins
   declRAM initFile 1 _ dw net =
     vcat $ map (\n -> declWire dw (netInstId net, n)) [Nothing]
   declRAM initFile 2 _ dw net =

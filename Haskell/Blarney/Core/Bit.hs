@@ -328,8 +328,10 @@ regEn init en a =
 
 -- * Misc. bit-vector operations
 
--- |Multiplexer
+-- | Multiplexer using a selector signal to index a list of input signals.
+--   Raises a circuit generation time error on empty list of inputs
 mux :: Bit w -> [Bit n] -> Bit n
+mux _ [] = error "cannot mux an empty list"
 mux sel xs = FromBV $ muxBV (toBV sel) (toBV <$> xs)
 
 -- |Lift integer value to type-level natural

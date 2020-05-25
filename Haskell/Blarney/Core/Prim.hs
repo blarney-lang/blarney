@@ -39,6 +39,8 @@ import Prelude
 import Data.Set
 import Data.Maybe
 
+import Blarney.Core.Utils
+
 -- | Every instance of a component in the circuit has a unique id
 type InstId = Int
 
@@ -187,10 +189,6 @@ data Prim =
     -- | Register file update (inputs: write-enable, address, data)
   | RegFileWrite RegFileInfo
   deriving Show
-
--- | log2 helper
-log2 :: (Integral a, Integral b) => a -> b
-log2 = ceiling . (logBase 2) . fromIntegral
 
 -- | Helper to tell whether a 'Prim' can be inlined during Netlist optimisation
 canInline :: Prim -> Bool
@@ -436,7 +434,7 @@ primInfo (Mux n w) = PrimInfo { isInlineable = False
                               , strRep = "Mux"
                               , dontKill = False
                               , isRoot = False
-                              , inputs = ("sel", log2 n)
+                              , inputs = ("sel", log2ceil n)
                                          : [("in" ++ show i, w) | i <- [0..n-1]]
                               , outputs = [("out", w)] }
 primInfo (Identity w) = PrimInfo { isInlineable = True
