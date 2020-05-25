@@ -100,5 +100,5 @@ lookupInterface ifcs i = fromIfcTerm (idx [toIfcTerm ifc | ifc <- ifcs])
     idx (ifcs@(IfcTermFun{}:_)) =
       IfcTermFun $ \x -> idx [f x | IfcTermFun f <- ifcs]
 
-    maskBV c x = muxBV (toBV c) (x, constBV w 0)
+    maskBV c x = muxBV (toBV c) [constBV w 0, x]
       where w = bvPrimOutWidth x

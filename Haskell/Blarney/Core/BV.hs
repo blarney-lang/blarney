@@ -264,9 +264,10 @@ concatBV a b = makePrim1 (Concat wa wb) [a, b]
     wb = bvPrimOutWidth b
 
 -- |Multiplexer
-muxBV :: BV -> (BV, BV) -> BV
-muxBV sel (a, b) = makePrim1 (Mux w) [sel, a, b]
-  where w = bvPrimOutWidth a
+muxBV :: BV -> [BV] -> BV
+muxBV sel xs = makePrim1 (Mux n w) (sel:xs)
+               where n = length xs
+                     w = bvPrimOutWidth $ head xs
 
 -- |Identity function
 idBV :: BV -> BV

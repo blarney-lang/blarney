@@ -140,8 +140,8 @@ data Prim =
     -- | Bit vector concatenation (2 inputs, 1 output)
   | Concat InputWidth InputWidth
 
-    -- | Multiplexer (3 inputs, 1 output)
-  | Mux OutputWidth
+    -- | Multiplexer (n inputs, 1 output)
+  | Mux Int OutputWidth
     -- | Identity function (1 input, 1 output)
   | Identity OutputWidth
 
@@ -187,6 +187,10 @@ data Prim =
     -- | Register file update (inputs: write-enable, address, data)
   | RegFileWrite RegFileInfo
   deriving Show
+
+-- | log2 helper
+log2 :: (Integral a, Integral b) => a -> b
+log2 = ceiling . (logBase 2) . fromIntegral
 
 -- | Helper to tell whether a 'Prim' can be inlined during Netlist optimisation
 canInline :: Prim -> Bool
@@ -427,13 +431,14 @@ primInfo (Concat w0 w1) = PrimInfo { isInlineable = True
                                    , isRoot = False
                                    , inputs = [("in0", w0), ("in1", w1)]
                                    , outputs = [("out", w0 + w1)] }
-primInfo (Mux w) = PrimInfo { isInlineable = True
-                            , inputsInlineable = True
-                            , strRep = "Mux"
-                            , dontKill = False
-                            , isRoot = False
-                            , inputs = [("sel", 1), ("in0", w), ("in1", w)]
-                            , outputs = [("out", w)] }
+primInfo (Mux n w) = PrimInfo { isInlineable = False
+                              , inputsInlineable = True
+                              , strRep = "Mux"
+                              , dontKill = False
+                              , isRoot = False
+                              , inputs = ("sel", log2 n)
+                                         : [("in" ++ show i, w) | i <- [0..n-1]]
+                              , outputs = [("out", w)] }
 primInfo (Identity w) = PrimInfo { isInlineable = True
                                  , inputsInlineable = True
                                  , strRep = "Identity"

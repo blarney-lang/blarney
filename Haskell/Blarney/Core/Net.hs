@@ -219,8 +219,10 @@ evalConstNet n@Net{ netPrim = SelectBits w hi lo, netInputs = [Lit a0] } =
 evalConstNet n@Net{ netPrim = Concat w0 w1, netInputs = [Lit a0, Lit a1] } =
   (n { netPrim = Const (w0+w1) ((a0 `B.shiftL` w1) B..|. a1)
      , netInputs = [] }, True)
-evalConstNet n@Net{ netPrim = Mux w, netInputs = [Lit s, Lit a0, Lit a1] } =
-  (n { netPrim = Const w (if s == 0 then a1 else a0), netInputs = [] }, True)
+evalConstNet n@Net{ netPrim = Mux _ w, netInputs = (Lit s):xs } =
+  case xs !! fromInteger s of
+    Lit x -> (n { netPrim = Const w x, netInputs = [] }, True)
+    _     -> (n, False)
 evalConstNet n@Net{ netPrim = Identity w, netInputs = [Lit a0] } =
   (n { netPrim   = Const w a0, netInputs = [] }, True)
 evalConstNet n = (n, False)

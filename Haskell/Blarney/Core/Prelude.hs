@@ -106,7 +106,7 @@ listIndex i xs = select [(i .==. fromInteger j, x) | (j, x) <- zip [0..] xs]
 -- |Ternary conditional operator (generic multiplexer)
 infixl 3 ?
 (?) :: Bits a => Bit 1 -> (a, a) -> a
-c ? (a, b) = unpack (mux c (pack a, pack b))
+c ? (a, b) = unpack (mux c [pack b, pack a])
 
 -- |Overloaded if-then-else
 instance {-# OVERLAPPABLE #-} Bits a => IfThenElse (Bit 1) a where

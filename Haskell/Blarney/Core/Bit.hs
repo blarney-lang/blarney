@@ -112,8 +112,8 @@ instance KnownNat n => Num (Bit n) where
   (-)         = (.-.)
   (*)         = (.*.)
   negate a    = inv a .+. 1
-  abs a       = mux (a `sLT` 0) (negate a, a)
-  signum a    = mux (a .==. 0) (0, mux (a `sLT` 0) (-1, 1))
+  abs a       = mux (a `sLT` 0) [a, negate a]
+  signum a    = mux (a .==. 0) [mux (a `sLT` 0) [1, -1], 0]
   fromInteger = constant
 
 -- * Bitwise operations on bit-vectors
@@ -329,8 +329,8 @@ regEn init en a =
 -- * Misc. bit-vector operations
 
 -- |Multiplexer
-mux :: Bit 1 -> (Bit n, Bit n) -> Bit n
-mux c (a, b) = FromBV $ muxBV (toBV c) (toBV a, toBV b)
+mux :: Bit w -> [Bit n] -> Bit n
+mux sel xs = FromBV $ muxBV (toBV sel) (toBV <$> xs)
 
 -- |Lift integer value to type-level natural
 liftNat :: Int -> (forall n. KnownNat n => Proxy n -> a) -> a
