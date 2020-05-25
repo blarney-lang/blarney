@@ -50,7 +50,7 @@ time (Par rs) = foldr max 0 `fmap` mapM time rs
 time other = Nothing
 
 -- Return index of the slowest recipe
-slowest :: [Recipe] -> Int 
+slowest :: [Recipe] -> Int
 slowest = snd . maximum . flip zip [0..] . map time
 
 -- |Run a recipe.  Take a go pulse and return a finish pulse.

@@ -21,7 +21,7 @@ top = do
     -- Write to queue
     when (q.notFull) do
       enq q (ind.zeroExtend)
-      
+
     -- Consume from queue
     when (q.canDeq) do
       deq q

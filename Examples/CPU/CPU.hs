@@ -100,7 +100,7 @@ makeCPU = do
 
     -- Stage 2: Latch Operands
     -- =======================
-  
+
     -- Latch instruction
     instr <== instrMem.out.old
 

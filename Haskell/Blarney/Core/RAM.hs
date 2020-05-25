@@ -62,7 +62,7 @@ ramTrueDualPrim dataWidth init (a0, d0, en0)
 -- |Uninitialised block RAM.
 -- (Read during write: reads "dont care")
 ram :: (Bits a, Bits d) => (a, d, Bit 1) -> d
-ram (a, d, en) = 
+ram (a, d, en) =
   unpack (ramPrim (sizeOf d) Nothing (pack a, pack d, en))
 
 -- |Initilaised block RAM (contents taken from hex file).
@@ -166,7 +166,7 @@ makeTrueDualRAMCore init = do
   let ramPrimitive = case init of
         Nothing  -> ramTrueDual
         Just str -> ramTrueDualInit str
- 
+
   -- RAM output
   let (outA, outB) = ramPrimitive (val addrBusA, val dataBusA, val writeEnA)
                                   (val addrBusB, val dataBusB, val writeEnB)

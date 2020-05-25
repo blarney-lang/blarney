@@ -59,7 +59,7 @@ data Token =
   deriving (Show)
 
 tokenise :: String -> [Token]
-tokenise = init [] 
+tokenise = init []
   where
     isBit c = c == '0' || c == '1'
 
@@ -72,8 +72,8 @@ tokenise = init []
 
     var str acc [] = init (Var (reverse str) : acc) []
     var str acc (c:cs)
-      | c == '[' = high (reverse str) acc cs 
-      | c == '<' = len (reverse str) acc cs 
+      | c == '[' = high (reverse str) acc cs
+      | c == '<' = len (reverse str) acc cs
       | c == ' ' = init (Var (reverse str) : acc) cs
       | otherwise = var (c:str) acc cs
 

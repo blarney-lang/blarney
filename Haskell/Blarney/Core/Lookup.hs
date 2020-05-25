@@ -45,7 +45,7 @@ import Blarney.Core.Module
 import Blarney.Core.Prelude
 import Blarney.Core.Interface
 
--- |Index a collection 'c' of elements 'e' using index 'i' 
+-- |Index a collection 'c' of elements 'e' using index 'i'
 class Lookup c i e | c -> e where
   (!) :: c -> i -> e
 
@@ -72,11 +72,11 @@ instance KnownNat m => Lookup (Bit n) (Bit m) (Bit 1) where
   b ! i = unsafeToBitList b ! i
 
 -- |Index a bit vector using an Int
-instance Lookup (Bit n) Int (Bit 1) where 
+instance Lookup (Bit n) Int (Bit 1) where
   b ! i = unsafeToBitList b ! i
 
 -- |Index a bit vector using an Integer
-instance Lookup (Bit n) Integer (Bit 1) where 
+instance Lookup (Bit n) Integer (Bit 1) where
   b ! i = unsafeToBitList b ! i
 
 -- |Index a list of interfaces using bit-vector

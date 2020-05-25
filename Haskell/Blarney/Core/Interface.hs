@@ -67,14 +67,14 @@ data IfcTerm =
   | IfcTermFun (IfcTerm -> IfcTerm)
 
 -- Interface type representation
-data IfcType = 
+data IfcType =
     IfcTypeUnit
   | IfcTypeBV Width
   | IfcTypeAction IfcType
   | IfcTypeProduct [IfcType]
   | IfcTypeFun IfcType IfcType
     -- Marks new field selector with name
-  | IfcTypeMetaSel String IfcType 
+  | IfcTypeMetaSel String IfcType
 
 class Interface a where
   toIfcTerm   :: a -> IfcTerm
@@ -255,7 +255,7 @@ declareInputBV suffix width = do
   addDecl (DeclInput name width)
   lookupInputBV name
 
--- Declare an output, generically over any iterface type  
+-- Declare an output, generically over any iterface type
 declareOut :: IfcTerm -> IfcType -> Declare ()
 declareOut x (IfcTypeMetaSel selName t) =
   newScope selName (declareOut x t)
@@ -279,7 +279,7 @@ declareOut (IfcTermFun fun) (IfcTypeFun argType retType) = do
 
 -- Typed version of 'declareOut'
 declareOutput :: Interface a => String -> a -> Declare ()
-declareOutput str out = 
+declareOutput str out =
   newScope str (declareOut (toIfcTerm out) (toIfcType out))
 
 -- Declare an input, generically over any iterface type

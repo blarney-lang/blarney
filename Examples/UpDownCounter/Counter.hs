@@ -44,7 +44,7 @@ top = do
         Seq [
           Action do counter.inc,
           Action do counter.inc,
-          Action do 
+          Action do
             counter.inc
             counter.dec,
           Action do

@@ -130,7 +130,7 @@ makeCPUPipeline sim c = do
 
     -- Stage 2: Latch Operands
     -- =======================
-  
+
     -- Register forwarding logic
     let forward rS other =
          (resultWire.active .&. (dst c (instr3.val) .==. instr2.val.rS)) ?
