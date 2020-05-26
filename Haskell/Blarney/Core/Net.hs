@@ -190,8 +190,6 @@ evalConstNet n@Net{ netPrim = Mul w, netInputs = [x, Lit 1] } =
 evalConstNet n@Net{ netPrim = Mul w, netInputs = [Lit a0, Lit a1] } =
   (n { netPrim = Const w (a0 * a1), netInputs = [] }, True)
 -- Div
-evalConstNet n@Net{ netPrim = Div w, netInputs = [_, Lit 0] } =
-  error $ "Division by constant 0 detected"
 evalConstNet n@Net{ netPrim = Div w, netInputs = [Lit 0, _] } =
   (n { netPrim = Const w 0, netInputs = [] }, True)
 evalConstNet n@Net{ netPrim = Div w, netInputs = [x, Lit 1] } =
@@ -199,8 +197,6 @@ evalConstNet n@Net{ netPrim = Div w, netInputs = [x, Lit 1] } =
 evalConstNet n@Net{ netPrim = Div w, netInputs = [Lit a0, Lit a1] } =
   (n { netPrim = Const w (a0 `div` a1), netInputs = [] }, True)
 -- Mod
-evalConstNet n@Net{ netPrim = Mod w, netInputs = [_, Lit 0] } =
-  error $ "Modulo by constant 0 detected"
 evalConstNet n@Net{ netPrim = Mod w, netInputs = [Lit 0, _] } =
   (n { netPrim = Const w 0, netInputs = [] }, True)
 evalConstNet n@Net{ netPrim = Mod w, netInputs = [x, Lit 1] } =
