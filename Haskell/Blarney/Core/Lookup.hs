@@ -81,7 +81,7 @@ instance Lookup (Bit n) Integer (Bit 1) where
 
 -- |Index a list of interfaces using bit-vector
 lookupInterface :: (KnownNat n, Interface a) => [a] -> Bit n -> a
-lookupInterface ifcs i = fromIfcTerm . idx $ toIfcTerm <$> ifcs
+lookupInterface ifcs i = fromIfcTerm (idx $ toIfcTerm <$> ifcs)
   where
     -- All elements in 'ifcs' have the same type, and hence all elements
     -- in the argument to 'idx' are the same constructor.
