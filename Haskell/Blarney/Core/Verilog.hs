@@ -33,6 +33,7 @@ import Data.Array.IArray
 import Blarney.Core.Net
 import Blarney.Core.Opts
 import Blarney.Core.Prim
+import Blarney.Core.Utils
 import Blarney.Core.Module
 import Blarney.Core.Interface
 import Blarney.Core.IfThenElse
@@ -218,8 +219,9 @@ genNetVerilog netlist net = case netPrim net of
   SignExtend wi wo        -> primNV { decl = Just $ declWire wo wId }
   SelectBits w hi lo      -> primNV { decl = Just $ declWire (1+hi-lo) wId }
   Concat aw bw            -> primNV { decl = Just $ declWire (aw+bw) wId }
-  Mux w                   -> primNV { decl = Just $ declWire w wId }
   Identity w              -> primNV { decl = Just $ declWire w wId }
+  Mux _ w                 -> dfltNV { decl = Just $ declMux w net
+                                    , inst = Just $ instMux net }
   Const w i               -> dfltNV { decl = Just $ declWireInit w wId i }
   DontCare w              -> dfltNV { decl = Just $ declWireDontCare w wId }
   Register i w            -> dfltNV { decl = Just $ declRegInit w wId i
@@ -328,9 +330,6 @@ genNetVerilog netlist net = case netPrim net of
     where width = hi+1-lo
   showPrim (Concat w0 w1) [e0, e1] =
     braces $ showNetInput e0 <> comma <+> showNetInput e1
-  showPrim (Mux w) [sel, e0, e1] =
-    showNetInput sel <+> char '?'
-                     <+> showNetInput e0 <+> colon <+> showNetInput e1
   showPrim (Identity w) [e0] = showNetInput e0
   showPrim p _ = error $
     "unsupported Prim '" ++ show p ++ "' encountered in Verilog generation"
@@ -358,6 +357,21 @@ genNetVerilog netlist net = case netPrim net of
   declReg width reg = text "reg" <+> showWireWidth width reg <> semi
   declRegInit width reg init =     text "reg" <+> showWireWidth width reg
                                <+> equals <+> showIntLit width init <> semi
+  declMux w net = declWire w (netInstId net, Nothing)
+    $+$ hang header 2 body
+    $+$ text "endfunction"
+    where thisMux = text "mux_" <> int (netInstId net)
+          header = text "function" <+> brackets (int (w-1) <> text ":0")
+                   <+> thisMux <> parens (text "input"
+                                          <+> brackets (int (selw - 1)
+                                          <> text ":0") <+> text "sel") <> semi
+          body = hang (text "case" <+> parens (text "sel")) 2
+                      (sep [ int i <> colon <+> thisMux
+                                   <+> equals <+> showNetInput x <> semi
+                           | (i, x) <- zip [0..] ins])
+                 $+$ text "endcase"
+          ins = tail $ netInputs net
+          selw = log2ceil $ length ins
   declRAM initFile 1 _ dw net =
     vcat $ map (\n -> declWire dw (netInstId net, n)) [Nothing]
   declRAM initFile 2 _ dw net =
@@ -414,6 +428,9 @@ genNetVerilog netlist net = case netPrim net of
                      <+> equals <+> showNetInput (netInputs net !! 0) <> semi
   instInput net s =     text "assign" <+> showWire (netInstId net, Nothing)
                     <+> equals <+> text s <> semi
+  instMux net = text "assign" <+> showWire (netInstId net, Nothing)
+                <+> equals <+> text "mux_" <> int (netInstId net)
+                <> parens (showNetInput $ netInputs net !! 0) <> semi
   instRAM net i aw dw =
         hang (hang (text "BlockRAM#") 2 (parens $ argStyle ramParams)) 2
           (hang (text "ram" <> int nId) 2 ((parens $ argStyle ramArgs) <> semi))

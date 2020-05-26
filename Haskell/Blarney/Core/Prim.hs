@@ -39,6 +39,8 @@ import Prelude
 import Data.Set
 import Data.Maybe
 
+import Blarney.Core.Utils
+
 -- | Every instance of a component in the circuit has a unique id
 type InstId = Int
 
@@ -140,8 +142,8 @@ data Prim =
     -- | Bit vector concatenation (2 inputs, 1 output)
   | Concat InputWidth InputWidth
 
-    -- | Multiplexer (3 inputs, 1 output)
-  | Mux OutputWidth
+    -- | Multiplexer (n inputs, 1 output)
+  | Mux Int OutputWidth
     -- | Identity function (1 input, 1 output)
   | Identity OutputWidth
 
@@ -427,13 +429,14 @@ primInfo (Concat w0 w1) = PrimInfo { isInlineable = True
                                    , isRoot = False
                                    , inputs = [("in0", w0), ("in1", w1)]
                                    , outputs = [("out", w0 + w1)] }
-primInfo (Mux w) = PrimInfo { isInlineable = True
-                            , inputsInlineable = True
-                            , strRep = "Mux"
-                            , dontKill = False
-                            , isRoot = False
-                            , inputs = [("sel", 1), ("in0", w), ("in1", w)]
-                            , outputs = [("out", w)] }
+primInfo (Mux n w) = PrimInfo { isInlineable = False
+                              , inputsInlineable = True
+                              , strRep = "Mux"
+                              , dontKill = False
+                              , isRoot = False
+                              , inputs = ("sel", log2ceil n)
+                                         : [("in" ++ show i, w) | i <- [0..n-1]]
+                              , outputs = [("out", w)] }
 primInfo (Identity w) = PrimInfo { isInlineable = True
                                  , inputsInlineable = True
                                  , strRep = "Identity"

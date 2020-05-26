@@ -81,24 +81,21 @@ instance Lookup (Bit n) Integer (Bit 1) where
 
 -- |Index a list of interfaces using bit-vector
 lookupInterface :: (KnownNat n, Interface a) => [a] -> Bit n -> a
-lookupInterface ifcs i = fromIfcTerm (idx [toIfcTerm ifc | ifc <- ifcs])
+lookupInterface ifcs i = fromIfcTerm (idx $ toIfcTerm <$> ifcs)
   where
     -- All elements in 'ifcs' have the same type, and hence all elements
     -- in the argument to 'idx' are the same constructor.
     idx [] = error "Blarney.Core.Lookup: looking up an empty list"
-    idx (ifcs@(IfcTermBV{}:_)) = IfcTermBV $
-      tree1 orBV [ maskBV (i .==. fromInteger j) x
-                 | (j, IfcTermBV x) <- zip [0..] ifcs ]
-    idx (ifcs@(IfcTermAction{}:_)) =
-      IfcTermAction do
-        rets <- sequence
-                  [ whenR (i .==. fromInteger j) act
-                  | (j, IfcTermAction act) <- zip [0..] ifcs ]
-        return (idx rets)
-    idx (ifcs@(IfcTermProduct{}:_)) =
-      IfcTermProduct $ map idx $ transpose [xs | IfcTermProduct xs <- ifcs]
-    idx (ifcs@(IfcTermFun{}:_)) =
-      IfcTermFun $ \x -> idx [f x | IfcTermFun f <- ifcs]
+    idx (terms@(IfcTermBV{}:_)) =
+      IfcTermBV $ muxBV (toBV i) [ x | (IfcTermBV x) <- terms ]
+    idx (terms@(IfcTermAction{}:_)) = IfcTermAction do
+      rets <- sequence [ whenR (i .==. fromInteger j) act
+                       | (j, IfcTermAction act) <- zip [0..] terms ]
+      return (idx rets)
+    idx (terms@(IfcTermProduct{}:_)) =
+      IfcTermProduct $ map idx $ transpose [xs | IfcTermProduct xs <- terms]
+    idx (terms@(IfcTermFun{}:_)) =
+      IfcTermFun $ \x -> idx [f x | IfcTermFun f <- terms]
 
-    maskBV c x = muxBV (toBV c) (x, constBV w 0)
+    maskBV c x = muxBV (toBV c) [constBV w 0, x]
       where w = bvPrimOutWidth x

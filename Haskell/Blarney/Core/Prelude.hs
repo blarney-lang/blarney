@@ -101,12 +101,13 @@ selectList alts =
 
 -- |Index a list
 listIndex :: (KnownNat n, Bits a) => Bit n -> [a] -> a
-listIndex i xs = select [(i .==. fromInteger j, x) | (j, x) <- zip [0..] xs]
+listIndex _ [] = dontCare
+listIndex i xs = unpack $ mux i (pack <$> xs)
 
 -- |Ternary conditional operator (generic multiplexer)
 infixl 3 ?
 (?) :: Bits a => Bit 1 -> (a, a) -> a
-c ? (a, b) = unpack (mux c (pack a, pack b))
+c ? (a, b) = unpack (mux c [pack b, pack a])
 
 -- |Overloaded if-then-else
 instance {-# OVERLAPPABLE #-} Bits a => IfThenElse (Bit 1) a where
