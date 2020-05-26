@@ -47,9 +47,9 @@ module PebblesTop
   Pebbles cpu
   ( .clock(clock)
   , .reset(reset)
-  , .in_canPeek(out_canGet)
-  , .in_peek(out_getData)
-  , .in_consume_en(out_get)
+  , .in0_canPeek(out_canGet)
+  , .in0_peek(out_getData)
+  , .in0_consume_en(out_get)
   , .out_consume_en(in_get)
   , .out_peek(in_getData)
   , .out_canPeek(in_canGet)
