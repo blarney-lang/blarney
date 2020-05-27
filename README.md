@@ -1,4 +1,4 @@
-<img src="blarney-logo.svg">
+<img src="blarney-logo.svg" width=275>
 
 Blarney is a Haskell library for hardware description that builds a
 range of HDL abstractions on top of a small set of core circuit
