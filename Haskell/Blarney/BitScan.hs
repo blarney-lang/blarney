@@ -44,6 +44,7 @@ module Blarney.BitScan
   ( (==>)
   , match
   , matchDefault
+  , Alt(..)
   ) where
 
 import Blarney
@@ -167,24 +168,30 @@ tokenWidth (Var v) = error "Error: tokenWidth not defined for unranged vars"
 tokenWidth (Range v hi lo) = (hi-lo)+1
 tokenWidth (Lit bs) = length bs
 
--- Match literals in pattern against subject
-matches :: BitList -> [Token] -> Bit 1
-matches subj toks
-  | width /= length subj = error "Format error: width mismatch"
-  | otherwise = check 0 toks
-  where
-    width = sum (map tokenWidth toks)
+-- |A bit pattern consists of a list of pattern bits
+type Pattern = [PatternBit]
 
-    check n [] = 1
-    check n (t : rest) =
-      case t of
-        Var v -> error "Format error: unranged vars not supported"
-        Range id hi lo -> check (n + (hi-lo) + 1) rest
-        Lit bs ->
-              andList [ if c == '0' then inv b else b
-                      | (c, b) <- zip bs (drop n subj) ]
-          .&. check (n + length bs) rest
+-- |Pattern bit
+data PatternBit = Zero | One | DontCare
+  deriving Eq
 
+-- |Convert a token stream to a bit pattern
+toPattern :: [Token] -> Pattern
+toPattern [] = []
+toPattern (t:ts) =
+  case t of
+    Var v -> error "Format error: unranged vars not supported"
+    Lit bs -> [if b == '0' then Zero else One | b <- bs] ++ toPattern ts
+    Range id hi lo -> replicate ((hi-lo)+1) DontCare ++ toPattern ts
+
+-- |Match alternative
+data Alt =
+  Alt {
+    altPattern :: Pattern
+  , altBody    :: BitList -> Action ()
+  }
+
+-- |Class capturing the right-hand-side of a match alternative
 class RHS f where
   apply :: f -> [BitList] -> Action ()
 
@@ -196,24 +203,46 @@ instance (RHS f, KnownNat n) => RHS (Bit n -> f) where
   apply f [] = error "Format error: too few pattern vars"
   apply f (arg:args) = apply (f (fromBitList arg)) args
 
--- |Case statement, with a subject and a list of alternatives
-match :: KnownNat n => Bit n -> [Bit n -> Action (Bit 1)] -> Action ()
-match subj alts = sequence_ [alt subj | alt <- alts]
-
--- |Case statement, with a default case
-matchDefault :: KnownNat n => Bit n -> [Bit n -> Action (Bit 1)] ->
-                  Action () -> Action ()
-matchDefault subj alts def = do
-  bs <- sequence [alt subj | alt <- alts]
-  when (inv (orList bs)) def
-
--- |Case alternative
+-- |Infix operator to construct a match alternative
 infix 1 ==>
-(==>) :: (KnownNat n, RHS rhs) => String -> rhs -> Bit n -> Action (Bit 1)
-fmt ==> rhs = \subj -> do
-    let subj' = toBitList subj
-    let matching = matches subj' toks
-    when matching $ apply rhs (args subj' (tag toks))
-    return matching
+(==>) :: RHS rhs => String -> rhs -> Alt
+fmt ==> rhs =
+  Alt {
+    altPattern = toPattern toks
+  , altBody = \subj -> apply rhs (args subj (tag toks))
+  }
+  where toks = tokenise fmt
+
+-- |Match a subject against a pattern
+isMatch :: BitList -> Pattern -> Bit 1
+isMatch subj pat
+  | length pat /= length subj = error "Format error: width mismatch"
+  | otherwise = andList (concat (zipWith matchBit pat subj))
   where
-    toks = tokenise fmt
+    matchBit DontCare x = []
+    matchBit One x      = [x]
+    matchBit Zero x     = [inv x]
+
+-- |Match a subject against many patterns
+isMatchMany :: BitList -> [Pattern] -> [Bit 1]
+isMatchMany subj pats = map (isMatch subj) pats
+
+-- |Match statement, with a subject, a list of alternatives and
+-- an optional default case
+matchGeneral :: KnownNat n => Bit n -> [Alt] -> Maybe (Action ()) -> Action ()
+matchGeneral subj alts def = do
+  let subj' = toBitList subj
+  let conds = isMatchMany subj' (map altPattern alts)
+  let bodies = [altBody alt subj' | alt <- alts]
+  sequence_ [when cond body | (cond, body) <- zip conds bodies]
+  case def of
+    Nothing  -> return ()
+    Just act -> when (inv (orList conds)) act
+
+-- |Match statement, with a subject and a list of alternatives
+match :: KnownNat n => Bit n -> [Alt] -> Action ()
+match subj alts = matchGeneral subj alts Nothing
+
+-- |Match statement, with a default case
+matchDefault :: KnownNat n => Bit n -> [Alt] -> Action () -> Action ()
+matchDefault subj alts def = matchGeneral subj alts (Just def)
