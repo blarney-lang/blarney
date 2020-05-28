@@ -44,7 +44,8 @@ module Blarney.BitScan
   ( (==>)
   , match
   , matchDefault
-  , Alt(..)
+  , Alt
+  , MatchOpts(..)
   ) where
 
 import Blarney
@@ -216,33 +217,139 @@ fmt ==> rhs =
 -- |Match a subject against a pattern
 isMatch :: BitList -> Pattern -> Bit 1
 isMatch subj pat
-  | length pat /= length subj = error "Format error: width mismatch"
+  | length pat /= length subj = error "BitScan format error: width mismatch"
   | otherwise = andList (concat (zipWith matchBit pat subj))
   where
     matchBit DontCare x = []
     matchBit One x      = [x]
     matchBit Zero x     = [inv x]
 
--- |Match a subject against many patterns
-isMatchMany :: BitList -> [Pattern] -> [Bit 1]
-isMatchMany subj pats = map (isMatch subj) pats
+-- |Match a subject against many patterns (simple algorithm)
+isMatchManySimple :: BitList -> [Pattern] -> [Bit 1]
+isMatchManySimple subj pats = map (isMatch subj) pats
 
--- |Match statement, with a subject, a list of alternatives and
--- an optional default case
-matchGeneral :: KnownNat n => Bit n -> [Alt] -> Maybe (Action ()) -> Action ()
-matchGeneral subj alts def = do
+-- |Match a subject against many patterns (exploit sharing).
+-- Overview: Is any bit position non-X in every pattern?
+--   Yes: select bit position with most 1's or most 0's
+--     * split patterns based on this bit, into those with 1's and
+--       that with 0's at this position
+--     * remove the bit from subject and each pattern
+--     * for patterns where bit is 1: AND the bit with accum and recurse
+--     * for patterns where bit is 0: INV the bit and AND with accum and recurse
+--   No: select bit position with most X's
+--     * split patterns bsaed on this bit, into X's and non-X's
+--     * for patterns where bit is X: remove bit from subject
+--       and each pattern, and recurse
+--     * for patterns where bit is non-X: recurse
+isMatchManyShare :: BitList -> [Pattern] -> [Bit 1]
+isMatchManyShare subj pats
+  | not isValid = error "BitScan format error: width mismatch"
+  | otherwise =
+        map snd
+      $ sortBy cmpFst
+      $ match 1 [0..numPats-1] subj pats
+  where
+    numPats = length pats
+    numBits = length subj
+    isValid = and [len == numBits | len <- map length pats]
+    cmpFst x y = fst x `compare` fst y
+
+    match cond ids subj pats
+      | all null pats = [(id, cond) | id <- ids]
+      | null someX =
+             match (cond .&. inv splitBit)
+                   ids0
+                   (remove splitBitPos subj)
+                   [pat | (id, pat) <- zip ids pats', id `elem` ids0]
+          ++ match (cond .&. splitBit)
+                   ids1
+                   (remove splitBitPos subj)
+                   [pat | (id, pat) <- zip ids pats', id `elem` ids1]
+      where
+        patsT = transpose pats
+
+        -- Which bit position is DontCare in every alternative?
+        (noneX, someX) = partition (all (/= DontCare)) patsT
+
+        -- Count max number of 0's or 1's at each bit position
+        counts = [ length [() | One <- bs] `max`
+                     length [() | Zero <- bs]
+                 | bs <- noneX ]
+
+        -- Which bit position has the most sharing?
+        splitBitPos = snd (maximum (zip counts [0..]))
+        splitBit = subj !! splitBitPos
+        
+        -- Split the alternatives
+        ids0 = [id | (id, Zero) <- zip ids (patsT !! splitBitPos)]
+        ids1 = [id | (id, One) <- zip ids (patsT !! splitBitPos)]
+
+        -- Remove the split bit
+        pats' = transpose (remove splitBitPos patsT)
+    match cond ids subj pats =
+           match cond
+                 idsX
+                 (remove remBitPos subj)
+                 [pat | (id, pat) <- zip ids pats', id `elem` idsX]
+        ++ match cond
+                 idsNotX
+                 subj
+                 [pat | (id, pat) <- zip ids pats, id `elem` idsNotX]
+      where
+        patsT = transpose pats
+
+        -- Count max number of DontCare's at each bit position
+        counts = [ length [() | DontCare <- bs] | bs <- patsT ]
+
+        -- Which bit position has the most DontCare's?
+        remBitPos = snd (maximum (zip counts [0..]))
+
+        -- Split the alternatives
+        idsX = [id | (id, DontCare) <- zip ids (patsT !! remBitPos)]
+        idsNotX = ids \\ idsX
+
+        -- Remove the split bit
+        pats' = transpose (remove remBitPos patsT)
+
+    -- Remove element at index i of list xs
+    remove i xs = take i xs ++ drop (i+1) xs
+
+-- |Match options
+data MatchOpts =
+  MatchOpts {
+    -- Default case (optional)
+    matchOptDefault :: Maybe (Action ())
+    -- Use simple matching algorithm?
+  , matchOptUseSimpleAlgorithm :: Bool
+  }
+
+-- |General parameterised match statement
+matchGeneral :: KnownNat n => Bit n -> [Alt] -> MatchOpts -> Action ()
+matchGeneral subj alts opts = do
   let subj' = toBitList subj
-  let conds = isMatchMany subj' (map altPattern alts)
+  let conds = if matchOptUseSimpleAlgorithm opts
+                then isMatchManySimple subj' (map altPattern alts)
+                else isMatchManyShare subj' (map altPattern alts)
   let bodies = [altBody alt subj' | alt <- alts]
   sequence_ [when cond body | (cond, body) <- zip conds bodies]
-  case def of
+  case matchOptDefault opts of
     Nothing  -> return ()
     Just act -> when (inv (orList conds)) act
 
 -- |Match statement, with a subject and a list of alternatives
 match :: KnownNat n => Bit n -> [Alt] -> Action ()
-match subj alts = matchGeneral subj alts Nothing
+match subj alts = matchGeneral subj alts opts
+  where
+    opts = MatchOpts {
+             matchOptDefault = Nothing
+           , matchOptUseSimpleAlgorithm = False
+           }
 
 -- |Match statement, with a default case
 matchDefault :: KnownNat n => Bit n -> [Alt] -> Action () -> Action ()
-matchDefault subj alts def = matchGeneral subj alts (Just def)
+matchDefault subj alts def = matchGeneral subj alts opts
+  where
+    opts = MatchOpts {
+             matchOptDefault = Just def
+           , matchOptUseSimpleAlgorithm = False
+           }
