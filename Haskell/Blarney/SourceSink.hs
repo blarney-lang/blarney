@@ -53,10 +53,12 @@ data Source t = Source { canPeek :: Bit 1
                        } deriving (Generic, Interface)
 
 -- | 'Sink' type. A 'Sink' 't' 'Interface' can be fed values of type 't' via its
---   'put' method and can exercise back pressure with the returned 'Bit' 1.
-data Sink t = Sink { put :: t -> Action (Bit 1)
-                     -- ^ Attempts to put a value of type 't' into the 'Sink',
-                     --   and returns 'true' on success and 'false' on failure.
+--   'put' method, expected to be called when its 'canPut' method returns
+--   'true'.
+data Sink t = Sink { canPut :: Bit 1
+                     -- ^ Checks whether a value can be 'put' this cycle
+                   , put :: t -> Action ()
+                     -- ^ Puts a value of type 't' into the 'Sink'
                    } deriving (Generic, Interface)
 
 -------------------------------
@@ -88,8 +90,8 @@ instance ToSink (Sink t) t where
 -- | 'Connectable' instance for 'Source' 't' and 'Sink' 't'
 instance Connectable (Source t) (Sink t) where
   makeConnection src snk = always do
-    when (src.canPeek) do done <- (snk.put) (src.peek)
-                          when done do src.consume
+    when ((src.canPeek) .&. (snk.canPut)) do (snk.put) (src.peek)
+                                             src.consume
 
 -----------------------------
 -- helpers and other utils --
@@ -107,7 +109,8 @@ makeNullSource = return nullSource
 
 -- | \"Null\" 'Sink' that always consumes its input.
 nullSink :: Sink t
-nullSink = Sink { put = \x -> do return true }
+nullSink = Sink { canPut = true
+                , put    = \x -> noAction }
 
 -- | \"Null\" 'Sink' 'Module' that always consumes its input.
 makeNullSink :: Module (Sink t)
@@ -131,7 +134,7 @@ debugSink :: (FShow t) => Sink t -- ^ The 'Sink' to debug
                        -> Format -- ^ A 'Format' prefix
                        -> Sink t -- ^ The wrapped 'Sink'
 debugSink snk msg = Sink {
-  put = \x -> do didPut <- (snk.put) x
-                 when didPut do display msg " - Sink put - " (fshow x)
-                 return didPut
+  canPut = snk.canPut
+, put = \x -> do (snk.put) x
+                 display msg " - Sink put - " (fshow x)
 }

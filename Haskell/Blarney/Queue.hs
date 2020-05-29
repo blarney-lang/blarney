@@ -43,8 +43,8 @@ instance ToSource (Queue t) t where
 
 -- | ToSink instance for Queue
 instance ToSink (Queue t) t where
-  toSink q = Sink { put = \x -> do when (q.notFull) do (q.enq) x
-                                   return (q.notFull)
+  toSink q = Sink { canPut = q.notFull
+                  , put    = q.enq
                   }
 
 -- | ToSP instance for Queue

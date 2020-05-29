@@ -29,14 +29,13 @@ top = do
   -- feed chain of queues
   always do
     -- chain queues
-    putOK <- (q0snk.put) (count.val) -- put count in q0's sink
-    let q2src = toSource s2          -- example use of toSource
+    when (canPut q0snk) do (q0snk.put) (count.val) -- put count in q0's sink
+    let q2src = toSource s2 -- example use of toSource
     -- Consume from q2
     when (q2src.canPeek .&. (count.val .>. 50)) do
       q2src.consume
       display "Got %0d" (q2src.peek)
       when (q2src.peek .>. 100) finish
-    --when putOK do count <== count.val + 1
     count <== count.val + 1
 
 -- Main function
