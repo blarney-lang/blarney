@@ -1,45 +1,42 @@
-{-# LANGUAGE BlockArguments        #-}
-{-# LANGUAGE DefaultSignatures     #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE RecursiveDo           #-}
+{-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE TypeOperators         #-}
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE KindSignatures        #-}
-{-# LANGUAGE TypeOperators         #-}
-{-# LANGUAGE TypeFamilies          #-}
-{-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE BlockArguments        #-}
+{-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE DefaultSignatures     #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
-{-# LANGUAGE RecursiveDo           #-}
+{-# LANGUAGE UndecidableInstances  #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 
 {-|
 Module      : Blarney.Core.Interface
 Description : Support for separate compilation
 Copyright   : (c) Matthew Naylor, 2019
-              (c) Alexandre Joannou, 2019
+              (c) Alexandre Joannou, 2019-2020
 License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
 
-Rather than flattening the entire design hierarchy down to a single
-netlist, we want to maintain the modular structure when generating
-Verilog.  This module allows Blarney functions to be turned into
-Verilog modules, and Verilog modules to be instantiated in a
-Blarney description.
+Rather than flattening the entire design hierarchy down to a single netlist, we
+want to maintain the modular structure when generating external modules.
+'Blarney.Core.Interface' allows Blarney functions to be turned into external
+modules, and external modules to be instantiated in a Blarney description.
 -}
-module Blarney.Core.Interface
-  ( Interface(..) -- Types that can be converted to Verilog I/O ports
-  , IfcTerm(..)   -- Generic term representation
-  , IfcType(..)   -- Generic type representation
-  , Method(..)    -- Function types that can be converted to Verilog I/O ports
-  , Modular(..)   -- Types that can be turned into Verilog modules
-  , makeModule    -- Convert a Blarney function to a Verilog module
-  , makeInstance  -- Instantiate a Verilog module in a Blarney description
-  , makeInstanceWithParams  -- Allow synthesis-time Verilog parameters
-  ) where
+module Blarney.Core.Interface (
+  Interface(..) -- Types that can be converted to external module I/O ports
+, IfcTerm(..)   -- Generic term representation
+, IfcType(..)   -- Generic type representation
+, Method(..)    -- Function types convertible to external module I/O ports
+, Modular(..)   -- Types that can be turned into external modules
+, makeModule    -- Convert a Blarney function to an external module
+, makeInstance  -- Instantiate an external module in a Blarney description
+, makeInstanceWithParams  -- Allow static parameters
+) where
 
 -- Standard imports
 import Prelude
@@ -255,7 +252,7 @@ declareInputBV suffix width = do
   addDecl (DeclInput name width)
   lookupInputBV name
 
--- Declare an output, generically over any iterface type
+-- Declare an output, generically over any interface type
 declareOut :: IfcTerm -> IfcType -> Declare ()
 declareOut x (IfcTypeMetaSel selName t) =
   newScope selName (declareOut x t)
@@ -282,7 +279,7 @@ declareOutput :: Interface a => String -> a -> Declare ()
 declareOutput str out =
   newScope str (declareOut (toIfcTerm out) (toIfcType out))
 
--- Declare an input, generically over any iterface type
+-- Declare an input, generically over any interface type
 declareIn :: IfcType -> Declare IfcTerm
 declareIn (IfcTypeMetaSel selName t) =
   newScope selName (declareIn t)

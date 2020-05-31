@@ -1,10 +1,11 @@
-{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE PatternSynonyms   #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 {-|
 Module      : Blarney.Flatten
 Description : Flatten BV into Net
 Copyright   : (c) Matthew Naylor, 2019
-              (c) Alexandre Joannou, 2019
+              (c) Alexandre Joannou, 2019-2020
 License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
@@ -16,15 +17,22 @@ module Blarney.Core.Flatten (
 , freshInstId -- Obtain a fresh instance id
 , addNet      -- Add a net to the netlist
 , flatten     -- Flatten a bit vector to a netlist
+, ToMNetlist(..)
+, ToNetlist(..)
 ) where
 
 import Prelude
 import Data.IORef
+import Data.Array
+import Data.Array.IO
+import Data.Map (fromListWith)
 import Control.Monad
 
 import Blarney.Core.BV
 import Blarney.Core.Net
 import Blarney.Core.Prim
+import Blarney.Core.RTL (RTL(..), RTLAction(..), R(..), Assign(..))
+import Blarney.Core.Module (Module(..))
 import qualified Blarney.Core.JList as JL
 
 -- |A reader/writer monad for accumulating the netlist
@@ -100,3 +108,48 @@ flatten bv@BV{bvNameHints=hints,bvInstRef=instRef} = do
       return $ InputWire (instId, bvOutput bv)
     Just instId -> do when hasNameHints $ addNameHints (instId, hints)
                       return $ InputWire (instId, bvOutput bv)
+
+class ToMNetlist a where
+  toMNetlist :: a -> IO MNetlist
+
+-- | Convert RTL monad to a netlist
+instance ToMNetlist (RTL ()) where
+  --toMNetlist :: RTL () -> IO MNetlist
+  toMNetlist rtl = do
+    -- flatten BVs into a Netlist
+    i <- newIORef (0 :: InstId)
+    ((nl, nms, undo), _) <- runFlatten flattenRoots i
+    maxId <- readIORef i
+    mnl :: MNetlist <-
+      thaw $ listArray (0, maxId) (replicate (maxId+1) Nothing)
+          // [(netInstId n, Just n) | n <- JL.toList nl]
+    -- update netlist with gathered names
+    forM_ (JL.toList nms) $ \(idx, hints) -> do
+      mnet <- readArray mnl idx
+      case mnet of
+        Just net@Net{ netNameHints = oldHints } ->
+          writeArray mnl idx (Just net { netNameHints = oldHints <> hints })
+        _ -> return ()
+    -- run undo computations
+    undo
+    -- return final netlist
+    return mnl
+    ------------------------
+    where
+      (_, actsJL, _) = runRTL rtl (R { nameHints = mempty
+                                     , cond = 1
+                                     , assigns = assignMap }) 0
+      acts = JL.toList actsJL
+      assignMap = fromListWith (++) [(lhs a, [a]) | RTLAssign a <- acts]
+      flattenRoots = mapM flatten (concat [rts | RTLRoots rts <- acts])
+
+-- | Convert Module monad to a netlist
+instance ToMNetlist (Module ()) where
+  --toMNetlist :: Module () -> IO MNetlist
+  toMNetlist = toMNetlist . runModule
+
+class ToMNetlist a => ToNetlist a where
+  toNetlist :: a -> IO Netlist
+  toNetlist x = toMNetlist x >>= freeze
+instance ToNetlist (RTL ())
+instance ToNetlist (Module ())

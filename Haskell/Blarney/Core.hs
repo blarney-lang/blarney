@@ -2,7 +2,7 @@
 Module      : Blarney.Core
 Description : Core module for the blarney hardware description library
 Copyright   : (c) Matthew Naylor, 2019
-              (c) Alexandre Joannou, 2019
+              (c) Alexandre Joannou, 2019-2020
 License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
@@ -14,7 +14,6 @@ module Blarney.Core (
 , module Blarney.Core.FShow
 , module Blarney.Core.Module
 , module Blarney.Core.Lookup
-, module Blarney.Core.Verilog
 , module Blarney.Core.Prelude
 , module Blarney.Core.Interface
 , module Blarney.Core.IfThenElse
@@ -26,7 +25,6 @@ import Blarney.Core.RAM
 import Blarney.Core.FShow
 import Blarney.Core.Module
 import Blarney.Core.Lookup
-import Blarney.Core.Verilog
 import Blarney.Core.Prelude
 import Blarney.Core.Interface
 import Blarney.Core.IfThenElse

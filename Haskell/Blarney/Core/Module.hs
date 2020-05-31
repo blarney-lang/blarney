@@ -13,13 +13,13 @@
 Module      : Blarney.Core.Module
 Description : Blarney modules
 Copyright   : (c) Matthew Naylor, 2019
-              (c) Alexandre Joannou, 2019
+              (c) Alexandre Joannou, 2019-2020
 License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
 
 We split the RTL monad into a Module monad and an Action monad, giving a
-more familar HDL structure in which modules instantiate other modules,
+more familiar HDL structure in which modules instantiate other modules,
 and express behaviour through 'always' blocks containing actions.
 Actions cannot instantiate modules.
 -}
@@ -68,15 +68,13 @@ module Blarney.Core.Module
     -- * External inputs and outputs
     input, inputBV, output, outputBV,
 
-    -- * Convert RTL to a netlist
-    addRoots, netlist
+    -- * Add a 'BV' as a netlist root
+    addRoots
   ) where
 
 -- Blarney imports
 import Blarney.Core.BV
-import Blarney.Core.Net
 import Blarney.Core.Bit
-import Blarney.Core.Opts
 import Blarney.Core.Bits
 import Blarney.Core.Prim
 import Blarney.Core.FShow
@@ -290,7 +288,3 @@ instance a ~ () => RTL.Displayable (Action a) where
 -- |Add roots
 addRoots :: [BV] -> Module ()
 addRoots roots = M (RTL.addRoots roots)
-
--- |Convert module to a netlist
-netlist :: Opts -> Module () -> IO Netlist
-netlist opts m = RTL.netlist opts (runModule m)
