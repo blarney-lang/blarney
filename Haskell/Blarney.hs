@@ -13,7 +13,7 @@ selection is common in hardware description).
 -}
 module Blarney (
   module Blarney.Core
---, module Blarney.Netlist
+, module Blarney.Netlist
 , module Blarney.Backend
 , module Control.Monad
 , module Control.Monad.Fix
@@ -24,7 +24,7 @@ module Blarney (
 ) where
 
 import Blarney.Core
---import Blarney.Netlist
+import Blarney.Netlist
 import Blarney.Backend
 import Control.Monad hiding (when)
 import Control.Monad.Fix
