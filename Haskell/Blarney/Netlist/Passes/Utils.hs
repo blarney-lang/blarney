@@ -40,19 +40,20 @@ netDontKill :: Net -> Bool
 netDontKill Net{netPrim=prim} = primDontKill prim
 
 -- | A helper function to read a 'Net' from a 'MNetlist'
-readNet :: MNetlist -> InstId -> IO Net
-readNet nl instId = fromMaybe (error "encountered InstId with no matching Net")
-                              <$> (readArray nl instId)
+--readNet :: MNetlist -> InstId -> IO Net
+readNet :: InstId -> MNetlistPass Net
+readNet instId mnl = fromMaybe (error "encountered InstId with no matching Net")
+                               <$> (readArray mnl instId)
 
 -- | A helper type for 'Net' reference counting
 type NetCounts = IOUArray InstId Int
 
 -- | A 'Net' reference counting helper function
-countNetRef :: MNetlist -> IO NetCounts
-countNetRef arr = do
-  bounds <- getBounds arr
+countNetRef :: MNetlistPass NetCounts
+countNetRef mnl = do
+  bounds <- getBounds mnl
   refCounts <- newArray bounds 0
-  es <- getElems arr
+  es <- getElems mnl
   -- count references for each Net
   let innerCount (InputWire (instId, _)) = do
         cnt <- readArray refCounts instId

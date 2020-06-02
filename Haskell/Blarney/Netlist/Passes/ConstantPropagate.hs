@@ -19,8 +19,8 @@ import Blarney.Netlist.Passes.Utils
 
 -- | Constant propagation pass
 constantPropagate :: MNetlistPass Bool
-constantPropagate nl = do
-  pairs <- getAssocs nl -- list of nets with their index
+constantPropagate mnl = do
+  pairs <- getAssocs mnl -- list of nets with their index
   changed <- newIORef False -- keep track of modifications to the 'Netlist'
   -- Turn constant 'InputWire' for each 'Net' into constant 'InputTree'
   forM_ [(a, b) | x@(a, Just b) <- pairs] $ \(idx, net) -> do
@@ -28,7 +28,7 @@ constantPropagate nl = do
     inputs' <- forM (netInputs net) $ \inpt -> do
       case inpt of
         InputWire (instId, _) -> do
-          inptNet <- readNet nl instId
+          inptNet <- readNet instId mnl
           -- keep track of change when transforming into an 'InputTree'
           case netPrim inptNet of
             p@(Const _ _)  -> writeIORef changed True >> return (InputTree p [])
@@ -36,7 +36,7 @@ constantPropagate nl = do
             _              -> return inpt
         _ -> return inpt
     -- update the current 'Net' in the 'Netlist'
-    writeArray nl idx (Just net { netInputs = inputs' })
+    writeArray mnl idx (Just net { netInputs = inputs' })
   -- finish pass
   -- DEBUG HELP -- x <- readIORef changed
   -- DEBUG HELP -- putStrLn $ "propagateConstant pass changed? " ++ show x
