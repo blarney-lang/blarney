@@ -1,8 +1,8 @@
 {-|
 Module      : Blarney.Backend
 Description : Backend module for the blarney hardware description library
-Copyright   : (c) Matthew Naylor, 2019
-              (c) Alexandre Joannou, 2019
+Copyright   : (c) Matthew Naylor, 2020
+              (c) Alexandre Joannou, 2020
 License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
@@ -19,6 +19,7 @@ import Prelude
 import Blarney.Core.Opts
 import Blarney.Core.Interface (Modular(..), makeModule)
 import Blarney.Core.Flatten (ToMNetlist(..))
+import Blarney.Core.Module
 import Blarney.Netlist
 
 -- Verilog backend
@@ -42,13 +43,12 @@ writeVerilogModule mod modName dirName = do
 
 -- This function is similar to 'writeVerilogModule' but also generate simulation
 -- files and Makefiles for toplevel modules
-writeVerilogTop :: Modular a
-                => a      -- ^ Blarney function
-                -> String -- ^ Module name
-                -> String -- ^ Output directory
+writeVerilogTop :: Module () -- ^ Blarney function
+                -> String    -- ^ Module name
+                -> String    -- ^ Output directory
                 -> IO ()
 writeVerilogTop mod modName dirName = do
   (opts, _) <- getOpts
-  mnl <- toMNetlist $ makeModule mod
+  mnl <- toMNetlist mod
   nl <- defaultNetlistPasses opts mnl
   genVerilogTop nl modName dirName
