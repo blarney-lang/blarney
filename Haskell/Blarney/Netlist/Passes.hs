@@ -14,6 +14,7 @@ module Blarney.Netlist.Passes (
 , module Blarney.Netlist.Passes.ZeroWidthNetIgnore
 , module Blarney.Netlist.Passes.ConstantFold
 , module Blarney.Netlist.Passes.ConstantPropagate
+, module Blarney.Netlist.Passes.ConstantEliminate
 , module Blarney.Netlist.Passes.NetInline
 , module Blarney.Netlist.Passes.NamePropagate
 , module Blarney.Netlist.Passes.DeadNetEliminate
@@ -28,19 +29,13 @@ import Blarney.Netlist.Passes.Utils
 import Blarney.Netlist.Passes.ZeroWidthNetIgnore
 import Blarney.Netlist.Passes.ConstantFold
 import Blarney.Netlist.Passes.ConstantPropagate
+import Blarney.Netlist.Passes.ConstantEliminate
 import Blarney.Netlist.Passes.NetInline
 import Blarney.Netlist.Passes.NamePropagate
 import Blarney.Netlist.Passes.DeadNetEliminate
 
 -- Netlist transformation passes
 --------------------------------------------------------------------------------
-
--- | A constant elimination pass
-constantEliminate :: MNetlistPass ()
-constantEliminate mnl = untilM not constElim >> return ()
-                        where constElim = do a <- constantFold mnl
-                                             b <- constantPropagate mnl
-                                             return $ a || b
 
 -- | Run mandatory set of netlist transformation passes and a (potentially
 --   empty) custom pass
