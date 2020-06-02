@@ -12,7 +12,7 @@
 Module      : Blarney.Core.RTL
 Description : Register-transfer-level descriptions
 Copyright   : (c) Matthew Naylor, 2019
-              (c) Alexandre Joannou, 2019
+              (c) Alexandre Joannou, 2019-2020
 License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
@@ -24,71 +24,69 @@ The module defines the RTL monad, supporting:
 3. Simulation-time I/O.
 4. Module input and output declarations.
 -}
-module Blarney.Core.RTL
-  ( -- * RTL monad
-    RTL             -- RTL monad (abstract)
-    -- * Conditional statements
-  , when            -- RTL conditional block
-  , whenR           -- RTL conditional block (with return value)
-  , ifThenElseRTL   -- RTL if-then-else statement
-  , switch          -- RTL switch statement
-  , (-->)           -- Operator for switch statement alternatives
-    -- * Block naming statements
-  , withNameHint    -- Set a name hint for an RTL block
-    -- * Mutable variables: registers and wires
-  , Reg(..)         -- Registers
-  , writeReg        -- Write to register
-  , Wire(..)        -- Wires
-  , writeWire       -- Write to wire
-  , makeReg         -- Create register
-  , makeRegU        -- Create uninitialised regiseter
-  , makeWire        -- Create wire
-  , makeWireU       -- Create uninitialised wire
-  , makeDReg        -- Like makeReg, but holds value one cycle only
-    -- * Simulation-time statements
-  , Displayable(..) -- To support N-ary display statement
-  , display         -- Display statement
-  , display_        -- Display statement (without newline)
-  , finish          -- Terminate simulator
-    -- * External inputs and outputs
-  , input           -- Declare module input
-  , output          -- Declare module output
-  , inputBV         -- Declare module input (untyped)
-  , outputBV        -- Declare module output (untyped)
-    -- * Register files
-  , RegFileRTL(..)  -- Register file interface
-  , makeRegFileInit -- Create initialised register file
-  , makeRegFile     -- Create uninitialised register file
-    -- * Convert RTL to a netlist
-  , addRoots        -- Add netlist roots
-  , netlist         -- Convert RTL monad to a netlist
-  ) where
+module Blarney.Core.RTL (
+  -- * RTL monad
+  RTL(..)         -- RTL monad (abstract)
+, RTLAction(..)   -- RTLAction
+, R(..)           -- The RTL reader type
+, Assign(..)      -- Conditional variable assignment
+  -- * Conditional statements
+, when            -- RTL conditional block
+, whenR           -- RTL conditional block (with return value)
+, ifThenElseRTL   -- RTL if-then-else statement
+, switch          -- RTL switch statement
+, (-->)           -- Operator for switch statement alternatives
+  -- * Block naming statements
+, withNameHint    -- Set a name hint for an RTL block
+  -- * Mutable variables: registers and wires
+, Reg(..)         -- Registers
+, writeReg        -- Write to register
+, Wire(..)        -- Wires
+, writeWire       -- Write to wire
+, makeReg         -- Create register
+, makeRegU        -- Create uninitialised regiseter
+, makeWire        -- Create wire
+, makeWireU       -- Create uninitialised wire
+, makeDReg        -- Like makeReg, but holds value one cycle only
+  -- * Simulation-time statements
+, Displayable(..) -- To support N-ary display statement
+, display         -- Display statement
+, display_        -- Display statement (without newline)
+, finish          -- Terminate simulator
+  -- * External inputs and outputs
+, input           -- Declare module input
+, output          -- Declare module output
+, inputBV         -- Declare module input (untyped)
+, outputBV        -- Declare module output (untyped)
+  -- * Register files
+, RegFileRTL(..)  -- Register file interface
+, makeRegFileInit -- Create initialised register file
+, makeRegFile     -- Create uninitialised register file
+  -- * Add netlist roots
+, addRoots        -- Add netlist roots
+) where
 
 -- Blarney imports
 import Blarney.Core.BV
-import Blarney.Core.Net
 import Blarney.Core.Bit
-import Blarney.Core.Opts
 import Blarney.Core.Bits
 import Blarney.Core.Prim hiding (nameHints)
 import Blarney.Core.FShow
 import Blarney.Core.Prelude
-import Blarney.Core.Flatten
 import Blarney.Core.IfThenElse
 import qualified Blarney.Core.JList as JL
 
 -- Standard imports
 import Prelude
-import Data.Array
 import Data.Maybe
 import Data.IORef
 import GHC.TypeLits
-import Data.Array.IO
+--import Data.Array.IO
 import Data.Set (Set, empty, insert, singleton, toList)
 import Control.Monad.Fix
 import Data.List (intercalate)
 import Control.Monad hiding (when)
-import Data.Map (Map, findWithDefault, fromListWith)
+import Data.Map (Map, findWithDefault)
 
 -- |The RTL monad, for register-transfer-level descriptions,
 -- is a fairly standard reader-writer-state monad.
@@ -413,35 +411,3 @@ makeRegFile = makeRegFileInit ""
 -- |Add netlist roots
 addRoots :: [BV] -> RTL ()
 addRoots roots = write (RTLRoots roots)
-
--- |Convert RTL monad to a netlist
-netlist :: Opts -> RTL () -> IO Netlist
-netlist opts rtl = do
-  -- flatten BVs into a Netlist
-  i <- newIORef (0 :: InstId)
-  ((nl, nms, undo), _) <- runFlatten flattenRoots i
-  maxId <- readIORef i
-  mnl :: MNetlist <-
-    thaw $ listArray (0, maxId) (replicate (maxId+1) Nothing)
-        // [(netInstId n, Just n) | n <- JL.toList nl]
-  -- update netlist with gathered names
-  forM_ (JL.toList nms) $ \(idx, hints) -> do
-    mnet <- readArray mnl idx
-    case mnet of
-      Just net@Net{ netNameHints = oldHints } ->
-        writeArray mnl idx (Just net { netNameHints = oldHints <> hints })
-      _ -> return ()
-  -- run netlist transformation passes
-  nl' <- netlistPasses opts mnl
-  -- run undo computations
-  undo
-  -- return final netlist
-  return nl'
-  ------------------------
-  where
-    (_, actsJL, _) = runRTL rtl (R { nameHints = empty
-                                   , cond = 1
-                                   , assigns = assignMap }) 0
-    acts = JL.toList actsJL
-    assignMap = fromListWith (++) [(lhs a, [a]) | RTLAssign a <- acts]
-    flattenRoots = mapM flatten (concat [rts | RTLRoots rts <- acts])

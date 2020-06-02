@@ -173,7 +173,7 @@ tokenWidth (Lit bs) = length bs
 type Pattern = [PatternBit]
 
 -- |Pattern bit
-data PatternBit = Zero | One | DontCare
+data PatternBit = Zero | One | X
   deriving Eq
 
 -- |Convert a token stream to a bit pattern
@@ -183,7 +183,7 @@ toPattern (t:ts) =
   case t of
     Var v -> error "Format error: unranged vars not supported"
     Lit bs -> [if b == '0' then Zero else One | b <- bs] ++ toPattern ts
-    Range id hi lo -> replicate ((hi-lo)+1) DontCare ++ toPattern ts
+    Range id hi lo -> replicate ((hi-lo)+1) X ++ toPattern ts
 
 -- |Match alternative
 data Alt =
@@ -220,7 +220,7 @@ isMatch subj pat
   | length pat /= length subj = error "BitScan format error: width mismatch"
   | otherwise = andList (concat (zipWith matchBit pat subj))
   where
-    matchBit DontCare x = []
+    matchBit X x = []
     matchBit One x      = [x]
     matchBit Zero x     = [inv x]
 
@@ -268,8 +268,8 @@ isMatchManyShare subj pats
       where
         patsT = transpose pats
 
-        -- Which bit position is DontCare in every alternative?
-        (noneX, someX) = partition (all (/= DontCare)) patsT
+        -- Which bit position is X in every alternative?
+        (noneX, someX) = partition (all (/= X)) patsT
 
         -- Count max number of 0's or 1's at each bit position
         counts = [ length [() | One <- bs] `max`
@@ -279,7 +279,7 @@ isMatchManyShare subj pats
         -- Which bit position has the most sharing?
         splitBitPos = snd (maximum (zip counts [0..]))
         splitBit = subj !! splitBitPos
-        
+
         -- Split the alternatives
         ids0 = [id | (id, Zero) <- zip ids (patsT !! splitBitPos)]
         ids1 = [id | (id, One) <- zip ids (patsT !! splitBitPos)]
@@ -298,14 +298,14 @@ isMatchManyShare subj pats
       where
         patsT = transpose pats
 
-        -- Count max number of DontCare's at each bit position
-        counts = [ length [() | DontCare <- bs] | bs <- patsT ]
+        -- Count max number of X's at each bit position
+        counts = [ length [() | X <- bs] | bs <- patsT ]
 
-        -- Which bit position has the most DontCare's?
+        -- Which bit position has the most X's?
         remBitPos = snd (maximum (zip counts [0..]))
 
         -- Split the alternatives
-        idsX = [id | (id, DontCare) <- zip ids (patsT !! remBitPos)]
+        idsX = [id | (id, X) <- zip ids (patsT !! remBitPos)]
         idsNotX = ids \\ idsX
 
         -- Remove the split bit
