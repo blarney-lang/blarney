@@ -3,7 +3,9 @@ module Pipeline where
 -- 5-stage pipeline for 32-bit 3-operand register-based CPU.
 
 import Blarney
+import Blarney.Option
 import Blarney.BitScan
+import qualified Data.Map as Map
 
 -- Instructions
 type Instr = Bit 32
@@ -23,27 +25,44 @@ data Config =
   , srcB :: Instr -> RegId
     -- Get destination register
   , dst :: Instr -> RegId
-    -- Dispatch rules for pre-execute stage
-  , preExecRules :: State -> [Alt]
-    -- Dispatch rules for execute stage
-  , execRules :: State -> [Alt]
-    -- Dispatch rules for post-execute stage
-  , postExecRules :: State -> [Alt]
+    -- Decode table
+  , decodeTable :: [(String, String)]
+    -- Action for pre-execute stage
+  , preExecRules :: State -> Action ()
+    -- Action for execute stage
+  , execRules :: State -> Action ()
+    -- Action for post-execute stage
+  , postExecRules :: State -> Action ()
   }
 
 -- Pipeline state, visisble to the ISA
 data State =
   State {
+    -- Current instruction
+    instr :: Bit 32
     -- Source operands
-    opA :: Bit 32
+  , opA :: Bit 32
   , opB :: Bit 32
+  , opBorImm :: Bit 32
     -- Program counter interface
   , pc :: ReadWrite (Bit 32)
     -- Write the instruction result
   , result :: WriteOnly (Bit 32)
     -- Indicate late result (i.e. computed in writeback rather than execute)
   , late :: WriteOnly (Bit 1)
+    -- Result of instruction decode
+  , opcode :: TagMap
+  , fields :: FieldMap
   }
+
+-- Helper function for determining opcode
+infix 8 `is`
+is :: TagMap -> [String] -> Bit 1
+is m [] = false
+is m (key:keys) =
+  case Map.lookup key m of
+    Nothing -> error ("Unknown opcode " ++ key)
+    Just b -> b .|. is m keys
 
 -- Pipeline
 makeCPUPipeline :: Bool -> Config -> Module ()
@@ -57,12 +76,10 @@ makeCPUPipeline sim c = do
   regFileA :: RAM RegId (Bit 32) <- makeDualRAMForward 0
   regFileB :: RAM RegId (Bit 32) <- makeDualRAMForward 0
 
-  -- Instruction register
-  instr :: Reg Instr <- makeReg dontCare
-
   -- Instruction operand registers
   regA :: Reg (Bit 32) <- makeReg dontCare
   regB :: Reg (Bit 32) <- makeReg dontCare
+  regBorImm :: Reg (Bit 32) <- makeReg dontCare
 
   -- Wire used to overidge the update to the PC,
   -- in case of a branch instruction
@@ -131,6 +148,9 @@ makeCPUPipeline sim c = do
     -- Stage 2: Latch Operands
     -- =======================
 
+    -- Decode instruction
+    let (tagMap, fieldMap) = matchMap (c.decodeTable) (instr2.val)
+
     -- Register forwarding logic
     let forward rS other =
          (resultWire.active .&. (dst c (instr3.val) .==. instr2.val.rS)) ?
@@ -145,22 +165,33 @@ makeCPUPipeline sim c = do
     let a = forward (c.srcA) (forward' (c.srcA) (regFileA.out))
     let b = forward (c.srcB) (forward' (c.srcB) (regFileB.out))
 
+    -- Use "imm" field if valid, otherwise use register b
+    let bOrImm = if Map.member "imm" fieldMap
+                   then let imm = getField fieldMap "imm"
+                        in imm.valid ? (imm.val, b)
+                   else b
+
     -- Latch operands
     regA <== a
     regB <== b
+    regBorImm <== bOrImm
 
     -- State for pre-execute stage
     let state = State {
-            opA    = a
-          , opB    = b
-          , pc     = ReadWrite (pc2.val) (error "Can't write PC in pre-execute")
+            instr = instr2.val
+          , opA = a
+          , opB = b
+          , opBorImm = bOrImm
+          , pc = ReadWrite (pc2.val) (error "Can't write PC in pre-execute")
           , result = error "Can't write result in pre-execute"
-          , late   = WriteOnly (lateWire <==)
+          , late = WriteOnly (lateWire <==)
+          , opcode = tagMap
+          , fields = fieldMap
           }
 
-    -- Pre-execute rules
+    -- Pre-execute action
     when (go2.val) do
-      match (instr2.val) (preExecRules c state)
+      preExecRules c state
 
     -- Pipeline stall
     when (lateWire.val) do
@@ -179,20 +210,29 @@ makeCPUPipeline sim c = do
     -- Stage 3: Execute
     -- ================
 
+    -- Buffer the decode tables
+    let bufferField opt = Option (buffer (opt.valid)) (map buffer (opt.val))
+    let tagMap3 = Map.map buffer tagMap
+    let fieldMap3 = Map.map bufferField fieldMap
+
     -- State for execute stage
     let state = State {
-            opA    = regA.val
-          , opB    = regB.val
-          , pc     = ReadWrite (pc3.val) (pcNext <==)
+            instr = instr3.val
+          , opA = regA.val
+          , opB = regB.val
+          , opBorImm = regBorImm.val
+          , pc = ReadWrite (pc3.val) (pcNext <==)
           , result = WriteOnly $ \x ->
                        when (dst c (instr3.val) .!=. 0) do
                          resultWire <== x
-          , late   = error "Cant write late signal in execute"
+          , late = error "Cant write late signal in execute"
+          , opcode = tagMap3
+          , fields = fieldMap3
           }
 
-    -- Execute rules
+    -- Execute action
     when (go3.val) do
-      match (instr3.val) (execRules c state)
+      execRules c state
       go4 <== go3.val
 
     instr4 <== instr3.val
@@ -200,20 +240,28 @@ makeCPUPipeline sim c = do
     -- Stage 4: Writeback
     -- ==================
 
+    -- Buffer the decode tables
+    let tagMap4 = Map.map buffer tagMap3
+    let fieldMap4 = Map.map bufferField fieldMap3
+
     -- State for post-execute stage
     let state = State {
-            opA    = regA.val.old
-          , opB    = regB.val.old
-          , pc     = error "Can't access PC in post-execute"
+            instr = instr4.val
+          , opA = regA.val.old
+          , opB = regB.val.old
+          , opBorImm = regBorImm.val.old
+          , pc = error "Can't access PC in post-execute"
           , result = WriteOnly $ \x ->
                        when (dst c (instr4.val) .!=. 0) do
                          postResultWire <== x
-          , late   = error "Can't write late signal in post-execute"
+          , late = error "Can't write late signal in post-execute"
+          , opcode = tagMap4
+          , fields = fieldMap4
           }
 
     -- Post-execute rules
     when (go4.val) do
-      match (instr4.val) (postExecRules c state)
+      postExecRules c state
 
     -- Determine final result
     let rd = dst c (instr4.val)

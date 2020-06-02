@@ -153,7 +153,7 @@ class Valid t where
 
 -- |Variable value (read)
 class Val v a | v -> a where
-  val :: Bits a => v -> a
+  val :: v -> a
 -- |Variable assignment (write)
 infix 1 <==
 class Assign v where

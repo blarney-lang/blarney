@@ -12,134 +12,159 @@ import Trap
 import DataMem
 import Pipeline
 
--- RISCV I instructions
+-- RISCV I decode
+-- ==============
 
-addi :: State -> Bit 12 -> Action ()
-addi s imm = s.result <== s.opA + signExtend imm
+decode =
+  [ "imm[31:12] <5> 0110111" --> "LUI"
+  , "imm[31:12] <5> 0010111" --> "AUIPC"
+  , "imm[11:0] <5> 000 <5> 0010011" --> "ADD"
+  , "imm[11:0] <5> 010 <5> 0010011" --> "SLT"
+  , "imm[11:0] <5> 011 <5> 0010011" --> "SLTU"
+  , "imm[11:0] <5> 111 <5> 0010011" --> "AND"
+  , "imm[11:0] <5> 110 <5> 0010011" --> "OR"
+  , "imm[11:0] <5> 100 <5> 0010011" --> "XOR"
+  , "0000000 imm[4:0] <5> 001 <5> 0010011" --> "SLL"
+  , "0000000 imm[4:0] <5> 101 <5> 0010011" --> "SRL"
+  , "0100000 imm[4:0] <5> 101 <5> 0010011" --> "SRA"
+  , "0000000 <5> <5> 000 <5> 0110011" --> "ADD"
+  , "0000000 <5> <5> 010 <5> 0110011" --> "SLT"
+  , "0000000 <5> <5> 011 <5> 0110011" --> "SLTU"
+  , "0000000 <5> <5> 111 <5> 0110011" --> "AND"
+  , "0000000 <5> <5> 110 <5> 0110011" --> "OR"
+  , "0000000 <5> <5> 100 <5> 0110011" --> "XOR"
+  , "0100000 <5> <5> 000 <5> 0110011" --> "SUB"
+  , "0000000 <5> <5> 001 <5> 0110011" --> "SLL"
+  , "0000000 <5> <5> 101 <5> 0110011" --> "SRL"
+  , "0100000 <5> <5> 101 <5> 0110011" --> "SRA"
+  , "imm[20] imm[10:1] imm[11] imm[19:12] <5> 1101111" --> "JAL"
+  , "imm[11:0] <5> 000 <5> 1100111" --> "JALR"
+  , "off[12] off[10:5] <5> <5> 000 off[4:1] off[11] 1100011" --> "BEQ"
+  , "off[12] off[10:5] <5> <5> 001 off[4:1] off[11] 1100011" --> "BNE"
+  , "off[12] off[10:5] <5> <5> 100 off[4:1] off[11] 1100011" --> "BLT"
+  , "off[12] off[10:5] <5> <5> 110 off[4:1] off[11] 1100011" --> "BLTU"
+  , "off[12] off[10:5] <5> <5> 101 off[4:1] off[11] 1100011" --> "BGE"
+  , "off[12] off[10:5] <5> <5> 111 off[4:1] off[11] 1100011" --> "BGEU"
+  , "imm[11:0] <5> <3> <5> 0000011" --> "LOAD"
+  , "imm[11:5] <5> <5> 0 <2> imm[4:0] 0100011" --> "STORE"
+  , "<4> <4> <4> <5> 000 <5> 0001111" --> "FENCE"
+  , "000000000000 <5> 000 <5> 1110011" --> "ECALL"
+  , "000000000001 <5> 000 <5> 1110011" --> "EBREAK"
+  , "imm[11:0] <5> 001 <5> 1110011" --> "CSRRW"
+  ]
 
-slti :: State -> Bit 12 -> Action ()
-slti s imm = s.result <== (s.opA `sLT` signExtend imm) ? (1, 0)
+-- Determine the access width of a load/store
+getAccessWidth :: Bit 32 -> Bit 2
+getAccessWidth = slice @13 @12
 
-sltiu :: State -> Bit 12 -> Action ()
-sltiu s imm = s.result <== (s.opA .<. signExtend imm) ? (1, 0)
+-- Determine if the load is unsigned
+isUnsignedLoad :: Bit 32 -> Bit 1
+isUnsignedLoad = at @14
 
-andi :: State -> Bit 12 -> Action ()
-andi s imm = s.result <== s.opA .&. signExtend imm
+-- RISCV I pre-execute
+-- ===================
 
-ori :: State -> Bit 12 -> Action ()
-ori s imm = s.result <== s.opA .|. signExtend imm
+preExecute :: State -> Action ()
+preExecute s = do
+  -- Signal late result on a load
+  when (s.opcode `is` ["LOAD"]) do
+    s.late <== true
 
-xori :: State -> Bit 12 -> Action ()
-xori s imm = s.result <== s.opA .^. signExtend imm
+-- RISCV I execute
+-- ===============
 
-lui :: State -> Bit 20 -> Action ()
-lui s imm = s.result <== signExtend (imm # (0 :: Bit 12))
+execute :: CSRUnit -> DataMem -> State -> Action ()
+execute csrUnit mem s = do
+  -- 33-bit add/sub/compare
+  let uns = s.opcode `is` ["SLTU", "BLTU", "BGEU"]
+  let addA = (uns ? (0, at @31 (s.opA))) # s.opA
+  let addB = (uns ? (0, at @31 (s.opBorImm))) # s.opBorImm
+  let isAdd = s.opcode `is` ["ADD"]
+  let sum = addA + (isAdd ? (addB, inv addB))
+                 + (isAdd ? (0, 1))
+  let less = at @32 sum
+  let equal = s.opA .==. s.opBorImm
 
-auipc :: State -> Bit 20 -> Action ()
-auipc s imm = s.result <== s.pc.val + (imm # (0 :: Bit 12))
+  when (s.opcode `is` ["ADD", "SUB"]) do
+    s.result <== truncate sum
 
-add :: State -> Action ()
-add s = s.result <== s.opA + s.opB
+  when (s.opcode `is` ["SLT", "SLTU"]) do
+    s.result <== zeroExtend less
 
-slt :: State -> Action ()
-slt s = s.result <== (s.opA `sLT` s.opB) ? (1, 0)
+  when (s.opcode `is` ["AND"]) do
+    s.result <== s.opA .&. s.opBorImm
 
-sltu :: State -> Action ()
-sltu s = s.result <== (s.opA .<. s.opB) ? (1, 0)
+  when (s.opcode `is` ["OR"]) do
+    s.result <== s.opA .|. s.opBorImm
 
-and' :: State -> Action ()
-and' s = s.result <== s.opA .&. s.opB
+  when (s.opcode `is` ["XOR"]) do
+    s.result <== s.opA .^. s.opBorImm
 
-or' :: State -> Action ()
-or' s = s.result <== s.opA .|. s.opB
+  when (s.opcode `is` ["LUI"]) do
+    s.result <== s.opBorImm
 
-xor :: State -> Action ()
-xor s = s.result <== s.opA .^. s.opB
+  when (s.opcode `is` ["AUIPC"]) do
+    s.result <== s.pc.val + s.opBorImm
 
-sub :: State -> Action ()
-sub s = s.result <== s.opA - s.opB
+  when (s.opcode `is` ["SLL"]) do
+    s.result <== s.opA .<<. slice @4 @0 (s.opBorImm)
 
-left :: State -> Bit 5 -> Bit 1 -> Action ()
-left s imm reg = do
-  let amount = reg ? (slice @4 @0 (s.opB), imm)
-  s.result <== s.opA .<<. amount
+  when (s.opcode `is` ["SRL", "SRA"]) do
+    let ext = s.opcode `is` ["SRA"] ? (at @31 (s.opA), 0)
+    let opAExt = ext # (s.opA)
+    s.result <== truncate (opAExt .>>>. slice @4 @0 (s.opBorImm))
 
-right :: State -> Bit 1 -> Bit 5 -> Bit 1 -> Action ()
-right s arith imm reg = do
-  let ext = arith ? (at @31 (s.opA), 0)
-  let amount = reg ? (slice @4 @0 (s.opB), imm)
-  let value = ext # (s.opA)
-  s.result <== truncate (value .>>>. amount)
+  let branch =
+        orList [
+          s.opcode `is` ["BEQ"] .&. equal
+        , s.opcode `is` ["BNE"] .&. inv equal
+        , s.opcode `is` ["BLT", "BLTU"] .&. less
+        , s.opcode `is` ["BGE", "BGEU"] .&. inv less
+        ]
 
-jal :: State -> Bit 20 -> Action ()
-jal s imm = do
-  s.pc <== s.pc.val + signExtend (imm # (0 :: Bit 1))
-  s.result <== s.pc.val + 4
+  when branch do
+    let offset = getField (s.fields) "off"
+    s.pc <== s.pc.val + offset.val
 
-jalr :: State -> Bit 12 -> Action ()
-jalr s imm = do
-  s.pc <== truncateLSB (s.opA + signExtend imm) # (0 :: Bit 1)
-  s.result <== s.pc.val + 4
+  when (s.opcode `is` ["JAL"]) do
+    s.pc <== s.pc.val + s.opBorImm -- TODO: share with AUIPC?
 
-beq :: State -> Bit 12 -> Action ()
-beq s imm = do
-  when (s.opA .==. s.opB) do
-    s.pc <== s.pc.val + signExtend (imm # (0 :: Bit 1))
+  when (s.opcode `is` ["JALR"]) do
+    s.pc <== truncateLSB (s.opA + s.opBorImm) # (0 :: Bit 1)
+    --TODO: s.pc <== truncateLSB sum # (0 :: Bit 1)
 
-bne :: State -> Bit 12 -> Action ()
-bne s imm = do
-  when (s.opA .!=. s.opB) do
-    s.pc <== s.pc.val + signExtend (imm # (0 :: Bit 1))
+  when (s.opcode `is` ["JAL", "JALR"]) do
+    s.result <== s.pc.val + 4
 
-blt :: State -> Bit 12 -> Action ()
-blt s imm = do
-  when (s.opA `sLT` s.opB) do
-    s.pc <== s.pc.val + signExtend (imm # (0 :: Bit 1))
+  let addr = s.opA + s.opBorImm
 
-bltu :: State -> Bit 12 -> Action ()
-bltu s imm = do
-  when (s.opA .<. s.opB) do
-    s.pc <== s.pc.val + signExtend (imm # (0 :: Bit 1))
+  when (s.opcode `is` ["LOAD"]) do
+    dataMemRead mem addr
 
-bge :: State -> Bit 12 -> Action ()
-bge s imm = do
-  when (s.opA `sGTE` s.opB) do
-    s.pc <== s.pc.val + signExtend (imm # (0 :: Bit 1))
+  when (s.opcode `is` ["STORE"]) do
+    dataMemWrite mem (s.instr.getAccessWidth) addr (s.opB)
 
-bgeu :: State -> Bit 12 -> Action ()
-bgeu s imm = do
-  when (s.opA .>=. s.opB) do
-    s.pc <== s.pc.val + signExtend (imm # (0 :: Bit 1))
+  when (s.opcode `is` ["FENCE"]) do
+    display "fence not implemented"
 
-memRead_0 :: State -> Action ()
-memRead_0 s = s.late <== 1
+  when (s.opcode `is` ["ECALL"]) do
+    trap s csrUnit (Exception exc_eCallFromU)
 
-memRead_1 :: State -> DataMem -> Bit 12 -> Action ()
-memRead_1 s mem imm =
-  dataMemRead mem (s.opA + signExtend imm)
+  when (s.opcode `is` ["EBREAK"]) do
+    trap s csrUnit (Exception exc_breakpoint)
 
-memRead_2 :: State -> DataMem -> Bit 12 -> Bit 1 -> Bit 2 -> Action ()
-memRead_2 s mem imm unsigned width =
-  s.result <== readMux mem (s.opA + signExtend imm) width unsigned
+  when (s.opcode `is` ["CSRRW"]) do
+    readCSR csrUnit (s.opBorImm.truncate) (s.result)
+    writeCSR csrUnit (s.opBorImm.truncate) (s.opA)
 
-memWrite :: State -> DataMem -> Bit 12 -> Bit 2 -> Action ()
-memWrite s mem imm width = do
-  dataMemWrite mem width (s.opA + signExtend imm) (s.opB)
+-- RISCV I post-execute
+-- ====================
 
-fence :: State -> Bit 4 -> Bit 4 -> Bit 4 -> Action ()
-fence s fm pred succ = display "fence not implemented"
-
-ecall :: State -> CSRUnit -> Action ()
-ecall s csrUnit = trap s csrUnit (Exception exc_eCallFromU)
-
-ebreak :: State -> CSRUnit -> Action ()
-ebreak s csrUnit = trap s csrUnit (Exception exc_breakpoint)
-
-csrrw :: State -> CSRUnit -> Bit 12 -> Action ()
-csrrw s csrUnit csr = do
-  -- Simple treatment of CSRs for now
-  readCSR csrUnit csr (s.result)
-  writeCSR csrUnit csr (s.opA)
+postExecute :: DataMem -> State -> Action ()
+postExecute mem s = do
+  when (s.opcode `is` ["LOAD"]) do
+    s.result <== readMux mem (s.opA + s.opBorImm)
+                   (s.instr.getAccessWidth) (s.instr.isUnsignedLoad)
 
 -- RV32I CPU, with UART input and output channels
 makePebbles :: Bool -> Stream (Bit 8) -> Module (Stream (Bit 8))
@@ -150,58 +175,16 @@ makePebbles sim uartIn = do
   -- CSR unit
   (uartOut, csrUnit) <- makeCSRUnit uartIn
 
-  -- Execute rules
-  let execute s =
-        [ "imm[11:0] <5> 000 <5> 0010011" ==> addi s
-        , "imm[11:0] <5> 010 <5> 0010011" ==> slti s
-        , "imm[11:0] <5> 011 <5> 0010011" ==> sltiu s
-        , "imm[11:0] <5> 111 <5> 0010011" ==> andi s
-        , "imm[11:0] <5> 110 <5> 0010011" ==> ori s
-        , "imm[11:0] <5> 100 <5> 0010011" ==> xori s
-        , "imm[19:0] <5> 0110111" ==> lui s
-        , "imm[19:0] <5> 0010111" ==> auipc s
-        , "0000000 <5> <5> 000 <5> 0110011" ==> add s
-        , "0000000 <5> <5> 010 <5> 0110011" ==> slt s
-        , "0000000 <5> <5> 011 <5> 0110011" ==> sltu s
-        , "0000000 <5> <5> 111 <5> 0110011" ==> and' s
-        , "0000000 <5> <5> 110 <5> 0110011" ==> or' s
-        , "0000000 <5> <5> 100 <5> 0110011" ==> xor s
-        , "0100000 <5> <5> 000 <5> 0110011" ==> sub s
-        , "0000000 imm[4:0] <5> 001 <5> 0 reg<1> 10011" ==> left s
-        , "0 arith<1> 00000 imm[4:0] <5> 101 <5> 0 reg<1> 10011" ==> right s
-        , "imm[19] imm[9:0] imm[10] imm[18:11] <5> 1101111" ==> jal s
-        , "imm[11:0] <5> 000 <5> 1100111" ==> jalr s
-        , "imm[11] imm[9:4] <5> <5> 000 imm[3:0] imm[10] 1100011" ==> beq s
-        , "imm[11] imm[9:4] <5> <5> 001 imm[3:0] imm[10] 1100011" ==> bne s
-        , "imm[11] imm[9:4] <5> <5> 100 imm[3:0] imm[10] 1100011" ==> blt s
-        , "imm[11] imm[9:4] <5> <5> 110 imm[3:0] imm[10] 1100011" ==> bltu s
-        , "imm[11] imm[9:4] <5> <5> 101 imm[3:0] imm[10] 1100011" ==> bge s
-        , "imm[11] imm[9:4] <5> <5> 111 imm[3:0] imm[10] 1100011" ==> bgeu s
-        , "imm[11:0] <5> <3> <5> 0000011" ==> memRead_1 s mem
-        , "imm[11:5] <5> <5> 0 w<2> imm[4:0] 0100011" ==> memWrite s mem
-        , "fm[3:0] pred[3:0] succ[3:0] <5> 000 <5> 0001111" ==> fence s
-        , "000000000000 <5> 000 <5> 1110011" ==> ecall s csrUnit
-        , "000000000001 <5> 000 <5> 1110011" ==> ebreak s csrUnit
-        , "csr<12> <5> 001 <5> 1110011" ==> csrrw s csrUnit
-        ]
-
-  -- Pre-execute rules
-  let preExecute s =
-        [ "<12> <5> <3> <5> 0000011" ==> memRead_0 s ]
-
-  -- Post-execute rules
-  let postExecute s =
-        [ "imm[11:0] <5> u<1> w<2> <5> 0000011" ==> memRead_2 s mem ]
-
   -- CPU pipeline
   makeCPUPipeline sim $
     Config {
       srcA = slice @19 @15
     , srcB = slice @24 @20
-    , dst  = slice @11 @7
+    , dst = slice @11 @7
+    , decodeTable = decode
     , preExecRules = preExecute
-    , execRules = execute
-    , postExecRules = postExecute
+    , execRules = execute csrUnit mem
+    , postExecRules = postExecute mem
     }
 
   return uartOut
