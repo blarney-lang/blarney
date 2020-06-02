@@ -10,6 +10,13 @@ module Blarney.Netlist.Passes (
   mandatoryNetlistPasses
 , optionalNetlistPasses
 , defaultNetlistPasses
+, module Blarney.Netlist.Passes.Utils
+, module Blarney.Netlist.Passes.ZeroWidthNetIgnore
+, module Blarney.Netlist.Passes.ConstantFold
+, module Blarney.Netlist.Passes.ConstantPropagate
+, module Blarney.Netlist.Passes.NetInline
+, module Blarney.Netlist.Passes.NamePropagate
+, module Blarney.Netlist.Passes.DeadNetEliminate
 ) where
 
 import Prelude
@@ -17,7 +24,6 @@ import Control.Monad
 import Data.Array.MArray (freeze)
 
 import Blarney.Core.Opts
-import Blarney.Netlist.Utils
 import Blarney.Netlist.Passes.Utils
 import Blarney.Netlist.Passes.ZeroWidthNetIgnore
 import Blarney.Netlist.Passes.ConstantFold

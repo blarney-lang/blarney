@@ -9,9 +9,7 @@ This module re exports internal components to help other consuming code
 (typically code in the 'Blarney.Backend' module) interact with Blarney Netlists
 -}
 module Blarney.Netlist (
-  module Blarney.Netlist.Utils
-, module Blarney.Netlist.Passes
+  module Blarney.Netlist.Passes
 ) where
 
-import Blarney.Netlist.Utils
 import Blarney.Netlist.Passes

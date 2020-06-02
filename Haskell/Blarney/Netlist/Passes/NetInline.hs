@@ -17,7 +17,6 @@ import Control.Monad
 import Data.IORef
 import Data.Array.MArray
 
-import Blarney.Netlist.Utils
 import Blarney.Netlist.Passes.Utils
 
 -- | Helper to inline a 'Net''s inputs

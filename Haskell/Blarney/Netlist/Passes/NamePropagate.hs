@@ -13,11 +13,10 @@ module Blarney.Netlist.Passes.NamePropagate (
 ) where
 
 import Prelude
+import Data.Array.IO
 import Control.Monad
 import Data.Set (insert, toList)
-import Data.Array.IO
 
-import Blarney.Netlist.Utils
 import Blarney.Netlist.Passes.Utils
 
 -- | propagate names through the Netlist

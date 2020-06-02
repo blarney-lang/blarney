@@ -14,12 +14,11 @@ module Blarney.Netlist.Passes.ConstantFold (
 ) where
 
 import Prelude
-import qualified Data.Bits as B
-import Control.Monad
 import Data.IORef
+import Control.Monad
 import Data.Array.MArray
+import qualified Data.Bits as B
 
-import Blarney.Netlist.Utils
 import Blarney.Netlist.Passes.Utils
 
 -- pattern helper to identify constant InputTree NetInputs

@@ -11,11 +11,10 @@ module Blarney.Netlist.Passes.DeadNetEliminate (
 ) where
 
 import Prelude
-import Control.Monad
 import Data.IORef
+import Control.Monad
 import Data.Array.MArray
 
-import Blarney.Netlist.Utils
 import Blarney.Netlist.Passes.Utils
 
 -- | Dead Net elimination pass

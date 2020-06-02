@@ -16,14 +16,17 @@ module Blarney.Netlist.Passes.Utils (
 , NetCounts
 , countNetRef
 , untilM
+, module Blarney.Core.Net
+, module Blarney.Core.Prim
 ) where
 
 import Prelude
-import Data.Array.IO
 import Data.Maybe
 import Control.Monad
+import Data.Array.IO
 
-import Blarney.Netlist.Utils
+import Blarney.Core.Net
+import Blarney.Core.Prim
 
 -- | A Pass type
 type MNetlistPass a = MNetlist -> IO a
