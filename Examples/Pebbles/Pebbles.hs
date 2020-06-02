@@ -45,21 +45,13 @@ decode =
   , "off[12] off[10:5] <5> <5> 110 off[4:1] off[11] 1100011" --> "BLTU"
   , "off[12] off[10:5] <5> <5> 101 off[4:1] off[11] 1100011" --> "BGE"
   , "off[12] off[10:5] <5> <5> 111 off[4:1] off[11] 1100011" --> "BGEU"
-  , "imm[11:0] <5> <3> <5> 0000011" --> "LOAD"
-  , "imm[11:5] <5> <5> 0 <2> imm[4:0] 0100011" --> "STORE"
+  , "imm[11:0] <5> ul<1> aw<2> <5> 0000011" --> "LOAD"
+  , "imm[11:5] <5> <5> 0 aw<2> imm[4:0] 0100011" --> "STORE"
   , "<4> <4> <4> <5> 000 <5> 0001111" --> "FENCE"
   , "000000000000 <5> 000 <5> 1110011" --> "ECALL"
   , "000000000001 <5> 000 <5> 1110011" --> "EBREAK"
   , "imm[11:0] <5> 001 <5> 1110011" --> "CSRRW"
   ]
-
--- Determine the access width of a load/store
-getAccessWidth :: Bit 32 -> Bit 2
-getAccessWidth = slice @13 @12
-
--- Determine if the load is unsigned
-isUnsignedLoad :: Bit 32 -> Bit 1
-isUnsignedLoad = at @14
 
 -- RISCV I pre-execute
 -- ===================
@@ -142,7 +134,8 @@ execute csrUnit mem s = do
     dataMemRead mem addr
 
   when (s.opcode `is` ["STORE"]) do
-    dataMemWrite mem (s.instr.getAccessWidth) addr (s.opB)
+    let accessWidth = getField (s.fields) "aw"
+    dataMemWrite mem (accessWidth.val) addr (s.opB)
 
   when (s.opcode `is` ["FENCE"]) do
     display "fence not implemented"
@@ -162,9 +155,12 @@ execute csrUnit mem s = do
 
 postExecute :: DataMem -> State -> Action ()
 postExecute mem s = do
+  let unsignedLoad = getField (s.fields) "ul"
+  let accessWidth = getField (s.fields) "aw"
+
   when (s.opcode `is` ["LOAD"]) do
     s.result <== readMux mem (s.opA + s.opBorImm)
-                   (s.instr.getAccessWidth) (s.instr.isUnsignedLoad)
+                   (accessWidth.val) (unsignedLoad.val)
 
 -- RV32I CPU, with UART input and output channels
 makePebbles :: Bool -> Stream (Bit 8) -> Module (Stream (Bit 8))
