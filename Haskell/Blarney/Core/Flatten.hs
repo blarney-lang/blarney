@@ -18,7 +18,7 @@ module Blarney.Core.Flatten (
 , addNet      -- Add a net to the netlist
 , flatten     -- Flatten a bit vector to a netlist
 , ToMNetlist(..)
-, ToNetlist(..)
+, toNetlist
 ) where
 
 import Prelude
@@ -114,7 +114,6 @@ class ToMNetlist a where
 
 -- | Convert RTL monad to a netlist
 instance ToMNetlist (RTL ()) where
-  --toMNetlist :: RTL () -> IO MNetlist
   toMNetlist rtl = do
     -- flatten BVs into a Netlist
     i <- newIORef (0 :: InstId)
@@ -145,11 +144,7 @@ instance ToMNetlist (RTL ()) where
 
 -- | Convert Module monad to a netlist
 instance ToMNetlist (Module ()) where
-  --toMNetlist :: Module () -> IO MNetlist
   toMNetlist = toMNetlist . runModule
 
-class ToMNetlist a => ToNetlist a where
-  toNetlist :: a -> IO Netlist
-  toNetlist x = toMNetlist x >>= freeze
-instance ToNetlist (RTL ())
-instance ToNetlist (Module ())
+toNetlist :: ToMNetlist a => a -> IO Netlist
+toNetlist x = toMNetlist x >>= freeze
