@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds      #-}
+{-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE FlexibleInstances #-}
 
 {-|
@@ -42,15 +42,24 @@ top = do
 -}
 module Blarney.BitScan
   ( (==>)
+  , Alt
   , match
   , matchDefault
-  , Alt
+  , matchOpts
   , MatchOpts(..)
+  , matchMap
+  , TagMap
+  , FieldMap
+  , getField
+  , getFieldStrict
   ) where
 
 import Blarney
+import Blarney.Option
+
 import Data.Char
 import Data.List
+import Data.Map (Map, fromList, fromListWith, toList, lookup, mapWithKey)
 
 type BitList = [Bit 1]
 
@@ -81,33 +90,33 @@ tokenise = init []
 
     len id acc cs =
       case takeWhile isDigit cs of
-        [] -> error "Format error: expected width"
+        [] -> error "BitScan: expected width"
         ds -> lenClose (Range id (n-1) 0 : acc) (dropWhile isDigit cs)
           where n = read ds :: Int
 
     lenClose acc ('>':cs) = init acc cs
-    lenClose acc other = error "Format error: expected '>'"
+    lenClose acc other = error "BitScan: expected '>'"
 
     high id acc cs =
       case takeWhile isDigit cs of
-        [] -> error "Format error: expected high number"
+        [] -> error "BitScan: expected high number"
         ds -> colon id n acc (dropWhile isDigit cs)
           where n = read ds :: Int
 
     colon id high acc (':':cs) = low id high acc cs
     colon id high acc (']':cs) = init (Range id high high : acc) cs
-    colon id high acc other = error "Format error: expected ':'"
+    colon id high acc other = error "BitScan: expected ':'"
 
     low id high acc cs =
       case takeWhile isDigit cs of
-        [] -> error "Format error: expected low number"
+        [] -> error "BitScan: expected low number"
         ds -> if   n > high
-              then error "Format error: range error"
+              then error "BitScan: range error"
               else close (Range id high n : acc) (dropWhile isDigit cs)
           where n = read ds :: Int
 
     close acc (']':cs) = init acc cs
-    close acc other = error "Format error: expected ']'"
+    close acc other = error "BitScan: expected ']'"
 
     lit acc cs = init (Lit s : acc) (dropWhile isBit cs)
       where s = reverse (takeWhile isBit cs)
@@ -123,56 +132,66 @@ tag = tagger 0
     tagger n (t:ts) =
       case t of
         Lit bs -> Tag n t : tagger (n + length bs) ts
-        Var v -> error "tag: unranged vars not supported"
+        Var v -> error "BitScan: unranged vars not supported"
         Range "" hi lo -> tagger (n + (hi-lo) + 1) ts
         Range v hi lo -> Tag n t : tagger (n + (hi-lo) + 1) ts
 
+-- Position of a bit in the subject being matched
+type BitPos = Maybe Int
+
+-- A list of bit positions
+type BitPosList = [BitPos]
+
 -- Mapping from var bit-index to subject bit-index
-type Mapping = [(Int, Int)]
+type Mapping = [(Int, BitPos)]
 
 mapping :: String -> [TaggedToken] -> Mapping
 mapping v toks =
-  concat [ zip [lo..hi] [n..]
+  concat [ zip [lo..hi] (fmap Just [n..])
          | Tag n (Range w hi lo) <- toks, v == w ]
 
--- Perform a substitution on a subject
-subst :: Mapping -> BitList -> BitList
-subst m bs = unscatter [(bi, bs !! si) | (bi, si) <- m]
-
 -- Join a scattered bit-string, complain if gaps or overlapping
-unscatter :: [(Int, Bit 1)] -> BitList
-unscatter = join 0
+unscatter :: String -> [(Int, BitPos)] -> BitPosList
+unscatter field = join 0
   where
    join i [] = []
    join i m =
-     case [x | (j, x) <- m, i == j] of
-       [] -> error "Format error: non-contiguous variable assignment"
-       [x] -> x : join (i+1) [p | p <- m, fst p /= i]
-       other -> error "Format error: overlapping variable assignment"
+     case [pos | (j, pos) <- m, i == j] of
+       [] -> Nothing : join (i+1) m
+       [pos] -> pos : join (i+1) [p | p <- m, fst p /= i]
+       other -> error ("BitScan: overlapping variable assignment " ++
+                       "in field: " ++ field)
 
--- Determine argument values to right-hand-side
-args :: BitList -> [TaggedToken] -> [BitList]
-args subj = get `o` reverse
+-- Extra fields from subject using pattern
+fields :: [TaggedToken] -> [(String, BitPosList)]
+fields toks = get (reverse toks)
   where
     notVar v (Tag i (Range w hi lo)) = v /= w
     notVar v other = False
 
     get [] = []
     get ts@(Tag i (Range v hi lo) : rest) =
-      subst (mapping v ts) subj :
+      (v, unscatter v (mapping v ts)) :
         get (filter (notVar v) rest)
     get (t:ts) = get ts
 
+-- Determine argument values to right-hand-side
+args :: BitList -> [TaggedToken] -> [BitList]
+args subj toks = [fmap bit ps | (_, ps) <- fields toks]
+  where
+    bit Nothing = error "BitScan: non-contiguous variable assignment"
+    bit (Just i) = subj !! i
+
 -- Determine width of a token
 tokenWidth :: Token -> Int
-tokenWidth (Var v) = error "Error: tokenWidth not defined for unranged vars"
+tokenWidth (Var v) = error "BitScan: tokenWidth not defined for unranged vars"
 tokenWidth (Range v hi lo) = (hi-lo)+1
 tokenWidth (Lit bs) = length bs
 
 -- |A bit pattern consists of a list of pattern bits
 type Pattern = [PatternBit]
 
--- |Pattern bit
+-- |Pattern bit: zero, one, or don't care
 data PatternBit = Zero | One | X
   deriving Eq
 
@@ -181,7 +200,7 @@ toPattern :: [Token] -> Pattern
 toPattern [] = []
 toPattern (t:ts) =
   case t of
-    Var v -> error "Format error: unranged vars not supported"
+    Var v -> error "BitScan: unranged vars not supported"
     Lit bs -> [if b == '0' then Zero else One | b <- bs] ++ toPattern ts
     Range id hi lo -> replicate ((hi-lo)+1) X ++ toPattern ts
 
@@ -198,10 +217,10 @@ class RHS f where
 
 instance RHS (Action ()) where
   apply f [] = f
-  apply f other = error "Format error: too many pattern vars"
+  apply f other = error "BitScan: too many pattern vars"
 
 instance (RHS f, KnownNat n) => RHS (Bit n -> f) where
-  apply f [] = error "Format error: too few pattern vars"
+  apply f [] = error "BitScan: too few pattern vars"
   apply f (arg:args) = apply (f (fromBitList arg)) args
 
 -- |Infix operator to construct a match alternative
@@ -217,7 +236,7 @@ fmt ==> rhs =
 -- |Match a subject against a pattern
 isMatch :: BitList -> Pattern -> Bit 1
 isMatch subj pat
-  | length pat /= length subj = error "BitScan format error: width mismatch"
+  | length pat /= length subj = error "BitScan: width mismatch"
   | otherwise = andList (concat (zipWith matchBit pat subj))
   where
     matchBit X x = []
@@ -226,7 +245,7 @@ isMatch subj pat
 
 -- |Match a subject against many patterns (simple algorithm)
 isMatchManySimple :: BitList -> [Pattern] -> [Bit 1]
-isMatchManySimple subj pats = map (isMatch subj) pats
+isMatchManySimple subj pats = fmap (isMatch subj) pats
 
 -- |Match a subject against many patterns (exploit sharing).
 -- Overview: Is any bit position non-X in every pattern?
@@ -243,15 +262,16 @@ isMatchManySimple subj pats = map (isMatch subj) pats
 --     * for patterns where bit is non-X: recurse
 isMatchManyShare :: BitList -> [Pattern] -> [Bit 1]
 isMatchManyShare subj pats
-  | not isValid = error "BitScan format error: width mismatch"
+  | not isValid = error ("BitScan: width mismatch in pattern set. " ++
+                         "Widths: " ++ show (map length pats))
   | otherwise =
-        map snd
+        fmap snd
       $ sortBy cmpFst
       $ match 1 [0..numPats-1] subj pats
   where
     numPats = length pats
     numBits = length subj
-    isValid = and [len == numBits | len <- map length pats]
+    isValid = and [len == numBits | len <- fmap length pats]
     cmpFst x y = fst x `compare` fst y
 
     match cond ids subj pats
@@ -279,7 +299,7 @@ isMatchManyShare subj pats
         -- Which bit position has the most sharing?
         splitBitPos = snd (maximum (zip counts [0..]))
         splitBit = subj !! splitBitPos
-
+        
         -- Split the alternatives
         ids0 = [id | (id, Zero) <- zip ids (patsT !! splitBitPos)]
         ids1 = [id | (id, One) <- zip ids (patsT !! splitBitPos)]
@@ -324,12 +344,12 @@ data MatchOpts =
   }
 
 -- |General parameterised match statement
-matchGeneral :: KnownNat n => Bit n -> [Alt] -> MatchOpts -> Action ()
-matchGeneral subj alts opts = do
+matchOpts :: KnownNat n => MatchOpts -> Bit n -> [Alt] -> Action ()
+matchOpts opts subj alts = do
   let subj' = toBitList subj
   let conds = if matchOptUseSimpleAlgorithm opts
-                then isMatchManySimple subj' (map altPattern alts)
-                else isMatchManyShare subj' (map altPattern alts)
+                then isMatchManySimple subj' (fmap altPattern alts)
+                else isMatchManyShare subj' (fmap altPattern alts)
   let bodies = [altBody alt subj' | alt <- alts]
   sequence_ [when cond body | (cond, body) <- zip conds bodies]
   case matchOptDefault opts of
@@ -338,7 +358,7 @@ matchGeneral subj alts opts = do
 
 -- |Match statement, with a subject and a list of alternatives
 match :: KnownNat n => Bit n -> [Alt] -> Action ()
-match subj alts = matchGeneral subj alts opts
+match subj alts = matchOpts opts subj alts
   where
     opts = MatchOpts {
              matchOptDefault = Nothing
@@ -347,9 +367,89 @@ match subj alts = matchGeneral subj alts opts
 
 -- |Match statement, with a default case
 matchDefault :: KnownNat n => Bit n -> [Alt] -> Action () -> Action ()
-matchDefault subj alts def = matchGeneral subj alts opts
+matchDefault subj alts def = matchOpts opts subj alts
   where
     opts = MatchOpts {
              matchOptDefault = Just def
            , matchOptUseSimpleAlgorithm = False
            }
+
+-- |Mapping from field names to optional bit lists
+type FieldMap = Map String (Option BitList)
+
+-- |Mapping from tag names to hot bits
+type TagMap = Map String (Bit 1)
+
+-- |Options for the match
+data MatchMapOpts =
+  MatchMapOpts {
+    matchMapOptStrict :: Bool
+  }
+
+-- |Compute tag and field maps given list of pattern/tag pairs.
+-- This is a relaxed version which fills field gaps with zero, and
+-- sign-extends each field to the length of the longest instance of
+-- that field.
+matchMap :: KnownNat n =>
+  Bool -> [(String, String)] -> Bit n -> (TagMap, FieldMap)
+matchMap strict alts subj = (tagMap, mapWithKey combine fieldMap)
+  where
+    tokLists = [(tokenise fmt) | (fmt, _) <- alts]
+    pats = [tag toks | toks <- tokLists]
+    subj' = toBitList subj
+    conds = isMatchManyShare subj' (fmap toPattern tokLists)
+    tagMap = fromListWith (.|.) (zip (fmap snd alts) conds)
+    fieldMap = fromListWith (++) [ (name, [(cond, bits)])
+                                 | (cond, pat) <- zip conds pats
+                                 , (name, bits) <- fields pat ]
+    combine field choices
+      | null choices = error "BitScan.matchMap: combine"
+      | allSame = Option valid (interpret (snd (head choices)))
+      | otherwise = Option valid value
+      where
+        allSame = length (nub (fmap snd choices)) == 1
+        valid = orList (fmap fst choices)
+        lens = [length bits | (_, bits) <- choices]
+        maxLen = maximum lens
+        value = fmap orList $ transpose
+                  [ fmap (cond .&.) (interpret bits)
+                  | (cond, bits) <- choices ]
+
+        interpret bits =
+          extend [ case b of
+                     Nothing -> 0
+                     Just i  -> subj' !! i
+                 | b <- bits ]
+
+        extend [] = error "BitScan.matchMap: extend"
+        extend xs
+          | strict && maxLen /= length xs =
+              error ("BitScan.matchMap: different widths for field " ++ field)
+          | otherwise = take maxLen (xs ++ repeat (last xs))
+
+-- |Get field value from a map, and cast to required size using
+-- truncation or sign-extension.
+getField :: KnownNat n => FieldMap -> String -> Option (Bit n)
+getField m key = result
+  where
+    result =
+      case Data.Map.lookup key m of
+        Nothing -> error ("BitScan.getField: unknown key " ++ key)
+        Just opt -> Option (opt.valid) (fromBitList (resize (opt.val)))
+
+    resize [] = error "BitScan.getField: resize"
+    resize list = take (widthOf (result.val)) (list ++ repeat (last list))
+
+-- |Get field value from a map, and raise an error the size is incorrect
+getFieldStrict :: KnownNat n => FieldMap -> String -> Option (Bit n)
+getFieldStrict m key = result
+  where
+    result =
+      case Data.Map.lookup key m of
+        Nothing -> error ("BitScan.getFieldStrict: unknown key " ++ key)
+        Just opt -> Option (opt.valid) (fromBitList (resize (opt.val)))
+
+    resize list
+      | length list == widthOf (result.val) = list
+      | otherwise = error ("BitScan.getFieldStrict: width mismatch "  ++
+                             "for field " ++ key)
