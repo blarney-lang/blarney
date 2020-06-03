@@ -119,11 +119,10 @@ execute csrUnit mem s = do
     s.pc <== s.pc.val + offset.val
 
   when (s.opcode `is` ["JAL"]) do
-    s.pc <== s.pc.val + s.opBorImm -- TODO: share with AUIPC?
+    s.pc <== s.pc.val + s.opBorImm
 
   when (s.opcode `is` ["JALR"]) do
     s.pc <== truncateLSB (s.opA + s.opBorImm) # (0 :: Bit 1)
-    --TODO: s.pc <== truncateLSB sum # (0 :: Bit 1)
 
   when (s.opcode `is` ["JAL", "JALR"]) do
     s.result <== s.pc.val + 4
@@ -138,7 +137,7 @@ execute csrUnit mem s = do
     dataMemWrite mem (accessWidth.val) addr (s.opB)
 
   when (s.opcode `is` ["FENCE"]) do
-    display "fence not implemented"
+    noAction
 
   when (s.opcode `is` ["ECALL"]) do
     trap s csrUnit (Exception exc_eCallFromU)

@@ -149,7 +149,7 @@ makeCPUPipeline sim c = do
     -- =======================
 
     -- Decode instruction
-    let (tagMap, fieldMap) = matchMap (c.decodeTable) (instr2.val)
+    let (tagMap, fieldMap) = matchMap False (c.decodeTable) (instr2.val)
 
     -- Register forwarding logic
     let forward rS other =

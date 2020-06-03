@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds      #-}
+{-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE FlexibleInstances #-}
 
 {-|
@@ -51,6 +51,7 @@ module Blarney.BitScan
   , TagMap
   , FieldMap
   , getField
+  , getFieldStrict
   ) where
 
 import Blarney
@@ -58,7 +59,7 @@ import Blarney.Option
 
 import Data.Char
 import Data.List
-import Data.Map (Map, fromList, fromListWith, toList, lookup)
+import Data.Map (Map, fromList, fromListWith, toList, lookup, mapWithKey)
 
 type BitList = [Bit 1]
 
@@ -379,12 +380,19 @@ type FieldMap = Map String (Option BitList)
 -- |Mapping from tag names to hot bits
 type TagMap = Map String (Bit 1)
 
+-- |Options for the match
+data MatchMapOpts =
+  MatchMapOpts {
+    matchMapOptStrict :: Bool
+  }
+
 -- |Compute tag and field maps given list of pattern/tag pairs.
 -- This is a relaxed version which fills field gaps with zero, and
 -- sign-extends each field to the length of the longest instance of
 -- that field.
-matchMap :: KnownNat n => [(String, String)] -> Bit n -> (TagMap, FieldMap)
-matchMap alts subj = (tagMap, fmap combine fieldMap)
+matchMap :: KnownNat n =>
+  Bool -> [(String, String)] -> Bit n -> (TagMap, FieldMap)
+matchMap strict alts subj = (tagMap, mapWithKey combine fieldMap)
   where
     tokLists = [(tokenise fmt) | (fmt, _) <- alts]
     pats = [tag toks | toks <- tokLists]
@@ -394,7 +402,7 @@ matchMap alts subj = (tagMap, fmap combine fieldMap)
     fieldMap = fromListWith (++) [ (name, [(cond, bits)])
                                  | (cond, pat) <- zip conds pats
                                  , (name, bits) <- fields pat ]
-    combine choices
+    combine field choices
       | null choices = error "BitScan.matchMap: combine"
       | allSame = Option valid (interpret (snd (head choices)))
       | otherwise = Option valid value
@@ -414,17 +422,34 @@ matchMap alts subj = (tagMap, fmap combine fieldMap)
                  | b <- bits ]
 
         extend [] = error "BitScan.matchMap: extend"
-        extend xs = take maxLen (xs ++ repeat (last xs))
+        extend xs
+          | strict && maxLen /= length xs =
+              error ("BitScan.matchMap: different widths for field " ++ field)
+          | otherwise = take maxLen (xs ++ repeat (last xs))
 
 -- |Get field value from a map, and cast to required size using
 -- truncation or sign-extension.
 getField :: KnownNat n => FieldMap -> String -> Option (Bit n)
 getField m key = result
   where
-    result = 
+    result =
       case Data.Map.lookup key m of
         Nothing -> error ("BitScan.getField: unknown key " ++ key)
         Just opt -> Option (opt.valid) (fromBitList (resize (opt.val)))
 
     resize [] = error "BitScan.getField: resize"
     resize list = take (widthOf (result.val)) (list ++ repeat (last list))
+
+-- |Get field value from a map, and raise an error the size is incorrect
+getFieldStrict :: KnownNat n => FieldMap -> String -> Option (Bit n)
+getFieldStrict m key = result
+  where
+    result =
+      case Data.Map.lookup key m of
+        Nothing -> error ("BitScan.getFieldStrict: unknown key " ++ key)
+        Just opt -> Option (opt.valid) (fromBitList (resize (opt.val)))
+
+    resize list
+      | length list == widthOf (result.val) = list
+      | otherwise = error ("BitScan.getFieldStrict: width mismatch "  ++
+                             "for field " ++ key)
