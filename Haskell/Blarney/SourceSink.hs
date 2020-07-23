@@ -52,6 +52,9 @@ data Source t = Source { canPeek :: Bit 1
                          --   'Action' with a 'when'.
                        } deriving (Generic, Interface)
 
+instance Functor Source where
+  fmap = mapSource
+
 -- | 'Sink' type. A 'Sink' 't' 'Interface' can be fed values of type 't' via its
 --   'put' method, expected to be called when its 'canPut' method returns
 --   'true'.
@@ -115,6 +118,21 @@ nullSink = Sink { canPut = true
 -- | \"Null\" 'Sink' 'Module' that always consumes its input.
 makeNullSink :: Module (Sink t)
 makeNullSink = return nullSink
+
+-- | \"map\" a function over a 'Source' and returns the new 'Source'. Note: this
+--   function is suitable for use as 'fmap' in a 'Functor' instance of 'Source'.
+mapSource :: (a -> b) -- ^ The function to map over the initial 'Source'
+          -> Source a -- ^ The initial 'Source'
+          -> Source b -- ^ The new 'Source'
+mapSource f src = src { peek = f (src.peek) }
+
+-- | \"map\" a function over a 'Sink' and returns the new 'Sink'
+mapSink :: (b -> a) -- ^ The function to map over the initial 'Sink'. Note:
+                    --   The type 'b -> a' is making this function not suitable
+                    --   for a potential 'Functor' instance of 'Sink'
+        -> Sink a   -- ^ The initial 'Source'
+        -> Sink b   -- ^ The new 'Source'
+mapSink f snk = snk { put = \x -> (snk.put) (f x) }
 
 -- | Wraps a 'Source' 't' with some debug info.
 debugSource :: (FShow t) => Source t -- ^ The 'Source' to debug
