@@ -51,17 +51,17 @@ data State =
     -- Indicate late result (i.e. computed in writeback rather than execute)
   , late :: WriteOnly (Bit 1)
     -- Result of instruction decode
-  , opcode :: TagMap
+  , opcode :: TagMap String
   , fields :: FieldMap
   }
 
 -- Helper function for determining opcode
 infix 8 `is`
-is :: TagMap -> [String] -> Bit 1
+is :: (Ord tag, Show tag) => TagMap tag -> [tag] -> Bit 1
 is m [] = false
 is m (key:keys) =
   case Map.lookup key m of
-    Nothing -> error ("Unknown opcode " ++ key)
+    Nothing -> error ("Unknown opcode " ++ show key)
     Just b -> b .|. is m keys
 
 -- Pipeline
