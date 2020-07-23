@@ -378,7 +378,7 @@ matchDefault subj alts def = matchOpts opts subj alts
 type FieldMap = Map String (Option BitList)
 
 -- |Mapping from tag names to hot bits
-type TagMap = Map String (Bit 1)
+type TagMap tag = Map tag (Bit 1)
 
 -- |Options for the match
 data MatchMapOpts =
@@ -390,8 +390,8 @@ data MatchMapOpts =
 -- This is a relaxed version which fills field gaps with zero, and
 -- sign-extends each field to the length of the longest instance of
 -- that field.
-matchMap :: KnownNat n =>
-  Bool -> [(String, String)] -> Bit n -> (TagMap, FieldMap)
+matchMap :: (KnownNat n, Ord tag) =>
+  Bool -> [(String, tag)] -> Bit n -> (TagMap tag, FieldMap)
 matchMap strict alts subj = (tagMap, mapWithKey combine fieldMap)
   where
     tokLists = [(tokenise fmt) | (fmt, _) <- alts]
