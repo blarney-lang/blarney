@@ -50,8 +50,11 @@ module Blarney.BitScan
   , matchMap
   , TagMap
   , FieldMap
+  , matchSel
+  , SelMap
   , getField
   , getFieldStrict
+  , getFieldSel
   ) where
 
 import Blarney
@@ -453,3 +456,48 @@ getFieldStrict m key = result
       | length list == widthOf (result.val) = list
       | otherwise = error ("BitScan.getFieldStrict: width mismatch "  ++
                              "for field " ++ key)
+
+-- |Mapping from field names to field selectors
+type SelMap n = Map String (Bit n -> BitList)
+
+-- |Compute a field selector function for each field that occupies
+-- precisely the same bits in every match alternative in which it occurs
+matchSel :: KnownNat n => [(String, tag)] -> SelMap n
+matchSel alts = mapWithKey combine fieldMap
+  where
+    tokLists = [(tokenise fmt) | (fmt, _) <- alts]
+    pats = [tag toks | toks <- tokLists]
+    fieldMap = fromListWith (++) [ (name, [bits])
+                                 | pat <- pats
+                                 , (name, bits) <- fields pat ]
+    combine field choices
+      | null choices = error "BitScan.matchSel: combine"
+      | allSame = interpret (head choices)
+      | otherwise =
+          error ("BitScan.matchSel does not currently compute" ++
+                 "field selector functions for non-uniform fields " ++
+                 "(field=" ++ field ++ ")")
+      where
+        allSame = length (nub choices) == 1
+        interpret bits = \subj ->
+          let subj' = toBitList subj in
+            [ case b of
+                Nothing -> 0
+                Just i  -> subj' !! i
+            | b <- bits ]
+
+-- |Get field selector function from a map.  If the field is not
+-- defined, the selector will return dont care.
+getFieldSel :: (KnownNat n, KnownNat m) =>
+  SelMap n -> String -> Bit n -> Bit m
+getFieldSel m key subj = result
+  where
+    result =
+      case Data.Map.lookup key m of
+        Nothing -> dontCare
+        Just f -> fromBitList (resize (f subj))
+
+    resize list
+      | length list == widthOf result = list
+      | otherwise = error ("BitScan.getFieldSel: width mismatch "  ++
+                             "for result of field selector " ++ key)
