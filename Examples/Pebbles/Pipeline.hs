@@ -19,14 +19,8 @@ type InstrAddr = Bit 14
 -- Pipeline configuration
 data Config =
   Config {
-    -- Get source register A
-    srcA :: Instr -> RegId
-    -- Get source register B
-  , srcB :: Instr -> RegId
-    -- Get destination register
-  , dst :: Instr -> RegId
     -- Decode table
-  , decodeTable :: [(String, String)]
+    decodeTable :: [(String, String)]
     -- Action for pre-execute stage
   , preExecRules :: State -> Action ()
     -- Action for execute stage
@@ -67,6 +61,14 @@ is m (key:keys) =
 -- Pipeline
 makeCPUPipeline :: Bool -> Config -> Module ()
 makeCPUPipeline sim c = do
+  -- Compute field selector functions from decode table
+  let selMap = matchSel (c.decodeTable)
+
+  -- Functions for extracting register ids from an instruction
+  let srcA :: Instr -> RegId = getFieldSel selMap "rs1"
+  let srcB :: Instr -> RegId = getFieldSel selMap "rs2"
+  let dst  :: Instr -> RegId = getFieldSel selMap "rd"
+
   -- Instruction memory
   let ext = if sim then ".hex" else ".mif"
   instrMem :: RAM InstrAddr Instr <- makeRAMInit ("prog" ++ ext)
@@ -138,8 +140,8 @@ makeCPUPipeline sim c = do
         go2 <== 1
 
     -- Fetch operands
-    load regFileA (srcA c (instrMem.out))
-    load regFileB (srcB c (instrMem.out))
+    load regFileA (instrMem.out.srcA)
+    load regFileB (instrMem.out.srcB)
 
     -- Latch instruction and PC for next stage
     instr2 <== instrMem.out
@@ -153,17 +155,17 @@ makeCPUPipeline sim c = do
 
     -- Register forwarding logic
     let forward rS other =
-         (resultWire.active .&. (dst c (instr3.val) .==. instr2.val.rS)) ?
+         (resultWire.active .&. (instr3.val.dst .==. instr2.val.rS)) ?
          (resultWire.val, other)
 
     let forward' rS other =
          (finalResultWire.active .&.
-           (dst c (instr4.val) .==. instr2.val.rS)) ?
+           (instr4.val.dst .==. instr2.val.rS)) ?
              (finalResultWire.val, other)
 
     -- Register forwarding
-    let a = forward (c.srcA) (forward' (c.srcA) (regFileA.out))
-    let b = forward (c.srcB) (forward' (c.srcB) (regFileB.out))
+    let a = forward srcA (forward' srcA (regFileA.out))
+    let b = forward srcB (forward' srcB (regFileB.out))
 
     -- Use "imm" field if valid, otherwise use register b
     let bOrImm = if Map.member "imm" fieldMap
@@ -195,8 +197,8 @@ makeCPUPipeline sim c = do
 
     -- Pipeline stall
     when (lateWire.val) do
-      when ((srcA c (instrMem.out) .==. dst c (instr2.val)) .|.
-            (srcB c (instrMem.out) .==. dst c (instr2.val))) do
+      when ((instrMem.out.srcA .==. instr2.val.dst) .|.
+            (instrMem.out.srcB .==. instr2.val.dst)) do
         stallWire <== true
 
     -- Latch instruction and PC for next stage
@@ -223,7 +225,7 @@ makeCPUPipeline sim c = do
           , opBorImm = regBorImm.val
           , pc = ReadWrite (pc3.val) (pcNext <==)
           , result = WriteOnly $ \x ->
-                       when (dst c (instr3.val) .!=. 0) do
+                       when (instr3.val.dst .!=. 0) do
                          resultWire <== x
           , late = error "Cant write late signal in execute"
           , opcode = tagMap3
@@ -252,7 +254,7 @@ makeCPUPipeline sim c = do
           , opBorImm = regBorImm.val.old
           , pc = error "Can't access PC in post-execute"
           , result = WriteOnly $ \x ->
-                       when (dst c (instr4.val) .!=. 0) do
+                       when (instr4.val.dst .!=. 0) do
                          postResultWire <== x
           , late = error "Can't write late signal in post-execute"
           , opcode = tagMap4
@@ -264,7 +266,7 @@ makeCPUPipeline sim c = do
       postExecRules c state
 
     -- Determine final result
-    let rd = dst c (instr4.val)
+    let rd = instr4.val.dst
     when (postResultWire.active) do
       finalResultWire <== postResultWire.val
     when (postResultWire.active.inv .&. delay 0 (resultWire.active)) do
