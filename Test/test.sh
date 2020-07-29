@@ -19,6 +19,7 @@ EXAMPLES=(
   Queue
   SourceSinkStream
   RAM
+  RAMBE
   Sorter
   UpDownCounter
   MasterSlave

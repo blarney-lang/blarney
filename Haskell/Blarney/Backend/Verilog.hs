@@ -190,10 +190,10 @@ genNetVerilog netlist net = case netPrim net of
   RegisterEn i w          -> dfltNV { decl = Just $ declRegInit w wId i
                                     , alws = Just $ alwsRegisterEn net
                                     , rst  = Just $ resetRegister w wId i }
-  BRAM i aw dw            -> dfltNV { decl = Just $ declRAM i 1 aw dw net
-                                    , inst = Just $ instRAM net i aw dw }
-  TrueDualBRAM i aw dw    -> dfltNV { decl = Just $ declRAM i 2 aw dw net
-                                    , inst = Just $ instTrueDualRAM net i aw dw }
+  BRAM i aw dw be         -> dfltNV { decl = Just $ declRAM i 1 aw dw net
+                                    , inst = Just $ instRAM net i aw dw be }
+  TrueDualBRAM i aw dw be -> dfltNV { decl = Just $ declRAM i 2 aw dw net
+                                    , inst = Just $ instTrueDualRAM net i aw dw be }
   Display args            -> dfltNV { alws = Just $ alwsDisplay args net }
   Finish                  -> dfltNV { alws = Just $ alwsFinish net }
   TestPlusArgs s          -> dfltNV { decl = Just $ declWire 1 wId
@@ -391,10 +391,11 @@ genNetVerilog netlist net = case netPrim net of
   instMux net = text "assign" <+> showWire (netInstId net, Nothing)
                 <+> equals <+> text "mux_" <> int (netInstId net)
                 <> parens (showNetInput $ netInputs net !! 0) <> semi
-  instRAM net i aw dw =
-        hang (hang (text "BlockRAM#") 2 (parens $ argStyle ramParams)) 2
+  instRAM net i aw dw be =
+        hang (hang (text modName) 2 (parens $ argStyle ramParams)) 2
           (hang (text "ram" <> int nId) 2 ((parens $ argStyle ramArgs) <> semi))
-    where ramParams = [ text ".INIT_FILE"  <> parens (text (show $ fromMaybe "UNUSED" i))
+    where modName = "BlockRAM" ++ (if be then "BE#" else "#")
+          ramParams = [ text ".INIT_FILE"  <> parens (text (show $ fromMaybe "UNUSED" i))
                       , text ".ADDR_WIDTH" <> parens (int aw)
                       , text ".DATA_WIDTH" <> parens (int dw) ]
           ramArgs   = [ text ".CLK(clock)"
@@ -402,11 +403,13 @@ genNetVerilog netlist net = case netPrim net of
                       , text ".ADDR" <> parens (showNetInput (netInputs net !! 0))
                       , text ".WE"   <> parens (showNetInput (netInputs net !! 2))
                       , text ".DO"   <> parens (showWire (nId, Nothing)) ]
+                   ++ [ text ".BE"   <> parens (showNetInput (netInputs net !! 3)) | be]
           nId = netInstId net
-  instTrueDualRAM net i aw dw =
-        hang (hang (text "BlockRAMTrueDual#") 2 (parens $ argStyle ramParams)) 2
+  instTrueDualRAM net i aw dw be =
+        hang (hang (text modName) 2 (parens $ argStyle ramParams)) 2
           (hang (text "ram" <> int nId) 2 ((parens $ argStyle ramArgs) <> semi))
-    where ramParams = [ text ".INIT_FILE"  <> parens (text (show $ fromMaybe "UNUSED" i))
+    where modName = "BlockRAMTrueDual" ++ (if be then "BE#" else "#")
+          ramParams = [ text ".INIT_FILE"  <> parens (text (show $ fromMaybe "UNUSED" i))
                       , text ".ADDR_WIDTH" <> parens (int aw)
                       , text ".DATA_WIDTH" <> parens (int dw) ]
           ramArgs   = [ text ".CLK(clock)"
@@ -417,7 +420,11 @@ genNetVerilog netlist net = case netPrim net of
                       , text ".DI_B"   <> parens (showNetInput (netInputs net !! 4))
                       , text ".ADDR_B" <> parens (showNetInput (netInputs net !! 3))
                       , text ".WE_B"   <> parens (showNetInput (netInputs net !! 5))
-                      , text ".DO_B"   <> parens (showWire (nId, Just "dataB")) ]
+                      , text ".DO_B"   <> parens (showWire (nId, Just "dataB"))
+                      ]
+                   ++ [ text ".BE_A"   <> parens (showNetInput (netInputs net !! 6)) | be]
+                   ++ [ text ".BE_B"   <> parens (showNetInput (netInputs net !! 7)) | be]
+
           nId = netInstId net
   instRegFileRead id net =
         text "assign" <+> showWire (netInstId net, Nothing)
