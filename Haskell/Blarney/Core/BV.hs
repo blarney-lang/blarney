@@ -84,6 +84,7 @@ import Data.Set (insert, empty)
 
 -- Standard imports
 import qualified Data.Bits as B
+import Data.Maybe
 
 -- Blarney imports
 import Blarney.Core.Prim
@@ -291,29 +292,37 @@ regEnBV :: Width -> BV -> BV -> BV -> BV
 regEnBV w i en a = makePrim1 (RegisterEn (getInitBV i) w) [en, a]
 
 -- |Single-port block RAM.
--- Input: one triple (address, data, write-enable)
-ramBV :: OutputWidth -> Maybe String -> (BV, BV, BV) -> BV
-ramBV dw initFile (addr, dataIn, weIn) =
-    makePrim1 prim [addr, dataIn, weIn]
+-- Inputs: one tuple (address, data, write-enable, optional byte-enable)
+ramBV :: OutputWidth -> Maybe String -> (BV, BV, BV, Maybe BV) -> BV
+ramBV dw initFile (addr, dataIn, weIn, byteEn) =
+    makePrim1 prim ([addr, dataIn, weIn] ++ [be | Just be <- [byteEn]])
   where
     prim = BRAM { ramInitFile  = initFile
                 , ramAddrWidth = bvPrimOutWidth addr
-                , ramDataWidth = dw }
+                , ramDataWidth = dw
+                , ramHasByteEn = isJust byteEn }
 
 -- |True dual-port block RAM.
--- Input: two triples (address, data, write-enable)
+-- Inputs: two tuples (address, data, write-enable, optional byte-enable)
 dualRamBV :: OutputWidth -> Maybe String
-          -> (BV, BV, BV)
-          -> (BV, BV, BV)
+          -> (BV, BV, BV, Maybe BV)
+          -> (BV, BV, BV, Maybe BV)
           -> (BV, BV)
-dualRamBV dw initFile (addrA, dataInA, weInA) (addrB, dataInB, weInB) =
-    (bvOuts !! 0, bvOuts !! 1)
+dualRamBV dw initFile (addrA, dataInA, weInA, byteEnA)
+                      (addrB, dataInB, weInB, byteEnB)
+  | isJust byteEnA /= isJust byteEnB =
+      error "dualRamBV: both/neither ports must have byte enables"
+  | otherwise =
+      (bvOuts !! 0, bvOuts !! 1)
   where
     outs = [Just "dataA", Just "dataB"]
-    bvOuts = makePrim prim [addrA, dataInA, weInA, addrB, dataInB, weInB] outs
+    bvOuts = makePrim prim ([addrA, dataInA, weInA,
+                             addrB, dataInB, weInB] ++
+                            [be | Just be <- [byteEnA, byteEnB]]) outs
     prim = TrueDualBRAM { ramInitFile  = initFile
                         , ramAddrWidth = bvPrimOutWidth addrA
-                        , ramDataWidth = dw }
+                        , ramDataWidth = dw
+                        , ramHasByteEn = isJust byteEnA }
 
 -- | Read from register file
 regFileReadBV :: RegFileInfo -> BV -> BV

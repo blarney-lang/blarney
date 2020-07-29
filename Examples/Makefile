@@ -33,3 +33,4 @@ clean:
 	make -C StackTesting clean
 	make -C UpDownCounter clean
 	make -C Vectors clean
+	make -C RAMBE clean

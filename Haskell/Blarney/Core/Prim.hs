@@ -155,11 +155,13 @@ data Prim =
     -- | Single-port block RAM
   | BRAM { ramInitFile  :: Maybe String
          , ramAddrWidth :: Width
-         , ramDataWidth :: Width }
+         , ramDataWidth :: Width
+         , ramHasByteEn :: Bool }
     -- | True dual-port block RAM
   | TrueDualBRAM { ramInitFile  :: Maybe String
                  , ramAddrWidth :: Width
-                 , ramDataWidth :: Width }
+                 , ramDataWidth :: Width
+                 , ramHasByteEn :: Bool }
 
     -- | Custom component
   | Custom { customName      :: String                  -- component name
@@ -249,7 +251,7 @@ data PrimInfo = PrimInfo {
   -- inlining of certain primitive such as 'Input' or 'Display' or stateful
   -- ones like 'Register'...
   isInlineable :: Bool
-  -- | Tells whether a 'Prim' ' inputs can be inlined during the netlist
+  -- | Tells whether a 'Prim' inputs can be inlined during the netlist
   -- optimisation passes. When generating verilog, it is useful to avoid
   -- inlining inputs to 'Prim's involving bit-slicing (specifically,
   -- 'SelectBits' and 'SignExtend') due to lack of underlying support.
@@ -459,23 +461,29 @@ primInfo (RegisterEn _ w) = PrimInfo { isInlineable = False
                                      , inputs = [("en", 1), ("in", w)]
                                      , outputs = [("out", w)] }
 primInfo BRAM{ ramAddrWidth = aw
-             , ramDataWidth = dw } =
+             , ramDataWidth = dw
+             , ramHasByteEn = hasBE } =
   PrimInfo { isInlineable = False
            , inputsInlineable = True
            , strRep = "BRAM"
            , dontKill = False
            , isRoot = False
-           , inputs = [("addr", aw), ("data_in", dw)]
+           , inputs = [("addr", aw), ("data_in", dw), ("write_en", 1)] ++
+                      [("byte_en", dw `div` 8) | hasBE]
            , outputs = [("data_out", dw)] }
 primInfo TrueDualBRAM{ ramAddrWidth = aw
-                     , ramDataWidth = dw } =
+                     , ramDataWidth = dw
+                     , ramHasByteEn = hasBE } =
   PrimInfo { isInlineable = False
            , inputsInlineable = True
            , strRep = "TrueDualBRAM"
            , dontKill = False
            , isRoot = False
-           , inputs = [("addr", aw), ("data_in", dw)]
-           , outputs = [("data_out", dw)] }
+           , inputs = [("addr_a", aw), ("data_in_a", dw), ("write_en_a", 1),
+                       ("addr_b", aw), ("data_in_b", dw), ("write_en_b", 1)] ++
+                      [("byte_en_a", dw `div` 8) | hasBE] ++
+                      [("byte_en_b", dw `div` 8) | hasBE]
+           , outputs = [("dataA", dw), ("dataB", dw)] }
 primInfo Custom{ customName = custNm
                , customInputs = ins
                , customOutputs = outs } =
