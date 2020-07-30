@@ -46,7 +46,12 @@ genVerilogModule nl mod dir =
      writeVerilog fileName mod nl
   where fileName = dir ++ "/" ++ mod ++ ".v"
 
--- | Convert given Blarney Netlist to a top-level Verilog module
+-- | Convert given Blarney Netlist to a top-level Verilog module, and
+-- automatically generate a sample verilator wrapper and makefile too.
+-- This is useful for simple examples and projects.  Most projects will
+-- probably require a more customised verilator wrapper;
+-- in that case, just use 'genVerilogModule', even for the top-level
+-- module.
 genVerilogTop :: Netlist -- ^ Blarney module
               -> String  -- ^ Top-level module name
               -> String  -- ^ Output directory

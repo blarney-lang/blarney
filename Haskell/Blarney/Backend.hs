@@ -41,8 +41,13 @@ writeVerilogModule mod modName dirName = do
   nl <- defaultNetlistPasses opts mnl
   genVerilogModule nl modName dirName
 
--- This function is similar to 'writeVerilogModule' but also generate simulation
--- files and Makefiles for toplevel modules
+-- | This function is similar to 'writeVerilogModule' but also generates
+-- a verilator wrapper and Makefile.
+-- This is useful for simple examples.  Major projects will
+-- probably require a more customised verilator wrapper;
+-- in that case, just use 'writeVerilogModule', even for the top-level
+-- module, and write a custom verilator driver, perhaps using the
+-- Blarney-generated one as a starting point.
 writeVerilogTop :: Module () -- ^ Blarney function
                 -> String    -- ^ Module name
                 -> String    -- ^ Output directory
