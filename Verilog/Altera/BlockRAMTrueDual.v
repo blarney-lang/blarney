@@ -43,16 +43,18 @@ module BlockRAMTrueDual (
   input [(DATA_WIDTH-1):0] DI_A, DI_B;
   input [(ADDR_WIDTH-1):0] ADDR_A, ADDR_B;
   input WE_A, WE_B, CLK;
-  output reg [(DATA_WIDTH-1):0] DO_A, DO_B;
-  reg [DATA_WIDTH-1:0] RAM[2**ADDR_WIDTH-1:0];
+  reg [(DATA_WIDTH-1):0] DO_A, DO_B;
+`ifndef ALTERA_RESERVED_QIS
+// synopsys translate_off
+`endif
+  tri1 CLK;
+  tri0 WE_A;
+  tri0 WE_B;
+`ifndef ALTERA_RESERVED_QIS
+// synopsys translate_on
+`endif
 
-  generate
-    if (INIT_FILE != "UNUSED") begin
-      initial $readmemh(INIT_FILE, RAM);
-    end
-  endgenerate
-
-    altsyncram altsyncram_component (
+  altsyncram altsyncram_component (
         .address_a (ADDR_A),
         .address_b (ADDR_B),
         .byteena_b (1'b1),
