@@ -59,7 +59,6 @@ namePropagate mnl = do
         isDest Register{}     = True
         isDest RegisterEn{}   = True
         isDest BRAM{}         = True
-        isDest TrueDualBRAM{} = True
         isDest Custom{}       = True
         isDest Input{}        = True
         isDest Output{}       = True

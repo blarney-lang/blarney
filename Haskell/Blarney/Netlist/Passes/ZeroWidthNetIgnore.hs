@@ -64,8 +64,6 @@ zeroWidthNetTransform net@Net{ netPrim = prim@Custom{ customInputs = primIns
 -- TODO currently unsupported cases that could be transformed
 zeroWidthNetTransform net@Net{ netPrim = BRAM { ramAddrWidth = 0 } } =
   error "zeroWidthNetTransform unsupported on BRAM Prim"
-zeroWidthNetTransform net@Net{ netPrim = TrueDualBRAM { ramAddrWidth = 0 } } =
-  error "zeroWidthNetTransform unsupported on TrueDualBRAM Prim"
 zeroWidthNetTransform
   net@Net{ netPrim = RegFileRead RegFileInfo{ regFileAddrWidth = 0 } } =
     error "zeroWidthNetTransform unsupported on RegFileRead Prim"

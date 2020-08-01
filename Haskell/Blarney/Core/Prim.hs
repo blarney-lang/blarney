@@ -21,6 +21,7 @@ module Blarney.Core.Prim (
 , primInputs      -- get the inputs of a 'Prim'
 , primOutputs     -- get the outputs of a 'Prim'
 , primOutWidth    -- get 'OutputWidth' for a given named output of a 'Prim'
+, BRAMKind(..)    -- Block RAM kind
   -- * Other primitive types
 , InstId          -- Every component instance has a unique id
 , Width           -- Bit vector width
@@ -152,16 +153,12 @@ data Prim =
     -- | Register with initial value and enable wire (2 inputs, 1 output)
   | RegisterEn Integer InputWidth
 
-    -- | Single-port block RAM
-  | BRAM { ramInitFile  :: Maybe String
+    -- | Block RAM
+  | BRAM { ramKind      :: BRAMKind
+         , ramInitFile  :: Maybe String
          , ramAddrWidth :: Width
          , ramDataWidth :: Width
          , ramHasByteEn :: Bool }
-    -- | True dual-port block RAM
-  | TrueDualBRAM { ramInitFile  :: Maybe String
-                 , ramAddrWidth :: Width
-                 , ramDataWidth :: Width
-                 , ramHasByteEn :: Bool }
 
     -- | Custom component
   | Custom { customName      :: String                  -- component name
@@ -190,6 +187,13 @@ data Prim =
   | RegFileRead RegFileInfo
     -- | Register file update (inputs: write-enable, address, data)
   | RegFileWrite RegFileInfo
+  deriving Show
+
+-- | Kind of block RAM
+data BRAMKind =
+    BRAMSinglePort
+  | BRAMDualPort
+  | BRAMTrueDualPort
   deriving Show
 
 -- | Helper to tell whether a 'Prim' can be inlined during Netlist optimisation
@@ -462,28 +466,34 @@ primInfo (RegisterEn _ w) = PrimInfo { isInlineable = False
                                      , outputs = [("out", w)] }
 primInfo BRAM{ ramAddrWidth = aw
              , ramDataWidth = dw
-             , ramHasByteEn = hasBE } =
+             , ramHasByteEn = hasBE
+             , ramKind      = kind } =
   PrimInfo { isInlineable = False
            , inputsInlineable = True
-           , strRep = "BRAM"
+           , strRep = str ++ (case hasBE of True -> "BE"; False -> "")
            , dontKill = False
            , isRoot = False
-           , inputs = [("addr", aw), ("data_in", dw), ("write_en", 1)] ++
-                      [("byte_en", dw `div` 8) | hasBE]
-           , outputs = [("data_out", dw)] }
-primInfo TrueDualBRAM{ ramAddrWidth = aw
-                     , ramDataWidth = dw
-                     , ramHasByteEn = hasBE } =
-  PrimInfo { isInlineable = False
-           , inputsInlineable = True
-           , strRep = "TrueDualBRAM"
-           , dontKill = False
-           , isRoot = False
-           , inputs = [("addr_a", aw), ("data_in_a", dw), ("write_en_a", 1),
-                       ("addr_b", aw), ("data_in_b", dw), ("write_en_b", 1)] ++
-                      [("byte_en_a", dw `div` 8) | hasBE] ++
-                      [("byte_en_b", dw `div` 8) | hasBE]
-           , outputs = [("dataA", dw), ("dataB", dw)] }
+           , inputs = ins
+           , outputs = outs }
+  where
+    str  = case kind of
+             BRAMSinglePort   -> "BlockRAM"
+             BRAMDualPort     -> "BlockRAMDual"
+             BRAMTrueDualPort -> "BlockRAMTrueDual"
+    ins  = case kind of
+             BRAMSinglePort   -> [("ADDR", aw), ("DI", dw), ("WE", 1)]
+                              ++ [("BE", dw `div` 8) | hasBE]
+             BRAMDualPort     -> [("RD_ADDR", aw), ("WR_ADDR", aw)]
+                              ++ [("DI", dw), ("WE", 1)]
+                              ++ [("BE", dw `div` 8) | hasBE]
+             BRAMTrueDualPort -> [("ADDR_A", aw), ("ADDR_B", aw)]
+                              ++ [("DI_A", dw), ("DI_B", dw)]
+                              ++ [("WE_A", 1), ("WE_B", 1)]
+                              ++ [("BE_A", dw `div` 8) | hasBE]
+                              ++ [("BE_B", dw `div` 8) | hasBE]
+    outs = case kind of
+             BRAMTrueDualPort -> [("DO_A", dw), ("DO_B", dw)]
+             other            -> [("DO", dw)]
 primInfo Custom{ customName = custNm
                , customInputs = ins
                , customOutputs = outs } =
