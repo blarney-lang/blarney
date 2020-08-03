@@ -527,13 +527,27 @@ makeDualRAMInitBE init = makeDualRAMBECore (Just init)
 -- One port used for reading and the other for writing.
 makeDualRAMBECore :: _ => Maybe String -> Module (RAMBE aw dw)
 makeDualRAMBECore init = do
-  -- Create true dual port RAM
-  (portA :: RAMBE aw dw, portB :: RAMBE aw dw) <- makeTrueDualRAMBECore init
+  -- Address busses and data bus and write-enable
+  rdAddrBus :: Wire (Bit aw) <- makeWireU
+  wrAddrBus :: Wire (Bit aw) <- makeWireU
+  dataBus   :: Wire (Bit (8*dw)) <- makeWireU
+  writeEn   :: Wire (Bit 1) <- makeWire 0
+  byteEn    :: Wire (Bit dw) <- makeWire 0
+
+  -- RAM primitive
+  let ramPrimitive = case init of
+        Nothing  -> ramDualBE
+        Just str -> ramDualInitBE str
 
   -- Return interface
   return RAMBE {
-    loadBE    = loadBE portA
-  , storeBE   = storeBE portB
-  , outBE     = outBE portA
-  , storeActiveBE = storeActiveBE portB
+    loadBE    = (rdAddrBus <==)
+  , storeBE   = \a be d -> do
+                  wrAddrBus <== a
+                  dataBus <== d
+                  writeEn <== 1
+                  byteEn  <== be
+  , outBE     = ramPrimitive (val rdAddrBus, val wrAddrBus, val dataBus,
+                              val writeEn, val byteEn)
+  , storeActiveBE = val writeEn
   }
