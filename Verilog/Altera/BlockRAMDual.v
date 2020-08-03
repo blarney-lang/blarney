@@ -25,6 +25,7 @@ module BlockRAMDual (
   RD_ADDR, // Read address
   WR_ADDR, // Write address
   WE,      // Write enable
+  RE,      // Read enable
   DO       // Data out
   );
 
@@ -41,12 +42,12 @@ module BlockRAMDual (
   input  [DATA_WIDTH-1:0] DI;
   input  [ADDR_WIDTH-1:0] RD_ADDR;
   input  [ADDR_WIDTH-1:0] WR_ADDR;
-  input  WE;
+  input  WE, RE;
   output [DATA_WIDTH-1:0] DO;
 `ifndef ALTERA_RESERVED_QIS
 // synopsys translate_off
 `endif
-  tri1 CLK;
+  tri1 CLK, RE;
   tri0 WE;
 `ifndef ALTERA_RESERVED_QIS
 // synopsys translate_on
@@ -74,7 +75,7 @@ module BlockRAMDual (
         .eccstatus (),
         .q_a (),
         .rden_a (1'b1),
-        .rden_b (1'b1),
+        .rden_b (RE),
         .wren_b (1'b0));
   defparam
     altsyncram_component.address_aclr_b = "NONE",
@@ -90,6 +91,7 @@ module BlockRAMDual (
     altsyncram_component.operation_mode = "DUAL_PORT",
     altsyncram_component.outdata_aclr_b = "NONE",
     altsyncram_component.outdata_reg_b = DO_REG,
+    altsyncram_component.rdcontrol_reg_b = "CLOCK0",
     altsyncram_component.power_up_uninitialized = "FALSE",
     altsyncram_component.read_during_write_mode_mixed_ports = RD_DURING_WR,
     altsyncram_component.widthad_a = ADDR_WIDTH,

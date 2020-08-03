@@ -6,6 +6,7 @@ module BlockRAM (
   DI,      // Data in
   ADDR,    // Read address
   WE,      // Write enable
+  RE,      // Read enable
   DO       // Data out
   );
 
@@ -16,7 +17,7 @@ module BlockRAM (
   input  CLK;
   input  [DATA_WIDTH-1:0] DI;
   input  [ADDR_WIDTH-1:0] ADDR;
-  input  WE;
+  input  WE, RE;
   output reg [DATA_WIDTH-1:0] DO;
   reg [DATA_WIDTH-1:0] RAM[2**ADDR_WIDTH-1:0];
 
@@ -30,11 +31,14 @@ module BlockRAM (
   begin
     if (WE) begin
       RAM[ADDR] <= DI;
-      DO <= {DATA_WIDTH{1'hx}};
     end
-    else begin
-      DO <= RAM[ADDR];
-    end 
+    if (RE) begin
+      if (WE) begin
+        DO <= {DATA_WIDTH{1'hx}};
+      end else begin
+        DO <= RAM[ADDR];
+      end 
+    end
   end 
 
 endmodule

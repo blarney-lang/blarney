@@ -24,11 +24,13 @@ module BlockRAMTrueDualBE (
   DI_A,      // Data in
   ADDR_A,    // Read address
   WE_A,      // Write enable
+  RE_A,      // Read enable
   BE_A,      // Byte enable
   DO_A,      // Data out
   DI_B,      // Data in
   ADDR_B,    // Read address
   WE_B,      // Write enable
+  RE_B,      // Read enable
   BE_B,      // Byte enable
   DO_B       // Data out
   );
@@ -45,13 +47,13 @@ module BlockRAMTrueDualBE (
 
   input [(DATA_WIDTH-1):0] DI_A, DI_B;
   input [(ADDR_WIDTH-1):0] ADDR_A, ADDR_B;
-  input WE_A, WE_B, CLK;
+  input WE_A, WE_B, RE_A, RE_B, CLK;
   input  [BE_WIDTH-1:0] BE_A, BE_B;
   output [(DATA_WIDTH-1):0] DO_A, DO_B;
 `ifndef ALTERA_RESERVED_QIS
 // synopsys translate_off
 `endif
-  tri1 CLK;
+  tri1 CLK, RE_A, RE_B;
   tri0 WE_A, WE_B;
 `ifndef ALTERA_RESERVED_QIS
 // synopsys translate_on
@@ -73,14 +75,14 @@ module BlockRAMTrueDualBE (
         .addressstall_a (1'b0),
         .addressstall_b (1'b0),
         .byteena_a (BE_A),
-        .clock1 (1'b1),
+        .clock1 (CLK),
         .clocken0 (1'b1),
         .clocken1 (1'b1),
         .clocken2 (1'b1),
         .clocken3 (1'b1),
         .eccstatus (),
-        .rden_a (1'b1),
-        .rden_b (1'b1));
+        .rden_a (RE_A),
+        .rden_b (RE_B));
   defparam
     altsyncram_component.address_reg_b = "CLOCK0",
     altsyncram_component.clock_enable_input_a = "BYPASS",

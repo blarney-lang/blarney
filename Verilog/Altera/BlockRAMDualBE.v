@@ -25,6 +25,7 @@ module BlockRAMDualBE (
   RD_ADDR, // Read address
   WR_ADDR, // Write address
   WE,      // Write enable
+  RE,      // Read enable
   BE,      // Byte enable
   DO       // Data out
   );
@@ -42,13 +43,13 @@ module BlockRAMDualBE (
   input  [DATA_WIDTH-1:0] DI;
   input  [ADDR_WIDTH-1:0] RD_ADDR;
   input  [ADDR_WIDTH-1:0] WR_ADDR;
-  input  WE;
+  input  WE, RE;
   input  [BE_WIDTH-1:0] BE;
   output [DATA_WIDTH-1:0] DO;
 `ifndef ALTERA_RESERVED_QIS
 // synopsys translate_off
 `endif
-  tri1 CLK;
+  tri1 CLK, RE;
   tri0 WE;
 `ifndef ALTERA_RESERVED_QIS
 // synopsys translate_on
@@ -67,7 +68,7 @@ module BlockRAMDualBE (
         .addressstall_a (1'b0),
         .addressstall_b (1'b0),
         .byteena_b (-1),
-        .clock1 (1'b1),
+        .clock1 (CLK),
         .clocken0 (1'b1),
         .clocken1 (1'b1),
         .clocken2 (1'b1),
@@ -76,7 +77,7 @@ module BlockRAMDualBE (
         .eccstatus (),
         .q_a (),
         .rden_a (1'b1),
-        .rden_b (1'b1),
+        .rden_b (RE),
         .wren_b (1'b0));
   defparam
     altsyncram_component.address_aclr_b = "NONE",
@@ -93,6 +94,7 @@ module BlockRAMDualBE (
     altsyncram_component.outdata_aclr_b = "NONE",
     altsyncram_component.outdata_reg_b = DO_REG,
     altsyncram_component.power_up_uninitialized = "FALSE",
+    altsyncram_component.rdcontrol_reg_b = "CLOCK0",
     altsyncram_component.read_during_write_mode_mixed_ports = RD_DURING_WR,
     altsyncram_component.widthad_a = ADDR_WIDTH,
     altsyncram_component.widthad_b = ADDR_WIDTH,

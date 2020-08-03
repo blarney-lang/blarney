@@ -6,11 +6,13 @@ module BlockRAMTrueDualBE (
   DI_A,      // Data in
   ADDR_A,    // Read address
   WE_A,      // Write enable
+  RE_A,      // Read enable
   BE_A,      // Byte enable
   DO_A,      // Data out
   DI_B,      // Data in
   ADDR_B,    // Read address
   WE_B,      // Write enable
+  RE_B,      // Read enable
   BE_B,      // Byte enable
   DO_B       // Data out
   );
@@ -23,7 +25,7 @@ module BlockRAMTrueDualBE (
   input  CLK;
   input  [DATA_WIDTH-1:0] DI_A, DI_B;
   input  [ADDR_WIDTH-1:0] ADDR_A, ADDR_B;
-  input  WE_A, WE_B;
+  input  WE_A, WE_B, RE_A, RE_B;
   input  [BE_WIDTH-1:0] BE_A, BE_B;
   output reg [DATA_WIDTH-1:0] DO_A, DO_B;
   logic [BE_WIDTH-1:0][7:0] RAM[2**ADDR_WIDTH-1:0];
@@ -46,10 +48,12 @@ module BlockRAMTrueDualBE (
   endgenerate
 
   always_ff@(posedge CLK) begin
-    if (WE_A) begin
-      DO_A <= {DATA_WIDTH{1'hx}};
-    end else begin
-      DO_A <= (WE_B && ADDR_A == ADDR_B) ? {DATA_WIDTH{1'hx}} : RAM[ADDR_A];
+    if (RE_A) begin
+      if (WE_A) begin
+        DO_A <= {DATA_WIDTH{1'hx}};
+      end else begin
+        DO_A <= (WE_B && ADDR_A == ADDR_B) ? {DATA_WIDTH{1'hx}} : RAM[ADDR_A];
+      end
     end
   end
 
@@ -65,10 +69,12 @@ module BlockRAMTrueDualBE (
   endgenerate
 
   always_ff@(posedge CLK) begin
-    if (WE_B) begin
-      DO_B <= {DATA_WIDTH{1'hx}};
-    end else begin
-      DO_B <= (WE_A && ADDR_A == ADDR_B) ? {DATA_WIDTH{1'hx}} : RAM[ADDR_B];
+    if (RE_B) begin
+      if (WE_B) begin
+        DO_B <= {DATA_WIDTH{1'hx}};
+      end else begin
+        DO_B <= (WE_A && ADDR_A == ADDR_B) ? {DATA_WIDTH{1'hx}} : RAM[ADDR_B];
+      end
     end
   end
 

@@ -293,10 +293,10 @@ regEnBV :: Width -> BV -> BV -> BV -> BV
 regEnBV w i en a = makePrim1 (RegisterEn (getInitBV i) w) [en, a]
 
 -- |Single-port block RAM.
--- Inputs: one tuple (address, data, write-enable, optional byte-enable)
-ramBV :: OutputWidth -> Maybe String -> (BV, BV, BV, Maybe BV) -> BV
-ramBV dw initFile (addr, dataIn, weIn, byteEn) =
-    makePrim1 prim ([addr, dataIn, weIn] ++ [be | Just be <- [byteEn]])
+-- Inputs: address, data, write-enable, read-enable, optional byte-enable
+ramBV :: OutputWidth -> Maybe String -> (BV, BV, BV, BV, Maybe BV) -> BV
+ramBV dw initFile (addr, dataIn, weIn, reIn, byteEn) =
+    makePrim1 prim ([addr, dataIn, weIn, reIn] ++ [be | Just be <- [byteEn]])
   where
     prim = BRAM { ramKind      = BRAMSinglePort
                 , ramInitFile  = initFile
@@ -305,11 +305,11 @@ ramBV dw initFile (addr, dataIn, weIn, byteEn) =
                 , ramHasByteEn = isJust byteEn }
 
 -- |Simple dual-port block RAM.
--- Inputs: one tuple (read address, write address, data,
--- write-enable, optional byte-enable)
-dualRamBV :: OutputWidth -> Maybe String -> (BV, BV, BV, BV, Maybe BV) -> BV
-dualRamBV dw initFile (rdAddr, wrAddr, dataIn, weIn, byteEn) =
-    makePrim1 prim ([rdAddr, wrAddr, dataIn, weIn] ++
+-- Inputs: read address, write address, data, write-enable,
+-- read-enable, optional byte-enable
+dualRamBV :: OutputWidth -> Maybe String -> (BV, BV, BV, BV, BV, Maybe BV) -> BV
+dualRamBV dw initFile (rdAddr, wrAddr, dataIn, weIn, reIn, byteEn) =
+    makePrim1 prim ([rdAddr, wrAddr, dataIn, weIn, reIn] ++
                     [be | Just be <- [byteEn]])
   where
     prim = BRAM { ramKind      = BRAMDualPort
@@ -319,20 +319,21 @@ dualRamBV dw initFile (rdAddr, wrAddr, dataIn, weIn, byteEn) =
                 , ramHasByteEn = isJust byteEn }
 
 -- |True dual-port block RAM.
--- Inputs: two tuples (address, data, write-enable, optional byte-enable)
+-- Inputs (x2): address, data, write-enable, read-enable, optional byte-enable
 trueDualRamBV :: OutputWidth -> Maybe String
-              -> (BV, BV, BV, Maybe BV)
-              -> (BV, BV, BV, Maybe BV)
+              -> (BV, BV, BV, BV, Maybe BV)
+              -> (BV, BV, BV, BV, Maybe BV)
               -> (BV, BV)
-trueDualRamBV dw initFile (addrA, dataInA, weInA, byteEnA)
-                          (addrB, dataInB, weInB, byteEnB)
+trueDualRamBV dw initFile (addrA, dataInA, weInA, reInA, byteEnA)
+                          (addrB, dataInB, weInB, reInB, byteEnB)
   | isJust byteEnA /= isJust byteEnB =
       error "dualRamBV: both/neither ports must have byte enables"
   | otherwise =
       (bvOuts !! 0, bvOuts !! 1)
   where
     outs = [Just "dataA", Just "dataB"]
-    bvOuts = makePrim prim ([addrA, addrB, dataInA, dataInB, weInA, weInB] ++
+    bvOuts = makePrim prim ([addrA, addrB, dataInA, dataInB] ++
+                            [weInA, weInB, reInA, reInB] ++
                             [be | Just be <- [byteEnA, byteEnB]]) outs
     prim = BRAM { ramKind      = BRAMTrueDualPort
                 , ramInitFile  = initFile

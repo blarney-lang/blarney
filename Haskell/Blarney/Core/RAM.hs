@@ -63,163 +63,166 @@ import GHC.TypeNats
 
 -- |RAM primitive (for internal use only)
 -- (Read during write: reads "dont care")
-ramPrim :: Int -> Maybe String -> (Bit a, Bit d, Bit 1) -> Bit d
-ramPrim dataWidth init (a, d, en) =
-  FromBV $ ramBV dataWidth init (toBV a, toBV d, toBV en, Nothing)
+ramPrim :: Int -> Maybe String -> (Bit a, Bit d, Bit 1, Bit 1) -> Bit d
+ramPrim dataWidth init (a, d, we, re) =
+  FromBV $ ramBV dataWidth init (toBV a, toBV d, toBV we, toBV re, Nothing)
 
 -- |Simple dual-port RAM primitive (for internal use only)
 -- (Read during write: reads "dont care")
-ramDualPrim :: Int -> Maybe String -> (Bit a, Bit a, Bit d, Bit 1) -> Bit d
-ramDualPrim dataWidth init (ra, wa, d, en) =
-  FromBV $ dualRamBV dataWidth init (toBV ra, toBV wa, toBV d, toBV en, Nothing)
+ramDualPrim :: Int -> Maybe String ->
+  (Bit a, Bit a, Bit d, Bit 1, Bit 1) -> Bit d
+ramDualPrim dataWidth init (ra, wa, d, we, re) =
+  FromBV $ dualRamBV dataWidth init
+    (toBV ra, toBV wa, toBV d, toBV we, toBV re, Nothing)
 
 -- |True dual-port RAM primitive (for internal use only)
 -- (Read during write: reads "dont care")
 ramTrueDualPrim :: Int -> Maybe String
-                -> (Bit a, Bit d, Bit 1)
-                -> (Bit a, Bit d, Bit 1)
+                -> (Bit a, Bit d, Bit 1, Bit 1)
+                -> (Bit a, Bit d, Bit 1, Bit 1)
                 -> (Bit d, Bit d)
-ramTrueDualPrim dataWidth init (a0, d0, en0)
-                               (a1, d1, en1) =
+ramTrueDualPrim dataWidth init (a0, d0, we0, re0)
+                               (a1, d1, we1, re1) =
    (FromBV o0, FromBV o1)
   where
     (o0, o1) = trueDualRamBV dataWidth init
-                 (toBV a0, toBV d0, toBV en0, Nothing)
-                 (toBV a1, toBV d1, toBV en1, Nothing)
+                 (toBV a0, toBV d0, toBV we0, toBV re0, Nothing)
+                 (toBV a1, toBV d1, toBV we1, toBV re1, Nothing)
 
 -- |Uninitialised block RAM.
 -- (Read during write: reads "dont care")
-ram :: (Bits a, Bits d) => (a, d, Bit 1) -> d
-ram (a, d, en) =
-  unpack (ramPrim (sizeOf d) Nothing (pack a, pack d, en))
+ram :: (Bits a, Bits d) => (a, d, Bit 1, Bit 1) -> d
+ram (a, d, we, re) =
+  unpack (ramPrim (sizeOf d) Nothing (pack a, pack d, we, re))
 
 -- |Initilaised block RAM (contents taken from hex file).
 -- (Read during write: reads "dont care")
-ramInit :: (Bits a, Bits d) => String -> (a, d, Bit 1) -> d
-ramInit init (a, d, en) =
-  unpack (ramPrim (sizeOf d) (Just init) (pack a, pack d, en))
+ramInit :: (Bits a, Bits d) => String -> (a, d, Bit 1, Bit 1) -> d
+ramInit init (a, d, we, re) =
+  unpack (ramPrim (sizeOf d) (Just init) (pack a, pack d, we, re))
 
 -- |Uninitialised simple dual-port block RAM.
 -- (Read during write: reads "dont care")
-ramDual :: (Bits a, Bits d) => (a, a, d, Bit 1) -> d
-ramDual (ra, wa, d, en) =
-  unpack (ramDualPrim (sizeOf d) Nothing (pack ra, pack wa, pack d, en))
+ramDual :: (Bits a, Bits d) => (a, a, d, Bit 1, Bit 1) -> d
+ramDual (ra, wa, d, we, re) =
+  unpack (ramDualPrim (sizeOf d) Nothing (pack ra, pack wa, pack d, we, re))
 
 -- |Initialised simple dual-port block RAM.
 -- (Read during write: reads "dont care")
-ramDualInit :: (Bits a, Bits d) => String -> (a, a, d, Bit 1) -> d
-ramDualInit init (ra, wa, d, en) =
-  unpack (ramDualPrim (sizeOf d) (Just init) (pack ra, pack wa, pack d, en))
+ramDualInit :: (Bits a, Bits d) => String -> (a, a, d, Bit 1, Bit 1) -> d
+ramDualInit init (ra, wa, d, we, re) =
+  unpack (ramDualPrim (sizeOf d) (Just init) (pack ra, pack wa, pack d, we, re))
 
 -- | Uninitialised true dual-port block RAM.
 -- (Read during write: reads "dont care")
 ramTrueDual :: (Bits a, Bits d) =>
-               (a, d, Bit 1)
-            -> (a, d, Bit 1)
+               (a, d, Bit 1, Bit 1)
+            -> (a, d, Bit 1, Bit 1)
             -> (d, d)
-ramTrueDual (a0, d0, en0)
-            (a1, d1, en1) = (unpack o0, unpack o1)
+ramTrueDual (a0, d0, we0, re0)
+            (a1, d1, we1, re1) = (unpack o0, unpack o1)
   where
     (o0, o1) = ramTrueDualPrim (sizeOf d0) Nothing
-                 (pack a0, pack d0, en0)
-                 (pack a1, pack d1, en1)
+                 (pack a0, pack d0, we0, re0)
+                 (pack a1, pack d1, we1, re1)
 
 -- Initilaised true dual-port block RAM.
 -- (Read during write: reads "dont care")
 ramTrueDualInit :: (Bits a, Bits d) =>
                    String
-                -> (a, d, Bit 1)
-                -> (a, d, Bit 1)
+                -> (a, d, Bit 1, Bit 1)
+                -> (a, d, Bit 1, Bit 1)
                 -> (d, d)
-ramTrueDualInit init (a0, d0, en0)
-                     (a1, d1, en1) = (unpack o0, unpack o1)
+ramTrueDualInit init (a0, d0, we0, re0)
+                     (a1, d1, we1, re1) = (unpack o0, unpack o1)
   where
     (o0, o1) = ramTrueDualPrim (sizeOf d0) (Just init)
-                 (pack a0, pack d0, en0)
-                 (pack a1, pack d1, en1)
+                 (pack a0, pack d0, we0, re0)
+                 (pack a1, pack d1, we1, re1)
 
 -- |RAM primitive with byte enables (for internal use only)
 -- (Read during write: reads "dont care")
 ramPrimBE :: Int -> Maybe String
-          -> (Bit a, Bit (8*be), Bit 1, Bit be) -> Bit (8*be)
-ramPrimBE dataWidth init (a, d, en, be) =
-  FromBV $ ramBV dataWidth init (toBV a, toBV d, toBV en, Just (toBV be))
+          -> (Bit a, Bit (8*be), Bit 1, Bit 1, Bit be) -> Bit (8*be)
+ramPrimBE dataWidth init (a, d, we, re, be) =
+  FromBV $ ramBV dataWidth init
+    (toBV a, toBV d, toBV we, toBV re, Just (toBV be))
 
 -- |Simple dual-port RAM primitive with byte enables (for internal use only)
 -- (Read during write: reads "dont care")
 ramDualPrimBE :: Int -> Maybe String
-              -> (Bit a, Bit a, Bit (8*be), Bit 1, Bit be) -> Bit (8*be)
-ramDualPrimBE dataWidth init (ra, wa, d, en, be) =
+              -> (Bit a, Bit a, Bit (8*be), Bit 1, Bit 1, Bit be) -> Bit (8*be)
+ramDualPrimBE dataWidth init (ra, wa, d, we, re, be) =
   FromBV $ dualRamBV dataWidth init
-    (toBV ra, toBV wa, toBV d, toBV en, Just (toBV be))
+    (toBV ra, toBV wa, toBV d, toBV we, toBV re, Just (toBV be))
 
 -- |True dual-port RAM primitive with byte enables (for internal use only)
 -- (Read during write: reads "dont care")
 ramTrueDualPrimBE :: Int -> Maybe String
-                  -> (Bit a, Bit (8*be), Bit 1, Bit be)
-                  -> (Bit a, Bit (8*be), Bit 1, Bit be)
+                  -> (Bit a, Bit (8*be), Bit 1, Bit 1, Bit be)
+                  -> (Bit a, Bit (8*be), Bit 1, Bit 1, Bit be)
                   -> (Bit (8*be), Bit (8*be))
-ramTrueDualPrimBE dataWidth init (a0, d0, en0, be0)
-                                 (a1, d1, en1, be1) =
+ramTrueDualPrimBE dataWidth init (a0, d0, we0, re0, be0)
+                                 (a1, d1, we1, re1, be1) =
     (FromBV o0, FromBV o1)
   where
     (o0, o1) = trueDualRamBV dataWidth init
-                 (toBV a0, toBV d0, toBV en0, Just (toBV be0))
-                 (toBV a1, toBV d1, toBV en1, Just (toBV be1))
+                 (toBV a0, toBV d0, toBV we0, toBV re0, Just (toBV be0))
+                 (toBV a1, toBV d1, toBV we1, toBV re1, Just (toBV be1))
 
 -- |Uninitialised block RAM.
 -- (Read during write: reads "dont care")
-ramBE :: KnownNat be => (Bit a, Bit (8*be), Bit 1, Bit be) -> Bit (8*be)
-ramBE (a, d, en, be) =
-  ramPrimBE (8 * widthOf be) Nothing (a, d, en, be)
+ramBE :: KnownNat be => (Bit a, Bit (8*be), Bit 1, Bit 1, Bit be) -> Bit (8*be)
+ramBE (a, d, we, re, be) =
+  ramPrimBE (8 * widthOf be) Nothing (a, d, we, re, be)
 
 -- |Initilaised block RAM (contents taken from hex file).
 -- (Read during write: reads "dont care")
 ramInitBE :: KnownNat be =>
-  String -> (Bit aw, Bit (8*be), Bit 1, Bit be) -> Bit (8*be)
-ramInitBE init (a, d, en, be) =
-  ramPrimBE (8 * widthOf be) (Just init) (a, d, en, be)
+  String -> (Bit aw, Bit (8*be), Bit 1, Bit 1, Bit be) -> Bit (8*be)
+ramInitBE init (a, d, we, re, be) =
+  ramPrimBE (8 * widthOf be) (Just init) (a, d, we, re, be)
 
 -- |Uninitialised block RAM.
 -- (Read during write: reads "dont care")
 ramDualBE :: KnownNat be =>
-  (Bit aw, Bit aw, Bit (8*be), Bit 1, Bit be) -> Bit (8*be)
-ramDualBE (ra, wa, d, en, be) =
-  ramDualPrimBE (8 * widthOf be) Nothing (ra, wa, d, en, be)
+  (Bit aw, Bit aw, Bit (8*be), Bit 1, Bit 1, Bit be) -> Bit (8*be)
+ramDualBE (ra, wa, d, we, re, be) =
+  ramDualPrimBE (8 * widthOf be) Nothing (ra, wa, d, we, re, be)
 
--- |Initilaised block RAM (contents taken from hex file).
+-- |Initialised block RAM (contents taken from hex file).
 -- (Read during write: reads "dont care")
 ramDualInitBE :: KnownNat be =>
-  String -> (Bit aw, Bit aw, Bit (8*be), Bit 1, Bit be) -> Bit (8*be)
-ramDualInitBE init (ra, wa, d, en, be) =
-  ramDualPrimBE (8 * widthOf be) (Just init) (ra, wa, d, en, be)
+  String -> (Bit aw, Bit aw, Bit (8*be), Bit 1, Bit 1, Bit be) -> Bit (8*be)
+ramDualInitBE init (ra, wa, d, we, re, be) =
+  ramDualPrimBE (8 * widthOf be) (Just init) (ra, wa, d, we, re, be)
 
 -- | Uninitialised true dual-port block RAM.
 -- (Read during write: reads "dont care")
 ramTrueDualBE :: KnownNat be =>
-     (Bit a, Bit (8*be), Bit 1, Bit be)
-  -> (Bit a, Bit (8*be), Bit 1, Bit be)
+     (Bit a, Bit (8*be), Bit 1, Bit 1, Bit be)
+  -> (Bit a, Bit (8*be), Bit 1, Bit 1, Bit be)
   -> (Bit (8*be), Bit (8*be))
-ramTrueDualBE (a0, d0, en0, be0)
-              (a1, d1, en1, be1) = (o0, o1)
+ramTrueDualBE (a0, d0, we0, re0, be0)
+              (a1, d1, we1, re1, be1) = (o0, o1)
   where
     (o0, o1) = ramTrueDualPrimBE (8 * widthOf be0) Nothing
-                 (a0, d0, en0, be0)
-                 (a1, d1, en1, be1)
+                 (a0, d0, we0, re0, be0)
+                 (a1, d1, we1, re1, be1)
 
 -- Initilaised true dual-port block RAM.
 -- (Read during write: reads "dont care")
 ramTrueDualInitBE :: KnownNat be =>
      String
-  -> (Bit a, Bit (8*be), Bit 1, Bit be)
-  -> (Bit a, Bit (8*be), Bit 1, Bit be)
+  -> (Bit a, Bit (8*be), Bit 1, Bit 1, Bit be)
+  -> (Bit a, Bit (8*be), Bit 1, Bit 1, Bit be)
   -> (Bit (8*be), Bit (8*be))
-ramTrueDualInitBE init (a0, d0, en0, be0)
-                       (a1, d1, en1, be1) = (o0, o1)
+ramTrueDualInitBE init (a0, d0, we0, re0, be0)
+                       (a1, d1, we1, re1, be1) = (o0, o1)
   where
     (o0, o1) = ramTrueDualPrimBE (8 * widthOf be0) (Just init)
-                 (a0, d0, en0, be0)
-                 (a1, d1, en1, be1)
+                 (a0, d0, we0, re0, be0)
+                 (a1, d1, we1, re1, be1)
 
 -- |RAM interface
 data RAM a d =
@@ -228,6 +231,7 @@ data RAM a d =
   , store :: a -> d -> Action ()  -- ^ Issue store request
   , out :: d                      -- ^ Data out
   , storeActive :: Bit 1          -- ^ Is there a store currently happening?
+  , preserveOut :: Action ()      -- ^ Preserve current output on next cycle
   }
 
 -- | Create uninitialised block RAM
@@ -245,6 +249,7 @@ makeRAMCore init = do
   addrBus :: Wire a <- makeWireU
   dataBus :: Wire d <- makeWireU
   writeEn :: Wire (Bit 1) <- makeWire 0
+  readEn  :: Wire (Bit 1) <- makeWire 1
 
   -- RAM primitive
   let ramPrimitive = case init of
@@ -258,8 +263,9 @@ makeRAMCore init = do
                 addrBus <== a
                 dataBus <== d
                 writeEn <== 1
-  , out     = ramPrimitive (val addrBus, val dataBus, val writeEn)
+  , out     = ramPrimitive (val addrBus, val dataBus, val writeEn, val readEn)
   , storeActive = val writeEn
+  , preserveOut = readEn <== 0
   }
 
 -- |Create true dual-port block RAM.
@@ -280,10 +286,12 @@ makeTrueDualRAMCore init = do
   addrBusA :: Wire a <- makeWireU
   dataBusA :: Wire d <- makeWireU
   writeEnA :: Wire (Bit 1) <- makeWire 0
+  readEnA  :: Wire (Bit 1) <- makeWire 1
 
   addrBusB :: Wire a <- makeWireU
   dataBusB :: Wire d <- makeWireU
   writeEnB :: Wire (Bit 1) <- makeWire 0
+  readEnB  :: Wire (Bit 1) <- makeWire 1
 
   -- RAM primitive
   let ramPrimitive = case init of
@@ -291,8 +299,9 @@ makeTrueDualRAMCore init = do
         Just str -> ramTrueDualInit str
 
   -- RAM output
-  let (outA, outB) = ramPrimitive (val addrBusA, val dataBusA, val writeEnA)
-                                  (val addrBusB, val dataBusB, val writeEnB)
+  let (outA, outB) = ramPrimitive
+        (val addrBusA, val dataBusA, val writeEnA, val readEnA)
+        (val addrBusB, val dataBusB, val writeEnB, val readEnB)
 
   -- Return interface
   return (RAM {
@@ -302,6 +311,7 @@ makeTrueDualRAMCore init = do
                                    writeEnA <== 1
             , out     = outA
             , storeActive = val writeEnA
+            , preserveOut = readEnA <== 0
             },
           RAM {
               load    = (addrBusB <==)
@@ -310,6 +320,7 @@ makeTrueDualRAMCore init = do
                                    writeEnB <== 1
             , out     = outB
             , storeActive = val writeEnB
+            , preserveOut = readEnB <== 0
             })
 
 -- |Create uninitialised dual-port RAM.
@@ -331,6 +342,7 @@ makeDualRAMCore init = do
   wrAddrBus :: Wire a <- makeWireU
   dataBus   :: Wire d <- makeWireU
   writeEn   :: Wire (Bit 1) <- makeWire 0
+  readEn    :: Wire (Bit 1) <- makeWire 1
 
   -- RAM primitive
   let ramPrimitive = case init of
@@ -345,8 +357,9 @@ makeDualRAMCore init = do
                 dataBus <== d
                 writeEn <== 1
   , out     = ramPrimitive (val rdAddrBus, val wrAddrBus,
-                            val dataBus, val writeEn)
+                            val dataBus, val writeEn, val readEn)
   , storeActive = val writeEn
+  , preserveOut = readEn <== 0
   }
 
 -- | Dual-port forwarding block RAM with initial contents from hex file.
@@ -410,6 +423,7 @@ makeDualRAMForwardCore n init
                          sd <== d
   , out     = get_rdata $ allStages !! n
   , storeActive = storeActive ram
+  , preserveOut = preserveOut ram
   }
 
 -- |RAM (with byte enables) interface (data width is in bytes)
@@ -423,6 +437,8 @@ data RAMBE aw dw =
   , outBE :: Bit (8*dw)
     -- | Is there a store currently happening?
   , storeActiveBE :: Bit 1
+    -- | Preserve current output on next cycle
+  , preserveOutBE :: Action ()
   }
 
 -- | Create uninitialised block RAM with byte enables
@@ -440,6 +456,7 @@ makeRAMBECore init = do
   addrBus :: Wire (Bit aw) <- makeWireU
   dataBus :: Wire (Bit (8*dw)) <- makeWireU
   writeEn :: Wire (Bit 1) <- makeWire 0
+  readEn  :: Wire (Bit 1) <- makeWire 1
   byteEn  :: Wire (Bit dw) <- makeWire 0
 
   -- RAM primitive
@@ -449,14 +466,16 @@ makeRAMBECore init = do
 
   -- Return interface
   return RAMBE {
-    loadBE    = (addrBus <==)
-  , storeBE   = \a be d -> do
+    loadBE = (addrBus <==)
+  , storeBE = \a be d -> do
                 addrBus <== a
                 dataBus <== d
                 writeEn <== 1
                 byteEn  <== be
-  , outBE   = ramPrimitive (val addrBus, val dataBus, val writeEn, val byteEn)
+  , outBE = ramPrimitive
+      (val addrBus, val dataBus, val writeEn, val readEn, val byteEn)
   , storeActiveBE = val writeEn
+  , preserveOutBE = readEn <== 0
   }
 
 -- |Create true dual-port block RAM with byte enables
@@ -476,11 +495,13 @@ makeTrueDualRAMBECore init = do
   addrBusA :: Wire (Bit aw) <- makeWireU
   dataBusA :: Wire (Bit (8*dw)) <- makeWireU
   writeEnA :: Wire (Bit 1) <- makeWire 0
+  readEnA  :: Wire (Bit 1) <- makeWire 1
   byteEnA  :: Wire (Bit dw) <- makeWireU
 
   addrBusB :: Wire (Bit aw) <- makeWireU
   dataBusB :: Wire (Bit (8*dw)) <- makeWireU
   writeEnB :: Wire (Bit 1) <- makeWire 0
+  readEnB  :: Wire (Bit 1) <- makeWire 1
   byteEnB  :: Wire (Bit dw) <- makeWireU
 
   -- RAM primitive
@@ -490,8 +511,8 @@ makeTrueDualRAMBECore init = do
 
   -- RAM output
   let (outA, outB) = ramPrimitive
-        (val addrBusA, val dataBusA, val writeEnA, val byteEnA)
-        (val addrBusB, val dataBusB, val writeEnB, val byteEnB)
+        (val addrBusA, val dataBusA, val writeEnA, val readEnA, val byteEnA)
+        (val addrBusB, val dataBusB, val writeEnB, val readEnB, val byteEnB)
 
   -- Return interface
   return (RAMBE {
@@ -502,6 +523,7 @@ makeTrueDualRAMBECore init = do
                                       byteEnA  <== be
             , outBE   = outA
             , storeActiveBE = val writeEnA
+            , preserveOutBE = readEnA <== 0
             },
           RAMBE {
               loadBE  = (addrBusB <==)
@@ -511,6 +533,7 @@ makeTrueDualRAMBECore init = do
                                       byteEnB  <== be
             , outBE   = outB
             , storeActiveBE = val writeEnB
+            , preserveOutBE = readEnB <== 0
             })
 
 -- |Create uninitialised dual-port RAM with byte enables.
@@ -532,6 +555,7 @@ makeDualRAMBECore init = do
   wrAddrBus :: Wire (Bit aw) <- makeWireU
   dataBus   :: Wire (Bit (8*dw)) <- makeWireU
   writeEn   :: Wire (Bit 1) <- makeWire 0
+  readEn    :: Wire (Bit 1) <- makeWire 1
   byteEn    :: Wire (Bit dw) <- makeWire 0
 
   -- RAM primitive
@@ -548,6 +572,7 @@ makeDualRAMBECore init = do
                   writeEn <== 1
                   byteEn  <== be
   , outBE     = ramPrimitive (val rdAddrBus, val wrAddrBus, val dataBus,
-                              val writeEn, val byteEn)
+                              val writeEn, val readEn, val byteEn)
   , storeActiveBE = val writeEn
+  , preserveOutBE = readEn <== 0
   }

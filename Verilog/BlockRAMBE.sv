@@ -6,6 +6,7 @@ module BlockRAMBE (
   DI,      // Data in
   ADDR,    // Read address
   WE,      // Write enable
+  RE,      // Read enable
   BE,      // Byte enable
   DO       // Data out
   );
@@ -18,7 +19,7 @@ module BlockRAMBE (
   input  CLK;
   input  [DATA_WIDTH-1:0] DI;
   input  [ADDR_WIDTH-1:0] ADDR;
-  input  WE;
+  input  WE, RE;
   input  [BE_WIDTH-1:0] BE;
   output reg [DATA_WIDTH-1:0] DO;
   logic [BE_WIDTH-1:0][7:0] RAM[2**ADDR_WIDTH-1:0];
@@ -40,10 +41,12 @@ module BlockRAMBE (
   endgenerate
 
   always_ff@(posedge CLK) begin
-    if (WE) begin
-      DO <= {DATA_WIDTH{1'hx}};
-    end else begin
-      DO <= RAM[ADDR];
+    if (RE) begin
+      if (WE) begin
+        DO <= {DATA_WIDTH{1'hx}};
+      end else begin
+        DO <= RAM[ADDR];
+      end
     end
   end
 

@@ -481,14 +481,16 @@ primInfo BRAM{ ramAddrWidth = aw
              BRAMDualPort     -> "BlockRAMDual"
              BRAMTrueDualPort -> "BlockRAMTrueDual"
     ins  = case kind of
-             BRAMSinglePort   -> [("ADDR", aw), ("DI", dw), ("WE", 1)]
+             BRAMSinglePort   -> [("ADDR", aw), ("DI", dw),
+                                  ("WE", 1), ("RE", 1)]
                               ++ [("BE", dw `div` 8) | hasBE]
              BRAMDualPort     -> [("RD_ADDR", aw), ("WR_ADDR", aw)]
-                              ++ [("DI", dw), ("WE", 1)]
+                              ++ [("DI", dw), ("WE", 1), ("RE", 1)]
                               ++ [("BE", dw `div` 8) | hasBE]
              BRAMTrueDualPort -> [("ADDR_A", aw), ("ADDR_B", aw)]
                               ++ [("DI_A", dw), ("DI_B", dw)]
                               ++ [("WE_A", 1), ("WE_B", 1)]
+                              ++ [("RE_A", 1), ("RE_B", 1)]
                               ++ [("BE_A", dw `div` 8) | hasBE]
                               ++ [("BE_B", dw `div` 8) | hasBE]
     outs = case kind of

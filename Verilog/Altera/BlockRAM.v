@@ -24,6 +24,7 @@ module BlockRAM (
   DI,      // Data in
   ADDR,    // Read address
   WE,      // Write enable
+  RE,      // Read enable
   DO       // Data out
   );
 
@@ -37,12 +38,12 @@ module BlockRAM (
   input  CLK;
   input  [DATA_WIDTH-1:0] DI;
   input  [ADDR_WIDTH-1:0] ADDR;
-  input  WE;
+  input  WE, RE;
   output [DATA_WIDTH-1:0] DO;
 `ifndef ALTERA_RESERVED_QIS
 // synopsys translate_off
 `endif
-  tri1 CLK;
+  tri1 CLK, RE;
   tri0 WE;
 `ifndef ALTERA_RESERVED_QIS
 // synopsys translate_on
@@ -69,7 +70,7 @@ module BlockRAM (
         .data_b (1'b1),
         .eccstatus (),
         .q_b (),
-        .rden_a (1'b1),
+        .rden_a (RE),
         .rden_b (1'b1),
         .wren_b (1'b0));
   defparam
