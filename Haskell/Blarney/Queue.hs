@@ -259,3 +259,35 @@ makeShiftQueueCore mode n = do
     , canDeq   = valids.head.val
     , first    = elems.head.val
     }
+
+-- |Single element bypass queue
+makeBypassQueue :: Bits a => Module (Queue a)
+makeBypassQueue = do
+  -- Data register
+  dataReg <- makeReg dontCare
+  dataRegFull <- makeReg false
+  -- Data wire (by default emits the value of the data register)
+  dataWire <- makeWire (dataReg.val)
+  -- Dequeue trigger
+  doDeq <- makeWire false
+
+  always do
+    if doDeq.val
+      then dataRegFull <== false
+      else do
+        when (dataWire.active) do
+          dataRegFull <== true
+          dataReg <== dataWire.val
+
+  -- Can dequeue when wire is being enqueued, or when data reg full
+  let canDeqVal = dataWire.active .|. dataRegFull.val
+
+  return $
+    Queue {
+      notEmpty = canDeqVal
+    , notFull  = dataRegFull.val.inv
+    , enq      = \a -> dataWire <== a
+    , deq      = doDeq <== true
+    , canDeq   = canDeqVal
+    , first    = dataWire.val
+    }
