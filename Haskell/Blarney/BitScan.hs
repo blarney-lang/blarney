@@ -55,6 +55,7 @@ module Blarney.BitScan
   , getField
   , getFieldStrict
   , getFieldSel
+  , is
   ) where
 
 import Blarney
@@ -501,3 +502,12 @@ getFieldSel m key subj = result
       | length list == widthOf result = list
       | otherwise = error ("BitScan.getFieldSel: width mismatch "  ++
                              "for result of field selector " ++ key)
+
+-- |Helper function for determining if tag is present in tag map
+infix 8 `is`
+is :: (Ord tag, Show tag) => TagMap tag -> [tag] -> Bit 1
+is m [] = false
+is m (key:keys) =
+  case Data.Map.lookup key m of
+    Nothing -> error ("BitScan: unknown tag " ++ show key)
+    Just b -> b .|. is m keys
