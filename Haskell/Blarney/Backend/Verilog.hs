@@ -165,7 +165,9 @@ genNetVerilog :: Netlist -> Net -> NetVerilog
 genNetVerilog netlist net = case netPrim net of
   Add w                   -> primNV { decl = Just $ declWire w wId }
   Sub w                   -> primNV { decl = Just $ declWire w wId }
-  Mul w                   -> primNV { decl = Just $ declWire w wId }
+  Mul w _ isFull
+    | isFull              -> primNV { decl = Just $ declWire (2*w) wId }
+    | otherwise           -> primNV { decl = Just $ declWire w wId }
   Div w                   -> primNV { decl = Just $ declWire w wId }
   Mod w                   -> primNV { decl = Just $ declWire w wId }
   Not w                   -> primNV { decl = Just $ declWire w wId }
@@ -262,7 +264,12 @@ genNetVerilog netlist net = case netPrim net of
   showPrim (DontCare w) [] = showDontCare w
   showPrim (Add _) [e0, e1] = showNetInput e0 <+> char '+' <+> showNetInput e1
   showPrim (Sub _) [e0, e1] = showNetInput e0 <+> char '-' <+> showNetInput e1
-  showPrim (Mul _) [e0, e1] = showNetInput e0 <+> char '*' <+> showNetInput e1
+  showPrim (Mul _ isSigned _) [e0, e1]
+    | isSigned = s0 <> char '*' <> s1
+    | otherwise = showNetInput e0 <+> char '*' <+> showNetInput e1
+    where
+      s0 = text "$signed" <> parens (showNetInput e0)
+      s1 = text "$signed" <> parens (showNetInput e1)
   showPrim (Div _) [e0, e1] = showNetInput e0 <+> char '/' <+> showNetInput e1
   showPrim (Mod _) [e0, e1] = showNetInput e0 <+> char '%' <+> showNetInput e1
   showPrim (And _) [e0, e1] = showNetInput e0 <+> char '&' <+> showNetInput e1

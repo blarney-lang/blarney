@@ -96,6 +96,10 @@ infixl 7 .*.
 (.*.) :: Bit n -> Bit n -> Bit n
 a .*. b = FromBV $ mulBV (toBV a) (toBV b)
 
+-- |Multiplier (full precision)
+fullMul :: Bool -> Bit n -> Bit n -> Bit (2*n)
+fullMul isSigned a b = FromBV $ fullMulBV isSigned (toBV a) (toBV b)
+
 -- |Quotient
 infixl 7 ./.
 (./.) :: Bit n -> Bit n -> Bit n

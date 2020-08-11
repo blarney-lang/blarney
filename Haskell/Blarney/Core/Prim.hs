@@ -99,8 +99,13 @@ data Prim =
   | Add OutputWidth
     -- | Subtractor (2 inputs, 1 output)
   | Sub OutputWidth
-    -- | Multiplier (2 inputs, 1 output)
-  | Mul OutputWidth
+    -- | Multiplier (2 inputs, 1 output).
+    --   In full-precision mode, output width is 2x input width.
+    --   Otherwise, input and output width are the same.
+  | Mul { primMulInputWidth    :: InputWidth
+        , primMulSigned        :: Bool
+        , primMulFullPrecision :: Bool
+        }
     -- | Quotient (2 inputs, 1 output)
   | Div OutputWidth
     -- | Remainder (2 inputs, 1 output)
@@ -301,13 +306,16 @@ primInfo (Sub w) = PrimInfo { isInlineable = True
                             , isRoot = False
                             , inputs = [("in0", w), ("in1", w)]
                             , outputs = [("out", w)] }
-primInfo (Mul w) = PrimInfo { isInlineable = True
-                            , inputsInlineable = True
-                            , strRep = "Mul"
-                            , dontKill = False
-                            , isRoot = False
-                            , inputs = [("in0", w), ("in1", w)]
-                            , outputs = [("out", w)] }
+primInfo (Mul w isSigned isFull) =
+  PrimInfo { isInlineable = not isFull
+           , inputsInlineable = True
+           , strRep = "Mul"
+           , dontKill = False
+           , isRoot = False
+           , inputs = [("in0", w), ("in1", w)]
+           , outputs = [("out", wout)] }
+  where
+    wout = case isFull of { True -> 2*w; False -> w }
 primInfo (Div w) = PrimInfo { isInlineable = True
                             , inputsInlineable = True
                             , strRep = "Div"

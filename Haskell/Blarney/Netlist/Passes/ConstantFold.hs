@@ -38,15 +38,16 @@ evalConstNet n@Net{ netPrim = Sub w, netInputs = [x, Lit 0] } =
 evalConstNet n@Net{ netPrim = Sub w, netInputs = [Lit a0, Lit a1] } =
   (n { netPrim = Const w (a0 - a1), netInputs = [] }, True)
 -- Mul
-evalConstNet n@Net{ netPrim = Mul w, netInputs = [Lit 0, _] } =
+evalConstNet n@Net{ netPrim = Mul w _ _, netInputs = [Lit 0, _] } =
   (n { netPrim = Const w 0, netInputs = [] }, True)
-evalConstNet n@Net{ netPrim = Mul w, netInputs = [_, Lit 0] } =
+evalConstNet n@Net{ netPrim = Mul w _ _, netInputs = [_, Lit 0] } =
   (n { netPrim = Const w 0, netInputs = [] }, True)
-evalConstNet n@Net{ netPrim = Mul w, netInputs = [Lit 1, x] } =
+evalConstNet n@Net{ netPrim = Mul w _ _, netInputs = [Lit 1, x] } =
   (n { netPrim = Identity w, netInputs = [x] }, True)
-evalConstNet n@Net{ netPrim = Mul w, netInputs = [x, Lit 1] } =
+evalConstNet n@Net{ netPrim = Mul w _ _, netInputs = [x, Lit 1] } =
   (n { netPrim = Identity w, netInputs = [x] }, True)
-evalConstNet n@Net{ netPrim = Mul w, netInputs = [Lit a0, Lit a1] } =
+evalConstNet n@Net{ netPrim = Mul w False _,
+                    netInputs = [Lit a0, Lit a1] } =
   (n { netPrim = Const w (a0 * a1), netInputs = [] }, True)
 -- Div
 evalConstNet n@Net{ netPrim = Div w, netInputs = [Lit 0, _] } =

@@ -37,6 +37,7 @@ module Blarney.Core.BV (
 , addBV          -- :: BV -> BV -> BV
 , subBV          -- :: BV -> BV -> BV
 , mulBV          -- :: BV -> BV -> BV
+, fullMulBV      -- :: Bool -> BV -> BV -> BV
 , divBV          -- :: BV -> BV -> BV
 , modBV          -- :: BV -> BV -> BV
 , invBV          -- :: BV -> BV
@@ -165,9 +166,14 @@ subBV :: BV -> BV -> BV
 subBV a b = makePrim1 (Sub w) [a, b]
   where w = bvPrimOutWidth a
 
--- |Multiplier
+-- |Multiplier (input and output widths are same)
 mulBV :: BV -> BV -> BV
-mulBV a b = makePrim1 (Mul w) [a, b]
+mulBV a b = makePrim1 (Mul w False False) [a, b]
+  where w = bvPrimOutWidth a
+
+-- |Multiplier (full precision, i.e. output width is 2x input width)
+fullMulBV :: Bool -> BV -> BV -> BV
+fullMulBV isSigned a b = makePrim1 (Mul w isSigned True) [a, b]
   where w = bvPrimOutWidth a
 
 -- |Quotient
