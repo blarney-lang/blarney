@@ -156,3 +156,12 @@ debugSink snk msg = Sink {
 , put = \x -> do (snk.put) x
                  display msg " - Sink put - " (fshow x)
 }
+
+-- | Left-biased merge of two sources
+mergeTwoSources :: Bits a => Source a -> Source a -> Source a
+mergeTwoSources s0 s1 =
+  Source {
+    canPeek = s0.canPeek .|. s1.canPeek
+  , peek    = s0.canPeek ? (s0.peek, s1.peek)
+  , consume = if s0.canPeek then s0.consume else s1.consume
+  }
