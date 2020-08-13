@@ -165,3 +165,11 @@ mergeTwoSources s0 s1 =
   , peek    = s0.canPeek ? (s0.peek, s1.peek)
   , consume = if s0.canPeek then s0.consume else s1.consume
   }
+
+-- |Sequential left-biased merge of multiple sources
+mergeSourcesSeq :: Bits a => [Source a] -> Source a
+mergeSourcesSeq = foldr mergeTwoSources nullSource
+
+-- |Tree merge of multiple sources, where each merge is left biased
+mergeSourcesTree :: Bits a => [Source a] -> Source a
+mergeSourcesTree = tree mergeTwoSources nullSource
