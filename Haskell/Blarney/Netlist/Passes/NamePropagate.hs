@@ -26,21 +26,21 @@ namePropagate mnl = do
   visited :: IOUArray InstId Bool <- newArray bounds False
   -- Push destination name down through netlist
   let visit destName instId = do
-      isVisited <- readArray visited instId
-      if not isVisited then do
-        net@Net{ netPrim = prim
-               , netInputs = inpts
-               , netNameHints = hints
-               } <- readNet instId mnl
-        let inpts' = [instId | x@(InputWire (instId, _)) <- inpts]
-        writeArray visited instId True
-        -- Detect new destination and update destination name in recursive call
-        if isDest prim then mapM_ (visit $ bestName net) inpts'
-        else do
-          let newHints = insert (NmSuffix 10 destName) hints
-          writeArray mnl instId $ Just net{netNameHints = newHints}
-          mapM_ (visit destName) inpts'
-      else return ()
+        isVisited <- readArray visited instId
+        if not isVisited then do
+          net@Net{ netPrim = prim
+                 , netInputs = inpts
+                 , netNameHints = hints
+                 } <- readNet instId mnl
+          let inpts' = [instId | x@(InputWire (instId, _)) <- inpts]
+          writeArray visited instId True
+          -- Detect new destination and update destination name in recursive call
+          if isDest prim then mapM_ (visit $ bestName net) inpts'
+          else do
+            let newHints = insert (NmSuffix 10 destName) hints
+            writeArray mnl instId $ Just net{netNameHints = newHints}
+            mapM_ (visit destName) inpts'
+        else return ()
   --
   pairs <- getAssocs mnl -- list of nets with their index
   forM_ [i | x@(i, Just n) <- pairs, netIsRoot n] $ \instId -> do
