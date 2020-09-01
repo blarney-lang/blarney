@@ -26,6 +26,7 @@ data Opts =
   Opts {
     optEnableSimplifier :: Bool
   , optEnableNamePropagation :: Bool
+  , optEnableVerilatorTrace :: Bool
   }
   deriving (Show)
 
@@ -33,6 +34,7 @@ defaultOpts :: Opts
 defaultOpts = Opts
   { optEnableSimplifier = False
   , optEnableNamePropagation = False
+  , optEnableVerilatorTrace = False
   }
 
 options :: [OptDescr (Opts -> Opts)]
@@ -43,6 +45,9 @@ options =
   , Option [] ["enable-name-prop"]
       (NoArg \opts -> opts { optEnableNamePropagation = True })
       "Name propagation pass"
+  , Option [] ["enable-verilator-trace"]
+      (NoArg \opts -> opts { optEnableVerilatorTrace = True })
+      "Generate trace.vcd file"
   ]
 
 -- Parse command line options

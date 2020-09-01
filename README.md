@@ -28,6 +28,7 @@ Examples:
 * [Example 14: Bit-string pattern matching](#example-14-bit-string-pattern-matching)
 * [Example 15: CPUs](#example-15-cpus)
 * [Example 16: Namer plugin](#example-16-namer-plugin)
+* [Example 17: Waveform creation](#example-17-waveform-creation)
 
 Type classes:
 
@@ -981,6 +982,15 @@ To further improve the readability of generated code, you can also
 pass the `--enable-name-prop` and `--enable-simplifier` options to
 your circuit generator.  This will enable the (experimental) name
 propagation and netlist simplification passes respectively.
+
+
+## Example 17: Waveform creation
+
+To create waveforms, you can pass the `--enable-verilator-trace`
+option to your circuit generator.  This will add (experimental)
+waveform tracing code to the `.cpp` model so
+[`verilator`](https://www.veripool.org/wiki/verilator/Manual-verilator)
+will produce a `trace.vcd` file for `GTKWave`.
 
 ## Class 1: Bits
 

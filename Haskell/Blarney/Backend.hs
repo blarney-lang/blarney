@@ -56,4 +56,4 @@ writeVerilogTop mod modName dirName = do
   (opts, _) <- getOpts
   mnl <- toMNetlist mod
   nl <- defaultNetlistPasses opts mnl
-  genVerilogTop nl modName dirName
+  genVerilogTop opts nl modName dirName
