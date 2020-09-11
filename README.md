@@ -1,11 +1,13 @@
 <img src="blarney-logo.svg" width=275>
 
 Blarney is a Haskell library for hardware description that builds a
-range of HDL abstractions on top of a small set of core circuit
-primitives.  It is a modern variant of
+range of HDL abstractions on top of a small set of pure functional
+circuit primitives.  It is a modern variant of
 [Lava](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.110.5587&rep=rep1&type=pdf),
-requiring GHC 8.6.1 or later.  Below, we introduce the library by
-example, supplementing the [Haddock
+requiring GHC 8.6.1 or later.  Some aspects of the library are also
+inspired by the [Bluespec
+language](https://github.com/B-Lang-org/bsc).  Below, we introduce the
+library by example, supplementing the [Haddock
 docs](http://mn416.github.io/blarney/index.html).
 
 ## Contents
