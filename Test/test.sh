@@ -2,7 +2,7 @@
 
 # Run regression tests
 
-BLARNEY_EXAMPLES=(
+BLARNEY_DEFAULT_EXAMPLES=(
   BasicRTL
   OptionExample
   NameBits
@@ -28,7 +28,7 @@ BLARNEY_EXAMPLES=(
   Stack
   Lookup
 )
-EXAMPLES="${EXAMPLES[@]:-${BLARNEY_EXAMPLES[@]}}"
+BLARNEY_EXAMPLES="${BLARNEY_EXAMPLES[@]:-${BLARNEY_DEFAULT_EXAMPLES[@]}}"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -37,10 +37,10 @@ NC='\033[0m'
 if [ -z "$BLARNEY_ROOT" ]; then
   echo Please set BLARNEY_ROOT environment variable
 fi
-TESTING_ROOT="${TESTING_ROOT:-$BLARNEY_ROOT}"
+BLARNEY_TESTING_ROOT="${BLARNEY_TESTING_ROOT:-$BLARNEY_ROOT}"
 
 # Fresh start
-make -s -C $TESTING_ROOT clean
+make -s -C $BLARNEY_TESTING_ROOT clean
 
 # Test plugins and netlist passes?
 if [ "$1" == "full" ]; then
@@ -49,8 +49,8 @@ if [ "$1" == "full" ]; then
   GEN_FLAGS="--enable-name-prop --enable-simplifier"
 fi
 
-for E in ${EXAMPLES[@]}; do
-  cd $TESTING_ROOT/Examples/$E
+for E in ${BLARNEY_EXAMPLES[@]}; do
+  cd $BLARNEY_TESTING_ROOT/Examples/$E
   make BLC_FLAGS=$BLC_FLAGS -s &> /dev/null
   if [ $? != 0 ]; then
     echo Failed to build $E
