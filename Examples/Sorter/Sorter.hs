@@ -1,7 +1,7 @@
 import Blarney
 
 twoSort :: (Bit 8, Bit 8) -> (Bit 8, Bit 8)
-twoSort (a, b) = a .<. b ? ((a, b), (b, a))
+twoSort (a, b) = if a .<. b then (a, b) else (b, a)
 
 {-
 top :: Module ()

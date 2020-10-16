@@ -49,12 +49,13 @@ returns the sorted pair.
 import Blarney
 
 twoSort :: (Bit 8, Bit 8) -> (Bit 8, Bit 8)
-twoSort (a, b) = a .<. b ? ((a, b), (b, a))
+twoSort (a, b) = if a .<. b then (a, b) else (b, a)
 ```
 
 This definition makes use of three Blarney constructs: the `Bit` type
 for bit vectors (parametised by the size of the vector); the unsigned
-comparison operator `.<.`; and the ternary conditional operator `?`.
+comparison operator `.<.`; and an instance of Haskell's
+if-then-else operator for conditions of type `Bit 1`.
 A quick test bench to check that it works:
 
 ```hs
@@ -75,7 +76,7 @@ to perform the given action *on every clock cycle*.  Blarney actions
 include statements for displaying values during simulation
 (`display`), terminating the simulator (`finish`), and mutating state
 (see below).  All statements in an `Action` execute in parallel,
-within an a single cycle of an implicit clock.  We can generate
+within a single cycle of an implicit clock.  We can generate
 Verilog for the test bench as follows.
 
 ```hs
@@ -115,8 +116,7 @@ We can build a general *N*-element sorter by connecting together
 multiple two-sorters.  One of the simplest ways to do this is the
 *bubble sort* network.  The key component of this network is a
 function `bubble` that takes a list of inputs and returns a new list
-in which the smallest element comes first (the smallest element
-"bubbles" to the front).
+in which the smallest element comes first.
 
 ```hs
 bubble :: [Bit 8] -> [Bit 8]
@@ -186,29 +186,24 @@ values.  But if we look at the types of the primitive functions it
 uses, we can see that it actually has a more general type.
 
 ```hs
-(.<.) :: Cmp a  => a -> a -> Bit 1
-(?)   :: Bits a => Bit 1 -> (a, a) -> a
+(.<.)      :: Cmp a  => a -> a -> Bit 1
+ifThenElse :: Bits a => Bit 1 -> a -> a -> a
 ```
 
 So `.<.` can be used on any type in the
 [Cmp](http://mn416.github.io/blarney/Blarney-Core-Bit.html#t:Cmp)
-(comparator) class.  Similarly `?` can be used on any type in the
-[Bits](#class-1-bits) class (which allows packing to a bit vector and
-back again). So a more generic definition of `twoSort` would be:
-
-```hs
-twoSort :: (Bits a, Cmp a) => (a, a) -> (a, a)
-twoSort (a, b) = a .<. b ? ((a, b), (b, a))
-```
-
-Indeed, this would be the type inferred by the Haskell compiler if no
-type signature was supplied.  We can also use `if`-`then`-`else`
-instead of the ternary conditional operator:
+(comparator) class.  Similarly, the conditional can be used on any
+type in the [Bits](#class-1-bits) class (which allows packing to a bit
+vector and back again). So a more generic definition of `twoSort`
+would be:
 
 ```hs
 twoSort :: (Bits a, Cmp a) => (a, a) -> (a, a)
 twoSort (a, b) = if a .<. b then (a, b) else (b, a)
 ```
+
+Indeed, this would be the type inferred by the Haskell compiler if no
+type signature was supplied.
 
 ## Example 4: Mutable registers
 
