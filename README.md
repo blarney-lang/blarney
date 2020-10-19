@@ -3,13 +3,15 @@
 Blarney is a Haskell library for hardware description that builds a
 range of HDL abstractions on top of a small set of pure functional
 circuit primitives.  It is a modern variant of
-[Lava](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.110.5587&rep=rep1&type=pdf),
-requiring GHC 8.6.1 or later.  Some aspects of the library are also
-inspired by [Bluespec](https://github.com/B-Lang-org/bsc).  Below, we
-introduce the library by example, supplementing the [Haddock
+[Lava](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.110.5587&rep=rep1&type=pdf).
+Some aspects of the library are also inspired by
+[Bluespec](https://github.com/B-Lang-org/bsc).  Below, we introduce
+the library by example, supplementing the [Haddock
 docs](http://mn416.github.io/blarney/index.html).
 
 ## Contents
+
+* [Prerequisites](#prerequisites)
 
 Examples:
 
@@ -36,6 +38,29 @@ Type classes:
 * [Class 2: Interface](#class-2-interface)
 * [Class 3: Lookup](#class-3-lookup)
 * [Class 4: FShow](#class-4-fshow)
+
+## Prerequisites
+
+To use Blarney, you'll need Verilator and a fairly recent version of
+GHC (8.6.1 or later).
+
+On Ubuntu 20.04, you can simply do:
+
+```sh
+> sudo apt install verilator ghc-8.6.5
+```
+
+After cloning this repo, set the `BLARNEY_ROOT` environment variable to
+point to it, and add the `Scripts` directory to your `PATH`, e.g.
+
+```sh
+> git clone https://github.com/blarney-lang/blarney
+> export BLARNEY_ROOT=$(pwd)/blarney
+> export PATH=$PATH:$BLARNEY_ROOT/Scripts
+```
+
+You might like to set these environment variables in your `.bashrc`
+(or equivalent) for future logins.
 
 ## Example 1: Two-sort
 
@@ -90,14 +115,12 @@ compiled at the command-line using
 > blc Sorter.hs
 ```
 
-where `blc` stands for *Blarney compiler*.  This is just a script that
-invokes GHC with the appropriate compiler flags.  For it to work,
-the `BLARNEY_ROOT` environment variable needs to be set to the root of
-the repository, and `BLARNEY_ROOT/Scripts` must be in your `PATH`.
-Running the resulting executable `./Sorter` will produce Verilog in the
-`/tmp/twoSort` directory, including a makefile to build a Verilator
-simulator (`sudo apt-get install verilator`).  The simulator can be
-built and run as follows.
+where `blc` stands for *Blarney compiler*.  This is just a script
+(from Blarney's `Scripts` directory) that invokes GHC with the
+appropriate compiler flags.  Running the resulting executable
+`./Sorter` will produce Verilog in the `/tmp/twoSort` directory,
+including a makefile to build a Verilator simulator.  The simulator
+can be built and run as follows.
 
 ```sh
 > cd /tmp/twoSort
