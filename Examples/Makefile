@@ -24,7 +24,6 @@ clean:
 	make -C NameBits clean
 	make -C NoC clean
 	make -C OptionExample clean
-	make -C Pebbles clean
 	make -C Queue clean
 	make -C RAM clean
 	make -C Sorter clean
