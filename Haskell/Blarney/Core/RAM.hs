@@ -31,10 +31,13 @@ module Blarney.Core.RAM (
 , RAM(..)             -- Block RAM interface
 , makeRAM             -- Block RAM
 , makeRAMInit         -- Initialised block RAM
+, makeRAMCore         -- Optionally initialised block RAM
 , makeTrueDualRAM     -- True dual-port block RAM
 , makeTrueDualRAMInit -- Initialised true dual-port block RAM
+, makeTrueDualRAMCore -- Optionally initialised true dual-port block RAM
 , makeDualRAM         -- Dual-port block RAM
 , makeDualRAMInit     -- Initialised dual-port block RAM
+, makeDualRAMCore     -- Optionally initialised dual-port block RAM
 , makeDualRAMForward  -- Forwarding dual-port block RAM
 , makeDualRAMForwardInit -- Initialised forwarding dual-port block RAM
 
@@ -42,10 +45,13 @@ module Blarney.Core.RAM (
 , RAMBE(..)              -- Block RAM interface
 , makeRAMBE              -- Block RAM
 , makeRAMInitBE          -- Intialised block RAM
+, makeRAMBECore          -- Optionally intialised block RAM
 , makeTrueDualRAMBE      -- True dual-port block RAM
 , makeTrueDualRAMInitBE  -- Initialised true dual-port block RAM
+, makeTrueDualRAMBECore  -- Optionally initialised true dual-port block RAM
 , makeDualRAMBE          -- Dual-port block RAM
 , makeDualRAMInitBE      -- Initilaised dual-port block RAM
+, makeDualRAMBECore      -- Initilaised dual-port block RAM
 ) where
 
 -- Standard imports
