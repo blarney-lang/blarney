@@ -928,10 +928,10 @@ A few processor cores have been implemented in Blarney:
 * [Simple](https://github.com/mn416/blarney/blob/master/Examples/CPU/CPU.hs):
 4-stage 8-bit CPU, with just 4 instructions, which resolves
 both control and data hazards.
-* [Pebbles](https://github.com/mn416/blarney/blob/master/Examples/Pebbles/):
+* [Pebbles](https://github.com/blarney-lang/pebbles/):
 5-stage 32-bit RISC-V core separating the ISA from the pipeline
 microarchitecture.
-* [Actora](https://github.com/POETSII/actora/): 3-stage stack
+* [Actora](https://github.com/blarney-lang/actora/): 3-stage stack
 machine that runs code written a subset of Erlang.
 
 ## Example 16: Namer plugin
