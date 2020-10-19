@@ -41,17 +41,18 @@ Type classes:
 
 ## Prerequisites
 
-To use Blarney, you'll need Verilator and a fairly recent version of
+To use Blarney, we'll need Verilator and a fairly recent version of
 GHC (8.6.1 or later).
 
-On Ubuntu 20.04, you can simply do:
+On Ubuntu 20.04, we can simply do:
 
 ```sh
 > sudo apt install verilator ghc-8.6.5
 ```
 
-After cloning this repo, set the `BLARNEY_ROOT` environment variable to
-point to it, and add the `Scripts` directory to your `PATH`, e.g.
+After cloning this repo, we set the `BLARNEY_ROOT` environment
+variable to point to it, and add the `Scripts` directory to our
+`PATH`, e.g.
 
 ```sh
 > git clone https://github.com/blarney-lang/blarney
@@ -59,8 +60,8 @@ point to it, and add the `Scripts` directory to your `PATH`, e.g.
 > export PATH=$PATH:$BLARNEY_ROOT/Scripts
 ```
 
-You might like to set these environment variables in your `.bashrc`
-(or equivalent) for future logins.
+We can set these environment variables in our `.bashrc` (or
+equivalent) for future logins.
 
 ## Example 1: Two-sort
 
@@ -961,9 +962,9 @@ machine that runs code written a subset of Erlang.
 
 One of the classic limitations of Lava is that identifier names are
 lost when the netlist is generated.  In particular, this is
-problematic when you want to analyse, say, the critical-path of your
+problematic when we want to analyse, say, the critical-path of our
 circuit using a third-party tool, but there is no way to map the
-netlist names reported by the tool back to the Lava names in your
+netlist names reported by the tool back to the Lava names in the
 original description.
 
 Blarney provides a solution to this problem in the form of the [Namer
@@ -996,9 +997,9 @@ cabal install
 
 and then pass the `--enable-namer-plugin` flag to `blc`.
 
-To further improve the readability of generated code, you can also
+To further improve the readability of generated code, we can also
 pass the `--enable-name-prop` and `--enable-simplifier` options to
-your circuit generator.  This will enable the (experimental) name
+our circuit generator.  This will enable the (experimental) name
 propagation and netlist simplification passes respectively.
 
 ## Class 1: Bits
