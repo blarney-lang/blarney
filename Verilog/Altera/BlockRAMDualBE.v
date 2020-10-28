@@ -38,6 +38,7 @@ module BlockRAMDualBE (
   parameter DO_REG       = "UNREGISTERED"; // Or: "CLOCK0"
   parameter INIT_FILE    = "UNUSED";
   parameter DEV_FAMILY   = "Stratix V";
+  parameter STYLE        = "AUTO";
 
   input  CLK;
   input  [DATA_WIDTH-1:0] DI;
