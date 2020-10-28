@@ -104,5 +104,3 @@ module BlockRAMDualBE (
     altsyncram_component.width_byteena_a = BE_WIDTH,
     altsyncram_component.ram_block_type = STYLE;
 endmodule
-
-endmodule
