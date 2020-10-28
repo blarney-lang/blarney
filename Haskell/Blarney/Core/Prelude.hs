@@ -18,6 +18,7 @@ Stability   : experimental
 -}
 module Blarney.Core.Prelude
   ( tree1           -- Tree fold (for non-empty lists)
+  , treeM1          -- Monadic tree fold (for non-empty lists)
   , tree            -- Tree fold
   , orList          -- Bitwise-or tree
   , andList         -- Bitwise-and tree
