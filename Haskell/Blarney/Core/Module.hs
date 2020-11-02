@@ -63,7 +63,7 @@ module Blarney.Core.Module
     RegFile(..), makeRegFileInit, makeRegFile,
 
     -- * Other actions
-    finish, RTL.display, RTL.display_,
+    finish, RTL.display, RTL.display_, dynamicAssert,
 
     -- * External inputs and outputs
     input, inputBV, output, outputBV,
@@ -280,6 +280,13 @@ makeRegFile = M (liftM toRegFile RTL.makeRegFile)
 -- |Terminate simulator
 finish :: Action ()
 finish = A RTL.finish
+
+-- |Simulation-time assertion
+dynamicAssert :: Bit 1 -> String -> Action ()
+dynamicAssert cond str =
+  when (inv cond) do
+    RTL.display ("Assertion failed: " ++ str)
+    finish
 
 -- |Display statement
 instance a ~ () => RTL.Displayable (Action a) where

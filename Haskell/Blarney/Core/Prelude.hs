@@ -37,7 +37,6 @@ module Blarney.Core.Prelude
   , buffer          -- Generic register with don't care initialiser
   , old             -- Generic register with don't care initialiser
   , delayEn         -- Generic register with enable
-  , dynamicAssert   -- Simulation-time assertion
   ) where
 
 import Prelude
@@ -161,10 +160,3 @@ old = delay dontCare
 delayEn :: Bits a => a -> Bit 1 -> a -> a
 delayEn init en a =
   unpack (regEn (pack init) en (pack a))
-
--- |Simulation-time assertion
-dynamicAssert :: Bit 1 -> String -> Action ()
-dynamicAssert cond str =
-  when (inv cond) do
-    display ("Assertion failed: " ++ str)
-    finish
