@@ -63,7 +63,7 @@ module Blarney.Core.Module
     RegFile(..), makeRegFileInit, makeRegFile,
 
     -- * Other actions
-    finish, RTL.display, RTL.display_, dynamicAssert,
+    finish, RTL.display, RTL.display_, dynamicAssert, staticAssert,
 
     -- * External inputs and outputs
     input, inputBV, output, outputBV,
@@ -287,6 +287,11 @@ dynamicAssert cond str =
   when (inv cond) do
     RTL.display ("Assertion failed: " ++ str)
     finish
+
+-- |Elaboration-time assertion
+staticAssert :: Bool -> String -> Module ()
+staticAssert cond str =
+  if cond then return () else error ("Assertion failed: " ++ str)
 
 -- |Display statement
 instance a ~ () => RTL.Displayable (Action a) where

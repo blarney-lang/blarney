@@ -380,3 +380,33 @@ onBitList f x
   where
     list = unsafeToBitList x
     list' = f list
+
+-- | Similar to 'truncate' but width check done at elaboration time
+truncateCast :: (KnownNat n, KnownNat m) => Bit n -> Bit m
+truncateCast x
+  | wx >= wy = y
+  | otherwise = error "truncateCast: output larger than input"
+  where
+    y = unsafeSlice (wy-1, 0) x
+    wx = widthOf x
+    wy = widthOf y
+
+-- | Similar to 'zeroExtend' but width check done at elaboration time
+zeroExtendCast :: (KnownNat n, KnownNat m) => Bit n -> Bit m
+zeroExtendCast x
+  | wx <= wy = y
+  | otherwise = error "zeroExtendCast: input larger than output"
+  where
+    y = FromBV $ zeroExtendBV wy (toBV x)
+    wx = widthOf x
+    wy = widthOf y
+
+-- | Zero extend or truncate input to give output
+cast :: (KnownNat n, KnownNat m) => Bit n -> Bit m
+cast x = y
+  where
+    y = case wx >= wy of
+          True  -> unsafeSlice (wy-1, 0) x
+          False -> FromBV $ zeroExtendBV wy (toBV x)
+    wx = widthOf x
+    wy = widthOf y
