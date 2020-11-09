@@ -17,6 +17,7 @@ module Blarney.Stream
   ( Stream(..), Source(..)
   , toStream
   , nullStream
+  , guardStream
   , SP(..)
   , ToSP(..)
   ) where
@@ -35,6 +36,10 @@ toStream = toSource
 -- | Null stream
 nullStream :: Bits a => Stream a
 nullStream = nullSource
+
+-- | Apply a guard to a stream
+guardStream :: (a -> Bit 1) -> Stream a -> Stream a
+guardStream = guardSource
 
 -- | StreamProcessor type
 type SP t0 t1 = Stream t0 -> Module (Stream t1)

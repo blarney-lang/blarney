@@ -134,6 +134,10 @@ mapSink :: (b -> a) -- ^ The function to map over the initial 'Sink'. Note:
         -> Sink b   -- ^ The new 'Source'
 mapSink f snk = snk { put = \x -> (snk.put) (f x) }
 
+-- | Apply a guard to a source
+guardSource :: (a -> Bit 1) -> Source a -> Source a
+guardSource g s = s { canPeek = s.canPeek .&. g (s.peek) }
+
 -- | Wraps a 'Source' 't' with some debug info.
 debugSource :: (FShow t) => Source t -- ^ The 'Source' to debug
                          -> Format   -- ^ A 'Format' prefix
@@ -156,20 +160,3 @@ debugSink snk msg = Sink {
 , put = \x -> do (snk.put) x
                  display msg " - Sink put - " (fshow x)
 }
-
--- | Left-biased merge of two sources
-mergeTwoSources :: Bits a => Source a -> Source a -> Source a
-mergeTwoSources s0 s1 =
-  Source {
-    canPeek = s0.canPeek .|. s1.canPeek
-  , peek    = s0.canPeek ? (s0.peek, s1.peek)
-  , consume = if s0.canPeek then s0.consume else s1.consume
-  }
-
--- |Sequential left-biased merge of multiple sources
-mergeSourcesSeq :: Bits a => [Source a] -> Source a
-mergeSourcesSeq = foldr mergeTwoSources nullSource
-
--- |Tree merge of multiple sources, where each merge is left biased
-mergeSourcesTree :: Bits a => [Source a] -> Source a
-mergeSourcesTree = tree mergeTwoSources nullSource
