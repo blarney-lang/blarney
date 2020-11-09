@@ -74,13 +74,12 @@ returns the sorted pair.
 import Blarney
 
 twoSort :: (Bit 8, Bit 8) -> (Bit 8, Bit 8)
-twoSort (a, b) = if a .<. b then (a, b) else (b, a)
+twoSort (a, b) = a .<. b ? ((a, b), (b, a))
 ```
 
 This definition makes use of three Blarney constructs: the `Bit` type
 for bit vectors (parametised by the size of the vector); the unsigned
-comparison operator `.<.`; and an instance of Haskell's
-if-then-else operator for conditions of type `Bit 1`.
+comparison operator `.<.`; and the ternary conditional operator `?`.
 A quick test bench to check that it works:
 
 ```hs
@@ -209,24 +208,30 @@ values.  But if we look at the types of the primitive functions it
 uses, we can see that it actually has a more general type.
 
 ```hs
-(.<.)      :: Cmp a  => a -> a -> Bit 1
-ifThenElse :: Bits a => Bit 1 -> a -> a -> a
+(.<.) :: Cmp a  => a -> a -> Bit 1
+(?)   :: Bits a => Bit 1 -> (a, a) -> a
 ```
 
 So `.<.` can be used on any type in the
 [Cmp](http://mn416.github.io/blarney/Blarney-Core-Bit.html#t:Cmp)
-(comparator) class.  Similarly, the conditional can be used on any
-type in the [Bits](#class-1-bits) class (which allows packing to a bit
-vector and back again). So a more generic definition of `twoSort`
-would be:
+(comparator) class.  Similarly, `?` can be used on any type in the
+[Bits](#class-1-bits) class (which allows packing to a bit vector and
+back again). So a more generic definition of `twoSort` would be:
+
+```hs
+twoSort :: (Bits a, Cmp a) => (a, a) -> (a, a)
+twoSort (a, b) = a .<. b ? ((a, b), (b, a))
+```
+
+Indeed, this would be the type inferred by the Haskell compiler if no
+type signature was supplied.  Using Haskell's rebindable syntax, we
+can also use an if-then-else expression instead of the ternary
+conditional operator:
 
 ```hs
 twoSort :: (Bits a, Cmp a) => (a, a) -> (a, a)
 twoSort (a, b) = if a .<. b then (a, b) else (b, a)
 ```
-
-Indeed, this would be the type inferred by the Haskell compiler if no
-type signature was supplied.
 
 ## Example 4: Mutable registers
 
@@ -260,9 +265,9 @@ creates a register, initialised to the given value; `val` returns the
 value of a register; the `.` operator is defined by Blarney as
 *reverse function application* rather than the usual *function
 composition*; and `when` allows conditional actions to be introduced.
-In addition to `when`, we can also use `if`-`then`-`else` in an
-`Action` context.  For example, the final three lines above could have
-been written as:
+In addition to `when`, we can also use if-then-else in an `Action`
+context.  For example, the final three lines above could have been
+written as:
 
 ```hs
   -- Terminate simulation when count reaches 10
