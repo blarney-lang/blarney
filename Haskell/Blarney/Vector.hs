@@ -28,6 +28,7 @@ module Blarney.Vector (
   -- * 'Vec' constructors
 , Blarney.Vector.newVec
 , Blarney.Vector.genVec
+, Blarney.Vector.fromList
 , Blarney.Vector.replicate
 , Blarney.Vector.replicateM
 , Blarney.Vector.genWith
@@ -140,6 +141,13 @@ newVec = Vec (L.replicate (valueOf @n) undefined)
 -- | Generate a 'Vec' of size 'n' initialized with integers from '0' to 'n-1'
 genVec :: forall n. KnownNat n => Vec n Integer
 genVec = Vec (L.take (valueOf @n) [0..])
+
+-- | Convert a list to a vector, after  size check
+fromList :: forall n a. KnownNat n => [a] -> Vec n a
+fromList xs
+  | valueOf @n == length xs = Vec xs
+  | otherwise = error ("Blarney.Vector.fromList: " ++
+      "list size does not match vector size")
 
 -- | Generate a 'Vec' with each element initialized to the given value
 replicate :: forall n a. KnownNat n => a -> Vec n a
