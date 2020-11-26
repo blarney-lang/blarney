@@ -12,6 +12,8 @@ module Blarney.Backend (
   module Blarney.Backend.Verilog
 , writeVerilogModule
 , writeVerilogTop
+  -- * SMT2 backend
+, writeSMT2Script
 ) where
 
 import Prelude
@@ -23,6 +25,7 @@ import Blarney.Core.Module
 import Blarney.Netlist
 
 import Blarney.Backend.Verilog
+import Blarney.Backend.SMT2
 
 -- Verilog backend
 --------------------------------------------------------------------------------
@@ -57,3 +60,20 @@ writeVerilogTop mod modName dirName = do
   nl <- toNetlist mod
   let nl' = runDefaultNetlistPasses opts nl
   genVerilogTop nl' modName dirName
+
+-- SMT2 backend
+--------------------------------------------------------------------------------
+
+-- | This function generates an SMT2 script for the 'pred' Blarney predicate.
+--   The name of the generated SMT2 script is specified with 'scriptName' and
+--   the generated file is `'dirName'/'scriptName'.smt2`.
+writeSMT2Script :: Modular a
+                   => a      -- ^ Blarney predicate
+                   -> String -- ^ Script name
+                   -> String -- ^ Output directory
+                   -> IO ()
+writeSMT2Script pred scriptName dirName = do
+  (opts, _) <- getOpts
+  nl <- toNetlist $ makeModule pred
+  let nl' = runDefaultNetlistPasses opts nl
+  genSMT2Script nl' scriptName dirName
