@@ -13,14 +13,15 @@ module Blarney.Netlist.Passes.NetInline (
 ) where
 
 import Prelude
+import Data.STRef
 import Control.Monad
-import Data.IORef
+import Control.Monad.ST
 import Data.Array.MArray
 
 import Blarney.Netlist.Passes.Utils
 
 -- | Helper to inline a 'Net''s inputs
-netInputInline :: MNetlist -> NetCounts -> NetInput -> IO (NetInput, Bool)
+netInputInline :: MNetlist s -> NetCounts s -> NetInput -> ST s (NetInput, Bool)
 netInputInline mnl nc inpt@(InputWire (instId, _)) = do
   -- read ref count for our referenced 'Net'
   cnt <- readArray nc instId
@@ -40,11 +41,11 @@ netInputInline mnl nc (InputTree prim inpts) = do
   return $ (InputTree prim inpts', or changes)
 
 -- | Single reference 'Net' inlining pass
-singleRefNetInline :: MNetlistPass Bool
+singleRefNetInline :: MNetlistPass s Bool
 singleRefNetInline mnl = do
   refCounts <- countNetRef mnl -- reference count for each 'Net'
   pairs <- getAssocs mnl -- list of nets with their index
-  changed <- newIORef False -- keep track of modifications to the 'Netlist'
+  changed <- newSTRef False -- keep track of modifications to the 'Netlist'
   -- Inline each "inlinable" (that is with a supported combinational underlying
   -- primitive) 'Net'
   forM_ [(a,b) | x@(a, Just b) <- pairs, canInlineInput (netPrim b)] $
@@ -53,8 +54,8 @@ singleRefNetInline mnl = do
                                               (netInputs net)
       when (or changes) $ do -- on change, update 'Netlist' and keep track
         writeArray mnl idx (Just net { netInputs = netInputs' })
-        writeIORef changed True
+        writeSTRef changed True
   -- finish pass
-  -- DEBUG HELP -- x <- readIORef changed
+  -- DEBUG HELP -- x <- readSTRef changed
   -- DEBUG HELP -- putStrLn $ "netInputInline pass changed? " ++ show x
-  readIORef changed
+  readSTRef changed

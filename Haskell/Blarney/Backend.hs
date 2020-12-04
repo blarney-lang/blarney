@@ -18,14 +18,14 @@ import Prelude
 
 import Blarney.Core.Opts
 import Blarney.Core.Interface (Modular(..), makeModule)
-import Blarney.Core.Flatten (ToMNetlist(..))
+import Blarney.Core.Flatten (ToNetlist(..))
 import Blarney.Core.Module
 import Blarney.Netlist
 
+import Blarney.Backend.Verilog
+
 -- Verilog backend
 --------------------------------------------------------------------------------
-
-import Blarney.Backend.Verilog
 
 -- | This function generates Verilog for the 'mod' Blarney 'Modular a' function.
 --   The name of the generated Verilog module is specified with 'modName' and
@@ -37,9 +37,9 @@ writeVerilogModule :: Modular a
                    -> IO ()
 writeVerilogModule mod modName dirName = do
   (opts, _) <- getOpts
-  mnl <- toMNetlist $ makeModule mod
-  nl <- defaultNetlistPasses opts mnl
-  genVerilogModule nl modName dirName
+  nl <- toNetlist (makeModule mod)
+  let nl' = runDefaultNetlistPasses opts nl
+  genVerilogModule nl' modName dirName
 
 -- | This function is similar to 'writeVerilogModule' but also generates
 -- a verilator wrapper and Makefile.
@@ -54,6 +54,6 @@ writeVerilogTop :: Module () -- ^ Blarney function
                 -> IO ()
 writeVerilogTop mod modName dirName = do
   (opts, _) <- getOpts
-  mnl <- toMNetlist mod
-  nl <- defaultNetlistPasses opts mnl
-  genVerilogTop nl modName dirName
+  nl <- toNetlist mod
+  let nl' = runDefaultNetlistPasses opts nl
+  genVerilogTop nl' modName dirName

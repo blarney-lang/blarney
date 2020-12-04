@@ -11,7 +11,7 @@ module Blarney.Netlist.Passes.ZeroWidthNetIgnore (
 ) where
 
 import Prelude
-import Data.IORef
+import Data.STRef
 import Control.Monad
 import Data.Array.MArray
 
@@ -79,24 +79,24 @@ zeroWidthRootNetEliminationRule Net{ netPrim = prim } =
         outs = primOutputs prim
 
 -- | Ignore 0-width Nets pass
-zeroWidthNetIgnore :: MNetlistPass Bool
+zeroWidthNetIgnore :: MNetlistPass s Bool
 zeroWidthNetIgnore nl = do
   pairs <- getAssocs nl -- list of nets with their index
-  changed <- newIORef False -- keep track of modifications to the 'Netlist'
+  changed <- newSTRef False -- keep track of modifications to the 'Netlist'
   -- For each 'Net' (in particular, those with a non-zero-width output) with at
   -- least one zero-width input, transform it into a 'Net' with no reference to
   -- any zero-width output 'Net'.
   forM_ [(a,b) | x@(a, Just b) <- pairs] $ \(idx, net@Net{netPrim = prim}) -> do
     let (net', netChanged) = zeroWidthNetTransform net
     when netChanged $ do writeArray nl idx (Just net')
-                         writeIORef changed True
+                         writeSTRef changed True
   -- Remove each zero-width root 'Net'
   forM_ [ i | x@(i, Just n) <- pairs
             , zeroWidthRootNetEliminationRule n ] $ \idx -> do
     writeArray nl idx Nothing
-    writeIORef changed True
+    writeSTRef changed True
   -- finish pass
-  -- DEBUG HELP -- x <- readIORef changed
+  -- DEBUG HELP -- x <- readSTRef changed
   -- DEBUG HELP -- putStrLn $ "ignoreZeroWidthNet pass changed? " ++ show x
-  readIORef changed
+  readSTRef changed
 

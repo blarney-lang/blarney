@@ -1,3 +1,4 @@
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE NoRebindableSyntax #-}
 
 {-|
@@ -9,13 +10,15 @@ Stability   : experimental
 -}
 
 module Blarney.Netlist.Passes.Utils (
-  MNetlistPass   -- Type to capture a pass on a mutable netlist
+  MNetlist       -- 'MNetlist' type, mutable netlist
+, MNetlistPass   -- Type to capture a pass on a mutable netlist
 , netIsRoot
 , netDontKill
 , readNet
 , NetCounts
 , countNetRef
 , untilM
+, untilM_
 , module Blarney.Core.Net
 , module Blarney.Core.Prim
 ) where
@@ -23,13 +26,21 @@ module Blarney.Netlist.Passes.Utils (
 import Prelude
 import Data.Maybe
 import Control.Monad
-import Data.Array.IO
+import Control.Monad.ST
+import Data.Array.ST
 
 import Blarney.Core.Net
 import Blarney.Core.Prim
 
--- | A Pass type
-type MNetlistPass a = MNetlist -> IO a
+-- | A helper type for mutable 'Netlist'
+type MNetlist s = STArray s InstId (Maybe Net)
+
+-- | A type for running a pass over an 'MNetlist'
+type MNetlistPass s a = MNetlist s -> ST s a
+
+--instance Monad (MNetlistPass s) where
+--  a >>= f = \mnl -> do x <- a mnl
+--                       f x mnl
 
 -- | A helper function to tell if a 'Net' is a netlist root
 netIsRoot :: Net -> Bool
@@ -40,16 +51,15 @@ netDontKill :: Net -> Bool
 netDontKill Net{netPrim=prim} = primDontKill prim
 
 -- | A helper function to read a 'Net' from a 'MNetlist'
---readNet :: MNetlist -> InstId -> IO Net
-readNet :: InstId -> MNetlistPass Net
+readNet :: InstId -> MNetlistPass s Net
 readNet instId mnl = fromMaybe (error "encountered InstId with no matching Net")
                                <$> (readArray mnl instId)
 
 -- | A helper type for 'Net' reference counting
-type NetCounts = IOUArray InstId Int
+type NetCounts s = STUArray s InstId Int
 
 -- | A 'Net' reference counting helper function
-countNetRef :: MNetlistPass NetCounts
+countNetRef :: MNetlistPass s (NetCounts s)
 countNetRef mnl = do
   bounds <- getBounds mnl
   refCounts <- newArray bounds 0
@@ -67,3 +77,8 @@ countNetRef mnl = do
 untilM :: Monad m => (a -> Bool) -> m a -> m a
 untilM pred act =
   act >>= \x -> if pred x then return x else untilM pred act
+
+-- | Same as 'untilM' but discard the final result
+untilM_ :: Monad m => (a -> Bool) -> m a -> m ()
+untilM_ pred act = do untilM pred act
+                      return ()

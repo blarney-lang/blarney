@@ -12,13 +12,12 @@ Stability   : experimental
 -}
 
 module Blarney.Core.Flatten (
-  Flatten(..) -- Monad for flattening a circuit (BV) to a netlist
-, doIO        -- Lift an IO computation to a Flatten computation
-, freshInstId -- Obtain a fresh instance id
-, addNet      -- Add a net to the netlist
-, flatten     -- Flatten a bit vector to a netlist
-, ToMNetlist(..)
-, toNetlist
+  Flatten(..)   -- Monad for flattening a circuit (BV) to a netlist
+, doIO          -- Lift an IO computation to a Flatten computation
+, freshInstId   -- Obtain a fresh instance id
+, addNet        -- Add a net to the netlist
+, flatten       -- Flatten a bit vector to a netlist
+, ToNetlist(..) -- Class of types that can be turned into 'Netlist's
 ) where
 
 import Prelude
@@ -109,17 +108,17 @@ flatten bv@BV{bvNameHints=hints,bvInstRef=instRef} = do
     Just instId -> do when hasNameHints $ addNameHints (instId, hints)
                       return $ InputWire (instId, bvOutput bv)
 
-class ToMNetlist a where
-  toMNetlist :: a -> IO MNetlist
+class ToNetlist a where
+  toNetlist :: a -> IO Netlist
 
 -- | Convert RTL monad to a netlist
-instance ToMNetlist (RTL ()) where
-  toMNetlist rtl = do
+instance ToNetlist (RTL ()) where
+  toNetlist rtl = do
     -- flatten BVs into a Netlist
     i <- newIORef (0 :: InstId)
     ((nl, nms, undo), _) <- runFlatten flattenRoots i
     maxId <- readIORef i
-    mnl :: MNetlist <-
+    mnl :: IOArray InstId (Maybe Net) <-
       thaw $ listArray (0, maxId) (replicate (maxId+1) Nothing)
           // [(netInstId n, Just n) | n <- JL.toList nl]
     -- update netlist with gathered names
@@ -132,7 +131,7 @@ instance ToMNetlist (RTL ()) where
     -- run undo computations
     undo
     -- return final netlist
-    return mnl
+    freeze mnl
     ------------------------
     where
       (_, actsJL, _) = runRTL rtl (R { nameHints = mempty
@@ -143,8 +142,5 @@ instance ToMNetlist (RTL ()) where
       flattenRoots = mapM flatten (concat [rts | RTLRoots rts <- acts])
 
 -- | Convert Module monad to a netlist
-instance ToMNetlist (Module ()) where
-  toMNetlist = toMNetlist . runModule
-
-toNetlist :: ToMNetlist a => a -> IO Netlist
-toNetlist x = toMNetlist x >>= freeze
+instance ToNetlist (Module ()) where
+  toNetlist = toNetlist . runModule
