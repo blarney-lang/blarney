@@ -1,5 +1,4 @@
 {-# LANGUAGE RankNTypes #-}
---{-# LANGUAGE NoTypeFamilies #-}
 
 {-|
 Module      : Blarney.Netlist.Passes
@@ -45,7 +44,7 @@ import Blarney.Netlist.Passes.DeadNetEliminate
 --------------------------------------------------------------------------------
 
 -- | Wrap a custom pass with the mandatory netlist transformation passes
-wrapWithMandatoryNetlistPasses :: MNetlistPass s _ -> MNetlistPass s ()
+wrapWithMandatoryNetlistPasses :: MNetlistPass s a -> MNetlistPass s ()
 wrapWithMandatoryNetlistPasses customPass mnl = do
   -- remove 'Bit 0' instances
   zeroWidthNetIgnore mnl
@@ -66,7 +65,7 @@ optionalNetlistPasses opts mnl = do
   when (optEnableNamePropagation opts) $ namePropagate mnl
 
 -- | Run an 'MNetlistPass' on a 'Netlist' and return the resulting 'Netlist'
-runNetlistPass :: (forall s. MNetlistPass s _) -> Netlist -> Netlist
+runNetlistPass :: (forall s. MNetlistPass s a) -> Netlist -> Netlist
 runNetlistPass pass netlist = runST m
   where m :: ST s Netlist
         m = do -- get a mutable netlist
@@ -79,5 +78,5 @@ runNetlistPass pass netlist = runST m
 -- | Run the default set of netlist passes
 runDefaultNetlistPasses :: Opts -> Netlist -> Netlist
 runDefaultNetlistPasses opts netlist = runNetlistPass pass netlist
-  where pass :: MNetlistPass s _
+  where pass :: MNetlistPass s ()
         pass = wrapWithMandatoryNetlistPasses $ optionalNetlistPasses opts
