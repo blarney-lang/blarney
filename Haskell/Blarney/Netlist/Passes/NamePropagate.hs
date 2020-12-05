@@ -13,17 +13,18 @@ module Blarney.Netlist.Passes.NamePropagate (
 ) where
 
 import Prelude
-import Data.Array.IO
+import Data.Array.ST
 import Control.Monad
+import Control.Monad.ST
 import Data.Set (insert, toList)
 
 import Blarney.Netlist.Passes.Utils
 
 -- | propagate names through the Netlist
-namePropagate :: MNetlist -> IO ()
+namePropagate :: forall s. MNetlistPass s ()
 namePropagate mnl = do
   bounds <- getBounds mnl
-  visited :: IOUArray InstId Bool <- newArray bounds False
+  visited :: STUArray s InstId Bool <- newArray bounds False
   -- Push destination name down through netlist
   let visit destName instId = do
         isVisited <- readArray visited instId

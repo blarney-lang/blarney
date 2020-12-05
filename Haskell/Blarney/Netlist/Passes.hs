@@ -1,3 +1,5 @@
+{-# LANGUAGE RankNTypes #-}
+
 {-|
 Module      : Blarney.Netlist.Passes
 Description : Blarney netlist passes
@@ -7,9 +9,10 @@ Stability   : experimental
 -}
 
 module Blarney.Netlist.Passes (
-  mandatoryNetlistPasses
+  runNetlistPass
+, runDefaultNetlistPasses
+, wrapWithMandatoryNetlistPasses
 , optionalNetlistPasses
-, defaultNetlistPasses
 , module Blarney.Netlist.Passes.Utils
 , module Blarney.Netlist.Passes.ZeroWidthNetIgnore
 , module Blarney.Netlist.Passes.ConstantFold
@@ -22,7 +25,10 @@ module Blarney.Netlist.Passes (
 
 import Prelude
 import Control.Monad
-import Data.Array.MArray (freeze)
+import Control.Monad.ST
+import Data.Array.MArray (newArray, thaw, freeze)
+
+import Data.STRef
 
 import Blarney.Core.Opts
 import Blarney.Netlist.Passes.Utils
@@ -37,22 +43,19 @@ import Blarney.Netlist.Passes.DeadNetEliminate
 -- Netlist transformation passes
 --------------------------------------------------------------------------------
 
--- | Run mandatory set of netlist transformation passes and a (potentially
---   empty) custom pass
-mandatoryNetlistPasses :: MNetlistPass _ -> MNetlistPass Netlist
-mandatoryNetlistPasses customPass mnl = do
+-- | Wrap a custom pass with the mandatory netlist transformation passes
+wrapWithMandatoryNetlistPasses :: MNetlistPass s a -> MNetlistPass s ()
+wrapWithMandatoryNetlistPasses customPass mnl = do
   -- remove 'Bit 0' instances
   zeroWidthNetIgnore mnl
   -- run custom netlist pass
   customPass mnl
   -- eliminate 'Net' entries in the netlist for 'Net's that are no longer
   -- referenced
-  untilM not $ deadNetEliminate mnl
-  -- turn the final netlist immutable
-  freeze mnl
+  untilM_ not $ deadNetEliminate mnl
 
--- | Netlist pass combining optional passes
-optionalNetlistPasses :: Opts -> MNetlistPass ()
+---- | Netlist pass combining optional passes
+optionalNetlistPasses :: Opts -> MNetlistPass s ()
 optionalNetlistPasses opts mnl = do
   -- netlist optimisation passes
   when (optEnableSimplifier opts) do constantEliminate mnl
@@ -61,6 +64,19 @@ optionalNetlistPasses opts mnl = do
   -- propagates existing names through the netlist
   when (optEnableNamePropagation opts) $ namePropagate mnl
 
--- | The default set of netlist passes
-defaultNetlistPasses :: Opts -> MNetlistPass Netlist
-defaultNetlistPasses opts = mandatoryNetlistPasses $ optionalNetlistPasses opts
+-- | Run an 'MNetlistPass' on a 'Netlist' and return the resulting 'Netlist'
+runNetlistPass :: (forall s. MNetlistPass s a) -> Netlist -> Netlist
+runNetlistPass pass netlist = runST m
+  where m :: ST s Netlist
+        m = do -- get a mutable netlist
+               mnl <- thaw netlist
+               -- apply netlist transformations
+               pass mnl
+               -- return transformed netlist as immutable
+               freeze mnl
+
+-- | Run the default set of netlist passes
+runDefaultNetlistPasses :: Opts -> Netlist -> Netlist
+runDefaultNetlistPasses opts netlist = runNetlistPass pass netlist
+  where pass :: MNetlistPass s ()
+        pass = wrapWithMandatoryNetlistPasses $ optionalNetlistPasses opts

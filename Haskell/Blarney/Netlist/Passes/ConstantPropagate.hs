@@ -11,17 +11,17 @@ module Blarney.Netlist.Passes.ConstantPropagate (
 ) where
 
 import Prelude
-import Data.IORef
+import Data.STRef
 import Control.Monad
 import Data.Array.MArray
 
 import Blarney.Netlist.Passes.Utils
 
 -- | Constant propagation pass
-constantPropagate :: MNetlistPass Bool
+constantPropagate :: MNetlistPass s Bool
 constantPropagate mnl = do
   pairs <- getAssocs mnl -- list of nets with their index
-  changed <- newIORef False -- keep track of modifications to the 'Netlist'
+  changed <- newSTRef False -- keep track of modifications to the 'Netlist'
   -- Turn constant 'InputWire' for each 'Net' into constant 'InputTree'
   forM_ [(a, b) | x@(a, Just b) <- pairs] $ \(idx, net) -> do
     -- process each 'NetInput' for the current 'Net'
@@ -31,14 +31,14 @@ constantPropagate mnl = do
           inptNet <- readNet instId mnl
           -- keep track of change when transforming into an 'InputTree'
           case netPrim inptNet of
-            p@(Const _ _)  -> writeIORef changed True >> return (InputTree p [])
-            p@(DontCare _) -> writeIORef changed True >> return (InputTree p [])
+            p@(Const _ _)  -> writeSTRef changed True >> return (InputTree p [])
+            p@(DontCare _) -> writeSTRef changed True >> return (InputTree p [])
             _              -> return inpt
         _ -> return inpt
     -- update the current 'Net' in the 'Netlist'
     writeArray mnl idx (Just net { netInputs = inputs' })
   -- finish pass
-  -- DEBUG HELP -- x <- readIORef changed
+  -- DEBUG HELP -- x <- readSTRef changed
   -- DEBUG HELP -- putStrLn $ "propagateConstant pass changed? " ++ show x
-  readIORef changed
+  readSTRef changed
 

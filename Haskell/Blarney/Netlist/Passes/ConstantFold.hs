@@ -14,7 +14,7 @@ module Blarney.Netlist.Passes.ConstantFold (
 ) where
 
 import Prelude
-import Data.IORef
+import Data.STRef
 import Control.Monad
 import Data.Array.MArray
 import qualified Data.Bits as B
@@ -152,17 +152,17 @@ evalConstNet n@Net{ netPrim = Identity w, netInputs = [Lit a0] } =
 evalConstNet n = (n, False)
 
 -- | Constant folding pass
-constantFold :: MNetlistPass Bool
+constantFold :: MNetlistPass s Bool
 constantFold nl = do
   pairs <- getAssocs nl -- list of nets with their index
-  changed <- newIORef False -- keep track of modifications to the 'Netlist'
+  changed <- newSTRef False -- keep track of modifications to the 'Netlist'
   -- Evaluate each constant 'Net' and update it in the 'Netlist'
   forM_ [(a, b) | x@(a, Just b) <- pairs] $ \(idx, net) -> do
     let (net', change) = evalConstNet net
-    when change $ do writeIORef changed True -- keep track of changes
+    when change $ do writeSTRef changed True -- keep track of changes
                      writeArray nl idx $ Just net' -- update 'Netlist'
   -- finish pass
-  -- DEBUG HELP -- x <- readIORef changed
+  -- DEBUG HELP -- x <- readSTRef changed
   -- DEBUG HELP -- putStrLn $ "foldConstant pass changed? " ++ show x
-  readIORef changed -- return whether a change occured
+  readSTRef changed -- return whether a change occured
 

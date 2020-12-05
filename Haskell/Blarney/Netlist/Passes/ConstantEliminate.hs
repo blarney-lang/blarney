@@ -17,7 +17,7 @@ import Blarney.Netlist.Passes.ConstantFold
 import Blarney.Netlist.Passes.ConstantPropagate
 
 -- | A constant elimination pass
-constantEliminate :: MNetlistPass ()
+constantEliminate :: MNetlistPass s ()
 constantEliminate mnl = untilM not constElim >> return ()
                         where constElim = do a <- constantFold mnl
                                              b <- constantPropagate mnl

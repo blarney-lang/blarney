@@ -20,14 +20,12 @@ module Blarney.Core.Net (
   Net(..)        -- 'Net' type to represent 'Netlist' nodes
 , WireId         -- 'WireId' type to uniquely identify wires
 , NetInput(..)   -- 'NetInput' type to represent inputs to 'Net's
-, MNetlist       -- 'MNetlist' type, mutable netlist
 , Netlist        -- 'Netlist' type to represent a circuit
 ) where
 
 import Prelude
 import Data.Maybe
 import Data.Array
-import Data.Array.IO
 
 import Blarney.Core.Prim
 
@@ -55,9 +53,6 @@ type WireId = (InstId, OutputName)
 data NetInput = InputWire WireId
               | InputTree Prim [NetInput]
               deriving Show
-
--- | A helper type for mutable 'Netlist'
-type MNetlist = IOArray InstId (Maybe Net)
 
 -- | A 'Netlist', represented as an 'Array InstId (Maybe Net)'
 type Netlist = Array InstId (Maybe Net)
