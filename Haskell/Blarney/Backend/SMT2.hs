@@ -195,17 +195,6 @@ withLetBindings nl (idx:idxs) doc =
 -- topological stort of a netlist
 --------------------------------------------------------------------------------
 
-data STList s idx elem = STList { headPtr :: STRef s idx
-                                , elemArr :: STArray s idx elem }
-newSTList :: Ix idx => (idx, idx) -> elem -> ST s (STList s idx elem)
-newSTList (lo, hi) e = do ptr <- newSTRef lo
-                          arr <- newArray (lo, hi) e
-                          return STList { headPtr = ptr, elemArr = arr }
-stListCons :: (Num idx, Ix idx) => elem -> STList s idx elem -> ST s ()
-stListCons e lst = do i <- readSTRef (headPtr lst)
-                      writeArray (elemArr lst) i e
-                      writeSTRef (headPtr lst) (i + 1)
-
 data Mark = Unmarked | Temporary | Permanent
 
 topologicalSort :: Netlist -> Net -> [InstId]
@@ -213,14 +202,14 @@ topologicalSort nl root = runST do
   -- initialise a mutable array to track visit through the netlist
   visited <- newArray (bounds nl) Unmarked
   -- initialise a mutable list to build the sorted return list
-  sorted  <- newSTList (bounds nl) Nothing
+  sorted  <- newSTRef []
   -- run the internal topological sort
   topoSort visited sorted $ netInstId root
-  -- return the sorted list as a list of InstIds
-  catMaybes <$> (getElems $ elemArr sorted)
+  -- return the sorted list of InstIds
+  reverse <$> readSTRef sorted
   -- helpers
   where topoSort :: STArray s InstId Mark
-                 -> STList s Int (Maybe InstId)
+                 -> STRef s [InstId]
                  -> InstId
                  -> ST s ()
         topoSort visited sorted netId = do
@@ -242,7 +231,7 @@ topologicalSort nl root = runST do
                                           (netInputs $ getNet nl netId)
               mapM_ (topoSort visited sorted) allInputIds
               writeArray visited netId Permanent
-              Just netId `stListCons` sorted
+              modifySTRef sorted (\ids -> netId:ids)
 
 -- generate NetSMT2
 --------------------------------------------------------------------------------
