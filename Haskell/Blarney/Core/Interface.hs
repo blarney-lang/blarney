@@ -54,6 +54,7 @@ import Blarney.Core.Bits
 import Blarney.Core.Prim
 import Blarney.Core.Module
 import Blarney.Core.Prelude
+import qualified Blarney.Core.RTL as RTL
 
 -- Interface term representation
 data IfcTerm =
@@ -357,18 +358,29 @@ class Modular a where
   makeMod :: Int -> a -> Declare ()
   makeInst :: String -> [Param] -> Int -> Declare () -> a
 
-instance Interface a => Modular (Module a) where
+-- Specific base case 
+instance {-# OVERLAPPING #-} Interface a => Modular (Module a) where
   makeMod count m =
     liftModule m >>= declareOutput "out"
   makeInst s ps count m =
-    instantiate s ps (m >> declareInput "out")
+    instantiate s ps True (m >> declareInput "out")
 
-instance (Interface a, Modular m) => Modular (a -> m) where
+-- Specific recursive case
+instance {-# OVERLAPPING #-} (Interface a, Modular m) => Modular (a -> m) where
   makeMod count f = do
     a <- declareInput ("in" ++ show count)
     makeMod (count+1) (f a)
   makeInst s ps count m = \a ->
     makeInst s ps (count+1) (m >> declareOutput ("in" ++ show count) a)
+
+-- General base case (pure function)
+instance {-# OVERLAPPABLE #-} Interface a => Modular a where
+  makeMod count out = declareOutput "out" out
+  makeInst s ps count m =
+      runPureModule mod $ "Interface.makeInstance: Actions not allowed "
+                       ++ "in a pure function interface"
+    where
+      mod = instantiate s ps False (m >> declareInput "out")
 
 -- Realise declarations to give standalone module
 modularise :: Declare a -> Module a
@@ -385,10 +397,10 @@ modularise ifc = noName mdo
       return $ zip (map fst inputs) tmps
 
 -- Realise declarations to give module instance
-instantiate :: String -> [Param] -> Declare a -> Module a
-instantiate name params ifc = noName mdo
+instantiate :: String -> [Param] -> Bool -> Declare a -> Module a
+instantiate name params doAddRoots ifc = noName mdo
     (_, w, a) <- runDeclare ifc 0 [] (custom w)
-    addRoots [x | (DeclOutput s x) <- w]
+    addRoots [x | DeclOutput s x <- w, doAddRoots]
     return a
   where
     custom w =

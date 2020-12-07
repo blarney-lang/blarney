@@ -69,7 +69,10 @@ module Blarney.Core.Module
     input, inputBV, output, outputBV,
 
     -- * Add a 'BV' as a netlist root
-    addRoots
+    addRoots,
+
+    -- * Run a pure module
+    runPureModule
   ) where
 
 -- Blarney imports
@@ -81,6 +84,7 @@ import Blarney.Core.FShow
 import Blarney.Core.Prelude
 import Blarney.Core.IfThenElse
 import qualified Blarney.Core.RTL as RTL
+import qualified Blarney.Core.JList as JL
 
 -- Standard imports
 import Prelude
@@ -300,3 +304,13 @@ instance a ~ () => RTL.Displayable (Action a) where
 -- |Add roots
 addRoots :: [BV] -> Module ()
 addRoots roots = M (RTL.addRoots roots)
+
+-- | Run a pure module, i.e. a module that has no side effects.
+-- If the module has side effects, raise an error.
+runPureModule :: Module a -> String -> a
+runPureModule mod errStr
+  | null (JL.toList w) && s == 0 = a
+  | otherwise = error errStr
+  where
+    r = RTL.R { nameHints = mempty, cond = 0, assigns = mempty}
+    (s, w, a) = RTL.runRTL (runModule mod) r 0
