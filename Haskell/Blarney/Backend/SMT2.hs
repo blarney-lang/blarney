@@ -231,7 +231,7 @@ topologicalSort nl root = runST do
                                           (netInputs $ getNet nl netId)
               mapM_ (topoSort visited sorted) allInputIds
               writeArray visited netId Permanent
-              modifySTRef sorted (\ids -> netId:ids)
+              modifySTRef' sorted (\ids -> netId:ids)
 
 -- generate NetSMT2
 --------------------------------------------------------------------------------
