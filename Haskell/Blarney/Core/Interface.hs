@@ -376,9 +376,8 @@ instance {-# OVERLAPPING #-} (Interface a, Modular m) => Modular (a -> m) where
 -- General base case (pure function)
 instance {-# OVERLAPPABLE #-} Interface a => Modular a where
   makeMod count out = declareOutput "out" out
-  makeInst s ps count m =
-      runPureModule mod $ "Interface.makeInstance: Actions not allowed "
-                       ++ "in a pure function interface"
+  makeInst s ps count m = runPureModule mod
+      "Interface.makeInstance: function must be in the Module monad, or pure"
     where
       mod = instantiate s ps False (m >> declareInput "out")
 
