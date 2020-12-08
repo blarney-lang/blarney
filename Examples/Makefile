@@ -8,6 +8,7 @@ top:
 
 .PHONY: clean
 clean:
+	make -C Adder clean
 	make -C Background clean
 	make -C BasicRTL clean
 	make -C Bit0 clean
@@ -26,6 +27,7 @@ clean:
 	make -C OptionExample clean
 	make -C Queue clean
 	make -C RAM clean
+	make -C Sklansky clean
 	make -C Sorter clean
 	make -C SourceSinkStream clean
 	make -C Stack clean
