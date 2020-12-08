@@ -410,4 +410,5 @@ makeRegFile = makeRegFileInit ""
 
 -- |Add netlist roots
 addRoots :: [BV] -> RTL ()
+addRoots [] = return ()
 addRoots roots = write (RTLRoots roots)
