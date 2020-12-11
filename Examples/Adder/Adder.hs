@@ -37,16 +37,28 @@ doom_adder x y = fromBitList $ listAdder 1 (toBitList x) (toBitList y)
 prop_add :: KnownNat n => (Bit n -> Bit n -> Bit n) -> Bit n -> Bit n -> Bit 1
 prop_add adder_imp x y = adder_imp x y .==. x + y
 
+--------------------------------------------------------------------------------
+
+-- | Sequential full adder
+adderSeq x y = res
+  where c_in = delay 0 c_out
+        res@(c_out, _) = fullAdder x y c_in
+-- | prop
+prop_addSeq x y = adderSeq x y === adderSeq x y
+
+--------------------------------------------------------------------------------
+
 main :: IO ()
 main = do
   -- path to script output directory
   cwd <- getCurrentDirectory
   let smtDir = cwd ++ "/Adder-SMT2/"
   -- generate smt2 scripts
-  writeSMT2Script (prop_add @2  adder)      "goodAdder2"    smtDir
-  writeSMT2Script (prop_add @16 adder)      "goodAdder16"   smtDir
-  writeSMT2Script (prop_add @2  doom_adder) "brokenAdder2"  smtDir
-  writeSMT2Script (prop_add @16 doom_adder) "brokenAdder16" smtDir
+  --writeSMT2Script (prop_add @2  adder)      "goodAdder2"    smtDir
+  --writeSMT2Script (prop_add @16 adder)      "goodAdder16"   smtDir
+  --writeSMT2Script (prop_add @2  doom_adder) "brokenAdder2"  smtDir
+  --writeSMT2Script (prop_add @16 doom_adder) "brokenAdder16" smtDir
+  writeSMT2Script (prop_addSeq) "addSeq" smtDir
   -- helper usage message
   putStrLn $ "SMT2 scripts generated under " ++ smtDir
   putStrLn $ "Run an SMT solver such as z3 with an SMT2 script as input:"
