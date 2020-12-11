@@ -43,8 +43,12 @@ prop_add adder_imp x y = adder_imp x y .==. x + y
 adderSeq x y = res
   where c_in = delay 0 c_out
         res@(c_out, _) = fullAdder x y c_in
+doom_adderSeq x y = res
+  where c_in = delay 0 s
+        res@(c_out, s) = fullAdder x y c_in
 -- | prop
 prop_addSeq x y = adderSeq x y === adderSeq x y
+prop_brokenAddSeq x y = adderSeq x y === doom_adderSeq x y
 
 --------------------------------------------------------------------------------
 
@@ -54,11 +58,12 @@ main = do
   cwd <- getCurrentDirectory
   let smtDir = cwd ++ "/Adder-SMT2/"
   -- generate smt2 scripts
-  --writeSMT2Script (prop_add @2  adder)      "goodAdder2"    smtDir
-  --writeSMT2Script (prop_add @16 adder)      "goodAdder16"   smtDir
-  --writeSMT2Script (prop_add @2  doom_adder) "brokenAdder2"  smtDir
-  --writeSMT2Script (prop_add @16 doom_adder) "brokenAdder16" smtDir
-  writeSMT2Script (prop_addSeq) "addSeq" smtDir
+  writeSMT2Script (prop_add @2  adder)      "goodAdder2"    smtDir
+  writeSMT2Script (prop_add @16 adder)      "goodAdder16"   smtDir
+  writeSMT2Script (prop_add @2  doom_adder) "brokenAdder2"  smtDir
+  writeSMT2Script (prop_add @16 doom_adder) "brokenAdder16" smtDir
+  writeSMT2Script (prop_addSeq)       "goodAddSeq"   smtDir
+  writeSMT2Script (prop_brokenAddSeq) "brokenAddSeq" smtDir
   -- helper usage message
   putStrLn $ "SMT2 scripts generated under " ++ smtDir
   putStrLn $ "Run an SMT solver such as z3 with an SMT2 script as input:"

@@ -51,12 +51,7 @@ genSMT2Script nl nm dir =
 --------------------------------------------------------------------------------
 
 showSMT2Script :: String -> Netlist -> Doc
-showSMT2Script nm nl =
-      char ';' <+> text (replicate 78 '-')
-  $+$ sep (catMaybes $ map defineNode netSMT2s)
-  $+$ text "; satisfiability checking"
-  $+$ char ';' <+> text (replicate 78 '-')
-  $+$ sep (catMaybes $ map checkNode netSMT2s)
+showSMT2Script nm nl = sep (catMaybes $ map defineNode netSMT2s)
   where nets = catMaybes $ elems nl
         netSMT2s = map (genNetSMT2 nl) [ n | n <- nets, case netPrim n of
                                                           --Input      _ _ -> True
@@ -78,9 +73,6 @@ showBVHexLit :: Integer -> Doc
 showBVHexLit n = text "#x" <> showHex n
 showBVBinLit :: Integer -> Doc
 showBVBinLit n = text "#b" <> showBin n
-showBVSizedDecLit :: Int -> Int -> Doc
-showBVSizedDecLit w n =
-  parens (parens (char '_' <+> text "int2bv" <+> int w) <+> int n)
 showBVSlice :: Int-> Int-> Doc -> Doc
 showBVSlice hi lo bv =
   parens $ (parens $ char '_' <+> text "extract" <+> int hi <+> int lo) <+> bv
@@ -97,6 +89,10 @@ genName hints
                       prefx  = intercalate "_" prefxs
                       root   = intercalate "_" roots
                       sufx   = intercalate "_" sufxs
+
+int2bv :: Int -> Integer -> Doc
+int2bv w n =
+  parens $ parens (char '_' <+> text "int2bv" <+> int w) <+> int (fromInteger n)
 bvIsFalse :: Doc -> Doc
 bvIsFalse doc = parens $ text "=" <+> doc <+> text "#b0"
 bvIsTrue :: Doc -> Doc
@@ -105,10 +101,27 @@ bv2Bool :: Doc -> Doc
 bv2Bool = bvIsTrue
 bool2BV :: Doc -> Doc
 bool2BV doc = parens $ text "ite" <+> doc <+> text "#b1" <+> text "#b0"
+parenList :: [(Doc, Doc)] -> Doc
+parenList = parens . sep . map (\(v, s) -> parens $ sep [v, s])
+-- binders
+quantify :: Doc -> [(Doc, Doc)] -> Doc -> Doc
+quantify _ [] doc = doc
+quantify q xs doc = parens $ sep [ q, parenList xs, doc ]
 univQuant :: [(Doc, Doc)] -> Doc -> Doc
-univQuant [] doc = doc
-univQuant xs doc = parens $ sep [ text "forall", vars, doc ]
-  where vars = parens $ sep $ map (\(v, s) -> parens $ v <+> s) xs
+univQuant = quantify $ text "forall"
+existQuant :: [(Doc, Doc)] -> Doc -> Doc
+existQuant = quantify $ text "exists"
+letBind :: [(Doc, Doc)] -> Doc -> Doc
+letBind [] doc = doc
+letBind ((lhs, rhs):xs) doc =
+  parens $  text "let" <+> parens (parens (sep [lhs, rhs]))
+         $$ nest (-1) (letBind xs doc)
+matchBind :: Doc -> [(Doc, Doc)] -> Doc
+matchBind doc [] = doc
+matchBind doc matches = parens $ sep [ text "match", doc, parenList matches ]
+parBind :: [Doc] -> Doc -> Doc
+parBind [] doc = doc
+parBind params doc = parens $ text "par" <+> sep [ parens (sep params), doc ]
 
 -- advanced internal helpers (rely on the netlist to lookup information)
 --------------------------------------------------------------------------------
@@ -124,7 +137,7 @@ showNet nl instId = showPrim nl (netPrim net) (netInputs net)
   where net = getNet nl instId
 
 showPrim :: Netlist -> Prim -> [NetInput] -> Doc
-showPrim nl (Const w n) [] = showBVSizedDecLit w (fromInteger n)
+showPrim nl (Const w n) [] = int2bv w n
 showPrim nl (DontCare w) [] = parens $  text "exists ((x " <> showBVSort w <> text ")) (x)"
 showPrim nl (Add _) ins = parens $ text "bvadd" <+> sep (map (showNetInput nl) ins)
 showPrim nl (Sub _) ins = parens $ text "bvsub" <+> sep (map (showNetInput nl) ins)
@@ -144,7 +157,7 @@ showPrim nl (LessThan _) ins = parens $ text "bvult" <+> sep (map (showNetInput 
 showPrim nl (LessThanEq _) ins = parens $ text "bvule" <+> sep (map (showNetInput nl) ins)
 showPrim nl (ReplicateBit w) [e0] = parens $ text "concat" <+> sep (map (showNetInput nl) $ replicate w e0) -- XXX check that we only ever get single bit inputs
 showPrim nl (ZeroExtend iw ow) [e0] =
-  parens $ text "concat" <+> showBVSizedDecLit (ow - iw) 0 <+> showNetInput nl e0
+  parens $ text "concat" <+> int2bv (ow - iw) 0 <+> showNetInput nl e0
 showPrim nl (SignExtend iw ow) [e0] = -- XX TODO could benefit from using a let quantifier for the sign bit?
   parens $ text "concat" <+> sep (replicate (ow - iw) sgn) <+> inpt
   where sgn = showBVSlice msb_idx msb_idx inpt
@@ -217,60 +230,117 @@ showAssertNode nl n@Net { netPrim = Register _ _, netInputs = [e0] } =
         assertExpr = bvIsFalse $ showNetInput nl e0
 showAssertNode _ n = error $ "SMT2 backend error: cannot showAssertNode on'" ++ show n ++ "'"
 
-showDeclareDatatype :: Netlist -> [InstId] -> String -> Doc
-showDeclareDatatype nl netIds nm =
-  parens $ sep [ text "declare-datatype", dtName, parens dtCons ]
-  where dtName = char 'T' <> text nm
-        dtCons = parens $ sep $ (text "newT" <> text nm) : (map mkField netIds)
-        mkField nId = let wId = (nId, Nothing)
-                      in parens $ showWire nl wId <+> showSort nl wId
+showDeclareRecordType :: Doc -> [Doc] -> [(Doc, Doc)] -> Doc
+showDeclareRecordType dtName dtParams dtFields =
+  parens $ sep [ text "declare-datatype", dtName, dtDef ]
+  where dtDef = parBind dtParams $ parens dtCons
+        dtCons = parens $ sep $ (text "mk" <> dtName) : (map mkField dtFields)
+        mkField (v, s) = parens $ v <+> s
 
-showDefineTransition :: Netlist -> Net -> Doc
-showDefineTransition nl n@Net { netPrim = Output _ nm, netInputs = [e0] } =
-     showDeclareDatatype nl inputs "inputs"
-  $$ showDeclareDatatype nl state "state"
-  $$ parens (sep [ text "define-fun", fName, fArgs, fRet, fBody ])
-  $$ parens (sep [ text "assert", univQuant aArgs aBody ])
-  where aArgs = [ (text "init",      text "Bool")
-                , (text "inpts",     text "Tinputs")
-                , (text "prev",      text "Tstate")
-                , (text "next",      text "Tstate")
-                , (text "predHolds", text "Bool") ]
-        aBody = parens $   text "=>"
-                       <+> parens (hsep [ fName
-                                        , text "init"
-                                        , text "inpts"
-                                        , text "prev"
-                                        , text "next"
-                                        , text "predHolds" ])
-                       <+> text "predHolds"
-        fName = text $ "t_" ++ nm
-        fArgs = parens $ hsep [ parens (text "init Bool")
-                              , parens (text "inpts Tinputs")
-                              , parens (text "prev Tstate")
-                              , parens (text "next Tstate")
-                              , parens (text "predHolds Bool") ]
-        fRet  = text "Bool"
-        fBody = withLetBindings nl filtered $
-                                parens $ text "and" <+> sep [ assertExpr
-                                                            , stateUpdtExpr ]
+showDeclareNLDatatype :: Netlist -> [InstId] -> Doc -> Doc
+showDeclareNLDatatype nl netIds dtNm =
+  showDeclareRecordType dtNm [] $ map mkField netIds
+  where mkField nId = let wId = (nId, Nothing)
+                      in  (showWire nl wId, showSort nl wId)
+
+showDefineTransition :: Netlist -> Net -> [InstId] -> Doc -> Doc
+showDefineTransition nl n@Net { netPrim = Output _ nm
+                              , netInputs = [e0] } state name =
+  parens $ sep [ text "define-fun", name, fArgs, fRet, fBody ]
+  where fArgs = parens $ hsep [ parens (text "inpts Inputs")
+                              , parens (text "prev State") ]
+        fRet  = text "(Pair Bool State)"
+        fBody = withLetBindings nl filtered $ newPair assertE stateUpdtE
+        newPair a b = parens $ text "mkPair" <+> sep [a, b]
         dontPrune i = case netPrim (getNet nl i) of Input      _ _ -> False
                                                     Register   _ _ -> False
                                                     RegisterEn _ _ -> False
                                                     Output     _ _ -> False
                                                     _              -> True
-        (sorted, inputs, state) = topologicalSort nl n
+        (sorted, _, _) = topologicalSort nl n
         filtered = [i | i <- sorted, dontPrune i]
-        assertExpr = parens $ char '=' <+> text "predHolds"
-                                       <+> bvIsFalse (showNetInput nl e0)
-        stateUpdtExpr = empty -- TODO
-showDefineTransition _ n = error $ "SMT2 backend error: cannot showAssertNode on'" ++ show n ++ "'"
+        assertE = bvIsFalse (showNetInput nl e0)
+        stateUpdtE
+          | null state = text "mkState"
+          | otherwise  = parens . sep $ text "mkState" : regsInpts state
+        regsInpts = map \i -> (showNetInput nl . head . netInputs . getNet nl) i
+showDefineTransition _ n _ _ =
+  error $ "SMT2 backend error: cannot showDefineTransition on '" ++ show n ++ "'"
+
+invokeTransition :: Doc -> Doc -> Doc -> Doc
+invokeTransition tFun tInpts tInitSt = parens $ hsep [ tFun, tInpts, tInitSt ]
+
+showBaseCase :: [(Integer, InputWidth)] -> Doc -> Doc
+showBaseCase initState tFun =
+      text "(push)"
+  $+$ toplvlIns
+  $+$ parens (sep [ text "assert"
+                  , letBind initStateArg $
+                      matchBind invoke
+                        [( parens $ text "mkPair ok next"
+                         , body )]])
+  $+$ text "(check-sat)"
+  $+$ text "(pop)"
+  where toplvlIns = text "(declare-const inpts Inputs)"
+        body = parens $ text "= ok true"
+        createState [] = text "mkState"
+        createState xs = parens $   text "mkState"
+                                <+> sep (map (\(v, w) -> int2bv w v) xs)
+        initStateArg = [(text "initState", createState initState)]
+        invoke = invokeTransition tFun (text "inpts") (text "initState")
+
+showInductionStep :: Doc -> Doc
+showInductionStep tFun =
+     text "(push)"
+  $+$ toplvlIns
+  $+$ parens (sep [ text "assert"
+                  , univQuant [(text "initState", text "State")] $
+                     matchBind invoke0
+                      [( parens $ text "mkPair ok0 next0"
+                       , matchBind invoke1
+                          [( parens $ text "mkPair ok1 next1"
+                           , body)] )]])
+  $+$ text "(check-sat)"
+  $+$ text "(pop)"
+  where toplvlIns = vcat [ text "(declare-const inpts0 Inputs)"
+                         , text "(declare-const inpts1 Inputs)" ]
+        body = parens $ sep [ text "and"
+                            , parens $ text "= ok0 true"
+                            , parens $ text "= ok1 true" ]
+        invoke0 = invokeTransition tFun (text "inpts0") (text "initState")
+        invoke1 = invokeTransition tFun (text "inpts1") (text "next0")
+
+showAll :: Netlist -> Net -> Doc
+showAll nl n@Net { netPrim = Output _ nm, netInputs = [e0] } =
+      char ';' <> text (replicate 79 '-')
+  $+$ text "; Defining a generic Pair sort"
+  $+$ showDeclareRecordType (text "Pair") [ text "X"
+                                          , text "Y" ]
+                                          [ (text "fst", text "X")
+                                          , (text "snd", text "Y") ]
+  $+$ char ';' <> text (replicate 79 '-')
+  $+$ text "; Defining the Inputs record type specific to the current netlist"
+  $+$ showDeclareNLDatatype nl inputs (text "Inputs")
+  $+$ char ';' <> text (replicate 79 '-')
+  $+$ text "; Defining the State record type specific to the current netlist"
+  $+$ showDeclareNLDatatype nl (map fst state) (text "State")
+  $+$ char ';' <> text (replicate 79 '-')
+  $+$ text "; Defining the transition function specific to the current netlist"
+  $+$ showDefineTransition nl n (map fst state) fName
+  $+$ char ';' <> text (replicate 79 '-')
+  $+$ text "; Base case"
+  $+$ showBaseCase (map snd state) fName
+  $+$ char ';' <> text (replicate 79 '-')
+  $+$ text "; Induction step"
+  $+$ showInductionStep fName
+  where fName = text $ "t_" ++ nm
+        (sorted, inputs, state) = topologicalSort nl n
+showAll _ n = error $ "SMT2 backend error: cannot showAll on'" ++ show n ++ "'"
 
 withLetBindings :: Netlist -> [InstId] -> Doc -> Doc
 withLetBindings _ [] doc = doc
-withLetBindings nl (idx:idxs) doc =
-  parens $ text "let" <+> parens (decl idx) $$ nest (-1) (withLetBindings nl idxs doc)
-  where decl i = parens $ showWire nl (i, Nothing) <+> showNet nl i
+withLetBindings nl instIds doc = letBind decls doc
+  where decls = map (\i -> (showWire nl (i, Nothing), showNet nl i)) instIds
 
 -- topological stort of a netlist
 --------------------------------------------------------------------------------
@@ -278,7 +348,8 @@ withLetBindings nl (idx:idxs) doc =
 type Depth = Int
 data Mark = Unmarked | Temporary Depth | Permanent
 
-topologicalSort :: Netlist -> Net -> ([InstId], [InstId], [InstId])
+topologicalSort :: Netlist -> Net
+                -> ([InstId], [InstId], [(InstId, (Integer, InputWidth))])
 topologicalSort nl root = runST do
   -- initialise a mutable array to track visit through the netlist
   visited <- newArray (bounds nl) Unmarked
@@ -299,7 +370,7 @@ topologicalSort nl root = runST do
     topoSort :: STArray s InstId Mark
              -> STRef s [InstId]
              -> STRef s [InstId]
-             -> STRef s [InstId]
+             -> STRef s [(InstId, (Integer, InputWidth))]
              -> Depth
              -> InstId
              -> ST s ()
@@ -324,8 +395,11 @@ topologicalSort nl root = runST do
         -- upon termination of children visits. Add the net to the returned
         -- list head
         Unmarked -> do
-          writeArray visited netId $ Temporary curDepth
           let net = getNet nl netId
+          let mark = case netPrim net of RegisterEn _ _ -> Permanent
+                                         Register   _ _ -> Permanent
+                                         _              -> Temporary curDepth
+          writeArray visited netId $ mark
           let allInputIds = concatMap (map fst . netInputWireIds)
                                       (netInputs net)
           let newDepth = case netPrim net of RegisterEn _ _ -> curDepth + 1
@@ -337,8 +411,8 @@ topologicalSort nl root = runST do
           insert sorted netId -- topological order list
           case netPrim net of
             -- For registers, update the list of state holding nets
-            RegisterEn _ _ -> insert state netId
-            Register   _ _ -> insert state netId
+            RegisterEn init w -> insert state (netId, (init, w))
+            Register   init w -> insert state (netId, (init, w))
             -- For Inputs, update the list of input nets
             Input      _ _ -> insert inputs netId
             -- Do nothing else otherwise
@@ -357,9 +431,9 @@ genNetSMT2 nl n = case netPrim n of
   --                       , assertNode = Just $ showAssertNode nl n }
   --RegisterEn _ _ -> dflt { defineNode = Just $ showDefineNode nl n
   --                       , assertNode = Just $ showAssertNode nl n }
-  Output     _ _ -> dflt { defineNode = Just $ showDefineTransition nl n
+  Output     _ _ -> dflt { defineNode = Just $ showAll nl n }
                          --, assertNode = Just $ showAssertNode nl n
-                         , checkNode  = Just $ text "(check-sat)" }
+                         --, checkNode  = Just $ text "(check-sat)" }
   _          -> error $ "SMT2 backend error: genNetSMT2 called on " ++ show n ++
                         "- Only Input and Output primitives are supported"
   where dflt = NetSMT2 { defineNode = Nothing
