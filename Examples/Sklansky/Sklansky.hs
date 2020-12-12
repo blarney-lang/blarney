@@ -8,7 +8,7 @@ halve :: [a] -> ([a], [a])
 halve xs = (take n xs, drop n xs)
   where n = length xs `div` 2
 
--- | Sklanksy parallel prefix network (assumes power-of-2 list size)
+-- | Sklansky parallel prefix network (assumes power-of-2 list size)
 sklansky :: (a -> a -> a) -> [a] -> [a]
 sklansky op [x] = [x]
 sklansky op xs = ys' ++ map (last ys' `op`) zs'
@@ -17,7 +17,7 @@ sklansky op xs = ys' ++ map (last ys' `op`) zs'
     ys' = sklansky op ys
     zs' = sklansky op zs
 
--- | Broken Sklanksy implementation
+-- | Broken Sklansky implementation
 doom_sklansky :: (a -> a -> a) -> [a] -> [a]
 doom_sklansky op [x] = [x]
 doom_sklansky op xs = ys' ++ map (head ys' `op`) zs'
@@ -42,7 +42,7 @@ main :: IO ()
 main = do
   -- path to script output directory
   cwd <- getCurrentDirectory
-  let smtDir = cwd ++ "/Sklanksy-SMT2/"
+  let smtDir = cwd ++ "/Sklansky-SMT2/"
   -- generate smt2 scripts
   writeSMT2Script (prop_scan @4 @4 sklansky (+))      "goodSklansky4_4"   smtDir
   writeSMT2Script (prop_scan @4 @4 doom_sklansky (+)) "brokenSklansky4_4" smtDir
