@@ -1090,9 +1090,9 @@ collection type.
 
 ## Class 4: FShow
 
-Any type in the
-[FShow](http://mn416.github.io/blarney/Blarney-Core-FShow.html)
-class can be passed as arguments to the
+Any value whose type is in the
+[FShow](http://mn416.github.io/blarney/Blarney-Core-FShow.html) class,
+or any value of type `Format`, can be passed as arguments to the
 variadic `display` function.
 
 ```hs
