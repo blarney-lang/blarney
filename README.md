@@ -126,8 +126,8 @@ can be built and run as follows.
 > cd /tmp/twoSort
 > make
 > ./top
-twoSort (1,2) = (01,02)
-twoSort (2,1) = (01,02)
+twoSort (1,2) = (1,2)
+twoSort (2,1) = (1,2)
 ```
 
 Looks like `twoSort` is working!
@@ -170,7 +170,7 @@ top = always do
 in simulation yields:
 
 ```
-sort [03,04,01,00,02] = [00,01,02,03,04]
+sort [3,4,1,0,2] = [0,1,2,3,4]
 ```
 
 To see that the `sort` function really is describing a circuit, let's
@@ -252,7 +252,7 @@ top = do
     cycleCount <== cycleCount.val + 1
 
     -- Display value on every cycle
-    display "cycleCount = %0d" (cycleCount.val)
+    display "cycleCount = " (cycleCount.val)
 
     -- Terminate simulation when count reaches 10
     when (cycleCount.val .==. 10) do
@@ -479,7 +479,7 @@ fact = do
               acc <== acc.val * n.val
           )
         , Action do
-            display "fact(10) = %0d" (acc.val)
+            display "fact(10) = " (acc.val)
             finish
         ]
        
@@ -512,7 +512,7 @@ top = do
             counter.inc
             counter.dec
         , Action do
-            display "counter = %0d" (counter.output)
+            display "counter = " (counter.output)
             finish
         ]
 
@@ -551,7 +551,7 @@ fact = do
             n <== n.val - 1
             acc <== acc.val * n.val
         action do
-          display "fact(10) = %0d" (acc.val)
+          display "fact(10) = " (acc.val)
           finish
 
   runStmt stmt
@@ -601,7 +601,7 @@ top = do
     action do
       load ram 0
     action do
-      display "Got 0x%0x" (ram.out)
+      display "Got " (ram.out)
       finish
 ```
 
@@ -758,7 +758,7 @@ top = do
     -- Consume
     when (out.canPeek) do
       consume out
-      display "Got 0x%0x" (out.peek)
+      display "Got " (out.peek)
       when (out.peek .==. 100) finish
 ```
 
@@ -823,7 +823,7 @@ master resps = do
     wait (resps.canPeek)
     action do
       resps.consume
-      display "Result: %0d" (resps.peek)
+      display "Result: " (resps.peek)
       finish
 
   return (reqs.toStream)
@@ -914,17 +914,15 @@ import Blarney.BitScan
 
 -- Semantics of add instruction
 add :: Bit 5 -> Bit 5 -> Bit 5 -> Action ()
-add rs2 rs1 rd =
-  display "add r%0d" (rd.val) ", r%0d" (rs1.val) ", r%0d" (rs2.val)
+add rs2 rs1 rd = display "add r" rd ", r" rs1 ", r" rs2
 
 -- Semantics of addi instruction
 addi :: Bit 12 -> Bit 5 -> Bit 5 -> Action ()
-addi imm rs1 rd =
-  display "add r%0d" (rd.val) ", r%0d" (rs1.val) ", 0x%0x" (imm.val)
+addi imm rs1 rd = display "addi r" rd ", r" rs1 ", " imm
 
--- Semantics of store-word instruciton
+-- Semantics of store instruciton
 sw :: Bit 12 -> Bit 5 -> Bit 5 -> Action ()
-sw imm rs2 rs1 = display "sw r%0d" rs2 ", %0d(r%0d)" imm rs1
+sw imm rs2 rs1 = display "sw r" rs2 ", " imm "(r" rs1 ")"
 
 top :: Module ()
 top = always do
@@ -1119,3 +1117,20 @@ instance (FShow a, FShow b) => FShow (a, b) where
 ```
 
 The `FShow` class supports generic deriving.
+
+The radix used to display a bit vector can be specified using the
+`radix` functions.
+
+```hs
+-- Control the radix when displaying a bit vector
+radix :: Radix -> Bit n -> Format
+```
+
+Where the `Radix` can be `Bin`, `Dec`, and `Hex`.  There's also a
+`pad` function which allows padding to be specified in addition to the
+radix.
+
+```hs
+-- Control the radix and zero padding when displaying a bit vector
+pad :: Radix -> Int -> Bit n -> Format
+```

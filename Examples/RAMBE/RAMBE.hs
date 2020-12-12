@@ -22,7 +22,7 @@ top = do
       action do
         loadBE ram (i.val)
       action do
-        display "ram[%0d]" (i.val) " = %0d" (ram.outBE)
+        display "ram[" (i.val) "] = " (ram.outBE)
         i <== i.val + 1
     action do
       finish

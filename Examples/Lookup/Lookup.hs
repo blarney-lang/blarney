@@ -25,7 +25,7 @@ top = do
     -- Consume from queue
     when (q.canDeq) do
       deq q
-      display "%0d: %0d" (cycleCount.val) (q.first)
+      display (cycleCount.val) ": " (q.first)
 
     -- Terminate simulation when count reaches 16
     when (cycleCount.val .==. 16) do

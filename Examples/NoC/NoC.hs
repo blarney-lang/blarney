@@ -136,9 +136,9 @@ testMesh (lenX, lenY) =
 
         when (input.canPeek) do
           consume input
-          display (x,y) ": dest=(%0d,%0d)"
-                  (input.peek.destX) (input.peek.destY)
-                  " t=%0d" (timer.val)
+          display (x,y) ": dest=("
+                  (input.peek.destX) "," (input.peek.destY)
+                  ") t=" (timer.val)
 
         when (buffer.notFull) do
           let pkt = MeshPkt { payload = 0,

@@ -35,6 +35,37 @@ import Prelude
 import Data.Monoid
 import GHC.Generics
 
+-- | Format for displaying values in simulation
+newtype Format = Format [FormatItem]
+
+-- | Allow displaying of bit vectors and strings
+data FormatItem =
+    -- | String
+    FormatString String
+    -- | Bit vector, with formatting options
+  | FormatBit Int BV Radix Pad
+
+-- | Bit vectors may be padded
+type Pad = Int
+
+-- | Format for displaying bit vectors
+data Radix =
+    Bin
+  | Dec
+  | Hex
+
+-- | Format given bit vector using given radix and padding
+pad :: Radix -> Int -> Bit n -> Format
+pad r p b =
+  Format [FormatBit width bv r p]
+    where
+      bv = toBV b
+      width = bvPrimOutWidth bv
+
+-- | Format given bit vector using given radix, no padding
+radix :: Radix -> Bit n -> Format
+radix r b = pad r 0 b
+
 -- FShow
 class FShow a where
   fshow :: a -> Format
@@ -49,15 +80,6 @@ class FShow a where
   default fshow :: (Generic a, GFShow (Rep a)) => a -> Format
   fshow x = gfshow False (from x)
 
-
--- | Format for displaying values in simulation
-newtype Format = Format [FormatItem]
-
--- | Allow displaying of bit vectors and strings
-data FormatItem =
-    FormatBit Int BV
-  | FormatString String
-
 -- | Format concatention
 instance Semigroup Format where
   Format a <> Format b = Format (a ++ b)
@@ -71,8 +93,7 @@ instance FShow Char where
   fshowList cs = Format [FormatString cs]
 
 instance FShow (Bit n) where
-  fshow b = Format [FormatBit (bvPrimOutWidth ub) ub]
-    where ub = toBV b
+  fshow = radix Dec
 
 instance FShow Int where
   fshow i = Format [FormatString (show i)]

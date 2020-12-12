@@ -18,7 +18,7 @@ fact = do
               acc <== acc.val * n.val
           )
         , Action do
-            display "fact(10) = %0d" (acc.val)
+            display "fact(10) = " (acc.val)
             finish
         ]
 
