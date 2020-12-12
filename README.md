@@ -1119,18 +1119,18 @@ instance (FShow a, FShow b) => FShow (a, b) where
 The `FShow` class supports generic deriving.
 
 The radix used to display a bit vector can be specified using the
-`radix` functions.
+`radix` function.
 
 ```hs
 -- Control the radix when displaying a bit vector
 radix :: Radix -> Bit n -> Format
 ```
 
-Where the `Radix` can be `Bin`, `Dec`, and `Hex`.  There's also a
+Possible `Radix` values are `Bin`, `Dec`, and `Hex`.  There's also a
 `pad` function which allows padding to be specified in addition to the
 radix.
 
 ```hs
--- Control the radix and zero padding when displaying a bit vector
+-- Control the radix and (zero) padding when displaying a bit vector
 pad :: Radix -> Int -> Bit n -> Format
 ```
