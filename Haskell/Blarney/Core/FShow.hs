@@ -55,15 +55,15 @@ formatBit radix pad b =
     bv = toBV b
     w = bvPrimOutWidth bv
 
--- | Format bit vector in binary
+-- | Format bit vector in binary with given amount of zero padding
 formatBin :: Int -> Bit n -> Format
 formatBin pad = formatBit Bin (Just pad)
 
--- | Format bit vector in decimal
+-- | Format bit vector in decimal with given amount of zero padding
 formatDec :: Int -> Bit n -> Format
 formatDec pad = formatBit Dec (Just pad)
 
--- | Format bit vector in decimal
+-- | Format bit vector in hex with given amount of zero padding
 formatHex :: Int -> Bit n -> Format
 formatHex pad = formatBit Hex (Just pad)
 
