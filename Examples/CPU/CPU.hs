@@ -141,7 +141,7 @@ makeCPU = do
       when (result.active) do
         store regFileA (instr.val.rD) (result.val)
         store regFileB (instr.val.rD) (result.val)
-        display (pad Dec 8 (count.val))
+        display (formatDec 8 (count.val))
                 ": rf[" (instr.val.rD) "] := " (result.val)
 
 -- Main function

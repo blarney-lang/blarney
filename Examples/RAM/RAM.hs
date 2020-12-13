@@ -22,7 +22,7 @@ top = do
       action do
         load ram (i.val)
       action do
-        display "ram[" (i.val) "] = 0x" (pad Hex 24 (ram.out))
+        display "ram[" (i.val) "] = 0x" (formatHex 24 (ram.out))
         i <== i.val + 1
     action do
       finish

@@ -31,6 +31,7 @@ module Blarney.Core.Prim (
 , BitIndex        -- For indexing a bit vector
 , RegFileInfo(..) -- Register file primitive parameters
 , DisplayArg(..)  -- Arguments to display primitive
+, DisplayArgRadix(..) -- Radix of argument to display
 , Param(..)       -- Compile-time parameters
 , NameHint(..)    -- A 'NameHint' type to represent name hints
 , NameHints       -- A 'NameHints' type to gather name hints
@@ -78,14 +79,27 @@ data RegFileInfo = RegFileInfo { regFileId        :: Int
 --   A parameter has a name and a value, both represented as strings
 data Param = String :-> String deriving Show
 
--- | For the Display primitive:
---   display a string literal or a bit-vector value of a given width
+-- | For the Display primitive: display a string literal or
+-- a bit-vector value of a given width
 data DisplayArg =
+    -- | Display a string
     DisplayArgString String
-  | DisplayArgBit InputWidth
-instance Show DisplayArg where
-  show (DisplayArgString s) = show s
-  show (DisplayArgBit w) = show w
+    -- | Display a bit vector with formatting options
+  | DisplayArgBit {
+      -- | Radix of bit vector to display
+      displayArgWidth :: InputWidth
+      -- | Radix of bit vector to display
+    , displayArgRadix :: DisplayArgRadix
+      -- | Optional padding
+    , displayArgPad :: Maybe Int
+      -- | Pad with zeros or spaces?
+    , displayArgZeroPad :: Bool
+    }
+  deriving Show
+
+-- | Format for displaying bit vectors
+data DisplayArgRadix = Bin | Dec | Hex
+  deriving Show
 
 -- | Primitive components
 data Prim =
@@ -536,7 +550,7 @@ primInfo (Display args) =
            , dontKill = True
            , isRoot = True
            , inputs = [ ("in" ++ show i, w)
-                      | (i, DisplayArgBit w) <- zip [0..] args ]
+                      | (i, DisplayArgBit w _ _ _) <- zip [0..] args ]
            , outputs = [] }
 primInfo Finish =
   PrimInfo { isInlineable = False

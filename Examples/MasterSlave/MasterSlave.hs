@@ -26,7 +26,7 @@ master resps = do
 
     when (resps.canPeek) do
       consume resps
-      display "Response: 0x" (pad Hex 8 (resps.peek))
+      display "Response: 0x" (formatHex 8 (resps.peek))
       finish
 
   return (buffer.toStream)

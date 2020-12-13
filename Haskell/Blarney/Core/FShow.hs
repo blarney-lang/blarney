@@ -29,6 +29,7 @@ module Blarney.Core.FShow where
 -- Blarney imports
 import Blarney.Core.BV
 import Blarney.Core.Bit
+import Blarney.Core.Prim (DisplayArg(..), DisplayArgRadix(..))
 
 -- Standard imports
 import Prelude
@@ -36,35 +37,35 @@ import Data.Monoid
 import GHC.Generics
 
 -- | Format for displaying values in simulation
-newtype Format = Format [FormatItem]
+data Format = Format [FormatItem]
 
--- | Allow displaying of bit vectors and strings
-data FormatItem =
-    -- | String
-    FormatString String
-    -- | Bit vector, with formatting options
-  | FormatBit Int BV Radix Pad
+-- | A format item is a display arg, tagged with a bit vector
+type FormatItem = (DisplayArg, BV)
 
--- | Bit vectors may be padded
-type Pad = Int
+-- | Convert a string to a format
+formatString :: String -> Format
+formatString str = Format [(DisplayArgString str, noBV)]
+  where noBV = error "Blarney.Core.FShow: string has no bit vector"
 
--- | Format for displaying bit vectors
-data Radix =
-    Bin
-  | Dec
-  | Hex
+-- | Convert bit vector to a format
+formatBit :: DisplayArgRadix -> Maybe Int -> Bit n -> Format
+formatBit radix pad b =
+    Format [(DisplayArgBit w radix pad True, bv)]
+  where
+    bv = toBV b
+    w = bvPrimOutWidth bv
 
--- | Format given bit vector using given radix and padding
-pad :: Radix -> Int -> Bit n -> Format
-pad r p b =
-  Format [FormatBit width bv r p]
-    where
-      bv = toBV b
-      width = bvPrimOutWidth bv
+-- | Format bit vector in binary
+formatBin :: Int -> Bit n -> Format
+formatBin pad = formatBit Bin (Just pad)
 
--- | Format given bit vector using given radix, no padding
-radix :: Radix -> Bit n -> Format
-radix r b = pad r 0 b
+-- | Format bit vector in decimal
+formatDec :: Int -> Bit n -> Format
+formatDec pad = formatBit Dec (Just pad)
+
+-- | Format bit vector in decimal
+formatHex :: Int -> Bit n -> Format
+formatHex pad = formatBit Hex (Just pad)
 
 -- FShow
 class FShow a where
@@ -89,17 +90,17 @@ instance Monoid Format where
   mempty = Format []
 
 instance FShow Char where
-  fshow c = Format [FormatString [c]]
-  fshowList cs = Format [FormatString cs]
+  fshow c = formatString [c]
+  fshowList cs = formatString cs
 
 instance FShow (Bit n) where
-  fshow = radix Dec
+  fshow = formatDec 0
 
 instance FShow Int where
-  fshow i = Format [FormatString (show i)]
+  fshow i = formatString (show i)
 
 instance FShow Integer where
-  fshow i = Format [FormatString (show i)]
+  fshow i = formatString (show i)
 
 instance FShow Format where
   fshow f = f

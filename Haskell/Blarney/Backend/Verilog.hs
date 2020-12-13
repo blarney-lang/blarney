@@ -460,9 +460,19 @@ genNetVerilog netlist net = case netPrim net of
              2 ((parens (argStyle $ fmtArgs args (tail $ netInputs net))) <> semi)
     where fmtArgs [] _ = []
           fmtArgs (DisplayArgString s : args) ins =
-            (text $ shows s "") : (fmtArgs args ins)
-          fmtArgs (DisplayArgBit w : args) (x:ins) =
-            (showNetInput x) : (fmtArgs args ins)
+            text (show (escape s)) : fmtArgs args ins
+          fmtArgs (DisplayArgBit _ r p z : args) (x:ins) =
+            text (show ("%" ++ fmtPad z p ++ fmtRadix r)) :
+              showNetInput x : fmtArgs args ins
+
+          escape str = concat [if c == '%' then "%%" else [c] | c <- str]
+
+          fmtPad zero Nothing = if zero then "0" else ""
+          fmtPad zero (Just x) = (if zero then "0" else "") ++ show x
+
+          fmtRadix Bin = "b"
+          fmtRadix Dec = "d"
+          fmtRadix Hex = "x"
   alwsFinish net =
     text "if" <+> parens (showNetInput (netInputs net !! 0) <+> text "== 1")
              <+> text "$finish" <> semi

@@ -39,7 +39,7 @@ top t w h = do
       forM_ (zip [0..] grid) $ \(i, row) ->
         forM_ (zip [0..] row) $ \(j, cell) ->
           display (show i) "," (show j) ":0x"
-            (pad Hex 8 (cell.val .>>. (16 :: Bit 5)))
+            (formatHex 8 (cell.val .>>. (16 :: Bit 5)))
       finish
 
 -- Main function
