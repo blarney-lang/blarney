@@ -34,7 +34,7 @@ top = do
     -- Consume from q2
     when (q2src.canPeek .&. (count.val .>. 50)) do
       q2src.consume
-      display "Got %0d" (q2src.peek)
+      display "Got " (q2src.peek)
       when (q2src.peek .>. 100) finish
     count <== count.val + 1
 

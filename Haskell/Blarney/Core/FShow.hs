@@ -29,11 +29,43 @@ module Blarney.Core.FShow where
 -- Blarney imports
 import Blarney.Core.BV
 import Blarney.Core.Bit
+import Blarney.Core.Prim (DisplayArg(..), DisplayArgRadix(..))
 
 -- Standard imports
 import Prelude
 import Data.Monoid
 import GHC.Generics
+
+-- | Format for displaying values in simulation
+data Format = Format [FormatItem]
+
+-- | A format item is a display arg, tagged with a bit vector
+type FormatItem = (DisplayArg, BV)
+
+-- | Convert a string to a format
+formatString :: String -> Format
+formatString str = Format [(DisplayArgString str, noBV)]
+  where noBV = error "Blarney.Core.FShow: string has no bit vector"
+
+-- | Convert bit vector to a format
+formatBit :: DisplayArgRadix -> Maybe Int -> Bit n -> Format
+formatBit radix pad b =
+    Format [(DisplayArgBit w radix pad True, bv)]
+  where
+    bv = toBV b
+    w = bvPrimOutWidth bv
+
+-- | Format bit vector in binary with given amount of zero padding
+formatBin :: Int -> Bit n -> Format
+formatBin pad = formatBit Bin (Just pad)
+
+-- | Format bit vector in decimal with given amount of zero padding
+formatDec :: Int -> Bit n -> Format
+formatDec pad = formatBit Dec (Just pad)
+
+-- | Format bit vector in hex with given amount of zero padding
+formatHex :: Int -> Bit n -> Format
+formatHex pad = formatBit Hex (Just pad)
 
 -- FShow
 class FShow a where
@@ -49,15 +81,6 @@ class FShow a where
   default fshow :: (Generic a, GFShow (Rep a)) => a -> Format
   fshow x = gfshow False (from x)
 
-
--- | Format for displaying values in simulation
-newtype Format = Format [FormatItem]
-
--- | Allow displaying of bit vectors and strings
-data FormatItem =
-    FormatBit Int BV
-  | FormatString String
-
 -- | Format concatention
 instance Semigroup Format where
   Format a <> Format b = Format (a ++ b)
@@ -67,18 +90,17 @@ instance Monoid Format where
   mempty = Format []
 
 instance FShow Char where
-  fshow c = Format [FormatString [c]]
-  fshowList cs = Format [FormatString cs]
+  fshow c = formatString [c]
+  fshowList cs = formatString cs
 
 instance FShow (Bit n) where
-  fshow b = Format [FormatBit (bvPrimOutWidth ub) ub]
-    where ub = toBV b
+  fshow = formatDec 0
 
 instance FShow Int where
-  fshow i = Format [FormatString (show i)]
+  fshow i = formatString (show i)
 
 instance FShow Integer where
-  fshow i = Format [FormatString (show i)]
+  fshow i = formatString (show i)
 
 instance FShow Format where
   fshow f = f

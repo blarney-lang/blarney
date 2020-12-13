@@ -22,7 +22,7 @@ top = do
         Seq [
           While (i.val .<. 20) (
             block [
-              display "storing %02d" (i.val),
+              display "storing " (i.val),
               store vecA (i.val) (i.val.zeroExtend),
               store vecB (i.val) (i.val.zeroExtend),
               i <== i.val + 1
@@ -31,21 +31,21 @@ top = do
 
           block [
             i <== 0,
-            display "starting at %02d" (globalTime.val)
+            display "starting at " (globalTime.val)
           ],
 
           While (i.val .<. 20) (
             block [
               do load vecA (i.val)
                  load vecB (i.val)
-                 display "loading un-pipelined at time %02d" (globalTime.val),
+                 display "loading un-pipelined at time " (globalTime.val),
               do store vecCNoPipe (i.val) (vecA.out + vecB.out)
                  i <== i.val + 1
             ]
           ),
 
           block [
-            display "un-pipelined loop ending at %d" (globalTime.val),
+            display "un-pipelined loop ending at " (globalTime.val),
             i <== 0,
             display "C values after un-pipelined add"
           ],
@@ -53,7 +53,7 @@ top = do
           While (i.val .<. 20) (
             block [
               load vecCNoPipe (i.val),
-              display "C[%02d]" (i.val) " = %02d" (out vecCNoPipe),
+              display "C[" (i.val) "] = " (out vecCNoPipe),
               i <== i.val + 1
             ]
           ),
@@ -74,7 +74,7 @@ top = do
           block [
             i <== 0,
             display "Running pipelined vector add...",
-            display "starting pipelined loop at %d" (globalTime.val)
+            display "starting pipelined loop at " (globalTime.val)
           ],
 
           While (i.val .<. 20) (
@@ -85,7 +85,7 @@ top = do
                    load vecA (i.val)
                    load vecB (i.val)
                    i0 <== i.val
-                   display "load values at time %02d" (globalTime.val),
+                   display "load values at time " (globalTime.val),
                  Action do
                    store vecCPipe (i0.val) (vecA.out + vecB.out)
                ]
@@ -95,7 +95,7 @@ top = do
           ),
 
           block [
-            display "ending pipelined loop at %d" (globalTime.val),
+            display "ending pipelined loop at " (globalTime.val),
             i <== 0,
             display "After pipelined add..."
           ],
@@ -103,7 +103,7 @@ top = do
           While (i.val .<. 20) (
             block [
               load vecCPipe (i.val),
-              display "C[%02d]" (i.val) " = %02d" (out vecCPipe),
+              display "C[" (i.val) "] = " (out vecCPipe),
               i <== i.val + 1
             ]
           )

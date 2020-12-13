@@ -41,8 +41,8 @@ zeroWidthNetTransform net@Net{ netPrim = Concat w0 w1, netInputs = [i0, i1] }
   | w0 /= 0 && w1 == 0 = (net { netPrim = Identity w0, netInputs = [i0] }, True)
   | otherwise = (net, False)
 zeroWidthNetTransform net@Net{ netPrim = Display args, netInputs = inpts } =
-  let bitArgs = [ ba | ba@(DisplayArgBit w) <- args ]
-      f (DisplayArgBit 0) i = (InputTree (Const 0 0) [], True)
+  let bitArgs = [ ba | ba@(DisplayArgBit {}) <- args ]
+      f (DisplayArgBit 0 _ _ _) i = (InputTree (Const 0 0) [], True)
       f _ i = (i, False)
       (tmps, changes) = unzip $ zipWith f bitArgs (tail inpts)
       inpts' = head inpts : tmps

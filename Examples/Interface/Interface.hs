@@ -43,7 +43,7 @@ top = do
     -- Consume
     when (out.canPeek) $ do
       out.consume
-      display "Got %0d" (out.peek)
+      display "Got " (out.peek)
       when (out.peek .==. 100) finish
 
 -- Main function

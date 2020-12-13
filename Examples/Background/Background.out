@@ -1,13 +1,13 @@
-storing 00
-storing 01
-storing 02
-storing 03
-storing 04
-storing 05
-storing 06
-storing 07
-storing 08
-storing 09
+storing 0
+storing 1
+storing 2
+storing 3
+storing 4
+storing 5
+storing 6
+storing 7
+storing 8
+storing 9
 storing 10
 storing 11
 storing 12
@@ -39,18 +39,18 @@ loading un-pipelined at time 114
 loading un-pipelined at time 116
 loading un-pipelined at time 118
 loading un-pipelined at time 120
-un-pipelined loop ending at        122
+un-pipelined loop ending at 122
 C values after un-pipelined add
-C[00] = 00
-C[01] = 02
-C[02] = 04
-C[03] = 06
-C[04] = 08
-C[05] = 10
-C[06] = 12
-C[07] = 14
-C[08] = 16
-C[09] = 18
+C[0] = 0
+C[1] = 2
+C[2] = 4
+C[3] = 6
+C[4] = 8
+C[5] = 10
+C[6] = 12
+C[7] = 14
+C[8] = 16
+C[9] = 18
 C[10] = 20
 C[11] = 22
 C[12] = 24
@@ -63,7 +63,7 @@ C[18] = 36
 C[19] = 38
 Clearing C values
 Running pipelined vector add...
-starting pipelined loop at        229
+starting pipelined loop at 229
 load values at time 230
 load values at time 231
 load values at time 232
@@ -84,18 +84,18 @@ load values at time 246
 load values at time 247
 load values at time 248
 load values at time 249
-ending pipelined loop at        250
+ending pipelined loop at 250
 After pipelined add...
-C[00] = 00
-C[01] = 02
-C[02] = 04
-C[03] = 06
-C[04] = 08
-C[05] = 10
-C[06] = 12
-C[07] = 14
-C[08] = 16
-C[09] = 18
+C[0] = 0
+C[1] = 2
+C[2] = 4
+C[3] = 6
+C[4] = 8
+C[5] = 10
+C[6] = 12
+C[7] = 14
+C[8] = 16
+C[9] = 18
 C[10] = 20
 C[11] = 22
 C[12] = 24

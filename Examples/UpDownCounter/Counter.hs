@@ -57,7 +57,7 @@ top = do
 
   always do
     when done do
-      display "Final count = %0d" (value counter)
+      display "Final count = " (value counter)
       finish
 
   return ()

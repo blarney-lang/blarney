@@ -15,8 +15,8 @@ top = do
   cnt :: Reg (Bit 32) <- makeReg 0
   always do
     -- Display values
-    display "opt = %s" (fshow opt) ", noopt = %0d" noopt
-    display "cnt = %0d" (cnt.val)
+    display "opt = " opt ", noopt = " noopt
+    display "cnt = " (cnt.val)
     -- update counter
     when (isSome opt) do cnt <== cnt.val + 1
     -- Terminate simulation

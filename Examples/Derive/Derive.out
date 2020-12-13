@@ -1,1 +1,1 @@
-req = MemReq { memOp = 0, memAddr = 00000064, memData = 00000000 }
+req = MemReq { memOp = 0, memAddr = 100, memData = 0 }

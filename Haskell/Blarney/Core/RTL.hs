@@ -318,13 +318,10 @@ instance Displayable (RTL a) where
   disp x suffix = do
       r <- ask
       let Format items = x <> suffix
-      let prim = Display (map toDisplayArg items)
-      let inps = toBV (cond r) : [b | FormatBit w b <- items]
+      let prim = Display (map fst items)
+      let inps = toBV (cond r) : [bv | (DisplayArgBit {}, bv) <- items]
       write (RTLRoots [makePrim0 prim inps])
       return (error "Return value of 'display' should be ignored")
-    where
-      toDisplayArg (FormatString s) = DisplayArgString s
-      toDisplayArg (FormatBit w b) = DisplayArgBit w
 
 -- |Recursive case
 instance (FShow b, Displayable a) => Displayable (b -> a) where

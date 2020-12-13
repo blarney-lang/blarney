@@ -24,10 +24,10 @@ top = do
                 else display "Bit 0 .<. false"
     if a .<=. b then display "Bit 0 .<=. true"
                 else display "Bit 0 .<=. false"
-    display "concat (10 :: Bit 8) with a Bit 0: %0d" ((someInst.meh8) # a)
+    display "concat (10 :: Bit 8) with a Bit 0: " ((someInst.meh8) # a)
     display "zeroExtend a Bit 0 to a Bit 4: " (zeroExtend a :: Bit 4)
     display "signExtend a Bit 0 to a Bit 4: " (signExtend a :: Bit 4)
-    display "displaying a Bit 0: %0d" a
+    display "displaying a Bit 0: " a
     finish
 
 main :: IO ()

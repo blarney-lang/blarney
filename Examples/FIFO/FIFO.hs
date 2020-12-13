@@ -52,12 +52,12 @@ top = do
     -- Writer side
     when (fifo.notFull) $ do
       enq fifo (timer.val)
-      display "Enqueued %0d" (timer.val)
+      display "Enqueued " (timer.val)
 
     -- Reader side
     when (fifo.notEmpty) $ do
       deq fifo
-      display "Dequeued %0d" (fifo.first)
+      display "Dequeued " (fifo.first)
 
     -- Terminate after 100 cycles
     when (timer.val .==. 100) finish

@@ -19,15 +19,15 @@ top = always do
     [
       lit @2 0b00 <#> var @2 <#> var @4
         ==>
-      \z n -> display "li %0d, %0d" z n
+      \z n -> display "li " z ", " n
 
     , lit @2 0b01 <#> var @2 <#> var @2 <#> var @2
         ==>
-      \z x y -> display "add %0d, %0d, %0d" z x y
+      \z x y -> display "add " z ", " x ", " y
 
     , lit @2 0b10 <#> var @4 <#> var @2
         ==>
-      \n y -> display "bnz %0d, 0x%0x" y n
+      \n y -> display "bnz " y ", " n
 
     , lit @2 0b11 <#> var @6
         ==>
