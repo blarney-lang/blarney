@@ -44,9 +44,10 @@ genSMT2Script :: Netlist -- ^ blarney netlist
 genSMT2Script nl nm dir =
   do system ("mkdir -p " ++ dir)
      h <- openFile fileName WriteMode
-     hPutStr h (render $ showAll nl (head outputs))
+     hPutStr h (renderStyle rStyle $ showAll nl (head outputs))
      hClose h
   where fileName = dir ++ "/" ++ nm ++ ".smt2"
+        rStyle = Style PageMode 80 1.05
         outputs = [ n | Just n@Net{netPrim=p} <- elems nl
                       , case p of Output _ _ -> True
                                   _          -> False ]
@@ -82,6 +83,9 @@ bool2BV :: Doc -> Doc
 bool2BV doc = parens $ text "ite" <+> doc <+> text "#b1" <+> text "#b0"
 parenList :: [(Doc, Doc)] -> Doc
 parenList = parens . sep . map (\(v, s) -> parens $ sep [v, s])
+-- qualifiers
+qualify :: Doc -> Doc -> Doc
+qualify expr sort = parens $ sep [ text "as", expr, sort]
 -- binders
 parBind :: [Doc] -> Doc -> Doc
 parBind [] doc = doc
@@ -102,6 +106,22 @@ nestLetBind :: [[(Doc, Doc)]] -> Doc -> Doc
 nestLetBind [] doc = doc
 nestLetBind (xs:xss) doc = letBind xs (nest (-5) (nestLetBind xss doc))
 -- the 5 is the length of "let " + 1
+
+showDeclareDataType :: Doc -> [Doc] -> [(Doc, [(Doc, Doc)])] -> Doc
+showDeclareDataType dtName dtParams dtConsAndFields =
+  parens $ sep [ text "declare-datatype", dtName, dtDef ]
+  where dtDef = parBind dtParams dtCons
+        dtCons = parens . sep . (map dtOneCons) $ dtConsAndFields
+        dtOneCons (cN, cFs) = parens . sep $ cN : (map dtField cFs)
+        dtField (v, s) = parens $ v <+> s
+
+showDefineFun :: Doc -> [(Doc, Doc)] -> Doc -> Doc -> Doc
+showDefineFun fName fArgs fRet fBody =
+  parens $ sep [ text "define-fun", fName, parenList fArgs, fRet, fBody ]
+
+showDefineFunRec :: Doc -> [(Doc, Doc)] -> Doc -> Doc -> Doc
+showDefineFunRec fName fArgs fRet fBody =
+  parens $ sep [ text "define-fun-rec", fName, parenList fArgs, fRet, fBody ]
 
 -- internal helpers specific to blarney netlists
 --------------------------------------------------------------------------------
@@ -204,25 +224,38 @@ showSort :: Netlist -> WireId -> Doc
 showSort nl (instId, m_outnm) = showBVSort w
   where w = primOutWidth (netPrim $ getNet nl instId) m_outnm
 
-showDeclareRecordType :: Doc -> [Doc] -> [(Doc, Doc)] -> Doc
-showDeclareRecordType dtName dtParams dtFields =
-  parens $ sep [ text "declare-datatype", dtName, dtDef ]
-  where dtDef = parBind dtParams $ parens dtCons
-        dtCons = parens $ sep $ (text "mk" <> dtName) : (map mkField dtFields)
-        mkField (v, s) = parens $ v <+> s
+showCreateListX :: [String] -> String -> Doc
+showCreateListX [] lstSort = qualify (text "nil")
+                                     (text $ "(ListX "++lstSort++")")
+showCreateListX (e:es) lstSort = parens $ sep [ text "cons "
+                                              , text e
+                                              , showCreateListX es lstSort ]
+showDefineAndReduce :: Doc
+showDefineAndReduce =
+  showDefineFunRec (text "andReduce")
+                   [ (text "lst", text "(ListX Bool)") ]
+                   (text "Bool")
+                   fBody
+  where fBody = matchBind (text "lst")
+                          [ (text "nil", text "true")
+                          , ( text "(cons h t)"
+                            , invokeFun (text "and")
+                                        [ text "h"
+                                        , invokeFun (text "andReduce")
+                                                    [text "t"] ] ) ]
 
 showDeclareNLDatatype :: Netlist -> [InstId] -> Doc -> Doc
 showDeclareNLDatatype nl netIds dtNm =
-  showDeclareRecordType dtNm [] $ map mkField netIds
+  showDeclareDataType dtNm [] [(text "mk" <> dtNm, map mkField netIds)]
   where mkField nId = let wId = (nId, Nothing)
                       in  (showWire nl wId, showSort nl wId)
 
 showDefineTransition :: Netlist -> Net -> [InstId] -> Doc -> Doc
 showDefineTransition nl n@Net { netPrim = Output _ nm
                               , netInputs = [e0] } state name =
-  parens $ sep [ text "define-fun", name, fArgs, fRet, fBody ]
-  where fArgs = parens $ hsep [ parens (text "inpts Inputs")
-                              , parens (text "prev State") ]
+  showDefineFun name fArgs fRet fBody
+  where fArgs = [ (text "inpts", text "Inputs")
+                , (text "prev",  text "State") ]
         fRet  = text "(Pair Bool State)"
         fBody = withBoundNets nl filtered $ newPair assertE stateUpdtE
         newPair a b = parens $ text "mkPair" <+> sep [a, b]
@@ -241,27 +274,41 @@ showDefineTransition nl n@Net { netPrim = Output _ nm
 showDefineTransition _ n _ _ =
   error $ "SMT2 backend error: cannot showDefineTransition on " ++ show n
 
-invokeTransition :: Doc -> Doc -> Doc -> Doc
-invokeTransition tFun tInpts tInitSt = parens $ hsep [ tFun, tInpts, tInitSt ]
+invokeFun :: Doc -> [Doc] -> Doc
+invokeFun fName fArgs = parens . sep $ fName : fArgs
+
+showDefineChainTransition :: Doc -> Doc
+showDefineChainTransition name =
+  showDefineFunRec cName [ (text "inpts", text "(ListX Inputs)")
+                         , (text "prevS", text "State") ]
+                         (text "(Pair (ListX Bool) State)") fBody
+  where cName = text "chain_" <> name
+        fBody = matchBind (text "inpts")
+                          [ (text "nil", lastRet)
+                          , (text "(cons h t)", matchInvokeT) ]
+        lastRet = parens $ sep [ text "mkPair"
+                               , qualify (text "nil") (text "(ListX Bool)")
+                               , text "prevS" ]
+        matchInvokeT = matchBind (invokeFun name [text "h", text "prevS"])
+                                 [(text "(mkPair ok nextS)", matchRecCall)]
+        matchRecCall = matchBind (parens $ sep [cName, text "t", text "nextS"])
+                                 [( text "(mkPair oks finalS)"
+                                  , text "(mkPair (cons ok oks) finalS)")]
 
 showBaseCase :: [(Integer, InputWidth)] -> Doc -> Doc
-showBaseCase initState tFun =
-      text "(push)"
-  $+$ toplvlIns
-  $+$ parens (sep [ text "assert"
-                  , letBind initStateArg $
-                      matchBind invoke
-                        [( parens $ text "mkPair ok next"
-                         , body )]])
-  $+$ text "(check-sat)"
-  $+$ text "(pop)"
-  where toplvlIns = text "(declare-const inpts Inputs)"
-        body = parens $ text "= ok true"
+showBaseCase initS fun =
+  text "(push)" $+$ decls $+$ assertion $+$ text "(check-sat)" $+$ text "(pop)"
+  where decls = vcat [ text "(declare-const in0 Inputs)"
+                     , text "(declare-const in1 Inputs)" ]
+        assertion = parens $ sep [ text "assert", letBind bindArgs matchInvoke ]
+        bindArgs = [ (text "inpts", showCreateListX ["in0", "in1"] "Inputs")
+                   , (text "initS", createState initS) ]
         createState [] = text "mkState"
         createState xs = parens $   text "mkState"
                                 <+> sep (map (\(v, w) -> int2bv w v) xs)
-        initStateArg = [(text "initState", createState initState)]
-        invoke = invokeTransition tFun (text "inpts") (text "initState")
+        matchInvoke = matchBind (invokeFun fun [text "inpts", text "initS"])
+                                [( text "(mkPair oks endS)"
+                                 , invokeFun (text "andReduce") [text "oks"] )]
 
 showInductionStep :: Doc -> Doc
 showInductionStep tFun =
@@ -281,17 +328,23 @@ showInductionStep tFun =
         body = parens $ sep [ text "and"
                             , parens $ text "= ok0 true"
                             , parens $ text "= ok1 true" ]
-        invoke0 = invokeTransition tFun (text "inpts0") (text "initState")
-        invoke1 = invokeTransition tFun (text "inpts1") (text "next0")
+        invoke0 = invokeFun tFun [text "inpts0", text "initState"]
+        invoke1 = invokeFun tFun [text "inpts1", text "next0"]
 
 showAll :: Netlist -> Net -> Doc
 showAll nl n@Net { netPrim = Output _ nm, netInputs = [e0] } =
       char ';' <> text (replicate 79 '-')
   $+$ text "; Defining a generic Pair sort"
-  $+$ showDeclareRecordType (text "Pair") [ text "X"
-                                          , text "Y" ]
-                                          [ (text "fst", text "X")
-                                          , (text "snd", text "Y") ]
+  $+$ showDeclareDataType (text "Pair") [ text "X", text "Y" ]
+                          [ (text "mkPair", [ (text "fst", text "X")
+                                            , (text "snd", text "Y") ]) ]
+  $+$ text "; Defining a generic ListX sort"
+  $+$ showDeclareDataType (text "ListX") [ text "X" ]
+                          [ (text "nil", [])
+                          , (text "cons", [ (text "head", text "X")
+                                          , (text "tail", text "(ListX X)") ]) ]
+  $+$ text "; Defining an \"and\" reduction function for ListX Bool"
+  $+$ showDefineAndReduce
   $+$ char ';' <> text (replicate 79 '-')
   $+$ text "; Defining the Inputs record type specific to the current netlist"
   $+$ showDeclareNLDatatype nl inputIds (text "Inputs")
@@ -302,8 +355,11 @@ showAll nl n@Net { netPrim = Output _ nm, netInputs = [e0] } =
   $+$ text "; Defining the transition function specific to the current netlist"
   $+$ showDefineTransition nl n stateIds fName
   $+$ char ';' <> text (replicate 79 '-')
+  $+$ text "; Defining the recursive chaining of the transition function"
+  $+$ showDefineChainTransition fName
+  $+$ char ';' <> text (replicate 79 '-')
   $+$ text "; Base case"
-  $+$ showBaseCase stateInits fName
+  $+$ showBaseCase stateInits (text "chain_" <> fName)
   $+$ char ';' <> text (replicate 79 '-')
   $+$ text "; Induction step"
   $+$ showInductionStep fName
