@@ -143,6 +143,18 @@ showDefineFunRec :: Doc -> [(Doc, Doc)] -> Doc -> Doc -> Doc
 showDefineFunRec fName fArgs fRet fBody =
   applyOp (text "define-fun-rec") [ fName, plist fArgs, fRet, fBody ]
 
+-- | argument is a list of tuples representing one function:
+--   the name, a potentially empty list of arguments, a return type and
+--   a function body
+showDefineFunsRec :: [(String, [(String, String)], String, Doc)] -> Doc
+showDefineFunsRec fs = applyOp (text "define-funs-rec") [ psep fDecls
+                                                        , psep fDefs ]
+  where (fDecls, fDefs) = unzip $ fmt <$> fs
+        fmt (nm, as, r, body) = ( psep [ text nm
+                                       , plist [(text a, text b) | (a,b) <- as]
+                                       , text r ]
+                                , body )
+
 -- internal helpers specific to blarney netlists
 --------------------------------------------------------------------------------
 
@@ -169,6 +181,7 @@ showPrim (SignExtend iw ow) [i] =
         sgn_var = char 's'
         msb_idx = iw - 1
 showPrim (SelectBits _ hi lo) [i] = showBVSlice hi lo i
+showPrim (Not _) ins = applyOp (text "bvneg")  ins
 -- binary / multary primitives
 showPrim (Add _)               ins = applyOp (text "bvadd")  ins
 showPrim (Sub _)               ins = applyOp (text "bvsub")  ins
@@ -178,7 +191,6 @@ showPrim (Mod _)               ins = applyOp (text "bvmod")  ins
 showPrim (And _)               ins = applyOp (text "bvand")  ins
 showPrim (Or _)                ins = applyOp (text "bvor")   ins
 showPrim (Xor _)               ins = applyOp (text "bvxor")  ins
-showPrim (Not _)               ins = applyOp (text "bvneg")  ins
 showPrim (ShiftLeft _ _)       ins = applyOp (text "bvshl")  ins
 showPrim (ShiftRight _ _)      ins = applyOp (text "bvlshr") ins
 showPrim (ArithShiftRight _ _) ins = applyOp (text "bvashr") ins
@@ -249,7 +261,7 @@ showDefineTuples ns = showDeclareDataTypes $ decl <$> nub ns
 showCreateListX :: [String] -> String -> Doc
 showCreateListX [] lstSort = qualify (text "nil")
                                      (text $ "(ListX "++lstSort++")")
-showCreateListX (e:es) lstSort = applyOp (text "cons ")
+showCreateListX (e:es) lstSort = applyOp (text "cons")
                                          [ text e
                                          , showCreateListX es lstSort ]
 showDefineAndReduce :: Doc
@@ -286,6 +298,52 @@ showDeclareNLDatatype nl netIds dtNm =
   where mkField nId = let wId = (nId, Nothing)
                       in  (wireName nl wId, strSort nl wId)
 
+showDefineDistinctState :: Doc
+showDefineDistinctState = showDefineFunsRec
+  [ ( "distinctStates", [ ("lst", "(ListX State)") ], "Bool"
+    , applyOp (text "distinctStatePairs")
+              [applyOp (text "allStatePairs") [text "lst"]])
+  , ( "distinctStatePairs", [ ("lst", "(ListX (Tuple2 State State))") ], "Bool"
+    , matchBind (text "lst")
+                [ ( text "nil", text "true" )
+                , ( text "(cons h t)"
+                  , applyOp (text "and") [ matchBind (text "h")
+                                                     [( text "(mkTuple2 a b)"
+                                                     , text "(distinct a b)" )]
+                                         , applyOp (text "distinctStatePairs")
+                                                   [ text "t" ]])])
+  , ( "allStatePairs", [ ("lst", "(ListX State)") ]
+    , "(ListX (Tuple2 State State))"
+    , matchBind (text "lst") [ ( text "nil"
+                               , qualify (text "nil")
+                                         (text "(ListX (Tuple2 State State))"))
+                             , ( text "(cons h t)"
+                               , applyOp (text "appendStatePairs")
+                                         [ applyOp (text "pairWithState")
+                                                   [ text "h", text "t" ]
+                                         , applyOp (text "allStatePairs")
+                                                   [ text "t" ]])])
+  , ( "appendStatePairs", [ ("xs", "(ListX (Tuple2 State State))")
+                          , ("ys", "(ListX (Tuple2 State State))") ]
+    , "(ListX (Tuple2 State State))"
+    , matchBind (text "xs") [ ( text "nil", text "ys" )
+                            , ( text "(cons h t)"
+                              , applyOp (text "cons")
+                                        [ text "h"
+                                        , applyOp (text "appendStatePairs")
+                                                  [ text "t", text "ys" ]])])
+  , ( "pairWithState", [ ("s", "State"), ("ss", "(ListX State)") ]
+    , "(ListX (Tuple2 State State))"
+    , matchBind (text "ss") [ ( text "nil"
+                              , qualify (text "nil")
+                                        (text "(ListX (Tuple2 State State))"))
+                            , ( text "(cons h t)"
+                              , applyOp (text "cons")
+                                        [ applyOp (text "mkTuple2")
+                                                  [ text "s", text "h" ]
+                                        , applyOp (text "pairWithState")
+                                                  [ text "s", text "t" ]])])]
+
 showDefineTransition :: Netlist -> Net -> [InstId] -> String -> Doc
 showDefineTransition nl n@Net { netPrim = Output _ nm
                               , netInputs = [e0] } state name =
@@ -312,20 +370,26 @@ showDefineTransition _ n _ _ =
 
 showDefineChainTransition :: String -> String -> Doc
 showDefineChainTransition tName cName =
-  showDefineFunRec (text cName) [ (text "inpts", text "(ListX Inputs)")
-                                , (text "prevS", text "State") ]
-                                (text "(Tuple2 (ListX Bool) State)") fBody
+  showDefineFunRec (text cName)
+                   [ (text "inpts", text "(ListX Inputs)")
+                   , (text "prevS", text "State") ]
+                   (text "(Tuple2 (ListX Bool) (ListX State))") fBody
   where fBody = matchBind (text "inpts")
                           [ (text "nil", lastRet)
                           , (text "(cons h t)", matchInvokeT) ]
         lastRet = applyOp (text "mkTuple2")
                           [ qualify (text "nil") (text "(ListX Bool)")
-                          , text "prevS" ]
+                          , applyOp (text "cons")
+                                    [ text "prevS"
+                                    , qualify (text "nil")
+                                              (text "(ListX State)") ] ]
         matchInvokeT = matchBind (applyOp (text tName) [text "h", text "prevS"])
                                  [(text "(mkTuple2 ok nextS)", matchRecCall)]
         matchRecCall = matchBind (applyOp (text cName) [text "t", text "nextS"])
-                                 [( text "(mkTuple2 oks finalS)"
-                                  , text "(mkTuple2 (cons ok oks) finalS)")]
+                                 [( text "(mkTuple2 oks ss)", recRet)]
+        recRet = applyOp (text "mkTuple2")
+                         [ applyOp (text "cons") [text "ok", text "oks"]
+                         , applyOp (text "cons") [text "nextS", text "ss"] ]
 
 showBaseCase :: String -> [(Integer, InputWidth)] -> Int -> Doc
 showBaseCase tFun initS depth =
@@ -341,13 +405,13 @@ showBaseCase tFun initS depth =
                                 <+> sep (map (\(v, w) -> int2bv w v) xs)
         matchInvoke = matchBind (applyOp (text tFun)
                                          [text "inpts", text "initS"])
-                                [( text "(mkTuple2 oks endS)"
+                                [( text "(mkTuple2 oks ss)"
                                  , applyOp (text "not")
                                            [applyOp (text "andReduce")
                                                     [text "oks"]] )]
 
-showInductionStep :: String -> Int -> Doc
-showInductionStep tFun depth =
+showInductionStep :: String -> Int -> Bool -> Doc
+showInductionStep tFun depth restrict =
   text "(push)" $+$ decls $+$ assertion $+$ text "(check-sat)" $+$ text "(pop)"
   where inpts = [ "in" ++ show i | i <- [0 .. depth] ]
         decls = vcat $ (text "(declare-const startS State)") :
@@ -357,10 +421,12 @@ showInductionStep tFun depth =
         bindArgs = [ (text "inpts", showCreateListX inpts "Inputs") ]
         matchInvoke = matchBind (applyOp (text tFun)
                                          [text "inpts", text "startS"])
-                                [( text "(mkTuple2 oks endS)"
-                                 , applyOp (text "not")
-                                           [applyOp (text "impliesReduce")
-                                                    [text "oks"]] )]
+                                [( text "(mkTuple2 oks ss)"
+                                 , applyOp (text "not") [propHolds] )]
+        propHolds = applyOp (text "and") $
+                            [ applyOp (text "impliesReduce") [text "oks"] ]
+                            ++ [ applyOp (text "distinctStates") [text "ss"]
+                               | restrict ]
 
 showAll :: Netlist -> Net -> Doc
 showAll nl n@Net { netPrim = Output _ nm, netInputs = [e0] } =
@@ -393,9 +459,14 @@ showAll nl n@Net { netPrim = Output _ nm, netInputs = [e0] } =
   $+$ text "; Base case"
   $+$ showBaseCase cFunName stateInits depth
   $+$ char ';' <> text (replicate 79 '-')
+  $+$ (if restrictStates then
+             text "; Defining helpers for restricted state checking"
+         $+$ showDefineDistinctState
+       else empty)
   $+$ text "; Induction step"
-  $+$ showInductionStep cFunName depth
-  where depth = 5
+  $+$ showInductionStep cFunName depth restrictStates
+  where depth = 1 -- MUST BE AT LEAST 1
+        restrictStates = False -- XXX TODO still WIP
         tFunName = "t_" ++ nm
         cFunName = "chain_" ++ tFunName
         inputIds = [ netInstId n | Just n@Net{netPrim = p} <- elems nl
