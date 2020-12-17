@@ -199,6 +199,12 @@ showPrim (LessThan _)          ins = applyOp (text "bvult")  ins
 showPrim (LessThanEq _)        ins = applyOp (text "bvule")  ins
 showPrim (Equal _)    ins = bool2BV $ applyOp (text "=") ins
 showPrim (NotEqual w) ins = applyOp (text "bvnot") [showPrim (Equal w) ins]
+showPrim (Mux n w) (sel:ins) = mux $ zip [0..] ins
+  where selSz = (ceiling . logBase 2 . fromIntegral) n
+        mux ((_,e):[]) = e
+        mux ((i,e):xs) = applyOp (text "ite")
+                                 [ applyOp (text "=") [sel, int2bv selSz i]
+                                 , e, mux xs ]
 -- unsupported primitives
 showPrim p ins = error $
   "SMT2 backend error: cannot showPrim Prim '" ++ show p ++ "'"
