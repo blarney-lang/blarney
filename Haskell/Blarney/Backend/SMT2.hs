@@ -222,30 +222,33 @@ wireName nl (iId, m_outnm) = name ++ richNm ++ outnm ++ "_" ++ show iId
                                 _       -> ""
         net = getNet nl iId
         richNm = case netPrim net of Input      _ nm -> "inpt_" ++ nm
-                                     Register   _ _  -> "reg"
                                      RegisterEn _ _  -> "reg"
+                                     Register   _ _  -> "reg"
                                      _               -> ""
         name = genName $ netNameHints net
 showWire :: Netlist -> WireId -> Doc
 showWire nl wId = text $ wireName nl wId
 
 -- | derive the SMT representation for a 'NetInput'
-showNetInput :: Netlist -> NetInput -> Doc
-showNetInput nl (InputWire (nId, m_nm)) = case netPrim $ getNet nl nId of
-  Input    _ _ -> parens $ showWire nl (nId, m_nm) <+> text "inpts"
-  Register _ _ -> parens $ showWire nl (nId, m_nm) <+> text "prev"
-  _            -> showWire nl (nId, m_nm)
-showNetInput nl (InputTree p ins) = showPrim p (showNetInput nl <$> ins)
+showNetInput :: (Netlist, String, String) -> NetInput -> Doc
+showNetInput (nl, inpts, state) (InputWire (nId, m_nm)) =
+  case netPrim $ getNet nl nId of
+    Input      _ _ -> parens $ showWire nl (nId, m_nm) <+> text inpts
+    RegisterEn _ _ -> parens $ showWire nl (nId, m_nm) <+> text state
+    Register   _ _ -> parens $ showWire nl (nId, m_nm) <+> text state
+    _              -> showWire nl (nId, m_nm)
+showNetInput ctx (InputTree p ins) = showPrim p (showNetInput ctx <$> ins)
 
 -- | derive the SMT representation for a net
-showNet :: Netlist -> InstId -> Doc
-showNet nl instId = showPrim (netPrim net) (showNetInput nl <$> netInputs net)
+showNet :: (Netlist, String, String) -> InstId -> Doc
+showNet ctx@(nl, _, _) instId =
+  showPrim (netPrim net) (showNetInput ctx <$> netInputs net)
   where net = getNet nl instId
 
-withBoundNets :: Netlist -> [InstId] -> Doc -> Doc
+withBoundNets :: (Netlist, String, String) -> [InstId] -> Doc -> Doc
 withBoundNets _ [] doc = doc
-withBoundNets nl instIds doc = nestLetBind decls doc
-  where decls = map (\i -> [(showWire nl (i, Nothing), showNet nl i)]) instIds
+withBoundNets ctx@(nl, _, _) instIds doc = nestLetBind decls doc
+  where decls = map (\i -> [(showWire nl (i, Nothing), showNet ctx i)]) instIds
 
 strSort :: Netlist -> WireId -> String
 strSort nl (instId, m_outnm) = strBVSort w
@@ -300,71 +303,56 @@ showDeclareNLDatatype nl netIds dtNm =
 
 showDefineDistinctState :: Doc
 showDefineDistinctState = showDefineFunsRec
-  [ ( "distinctStates", [ ("lst", "(ListX State)") ], "Bool"
-    , applyOp (text "distinctStatePairs")
-              [applyOp (text "allStatePairs") [text "lst"]])
-  , ( "distinctStatePairs", [ ("lst", "(ListX (Tuple2 State State))") ], "Bool"
+  [ ( "allDifferent", [ ("lst", "(ListX State)") ], "Bool"
     , matchBind (text "lst")
                 [ ( text "nil", text "true" )
                 , ( text "(cons h t)"
-                  , applyOp (text "and") [ matchBind (text "h")
-                                                     [( text "(mkTuple2 a b)"
-                                                     , text "(distinct a b)" )]
-                                         , applyOp (text "distinctStatePairs")
+                  , applyOp (text "and") [ applyOp (text "distinctFromStates")
+                                                   [text "h", text "t"]
+                                         , applyOp (text "allDifferent")
                                                    [ text "t" ]])])
-  , ( "allStatePairs", [ ("lst", "(ListX State)") ]
-    , "(ListX (Tuple2 State State))"
-    , matchBind (text "lst") [ ( text "nil"
-                               , qualify (text "nil")
-                                         (text "(ListX (Tuple2 State State))"))
-                             , ( text "(cons h t)"
-                               , applyOp (text "appendStatePairs")
-                                         [ applyOp (text "pairWithState")
-                                                   [ text "h", text "t" ]
-                                         , applyOp (text "allStatePairs")
-                                                   [ text "t" ]])])
-  , ( "appendStatePairs", [ ("xs", "(ListX (Tuple2 State State))")
-                          , ("ys", "(ListX (Tuple2 State State))") ]
-    , "(ListX (Tuple2 State State))"
-    , matchBind (text "xs") [ ( text "nil", text "ys" )
-                            , ( text "(cons h t)"
-                              , applyOp (text "cons")
-                                        [ text "h"
-                                        , applyOp (text "appendStatePairs")
-                                                  [ text "t", text "ys" ]])])
-  , ( "pairWithState", [ ("s", "State"), ("ss", "(ListX State)") ]
-    , "(ListX (Tuple2 State State))"
-    , matchBind (text "ss") [ ( text "nil"
-                              , qualify (text "nil")
-                                        (text "(ListX (Tuple2 State State))"))
-                            , ( text "(cons h t)"
-                              , applyOp (text "cons")
-                                        [ applyOp (text "mkTuple2")
-                                                  [ text "s", text "h" ]
-                                        , applyOp (text "pairWithState")
-                                                  [ text "s", text "t" ]])])]
+  , ( "distinctFromStates", [ ("s", "State"), ("ss", "(ListX State)") ], "Bool"
+    , matchBind (text "ss")
+                [ ( text "nil", text "true" )
+                , ( text "(cons h t)"
+                  , applyOp (text "and")
+                            [ applyOp (text "distinct") [text "s", text "h"]
+                            , applyOp (text "distinctFromStates")
+                                      [ text "s", text "t" ]])])]
 
 showDefineTransition :: Netlist -> Net -> [InstId] -> String -> Doc
 showDefineTransition nl n@Net { netPrim = Output _ nm
                               , netInputs = [e0] } state name =
   showDefineFun (text name) fArgs fRet fBody
-  where fArgs = [ (text "inpts", text "Inputs")
-                , (text "prev",  text "State") ]
+  where inVar = "inpts"
+        stVar = "prev"
+        ctx = (nl, inVar, stVar)
+        fArgs = [ (text inVar, text "Inputs")
+                , (text stVar,  text "State") ]
         fRet  = text "(Tuple2 Bool State)"
-        fBody = withBoundNets nl filtered $ newTuple2 assertE stateUpdtE
+        fBody = withBoundNets ctx filtered $ newTuple2 assertE stateUpdtE
         newTuple2 a b = applyOp (text "mkTuple2") [a, b]
         dontPrune i = case netPrim (getNet nl i) of Input      _ _ -> False
-                                                    Register   _ _ -> False
                                                     RegisterEn _ _ -> False
+                                                    Register   _ _ -> False
                                                     Output     _ _ -> False
                                                     _              -> True
         sorted = topologicalSort nl
         filtered = [i | i <- sorted, dontPrune i]
-        assertE = bvIsTrue $ showNetInput nl e0
+        assertE = bvIsTrue $ showNetInput ctx e0
         stateUpdtE
           | null state = text "mkState"
           | otherwise  = applyOp (text "mkState") $ regsInpts state
-        regsInpts = map \i -> (showNetInput nl . head . netInputs . getNet nl) i
+        --regsInpts = map (showNetInput ctx . head . netInputs . getNet nl)
+        regsInpts = map (regInpts . getNet nl)
+        regInpts Net{ netInstId = idx
+                    , netPrim = RegisterEn _ _
+                    , netInputs = [en, regIn] } =
+          applyOp (text "ite") [ bvIsTrue $ showNetInput ctx en
+                               , showNetInput ctx regIn
+                               , psep [showWire nl (idx, Nothing), text stVar] ]
+        regInpts Net{ netPrim = Register _ _, netInputs = [inpt] } =
+          showNetInput ctx inpt
 showDefineTransition _ n _ _ =
   error $ "SMT2 backend error: cannot showDefineTransition on " ++ show n
 
@@ -423,10 +411,12 @@ showInductionStep tFun depth restrict =
                                          [text "inpts", text "startS"])
                                 [( text "(mkTuple2 oks ss)"
                                  , applyOp (text "not") [propHolds] )]
-        propHolds = applyOp (text "and") $
-                            [ applyOp (text "impliesReduce") [text "oks"] ]
-                            ++ [ applyOp (text "distinctStates") [text "ss"]
-                               | restrict ]
+        propHolds =
+          applyOp (text "impliesReduce")
+                  if not restrict then [ text "oks" ]
+                  else [ applyOp (text "cons")
+                                 [ applyOp (text "allDifferent") [text "ss"]
+                                 , text "oks" ]]
 
 showAll :: Netlist -> Net -> Doc
 showAll nl n@Net { netPrim = Output _ nm, netInputs = [e0] } =
@@ -513,8 +503,8 @@ topologicalSort nl = runST do
     -- identify leaf net
     isLeaf :: Net -> Bool
     isLeaf Net{ netPrim = Input      _ _ } = True
-    isLeaf Net{ netPrim = Register   _ _ } = True
     isLeaf Net{ netPrim = RegisterEn _ _ } = True
+    isLeaf Net{ netPrim = Register   _ _ } = True
     isLeaf _                               = False
     -- list insertion helper
     insert lst elem = modifySTRef' lst $ \xs -> elem : xs
