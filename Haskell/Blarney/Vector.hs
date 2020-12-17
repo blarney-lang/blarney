@@ -106,8 +106,8 @@ module Blarney.Vector (
 
 -- Blarney imports
 import Blarney
---import Blarney.BV
 import Blarney.Option
+import Blarney.Core.BV
 
 import qualified Data.List as L
 import qualified Data.Type.Bool as B
@@ -116,15 +116,22 @@ import Data.Type.Equality
 -- | 'Vec' type
 data Vec (n :: Nat) a = Vec { toList :: [a] } deriving (Generic, FShow)
 
-instance (Bits a, KnownNat n) => Bits (Vec n a) where
+instance (KnownNat n, Bits a) => Bits (Vec n a) where
   type SizeOf (Vec n a) = n * SizeOf a
-  sizeOf xs = sum $ fmap sizeOf (toList xs)
-  pack x = unsafeFromBitList $ concatMap (unsafeToBitList`o`pack) (toList x)
+  sizeOf xs = valueOf @n * sizeOf (error "sizeOf: _|_ " :: a)
+  pack x
+    | null xs = FromBV $ constBV 0 0
+    | otherwise = FromBV $ L.foldr1 concatBV $
+                    fmap toBV $ fmap pack $ L.reverse xs
+    where xs = toList x
   unpack x = Vec xs
-             where idxs = L.take (valueOf @n + 1)
-                                 [0, (unsafeWidthOf x `div` valueOf @n)..]
-                   ranges = L.zip (fmap pred $ L.tail idxs) idxs
-                   xs = fmap unpack [unsafeSlice range x | range <- ranges]
+    where
+      len = valueOf @n
+      xs  = [ let bits = unsafeSlice ((w*i)-1, w*(i-1)) x
+                  elem = unpack bits
+                  w    = sizeOf elem
+              in elem
+            | i <- [1..len] ]
   nameBits nm xs = Vec [ nameBits (nm ++ "_vec_" ++ show i) b
                        | (i,b) <- L.zip [0..] (toList xs) ]
 
