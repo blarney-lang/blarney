@@ -147,7 +147,12 @@ evalConstNet n@Net{ netPrim = Mux _ w, netInputs = (Lit s):xs } =
   (n { netPrim = Identity w, netInputs = [xs !! fromInteger s] }, True)
 -- Identity
 evalConstNet n@Net{ netPrim = Identity w, netInputs = [Lit a0] } =
-  (n { netPrim   = Const w a0, netInputs = [] }, True)
+  (n { netPrim = Const w a0, netInputs = [] }, True)
+-- RegisterEn
+evalConstNet n@Net{ netPrim = RegisterEn i w, netInputs = [Lit 0, a] } =
+  (n { netPrim = Const w i, netInputs = [] }, True)
+evalConstNet n@Net{ netPrim = RegisterEn i w, netInputs = [Lit 1, a] } =
+  (n { netPrim = Register i w, netInputs = [a] }, True)
 -- Fall-through case, no change
 evalConstNet n = (n, False)
 
