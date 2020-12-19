@@ -53,6 +53,8 @@ module Blarney.Core.RTL (
 , display         -- Display statement
 , display_        -- Display statement (without newline)
 , finish          -- Terminate simulator
+  -- * Assertions
+, assert          -- assertion of a predicate
   -- * External inputs and outputs
 , input           -- Declare module input
 , output          -- Declare module output
@@ -307,6 +309,12 @@ finish :: RTL ()
 finish = do
   r <- ask
   let root = makePrim0 Finish [toBV (cond r)]
+  write (RTLRoots [root])
+
+-- | Assert that a predicate holds
+assert :: (Bits a, SizeOf a ~ 1) => a -> String -> String -> RTL ()
+assert pred nm msg = do
+  let root = makePrim0 (Assert nm msg) [toBV $ pack pred]
   write (RTLRoots [root])
 
 -- |To support a display statement with variable number of arguments

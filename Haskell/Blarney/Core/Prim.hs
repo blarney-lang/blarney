@@ -2,7 +2,7 @@
 Module      : Blarney.Core.Prim
 Description : circuit primitives
 Copyright   : (c) Matthew Naylor, 2019
-              (c) Alexandre Joannou, 2019
+              (c) Alexandre Joannou, 2019-2020
 License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
@@ -198,6 +198,11 @@ data Prim =
   | Finish
     -- | Test presence of plusargs (output: 1-bit boolean)
   | TestPlusArgs String
+
+    -- | Assertion that a predicate holds (1 input, 0 outputs)
+    --   First argument is the property's name
+    --   Second argument is an assertion message
+  | Assert String String
 
     -- | Register file declaration
     --   (only used in RTL context, not expression context)
@@ -567,6 +572,13 @@ primInfo (TestPlusArgs arg) = PrimInfo { isInlineable = False
                                        , isRoot = True
                                        , inputs = []
                                        , outputs = [("out", 1)] }
+primInfo (Assert _ _) = PrimInfo { isInlineable = False
+                                 , inputsInlineable = True
+                                 , strRep = "Assert"
+                                 , dontKill = True
+                                 , isRoot = True
+                                 , inputs = [("in", 1)]
+                                 , outputs = [] }
 primInfo RegFileMake{} =
   PrimInfo { isInlineable = False
            , inputsInlineable = True

@@ -63,7 +63,7 @@ module Blarney.Core.Module
     RegFile(..), makeRegFileInit, makeRegFile,
 
     -- * Other actions
-    finish, RTL.display, RTL.display_, dynamicAssert, staticAssert,
+    finish, RTL.display, RTL.display_, assert, dynamicAssert, staticAssert,
 
     -- * External inputs and outputs
     input, inputBV, output, outputBV,
@@ -281,9 +281,13 @@ makeRegFileInit initFile = M (liftM toRegFile $ RTL.makeRegFileInit initFile)
 makeRegFile :: forall a d. (Bits a, Bits d) => Module (RegFile a d)
 makeRegFile = M (liftM toRegFile RTL.makeRegFile)
 
--- |Terminate simulator
+-- | Terminate simulator
 finish :: Action ()
 finish = A RTL.finish
+
+-- | Assert that a predicate holds
+assert :: (Bits a, SizeOf a ~ 1) => a -> String -> String -> Action ()
+assert pred nm msg = A $ RTL.assert pred nm msg
 
 -- |Simulation-time assertion
 dynamicAssert :: Bit 1 -> String -> Action ()

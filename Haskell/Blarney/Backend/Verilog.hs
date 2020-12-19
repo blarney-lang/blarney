@@ -213,6 +213,7 @@ genNetVerilog netlist net = case netPrim net of
   Input w s               -> dfltNV { decl = Just $ declWire w wId
                                     , inst = Just $ instInput net s }
   Output w s              -> dfltNV { inst = Just $ instOutput net s }
+  Assert nm msg           -> dfltNV { alws = Just $ alwsAssert net nm msg }
   RegFileMake rfinfo
     -> dfltNV { decl = Just $ declRegFile rfinfo }
   RegFileRead RegFileInfo{ regFileId = vId, regFileDataWidth = w }
@@ -480,3 +481,9 @@ genNetVerilog netlist net = case netPrim net of
         text "if" <+> parens (showNetInput (netInputs net !! 0) <+> text "== 1")
     <+> text "rf" <> int id <> brackets (showNetInput (netInputs net !! 1))
     <+> text "<=" <+> showNetInput (netInputs net !! 2) <> semi
+  alwsAssert Net{netInputs=[x]} _ msg = hang ifStmt 2 ifBody $+$ text "end"
+    where
+      ifStmt = text "if" <+> parens (showNetInput x <+> text "== 0")
+                         <+> text "begin"
+      ifBody =     text "$write" <> parens (doubleQuotes $ text msg) <> semi
+               $+$ text "$finish" <> semi

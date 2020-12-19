@@ -44,13 +44,10 @@ genSMT2Script :: Netlist -- ^ blarney netlist
 genSMT2Script nl nm dir =
   do system ("mkdir -p " ++ dir)
      h <- openFile fileName WriteMode
-     hPutStr h (renderStyle rStyle $ showAll nl (head outputs))
+     hPutStr h (renderStyle rStyle $ showAll nl)
      hClose h
   where fileName = dir ++ "/" ++ nm ++ ".smt2"
         rStyle = Style PageMode 80 1.05
-        outputs = [ n | Just n@Net{netPrim=p} <- elems nl
-                      , case p of Output _ _ -> True
-                                  _          -> False ]
 
 -- basic internal helpers for pretty printing SMT-lib bit vector code
 --------------------------------------------------------------------------------
@@ -169,7 +166,7 @@ getNet nl i = fromMaybe err (nl ! i)
 showPrim :: Prim -> [Doc] -> Doc
 -- nullary primitives
 showPrim (Const w n)  [] = int2bv w n
-showPrim (DontCare w) [] = existsBind [(char 'x', showBVSort w)] (char 'x')
+showPrim (DontCare w) [] = int2bv w 0 -- XXX TODO make toplevel existential var -- existsBind [(char 'x', showBVSort w)] (char 'x')
 -- unary primitives
 showPrim (Identity _) [i] = i
 showPrim (ReplicateBit w) [i] = applyOp (text "concat") (replicate w i)
@@ -327,9 +324,13 @@ showDefineDistinctState = showDefineFunsRec
                                       [ text "s", text "t" ]])])]
 
 showDefineTransition :: Netlist -> Net -> [InstId] -> String -> Doc
-showDefineTransition nl n@Net { netPrim = Output _ nm
-                              , netInputs = [e0] } state name =
-  showDefineFun (text name) fArgs fRet fBody
+showDefineTransition nl n@Net { netPrim = p, netInputs = ins } state name
+  | case p of Output _ _ -> True
+              Assert _ _ -> True
+              _          -> False =
+    showDefineFun (text name) fArgs fRet fBody
+  | otherwise = error $ "SMT2 backend error: cannot showDefineTransition on " ++
+                        show n
   where inVar = "inpts"
         stVar = "prev"
         ctx = (nl, inVar, stVar)
@@ -342,14 +343,14 @@ showDefineTransition nl n@Net { netPrim = Output _ nm
                                                     RegisterEn _ _ -> False
                                                     Register   _ _ -> False
                                                     Output     _ _ -> False
+                                                    Assert     _ _ -> False
                                                     _              -> True
         sorted = topologicalSort nl
         filtered = [i | i <- sorted, dontPrune i]
-        assertE = bvIsTrue $ showNetInput ctx e0
+        assertE = bvIsTrue $ showNetInput ctx (head ins)
         stateUpdtE
           | null state = text "mkState"
           | otherwise  = applyOp (text "mkState") $ regsInpts state
-        --regsInpts = map (showNetInput ctx . head . netInputs . getNet nl)
         regsInpts = map (regInpts . getNet nl)
         regInpts Net{ netInstId = idx
                     , netPrim = RegisterEn _ _
@@ -359,8 +360,6 @@ showDefineTransition nl n@Net { netPrim = Output _ nm
                                , psep [showWire nl (idx, Nothing), text stVar] ]
         regInpts Net{ netPrim = Register _ _, netInputs = [inpt] } =
           showNetInput ctx inpt
-showDefineTransition _ n _ _ =
-  error $ "SMT2 backend error: cannot showDefineTransition on " ++ show n
 
 showDefineChainTransition :: String -> String -> Doc
 showDefineChainTransition tName cName =
@@ -385,9 +384,12 @@ showDefineChainTransition tName cName =
                          [ applyOp (text "cons") [text "ok", text "oks"]
                          , applyOp (text "cons") [text "nextS", text "ss"] ]
 
-showBaseCase :: String -> [(Integer, InputWidth)] -> Int -> Doc
-showBaseCase tFun initS depth =
-  text "(push)" $+$ decls $+$ assertion $+$ text "(check-sat)" $+$ text "(pop)"
+showBaseCase :: String -> [(Integer, InputWidth)] -> Int -> String -> Doc
+showBaseCase tFun initS depth propNm =
+      text "(push)" $+$ decls $+$ assertion
+  $+$ text (   "(echo \"Base case for property " ++ propNm
+            ++ ", induction depth " ++ show depth ++ "\")")
+  $+$ text "(check-sat)" $+$ text "(pop)"
   where inpts = [ "in" ++ show i | i <- [0 .. depth-1] ]
         decls = vcat $ map (\i -> text $ "(declare-const " ++ i ++ " Inputs)")
                            inpts
@@ -404,9 +406,13 @@ showBaseCase tFun initS depth =
                                            [applyOp (text "andReduce")
                                                     [text "oks"]] )]
 
-showInductionStep :: String -> Int -> Bool -> Doc
-showInductionStep tFun depth restrict =
-  text "(push)" $+$ decls $+$ assertion $+$ text "(check-sat)" $+$ text "(pop)"
+showInductionStep :: String -> Int -> Bool -> String -> Doc
+showInductionStep tFun depth restrict propNm =
+      text "(push)" $+$ decls $+$ assertion
+  $+$ text (   "(echo \"Induction step for property " ++ propNm
+            ++ ", induction depth " ++ show depth
+            ++ if restrict then " with restricted states\")" else "\")")
+  $+$ text "(check-sat)" $+$ text "(pop)"
   where inpts = [ "in" ++ show i | i <- [0 .. depth] ]
         decls = vcat $ (text "(declare-const startS State)") :
                        map (\i -> text $ "(declare-const " ++ i ++ " Inputs)")
@@ -424,46 +430,48 @@ showInductionStep tFun depth restrict =
                                  [ applyOp (text "allDifferent") [text "ss"]
                                  , text "oks" ]]
 
-showAll :: Netlist -> Net -> Doc
-showAll nl n@Net { netPrim = Output _ nm, netInputs = [e0] } =
+showAssert :: Netlist -> Net -> Doc
+showAssert nl net@Net{netPrim=prim} =
       char ';' <> text (replicate 79 '-')
-  $+$ text "; Defining Tuple sorts"
-  $+$ showDefineTuples [2, 3]
-  $+$ text "; Defining a generic ListX sort"
-  $+$ showDeclareDataType "ListX" ["X"] [ ("nil", [])
-                                        , ("cons", [ ("head", "X")
-                                                   , ("tail", "(ListX X)") ]) ]
-  $+$ text "; Defining an \"and\" reduction function for ListX Bool"
-  $+$ showDefineAndReduce
-  $+$ text "; Defining an \"implies\" reduction function for ListX Bool"
-  $+$ showDefineImpliesReduce
+  $+$ text ("; code gen for net" ++ show net)
   $+$ char ';' <> text (replicate 79 '-')
-  $+$ text "; Defining the Inputs record type specific to the current netlist"
+  $+$ text ("(push)")
+  $+$ char ';' <> text (replicate 79 '-')
+  $+$ text "; Defining the specific Inputs record type"
   $+$ showDeclareNLDatatype nl inputIds "Inputs"
   $+$ char ';' <> text (replicate 79 '-')
-  $+$ text "; Defining the State record type specific to the current netlist"
+  $+$ text "; Defining the specific State record type"
   $+$ showDeclareNLDatatype nl stateIds "State"
   $+$ char ';' <> text (replicate 79 '-')
-  $+$ text "; Defining the transition function specific to the current netlist"
-  $+$ showDefineTransition nl n stateIds tFunName
+  $+$ text "; Defining the specific transition function"
+  $+$ showDefineTransition nl net stateIds tFunName
   $+$ char ';' <> text (replicate 79 '-')
-  $+$ text "; Defining the recursive chaining of the transition function"
+  $+$ text "; Defining the specific chaining of the transition function"
   $+$ showDefineChainTransition tFunName cFunName
   $+$ char ';' <> text (replicate 79 '-')
   $+$ text "; Proof by induction, induction depth =" <+> int depth
   $+$ char ';' <> text (replicate 79 '-')
+  $+$ text ("(echo \"" ++ msg ++ "\")")
+  $+$ text ("(echo \"" ++ replicate 80 '-' ++ "\")")
   $+$ text "; Base case"
-  $+$ showBaseCase cFunName stateInits depth
+  $+$ showBaseCase cFunName stateInits depth nm
   $+$ char ';' <> text (replicate 79 '-')
   $+$ (if restrictStates then
              text "; Defining helpers for restricted state checking"
          $+$ showDefineDistinctState
        else empty)
   $+$ text "; Induction step"
-  $+$ showInductionStep cFunName depth restrictStates
-  where depth = 1 -- MUST BE AT LEAST 1
-        restrictStates = False -- XXX TODO still WIP
-        tFunName = "t_" ++ nm
+  $+$ showInductionStep cFunName depth restrictStates nm
+  $+$ text ("(echo \"" ++ replicate 80 '-' ++ "\")")
+  $+$ text ("(pop)")
+  where depth = 5 -- MUST BE AT LEAST 1
+        restrictStates = True
+        (nm, msg) = case prim of
+          Output _      outnm   -> ("output_"++outnm, outnm++" as predicate")
+          Assert propnm propmsg -> ("assert_"++propnm, propmsg)
+          _ -> error $ "SMT2 backend error: expected Output or Assert net " ++
+                       "but got " ++ show net
+        tFunName = "tFun_" ++ nm
         cFunName = "chain_" ++ tFunName
         inputIds = [ netInstId n | Just n@Net{netPrim = p} <- elems nl
                                  , case p of Input _ _ -> True
@@ -477,9 +485,31 @@ showAll nl n@Net { netPrim = Output _ nm, netInputs = [e0] } =
         stateInit Net{netPrim=RegisterEn init w} = (init, w)
         stateInit Net{netPrim=Register   init w} = (init, w)
         stateInit _ =
-          error $ "SMT2 backend error: encountered non state net " ++ show n ++
-                  " where one was expected"
-showAll _ n = error $ "SMT2 backend error: cannot showAll on'" ++ show n ++ "'"
+          error $ "SMT2 backend error: non state net " ++ show net ++
+                  " encountered where state net was expected"
+
+showAll :: Netlist -> Doc
+showAll nl =
+  -- general definitions
+      char ';' <> text (replicate 79 '-')
+  $+$ text "; Defining Tuple sorts"
+  $+$ showDefineTuples [2, 3]
+  $+$ text "; Defining a generic ListX sort"
+  $+$ showDeclareDataType "ListX" ["X"] [ ("nil", [])
+                                        , ("cons", [ ("head", "X")
+                                                   , ("tail", "(ListX X)") ]) ]
+  $+$ text "; Defining an \"and\" reduction function for ListX Bool"
+  $+$ showDefineAndReduce
+  $+$ text "; Defining an \"implies\" reduction function for ListX Bool"
+  $+$ showDefineImpliesReduce
+  -- show the transition function and the induction proof for each netlist root.
+  -- XXX TODO sort out showing transitions functions for each "root" and proofs
+  -- only for assert nets
+  $+$ vcat [ showAssert nl x | x <- roots ]
+  where roots = [ n | Just n@Net{netPrim=p} <- elems nl
+                    , case p of Output _ _ -> True
+                                Assert _ _ -> True
+                                _          -> False ]
 
 -- topological stort of a netlist
 -- TODO: move to Netlist passes module
@@ -494,8 +524,11 @@ topologicalSort nl = runST do
   -- initialise state for the topological sorting
   visited <- newArray (bounds nl) Unmarked -- track visit through the netlist
   sorted  <- newSTRef [] -- sorted list as a result
-  -- run the internal topological sort from all relevant root
-  mapM_ (topoSort visited sorted) relevantRoots
+  roots  <- newSTRef relevantRoots -- queue of roots to explore next
+  -- run the internal topological sort while there are roots to explore
+  whileM_ (notEmpty roots) do
+    root <- pop roots -- consume a root
+    topoSort visited sorted roots root -- explore from the consumed root
   -- return the sorted list of InstId
   reverse <$> readSTRef sorted
   -- helpers
@@ -505,19 +538,31 @@ topologicalSort nl = runST do
                                   , case p of RegisterEn _ _ -> True
                                               Register   _ _ -> True
                                               Output     _ _ -> True
+                                              Assert     _ _ -> True
                                               _              -> False ]
+
+    whileM_ :: Monad m => m Bool -> m a -> m ()
+    whileM_ pred act = pred >>= \x -> if x then act >> whileM_ pred act else return ()
     -- identify leaf net
     isLeaf :: Net -> Bool
     isLeaf Net{ netPrim = Input      _ _ } = True
     isLeaf Net{ netPrim = RegisterEn _ _ } = True
     isLeaf Net{ netPrim = Register   _ _ } = True
     isLeaf _                               = False
-    -- list insertion helper
-    insert lst elem = modifySTRef' lst $ \xs -> elem : xs
+    -- helpers to use an STRef [a] as a stack
+    push stck elem = modifySTRef' stck $ \xs -> elem : xs
+    pushN stck elems = modifySTRef' stck $ \xs -> elems ++ xs
+    pop stck = do top <- head <$> readSTRef stck
+                  modifySTRef' stck $ \xs -> tail xs
+                  return top
+    notEmpty stck = do l <- readSTRef stck
+                       return (not . null $ l)
     -- the actual recursive topological sort algorithm
-    topoSort :: STArray s InstId Mark -> STRef s [InstId] -> InstId
+    topoSort :: STArray s InstId Mark -> STRef s [InstId] -> STRef s [InstId]
+             -> InstId
              -> ST s ()
-    topoSort visited sorted netId = do
+    topoSort visited sorted roots netId = do
+      let net = getNet nl netId
       -- retrieve the 'visited' array entry for the current net
       netVisit <- readArray visited netId
       case netVisit of
@@ -525,20 +570,19 @@ topologicalSort nl = runST do
         Permanent -> return ()
         -- For nets under visit, we identified a combinational cycle
         -- (unsupported ==> error out)
-        Temporary -> do let net = getNet nl netId
-                        error $ "SMT2 backend error: " ++
-                                "combinational cycle detected -- " ++
-                                show net
+        Temporary -> error $ "SMT2 backend error: " ++
+                             "combinational cycle detected -- " ++ show net
         -- For new visits:
         Unmarked -> do
-          let net = getNet nl netId
-          -- For non leaf nets: mark net as temporarily under visit,
-          --                    explore all inputs recursively
-          when (not $ isLeaf net) do
-            writeArray visited netId Temporary
-            let allInputIds = concatMap (map fst . netInputWireIds)
-                                        (netInputs net)
-            mapM_ (topoSort visited sorted) allInputIds
+          let allInputIds = concatMap (map fst . netInputWireIds)
+                                      (netInputs net)
+          -- For leaf nets, strop here and mark inputs as roots for next
+          -- toplevel call
+          if isLeaf net then do pushN roots allInputIds
+          -- For non leaf nets, mark net as temporarily under visit and explore
+          -- all inputs recursively
+          else do writeArray visited netId Temporary
+                  mapM_ (topoSort visited sorted roots) allInputIds
           -- Mark net as permanent and insert it into the sorted list
           writeArray visited netId Permanent
-          insert sorted netId
+          push sorted netId

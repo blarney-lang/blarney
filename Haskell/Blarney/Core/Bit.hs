@@ -14,7 +14,7 @@
 Module      : Blarney.Core.Bit
 Description : Typed bit-vectors and circuit primitives
 Copyright   : (c) Matthew Naylor, 2019
-              (c) Alexandre Joannou, 2019
+              (c) Alexandre Joannou, 2019-2020
 License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
@@ -155,6 +155,10 @@ a .>>. b = FromBV $ rightBV (toBV a) (toBV b)
 infixl 8 .>>>.
 (.>>>.) :: Bit n -> Bit m -> Bit n
 a .>>>. b = FromBV $ arithRightBV (toBV a) (toBV b)
+
+infixr 3 .==>.
+(.==>.) :: Bit 1 -> Bit 1 -> Bit 1
+a .==>. b = inv $ a .&. inv b
 
 -- * Bit-vector comparison primitives
 

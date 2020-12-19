@@ -37,6 +37,12 @@ doom_adder x y = fromBitList $ listAdder 1 (toBitList x) (toBitList y)
 prop_add :: KnownNat n => (Bit n -> Bit n -> Bit n) -> Bit n -> Bit n -> Bit 1
 prop_add adder_imp x y = adder_imp x y .==. x + y
 
+testAssert :: KnownNat n => Bit n -> Bit n -> Module ()
+testAssert x y = always do assert (prop_add adder x y) "prop_add"
+                                  "the prop_add property"
+                           assert (prop_add doom_adder x y) "doom_prop_add"
+                                  "the doom_prop_add property"
+
 --------------------------------------------------------------------------------
 
 -- | Sequential full adder
@@ -57,6 +63,9 @@ main = do
   -- path to script output directory
   cwd <- getCurrentDirectory
   let smtDir = cwd ++ "/Adder-SMT2/"
+  let verilogDir = cwd ++ "/Adder-Verilog/"
+  -- verilog
+  writeVerilogModule (testAssert @4) "testAssert" verilogDir
   -- generate smt2 scripts
   writeSMT2Script (prop_add @2  adder)      "goodAdder2"    smtDir
   writeSMT2Script (prop_add @16 adder)      "goodAdder16"   smtDir
@@ -64,6 +73,7 @@ main = do
   writeSMT2Script (prop_add @16 doom_adder) "brokenAdder16" smtDir
   writeSMT2Script (prop_addSeq)       "goodAddSeq"   smtDir
   writeSMT2Script (prop_brokenAddSeq) "brokenAddSeq" smtDir
+  writeSMT2Script (testAssert @4) "testAssert" smtDir
   -- helper usage message
   putStrLn $ "SMT2 scripts generated under " ++ smtDir
   putStrLn $ "Run an SMT solver such as z3 with an SMT2 script as input:"
