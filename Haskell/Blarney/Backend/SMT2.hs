@@ -178,7 +178,7 @@ showPrim (SignExtend iw ow) [i] =
         sgn_var = char 's'
         msb_idx = iw - 1
 showPrim (SelectBits _ hi lo) [i] = showBVSlice hi lo i
-showPrim (Not _) ins = applyOp (text "bvneg")  ins
+showPrim (Not _) ins = applyOp (text "bvnot")  ins
 -- binary / multary primitives
 showPrim (Add _)               ins = applyOp (text "bvadd")  ins
 showPrim (Sub _)               ins = applyOp (text "bvsub")  ins
@@ -192,8 +192,8 @@ showPrim (ShiftLeft _ _)       ins = applyOp (text "bvshl")  ins
 showPrim (ShiftRight _ _)      ins = applyOp (text "bvlshr") ins
 showPrim (ArithShiftRight _ _) ins = applyOp (text "bvashr") ins
 showPrim (Concat _ _)          ins = applyOp (text "concat") ins
-showPrim (LessThan _)          ins = applyOp (text "bvult")  ins
-showPrim (LessThanEq _)        ins = applyOp (text "bvule")  ins
+showPrim (LessThan _)          ins = bool2BV $ applyOp (text "bvult")  ins
+showPrim (LessThanEq _)        ins = bool2BV $ applyOp (text "bvule")  ins
 showPrim (Equal _)    ins = bool2BV $ applyOp (text "=") ins
 showPrim (NotEqual w) ins = applyOp (text "bvnot") [showPrim (Equal w) ins]
 showPrim (Mux n w) (sel:ins) = mux $ zip [0..] ins
