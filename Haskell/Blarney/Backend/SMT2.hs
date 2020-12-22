@@ -306,7 +306,19 @@ showDeclareNLDatatype nl netIds dtNm =
 
 showDefineDistinctState :: Doc
 showDefineDistinctState = showDefineFunsRec
-  [ ( "allDifferent", [ ("lst", "(ListX State)") ], "Bool"
+  [ ( "listXStateInit", [ ("lst", "(ListX State)") ], "(ListX State)"
+    , matchBind (text "lst")
+                [ ( text "nil", qualify (text "nil") (text "(ListX State)"))
+                , ( text "(cons h t)"
+                  , matchBind (text "t")
+                              [ ( text "nil"
+                                , qualify (text "nil") (text "(ListX State)"))
+                              , ( text "(cons hh tt)"
+                                , applyOp (text "cons")
+                                          [ text "h"
+                                          , applyOp (text "listXStateInit")
+                                                    [ text "t" ]])])])
+  , ( "allDifferent", [ ("lst", "(ListX State)") ], "Bool"
     , matchBind (text "lst")
                 [ ( text "nil", text "true" )
                 , ( text "(cons h t)"
@@ -427,7 +439,9 @@ showInductionStep tFun depth restrict propNm =
           applyOp (text "impliesReduce")
                   if not restrict then [ text "oks" ]
                   else [ applyOp (text "cons")
-                                 [ applyOp (text "allDifferent") [text "ss"]
+                                 [ applyOp (text "allDifferent")
+                                           [applyOp (text "listXStateInit")
+                                                    [text "ss"]]
                                  , text "oks" ]]
 
 showAssert :: Netlist -> Net -> Doc
