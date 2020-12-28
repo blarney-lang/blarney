@@ -8,7 +8,7 @@ data QueueCmd a =
   , cmdDeq :: Action ()
   }
   deriving (Generic, Interface)
-cosim :: Bits a => Queue a -> Queue a -> Module (QueueCmd a)
+cosim :: (Num a, Bits a) => Queue a -> Queue a -> Module (QueueCmd a)
 cosim q1 q2 = do
   always do
     assert (q1.notFull .==. q2.notFull) "prop_notFull"

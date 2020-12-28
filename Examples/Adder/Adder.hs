@@ -5,16 +5,15 @@ import Blarney
 -- | Half adder taking two bits and returning a tuple with the carry bit first
 --   and the sum second
 halfAdder :: Bit 1 -> Bit 1 -> (Bit 1, Bit 1)
-halfAdder x y = (x .&. y, x .^. y)
+halfAdder a b = (a .&. b, a .^. b)
 
 -- | Full adder taking two bits and an input carry and returning a tuple with
 --   the output carry bit first and the sum second
 fullAdder :: Bit 1 -> Bit 1 -> Bit 1 -> (Bit 1, Bit 1)
-fullAdder x y c_in = (c_out, s1)
-  where
-    (c0, s0) = halfAdder x y
-    (c1, s1) = halfAdder s0 c_in
-    c_out = c0 .|. c1
+fullAdder a b cIn = (cOut, s1)
+  where (c0, s0) = halfAdder a b
+        (c1, s1) = halfAdder s0 cIn
+        cOut = c0 .|. c1
 
 -- | Bit-list adder
 listAdder :: Bit 1 -> [Bit 1] -> [Bit 1] -> [Bit 1]

@@ -478,7 +478,7 @@ showAssert nl net@Net{netPrim=prim} =
   $+$ showInductionStep cFunName depth restrictStates nm
   $+$ text ("(echo \"" ++ replicate 80 '-' ++ "\")")
   $+$ text ("(pop)")
-  where depth = 5 -- MUST BE AT LEAST 1
+  where depth = 8 -- MUST BE AT LEAST 1
         restrictStates = True
         (nm, msg) = case prim of
           Output _      outnm   -> ("output_"++outnm, outnm++" as predicate")
