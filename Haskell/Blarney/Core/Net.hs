@@ -22,6 +22,7 @@ module Blarney.Core.Net (
 , NetInput(..)    -- 'NetInput' type to represent inputs to 'Net's
 , netInputWireIds -- Helper function to extract all 'NetInput''s 'WireId's
 , Netlist         -- 'Netlist' type to represent a circuit
+, getNet          -- Extract the 'Net' from a 'Netlist' at the provided 'InstId'
 ) where
 
 import Prelude
@@ -62,3 +63,10 @@ netInputWireIds (InputTree _ ins) = concatMap netInputWireIds ins
 
 -- | A 'Netlist', represented as an 'Array InstId (Maybe Net)'
 type Netlist = Array InstId (Maybe Net)
+
+-- | Extract the 'Net' from a 'Netlist' at the provided 'InstId'. Raise an error
+--   if no 'Net' with this 'InstId' is present.
+getNet :: Netlist -> InstId -> Net
+getNet nl i = fromMaybe err (nl ! i)
+  where err = error $ "Blarney.Core.Net: " ++
+                      "access to non existing Net at instId " ++ show i
