@@ -3,7 +3,7 @@
 {-|
 Module      : Blarney.Backend.SMT2.NetlistUtils
 Description : Netlist utility functions for SMT2 pretty printing
-Copyright   : (c) Alexandre Joannou, 2020
+Copyright   : (c) Alexandre Joannou, 2020-2021
 License     : MIT
 Stability   : experimental
 
@@ -15,6 +15,10 @@ module Blarney.Backend.SMT2.NetlistUtils (
   declareNLDatatype
 , defineNLTransition
 , defineChainTransition
+, assertInductionBase
+, assertInductionStep
+, checkInductionBase
+, checkInductionStep
 ) where
 
 -- Standard imports
@@ -30,6 +34,7 @@ import qualified Data.Set as Set
 -- Blarney imports
 import Blarney.Netlist
 import Blarney.Backend.SMT2.Utils
+import Blarney.Backend.SMT2.BasicDefinitions
 
 -- | Declare a datatype whose fields are specific to the provided 'Netlist'
 declareNLDatatype :: Netlist -> [InstId] -> String -> Doc
@@ -46,8 +51,8 @@ defineNLTransition nl n@Net { netPrim = p, netInputs = ins } state name
               Assert _ _ -> True
               _          -> False =
     defineFun (text name) fArgs fRet fBody
-  | otherwise = error $ "SMT2 backend error: cannot defineTransition on " ++
-                        show n
+  | otherwise = error $ "Blarney.Backend.SMT2.NetlistUtils: " ++
+                        "cannot defineNLTransition on " ++ show n
   where inVar = "inpts"
         stVar = "prev"
         ctx = (nl, inVar, stVar)
@@ -81,26 +86,71 @@ defineNLTransition nl n@Net { netPrim = p, netInputs = ins } state name
 -- | Define the repeated application of a function
 defineChainTransition :: String -> String -> Doc
 defineChainTransition tName cName =
-  defineFunRec (text cName)
-               [ (text "inpts", text "(ListX Inputs)")
-               , (text "prevS", text "State") ]
-               (text "(Tuple2 (ListX Bool) (ListX State))") fBody
-  where fBody = matchBind (text "inpts")
-                          [ (text "nil", lastRet)
-                          , (text "(cons h t)", matchInvokeT) ]
-        lastRet = applyOp (text "mkTuple2")
-                          [ qualify (text "nil") (text "(ListX Bool)")
-                          , applyOp (text "cons")
-                                    [ text "prevS"
-                                    , qualify (text "nil")
-                                              (text "(ListX State)") ] ]
-        matchInvokeT = matchBind (applyOp (text tName) [text "h", text "prevS"])
-                                 [(text "(mkTuple2 ok nextS)", matchRecCall)]
-        matchRecCall = matchBind (applyOp (text cName) [text "t", text "nextS"])
-                                 [( text "(mkTuple2 oks ss)", recRet)]
-        recRet = applyOp (text "mkTuple2")
-                         [ applyOp (text "cons") [text "ok", text "oks"]
-                         , applyOp (text "cons") [text "nextS", text "ss"] ]
+  defineChain cName (tName, ("Inputs", "State"), "Bool")
+
+-- | Define inputs and assertion of the base case for proof by induction of the
+--   provided chaining function for the checked property, with a given initial
+--   state, and for a given induction depth
+assertInductionBase :: String -> [(Integer, InputWidth)] -> Int -> Doc
+assertInductionBase cFun initS depth = decls $+$ assertion
+  where inpts = [ "in" ++ show i | i <- [0 .. depth-1] ]
+        decls = vcat $ map (\i -> text $ "(declare-const " ++ i ++ " Inputs)")
+                           inpts
+        assertion = applyOp (text "assert") [ letBind bindArgs matchInvoke ]
+        bindArgs = [ (text "inpts", mkListX inpts "Inputs")
+                   , (text "initS", createState initS) ]
+        createState [] = text "mkState"
+        createState xs = parens $   text "mkState"
+                                <+> sep (map (\(v, w) -> int2bv w v) xs)
+        matchInvoke = matchBind (applyOp (text cFun)
+                                         [text "inpts", text "initS"])
+                                [( text "(mkTuple2 oks ss)"
+                                 , applyOp (text "not")
+                                           [applyOp (text "andReduce")
+                                                    [text "oks"]] )]
+
+-- | Define inputs and assertion of the induction step for proof by induction of
+--   the provided chaining function for the checked property, for a given
+--   induction depth and with optional state restriction
+assertInductionStep :: String -> Int -> Bool -> Doc
+assertInductionStep cFun depth restrict = decls $+$ assertion
+  where inpts = [ "in" ++ show i | i <- [0 .. depth] ]
+        decls = vcat $ (text "(declare-const startS State)") :
+                       map (\i -> text $ "(declare-const " ++ i ++ " Inputs)")
+                           inpts
+        assertion = applyOp (text "assert") [ letBind bindArgs matchInvoke ]
+        bindArgs = [ (text "inpts", mkListX inpts "Inputs") ]
+        matchInvoke = matchBind (applyOp (text cFun)
+                                         [text "inpts", text "startS"])
+                                [( text "(mkTuple2 oks ss)"
+                                 , applyOp (text "not") [propHolds] )]
+        propHolds =
+          applyOp (text "impliesReduce")
+                  if not restrict then [ text "oks" ]
+                  else [ applyOp (text "cons")
+                                 [ applyOp (text "allDifferent_ListX_State")
+                                           [applyOp (text "init_ListX_State")
+                                                    [text "ss"]]
+                                 , text "oks" ]]
+
+
+-- | Wrap an induction base case in a push-pop context for interaction with SMT
+--   solvers and adds a check-sat command
+checkInductionBase :: String -> [(Integer, InputWidth)] -> Int -> Doc
+checkInductionBase cFun initS depth =
+      text "(push)"
+  $+$ assertInductionBase cFun initS depth
+  $+$ text "(check-sat)"
+  $+$ text "(pop)"
+
+-- | Wrap an induction step in a push-pop context for interaction with SMT
+--   solvers and adds a check-sat command
+checkInductionStep :: String -> Int -> Bool -> Doc
+checkInductionStep cFun depth restrictStates =
+      text "(push)"
+  $+$ assertInductionStep cFun depth restrictStates
+  $+$ text "(check-sat)"
+  $+$ text ("(pop)")
 
 -- internal helpers
 
@@ -238,7 +288,8 @@ topologicalSort nl = runST do
                                               _              -> False ]
 
     whileM_ :: Monad m => m Bool -> m a -> m ()
-    whileM_ pred act = pred >>= \x -> if x then act >> whileM_ pred act else return ()
+    whileM_ pred act = pred >>= \x -> if x then act >> whileM_ pred act
+                                           else return ()
     -- identify leaf net
     isLeaf :: Net -> Bool
     isLeaf Net{ netPrim = Input      _ _ } = True
@@ -266,7 +317,7 @@ topologicalSort nl = runST do
         Permanent -> return ()
         -- For nets under visit, we identified a combinational cycle
         -- (unsupported ==> error out)
-        Temporary -> error $ "SMT2 backend error: " ++
+        Temporary -> error $ "Blarney.Backend.SMT2.NetlistUtils: " ++
                              "combinational cycle detected -- " ++ show net
         -- For new visits:
         Unmarked -> do

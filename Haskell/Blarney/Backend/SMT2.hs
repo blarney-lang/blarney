@@ -1,10 +1,11 @@
+{-# LANGUAGE MultiWayIf         #-}
 {-# LANGUAGE RecordWildCards    #-}
 {-# LANGUAGE NoRebindableSyntax #-}
 
 {-|
 Module      : Blarney.Backend.SMT2
 Description : SMT2 generation
-Copyright   : (c) Alexandre Joannou, 2020
+Copyright   : (c) Alexandre Joannou, 2020-2021
 License     : MIT
 Stability   : experimental
 
@@ -13,16 +14,19 @@ Convert Blarney Netlist to SMT2 scripts.
 
 module Blarney.Backend.SMT2 (
   genSMT2Script
+, VerifyConf (..)
+, dfltVerifyConf
+, verifyWithSMT2
 ) where
 
 -- Standard imports
 import System.IO
 import Data.Maybe
 import Control.Monad
+import System.Process
 import Text.PrettyPrint
 import Data.Array.IArray
 import Prelude hiding ((<>))
-import System.Process (system)
 
 -- Blarney imports
 import Blarney.Netlist
@@ -33,80 +37,171 @@ import Blarney.Backend.SMT2.BasicDefinitions
 -- Toplevel API
 --------------------------------------------------------------------------------
 
+data VerifyConf = VerifyConf { verifyConfDepth          :: (Int, Int) -- cur depth, max depth. max depth 0 means incremental search
+                             , verifyConfRestrictStates :: Bool
+                             , verifyConfSolverCmd      :: (String, [String])
+                             , verifyConfVerbosity      :: Int }
+dfltVerifyConf :: VerifyConf
+dfltVerifyConf = VerifyConf { verifyConfDepth = (1,1)
+                            , verifyConfRestrictStates = False
+                            , verifyConfSolverCmd = ("z3", ["-in"])
+                            , verifyConfVerbosity = 1 }
+legalDepth :: (Int, Int) -> (Int, Int)
+legalDepth (curD, maxD) = (max 1 curD, maxD)
+
 -- | Convert given blarney 'Netlist' to an SMT2 script
-genSMT2Script :: Netlist -- ^ blarney netlist
+genSMT2Script :: VerifyConf
+              -> Netlist -- ^ blarney netlist
               -> String  -- ^ script name
               -> String  -- ^ output directory
               -> IO ()
-genSMT2Script nl nm dir =
+genSMT2Script VerifyConf{..} nl nm dir =
   do system ("mkdir -p " ++ dir)
-     h <- openFile fileName WriteMode
-     hPutStr h (renderStyle rStyle $ showAll nl)
-     hClose h
+     withFile fileName WriteMode \h -> do
+       hPutStr h $ renderStyle rStyle smtCode
   where fileName = dir ++ "/" ++ nm ++ ".smt2"
         rStyle = Style PageMode 80 1.05
+        depth = snd . legalDepth $ verifyConfDepth
+        smtCode = showAll nl depth verifyConfRestrictStates False
+
+verifyWithSMT2 :: VerifyConf -> Netlist -> IO ()
+verifyWithSMT2 VerifyConf{..} nl =
+  withCreateProcess smtP \(Just hIn) (Just hOut) _ _ -> do
+    -- set stdin handle to unbuffered for communication with SMT solver
+    hSetBuffering hIn LineBuffering
+    say 0 $ "---- now verifying property so and so ----"
+    -- send general SMT sort definitions
+    say 2 $ rStr (showGeneralDefs True)
+    hPutStrLn hIn $ rStr (showGeneralDefs True)
+    -- send netlist-specific SMT sort definitions
+    say 2 $ rStr (showSpecificDefs ctxt True)
+    hPutStrLn hIn $ rStr (showSpecificDefs ctxt True)
+    when verifyConfRestrictStates do
+      say 2 $ rStr (defineDistinctListX "State")
+      hPutStrLn hIn $ rStr (defineDistinctListX "State")
+    -- iterative depening for induction proof
+    deepen ctxt (hIn, hOut) (legalDepth verifyConfDepth)
+  where
+    say n msg = when (max 0 n <= verifyConfVerbosity) $ putStrLn msg
+    smtP = (uncurry proc verifyConfSolverCmd){ std_in  = CreatePipe
+                                             , std_out = CreatePipe
+                                             , std_err = CreatePipe }
+    rStr = renderStyle $ Style OneLineMode 0 0
+    root = head [ n | Just n@Net{netPrim=p} <- elems nl
+                    , case p of Output _ _ -> True
+                                _          -> False ]
+    ctxt = mkContext nl root
+    deepen c@Context{..} (hI, hO) (curD, maxD) = do
+      say 1 $ "----> depth " ++ show curD
+      --
+      let base = assertInductionBase ctxtCFunName ctxtStateInits curD
+      let step = assertInductionStep ctxtCFunName curD verifyConfRestrictStates
+      say 2 $ rStr base
+      sndLn "(push)"
+      sndLn $ rStr base
+      sndLn "(check-sat)"
+      ln <- rcvLn
+      say 1 $ "base: " ++ ln
+      if | ln == "unsat" -> do sndLn "(pop)"
+                               say 2 $ rStr step
+                               sndLn "(push)"
+                               sndLn $ rStr step
+                               sndLn "(check-sat)"
+                               ln <- rcvLn
+                               say 1 $ "step: " ++ ln
+                               if | ln == "unsat" -> do sndLn "(pop)"
+                                                        say 0 "verified"
+                                  | curD == maxD  -> failVerify
+                                  | otherwise     -> do sndLn "(pop)"
+                                                        say 2 "failed to verify induction step ---> deepen"
+                                                        deepen c (hI, hO)
+                                                                 (curD + 1, maxD)
+         | curD == maxD  -> failVerify
+         | otherwise     -> do sndLn "(pop)"
+                               say 2 "failed to verify base case ---> deepen"
+                               deepen c (hI, hO) (curD + 1, maxD)
+      where sndLn = hPutStrLn hI
+            rcvLn = hGetLine hO
+            rcvAll = hGetContents hO
+            failVerify = do say 0 "Couldn't verify property"
+                            say 0 "Show current counter-example? y/N"
+                            ln <- getLine
+                            -- XXX TODO sort out hang on rcvAll...
+                            when (ln == "y" || ln == "Y") do sndLn "(get-model)"
+                                                             say 0 =<< rcvAll
+                            sndLn "(pop)"
 
 -- internal helpers specific to blarney netlists
 --------------------------------------------------------------------------------
-showGeneralDefs :: Doc
-showGeneralDefs =
-      char ';' <> text (replicate 79 '-')
-  $+$ text "; Defining Tuple sorts"
+showGeneralDefs :: Bool -> Doc
+showGeneralDefs quiet =
+      shush (char ';' <> text (replicate 79 '-'))
+  $+$ shush (text "; Defining Tuple sorts")
   $+$ declareTupleTypes [2, 3]
-  $+$ text "; Defining a generic ListX sort"
+  $+$ shush (text "; Defining a generic ListX sort")
   $+$ declareListXType
-  $+$ text "; Defining an \"and\" reduction function for ListX Bool"
+  $+$ shush (text "; Defining an \"and\" reduction function for ListX Bool")
   $+$ defineAndReduce
-  $+$ text "; Defining an \"implies\" reduction function for ListX Bool"
+  $+$ shush (text "; Defining an \"implies\" reduction function for ListX Bool")
   $+$ defineImpliesReduce
+  where shush doc = if quiet then empty else doc
 
-showBaseCase :: String -> [(Integer, InputWidth)] -> Int -> Doc
-showBaseCase cFun initS depth =
-      text "(push)" $+$ decls $+$ assertion
-  $+$ text (   "(echo \"Base case for property " ++ cFun
-            ++ ", induction depth " ++ show depth ++ "\")")
-  $+$ text "(check-sat)" $+$ text "(pop)"
-  where inpts = [ "in" ++ show i | i <- [0 .. depth-1] ]
-        decls = vcat $ map (\i -> text $ "(declare-const " ++ i ++ " Inputs)")
-                           inpts
-        assertion = applyOp (text "assert") [ letBind bindArgs matchInvoke ]
-        bindArgs = [ (text "inpts", mkListX inpts "Inputs")
-                   , (text "initS", createState initS) ]
-        createState [] = text "mkState"
-        createState xs = parens $   text "mkState"
-                                <+> sep (map (\(v, w) -> int2bv w v) xs)
-        matchInvoke = matchBind (applyOp (text cFun)
-                                         [text "inpts", text "initS"])
-                                [( text "(mkTuple2 oks ss)"
-                                 , applyOp (text "not")
-                                           [applyOp (text "andReduce")
-                                                    [text "oks"]] )]
+showSpecificDefs :: Context -> Bool -> Doc
+showSpecificDefs Context{..} quiet =
+      shush (char ';' <> text (replicate 79 '-'))
+  $+$ shush (text ("; code gen for net" ++ show ctxtRootNet))
+  $+$ shush (char ';' <> text (replicate 79 '-'))
+  $+$ text ("(push)")
+  $+$ shush (char ';' <> text (replicate 79 '-'))
+  $+$ shush (text "; Defining the specific Inputs record type")
+  $+$ declareNLDatatype ctxtNetlist ctxtInputIds "Inputs"
+  $+$ shush (char ';' <> text (replicate 79 '-'))
+  $+$ shush (text "; Defining the specific State record type")
+  $+$ declareNLDatatype ctxtNetlist ctxtStateIds "State"
+  $+$ shush (char ';' <> text (replicate 79 '-'))
+  $+$ shush (text "; Defining the specific transition function")
+  $+$ defineNLTransition ctxtNetlist ctxtRootNet ctxtStateIds ctxtTFunName
+  $+$ shush (char ';' <> text (replicate 79 '-'))
+  $+$ shush (text "; Defining the specific chaining of the transition function")
+  $+$ defineChainTransition ctxtTFunName ctxtCFunName
+  where shush doc = if quiet then empty else doc
 
-showInductionStep :: String -> Int -> Bool -> Doc
-showInductionStep cFun depth restrict =
-      text "(push)" $+$ decls $+$ assertion
-  $+$ text (   "(echo \"Induction step for property " ++ cFun
-            ++ ", induction depth " ++ show depth
-            ++ if restrict then " with restricted states\")" else "\")")
-  $+$ text "(check-sat)" $+$ text "(pop)"
-  where inpts = [ "in" ++ show i | i <- [0 .. depth] ]
-        decls = vcat $ (text "(declare-const startS State)") :
-                       map (\i -> text $ "(declare-const " ++ i ++ " Inputs)")
-                           inpts
-        assertion = applyOp (text "assert") [ letBind bindArgs matchInvoke ]
-        bindArgs = [ (text "inpts", mkListX inpts "Inputs") ]
-        matchInvoke = matchBind (applyOp (text cFun)
-                                         [text "inpts", text "startS"])
-                                [( text "(mkTuple2 oks ss)"
-                                 , applyOp (text "not") [propHolds] )]
-        propHolds =
-          applyOp (text "impliesReduce")
-                  if not restrict then [ text "oks" ]
-                  else [ applyOp (text "cons")
-                                 [ applyOp (text "allDifferent_ListX_State")
-                                           [applyOp (text "init_ListX_State")
-                                                    [text "ss"]]
-                                 , text "oks" ]]
+showSpecificAssert :: Context -> Int -> Bool -> Bool -> Doc
+showSpecificAssert ctxt@Context{..} depth restrictStates quiet =
+      showSpecificDefs ctxt quiet
+  $+$ shush (char ';' <> text (replicate 79 '-'))
+  $+$ shush (text "; Proof by induction, induction depth =" <+> int depth)
+  $+$ shush (maybe empty (\msg -> text $ "(echo \"" ++ msg ++ "\")")
+                         ctxtAssertMsg)
+  $+$ shush (text ("(echo \"" ++ replicate 80 '-' ++ "\")"))
+  $+$ shush (char ';' <> text (replicate 79 '-'))
+  $+$ shush (text "; Base case")
+  $+$ checkInductionBase ctxtCFunName ctxtStateInits depth
+  $+$ shush (char ';' <> text (replicate 79 '-'))
+  $+$ (if restrictStates then
+             shush (text "; Defining helpers for restricted state checking")
+         $+$ defineDistinctListX "State"
+       else empty)
+  $+$ shush (text "; Induction step")
+  $+$ checkInductionStep ctxtCFunName depth restrictStates
+  $+$ shush (text ("(echo \"" ++ replicate 80 '-' ++ "\")"))
+  $+$ text ("(pop)")
+  where shush doc = if quiet then empty else doc
+
+showAll :: Netlist -> Int -> Bool -> Bool -> Doc
+showAll nl depth restrictStates quiet =
+  -- general definitions
+      showGeneralDefs quiet
+  -- show the transition function and the induction proof for each netlist root.
+  -- XXX TODO sort out showing transitions functions for each "root" and proofs
+  -- only for assert nets
+  $+$ vcat [ showSpecificAssert (mkContext nl n) depth restrictStates quiet
+           | n <- roots ]
+  where roots = [ n | Just n@Net{netPrim=p} <- elems nl
+                    , case p of Output _ _ -> True
+                                Assert _ _ -> True
+                                _          -> False ]
+---
 
 data Context = Context { ctxtNetlist    :: Netlist
                        , ctxtInputIds   :: [InstId]
@@ -117,69 +212,16 @@ data Context = Context { ctxtNetlist    :: Netlist
                        , ctxtCFunName   :: String
                        , ctxtAssertMsg  :: Maybe String }
 
-showSpecificDefs :: Context -> Doc
-showSpecificDefs Context{..} =
-      char ';' <> text (replicate 79 '-')
-  $+$ text ("; code gen for net" ++ show ctxtRootNet)
-  $+$ char ';' <> text (replicate 79 '-')
-  $+$ text ("(push)")
-  $+$ char ';' <> text (replicate 79 '-')
-  $+$ text "; Defining the specific Inputs record type"
-  $+$ declareNLDatatype ctxtNetlist ctxtInputIds "Inputs"
-  $+$ char ';' <> text (replicate 79 '-')
-  $+$ text "; Defining the specific State record type"
-  $+$ declareNLDatatype ctxtNetlist ctxtStateIds "State"
-  $+$ char ';' <> text (replicate 79 '-')
-  $+$ text "; Defining the specific transition function"
-  $+$ defineNLTransition ctxtNetlist ctxtRootNet ctxtStateIds ctxtTFunName
-  $+$ char ';' <> text (replicate 79 '-')
-  $+$ text "; Defining the specific chaining of the transition function"
-  $+$ defineChainTransition ctxtTFunName ctxtCFunName
-
-showSpecificAssert :: Context -> Int -> Bool -> Doc
-showSpecificAssert ctxt@Context{..} depth restrictStates =
-      showSpecificDefs ctxt
-  $+$ char ';' <> text (replicate 79 '-')
-  $+$ text "; Proof by induction, induction depth =" <+> int depth
-  $+$ maybe empty (\msg -> text $ "(echo \"" ++ msg ++ "\")") ctxtAssertMsg
-  $+$ text ("(echo \"" ++ replicate 80 '-' ++ "\")")
-  $+$ char ';' <> text (replicate 79 '-')
-  $+$ text "; Base case"
-  $+$ showBaseCase ctxtCFunName ctxtStateInits depth
-  $+$ char ';' <> text (replicate 79 '-')
-  $+$ (if restrictStates then
-             text "; Defining helpers for restricted state checking"
-         $+$ defineDistinctListX "State"
-       else empty)
-  $+$ text "; Induction step"
-  $+$ showInductionStep ctxtCFunName depth restrictStates
-  $+$ text ("(echo \"" ++ replicate 80 '-' ++ "\")")
-  $+$ text ("(pop)")
-
-showAll :: Netlist -> Doc
-showAll nl =
-  -- general definitions
-      showGeneralDefs
-  -- show the transition function and the induction proof for each netlist root.
-  -- XXX TODO sort out showing transitions functions for each "root" and proofs
-  -- only for assert nets
-  $+$ vcat [ showSpecificAssert (mkCtxt x) depth restrictStates | x <- roots ]
-  where depth = 8 -- MUST BE AT LEAST 1
-        restrictStates = True
-        roots = [ n | Just n@Net{netPrim=p} <- elems nl
-                    , case p of Output _ _ -> True
-                                Assert _ _ -> True
-                                _          -> False ]
-        mkCtxt n =
-          Context { ctxtNetlist    = nl
-                  , ctxtInputIds   = inputIds
-                  , ctxtStateIds   = stateIds
-                  , ctxtStateInits = stateInits
-                  , ctxtRootNet    = n
-                  , ctxtTFunName   = tFun
-                  , ctxtCFunName   = cFun
-                  , ctxtAssertMsg  = msg } where (tFun, cFun, msg) = rootStrs n
-        inputIds = [ netInstId n | Just n@Net{netPrim = p} <- elems nl
+mkContext :: Netlist -> Net -> Context
+mkContext nl n = Context { ctxtNetlist    = nl
+                         , ctxtInputIds   = inputIds
+                         , ctxtStateIds   = stateIds
+                         , ctxtStateInits = stateInits
+                         , ctxtRootNet    = n
+                         , ctxtTFunName   = tFun
+                         , ctxtCFunName   = cFun
+                         , ctxtAssertMsg  = msg }
+  where inputIds = [ netInstId n | Just n@Net{netPrim = p} <- elems nl
                                  , case p of Input _ _ -> True
                                              _         -> False ]
         stateElems = [ n | Just n@Net{netPrim = p} <- elems nl
@@ -190,14 +232,15 @@ showAll nl =
         stateInits = map stateInit stateElems
         stateInit Net{netPrim=RegisterEn init w} = (init, w)
         stateInit Net{netPrim=Register   init w} = (init, w)
-        stateInit n =
-          error $ "SMT2 backend error: non state net " ++ show n ++
-                  " encountered where state net was expected"
-        rootStrs n = (tFun, cFun, msg) where tFun = "tFun_" ++ nm
-                                             cFun = "chain_" ++ tFun
-                                             (nm, msg) = primStrs n
-        primStrs n = case netPrim n of
+        stateInit n = error $ "SMT2 backend error: non state net " ++ show n ++
+                              " encountered where state net was expected"
+        tFun = "tFun_" ++ nm
+        cFun = "chain_" ++ tFun
+        (nm, msg) = case netPrim n of
           Output _      outnm   -> ("output_"++outnm,  Nothing)
           Assert propnm propmsg -> ("assert_"++propnm, Just propmsg)
           _ -> error $ "SMT2 backend error: expected Output or Assert net " ++
                        "but got " ++ show n
+
+------
+

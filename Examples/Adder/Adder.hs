@@ -66,13 +66,13 @@ main = do
   -- verilog
   writeVerilogModule (testAssert @4) "testAssert" verilogDir
   -- generate smt2 scripts
-  writeSMT2Script (prop_add @2  adder)      "goodAdder2"    smtDir
-  writeSMT2Script (prop_add @16 adder)      "goodAdder16"   smtDir
-  writeSMT2Script (prop_add @2  doom_adder) "brokenAdder2"  smtDir
-  writeSMT2Script (prop_add @16 doom_adder) "brokenAdder16" smtDir
-  writeSMT2Script (prop_addSeq)       "goodAddSeq"   smtDir
-  writeSMT2Script (prop_brokenAddSeq) "brokenAddSeq" smtDir
-  writeSMT2Script (testAssert @4) "testAssert" smtDir
+  writeSMT2Script verifConf (prop_add @2  adder)      "goodAdder2"    smtDir
+  writeSMT2Script verifConf (prop_add @16 adder)      "goodAdder16"   smtDir
+  writeSMT2Script verifConf (prop_add @2  doom_adder) "brokenAdder2"  smtDir
+  writeSMT2Script verifConf (prop_add @16 doom_adder) "brokenAdder16" smtDir
+  writeSMT2Script verifConf (prop_addSeq)       "goodAddSeq"   smtDir
+  writeSMT2Script verifConf (prop_brokenAddSeq) "brokenAddSeq" smtDir
+  writeSMT2Script verifConf (testAssert @4) "testAssert" smtDir
   -- helper usage message
   putStrLn $ "SMT2 scripts generated under " ++ smtDir
   putStrLn $ "Run an SMT solver such as z3 with an SMT2 script as input:"
@@ -85,3 +85,4 @@ main = do
   putStrLn $ "    $ z3 " ++ smtDir ++ "brokenAdder2.smt2"
   putStrLn $ "to get a set of input assignments for which the tested property"
              ++ " does not hold."
+  where verifConf = dfltVerifyConf

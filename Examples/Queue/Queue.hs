@@ -62,4 +62,6 @@ main :: IO ()
 main = do
   writeVerilogTop top "top" "Queue-Verilog"
   writeVerilogModule (prop_queueEquiv @1) "prop_queueEquiv" "Queue-Verilog"
-  writeSMT2Script (prop_queueEquiv @1) "prop_queueEquiv" "Queue-SMT2"
+  writeSMT2Script verifConf (prop_queueEquiv @1) "prop_queueEquiv" "Queue-SMT2"
+  where verifConf = dfltVerifyConf { verifyConfDepth = (8,8)
+                                   , verifyConfRestrictStates = True }

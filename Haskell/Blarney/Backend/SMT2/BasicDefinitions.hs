@@ -1,7 +1,7 @@
 {-|
 Module      : Blarney.Backend.SMT2.BasicDefinitions
 Description : Basic SMT2 helper types and functions definitions
-Copyright   : (c) Alexandre Joannou, 2020
+Copyright   : (c) Alexandre Joannou, 2020-2021
 License     : MIT
 Stability   : experimental
 
@@ -13,12 +13,14 @@ module Blarney.Backend.SMT2.BasicDefinitions (
 -- * datatypes declaration
   declareTupleTypes
 , declareListXType
--- * list creating
+-- * list creation
 , mkListX
 -- * list reduction
 , defineAndReduce
 , defineImpliesReduce
 , defineDistinctListX
+-- * miscellaneous
+, defineChain
 ) where
 
 -- Standard imports
@@ -130,3 +132,38 @@ defineDistinctListX elemSort = defineFunsRec
                                       [ text "s", text "t" ]])])]
   where lstSort = "(ListX " ++ elemSort ++ ")"
         sfx = "_ListX_" ++ elemSort
+
+-- | Define the repeated application of a function f of 2 arguments returning a
+--   pair where
+--   * the first argument of f is taken from an overall argument list
+--   * the second argument of f is an explicit argument of first invocation, and
+--     is the second member of the pair returned by the previous invocation on
+--     subsequent calls
+--   * the call depth is defined by the length of the explicit argument list
+--   * the overall return is a pair of reversed lists of individual returned
+--     values
+defineChain :: String -> (String, (String, String), String) -> Doc
+defineChain name (f, (a0Sort, a1Sort), retSort) =
+  defineFunRec (text name)
+               [ (text "xs", text a0Lst)
+               , (text "prev", text a1Sort) ]
+               (text $ "(Tuple2 " ++ retLst ++ " " ++ a1Lst ++ ")") fBody
+  where fBody = matchBind (text "xs")
+                          [ (text "nil", lastRet)
+                          , (text "(cons h t)", matchInvoke) ]
+        lastRet = applyOp (text "mkTuple2")
+                          [ qualify (text "nil") (text retLst)
+                          , applyOp (text "cons")
+                                    [ text "prev"
+                                    , qualify (text "nil")
+                                              (text a1Lst) ] ]
+        matchInvoke = matchBind (applyOp (text f) [text "h", text "prev"])
+                                [(text "(mkTuple2 ret next)", matchRecCall)]
+        matchRecCall = matchBind (applyOp (text name) [text "t", text "next"])
+                                 [( text "(mkTuple2 rets ys)", recRet)]
+        recRet = applyOp (text "mkTuple2")
+                         [ applyOp (text "cons") [text "ret", text "rets"]
+                         , applyOp (text "cons") [text "next", text "ys"] ]
+        retLst = "(ListX " ++ retSort ++ ")"
+        a0Lst = "(ListX " ++ a0Sort ++ ")"
+        a1Lst = "(ListX " ++ a1Sort ++ ")"
