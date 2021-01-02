@@ -13,6 +13,7 @@ generation
 
 module Blarney.Backend.SMT2.NetlistUtils (
   declareNLDatatype
+, mkNLDatatype
 , defineNLTransition
 , defineChainTransition
 , assertInductionBase
@@ -43,10 +44,21 @@ declareNLDatatype nl netIds dtNm =
   where mkField nId = let wId = (nId, Nothing)
                       in  (wireName nl wId, strSort nl wId)
 
--- | Declare the transistion function for a given root 'Net' in the provided
+-- | Invoke the constructor for a datatype declared with 'declareNLDatatype'
+mkNLDatatype :: String -> [Doc] -> Doc
+mkNLDatatype dtNm [] = text $ "mk" ++ dtNm
+mkNLDatatype dtNm dtFields = applyOp (text $ "mk" ++ dtNm) dtFields
+
+-- | Declare the transition function for a given root 'Net' in the provided
 --   'Netlist'
-defineNLTransition :: Netlist -> Net -> [InstId] -> String -> Doc
-defineNLTransition nl n@Net { netPrim = p, netInputs = ins } state name
+defineNLTransition :: Netlist
+                   -> Net
+                   -> (String, String)
+                   -> [InstId]
+                   -> String
+                   -> Doc
+defineNLTransition nl n@Net { netPrim = p, netInputs = ins }
+                   (inptType, stType) state name
   | case p of Output _ _ -> True
               Assert _ _ -> True
               _          -> False =
@@ -56,9 +68,9 @@ defineNLTransition nl n@Net { netPrim = p, netInputs = ins } state name
   where inVar = "inpts"
         stVar = "prev"
         ctx = (nl, inVar, stVar)
-        fArgs = [ (text inVar, text "Inputs")
-                , (text stVar,  text "State") ]
-        fRet  = text "(Tuple2 Bool State)"
+        fArgs = [ (text inVar, text inptType)
+                , (text stVar,  text stType) ]
+        fRet  = text $ "(Tuple2 Bool " ++ stType ++ ")"
         fBody = withBoundNets ctx filtered $ newTuple2 assertE stateUpdtE
         newTuple2 a b = applyOp (text "mkTuple2") [a, b]
         dontPrune i = case netPrim (getNet nl i) of Input      _ _ -> False
@@ -70,9 +82,7 @@ defineNLTransition nl n@Net { netPrim = p, netInputs = ins } state name
         sorted = topologicalSort nl
         filtered = [i | i <- sorted, dontPrune i]
         assertE = bvIsTrue $ showNetInput ctx (head ins)
-        stateUpdtE
-          | null state = text "mkState"
-          | otherwise  = applyOp (text "mkState") $ regsInpts state
+        stateUpdtE = mkNLDatatype stType $ regsInpts state
         regsInpts = map (regInpts . getNet nl)
         regInpts Net{ netInstId = idx
                     , netPrim = RegisterEn _ _
@@ -84,24 +94,27 @@ defineNLTransition nl n@Net { netPrim = p, netInputs = ins } state name
           showNetInput ctx inpt
 
 -- | Define the repeated application of a function
-defineChainTransition :: String -> String -> Doc
-defineChainTransition tName cName =
-  defineChain cName (tName, ("Inputs", "State"), "Bool")
+defineChainTransition :: String -> (String, String) -> String -> Doc
+defineChainTransition tName argTypes cName =
+  defineChain cName (tName, argTypes, "Bool")
 
 -- | Define inputs and assertion of the base case for proof by induction of the
 --   provided chaining function for the checked property, with a given initial
 --   state, and for a given induction depth
-assertInductionBase :: String -> [(Integer, InputWidth)] -> Int -> Doc
-assertInductionBase cFun initS depth = decls $+$ assertion
+assertInductionBase :: String
+                    -> (String, String)
+                    -> [(Integer, InputWidth)]
+                    -> Int
+                    -> Doc
+assertInductionBase cFun (inptType, stType) initS depth = decls $+$ assertion
   where inpts = [ "in" ++ show i | i <- [0 .. depth-1] ]
-        decls = vcat $ map (\i -> text $ "(declare-const " ++ i ++ " Inputs)")
-                           inpts
+        decls = vcat $
+                  map (\i -> text $ "(declare-const "++i++" "++inptType++")")
+                      inpts
         assertion = applyOp (text "assert") [ letBind bindArgs matchInvoke ]
-        bindArgs = [ (text "inpts", mkListX inpts "Inputs")
+        bindArgs = [ (text "inpts", mkListX inpts inptType)
                    , (text "initS", createState initS) ]
-        createState [] = text "mkState"
-        createState xs = parens $   text "mkState"
-                                <+> sep (map (\(v, w) -> int2bv w v) xs)
+        createState xs = mkNLDatatype stType (map (\(v, w) -> int2bv w v) xs)
         matchInvoke = matchBind (applyOp (text cFun)
                                          [text "inpts", text "initS"])
                                 [( text "(mkTuple2 oks ss)"
@@ -112,14 +125,14 @@ assertInductionBase cFun initS depth = decls $+$ assertion
 -- | Define inputs and assertion of the induction step for proof by induction of
 --   the provided chaining function for the checked property, for a given
 --   induction depth and with optional state restriction
-assertInductionStep :: String -> Int -> Bool -> Doc
-assertInductionStep cFun depth restrict = decls $+$ assertion
+assertInductionStep :: String -> (String, String) -> Int -> Bool -> Doc
+assertInductionStep cFun (inptType, stType) depth restrict = decls $+$ assertion
   where inpts = [ "in" ++ show i | i <- [0 .. depth] ]
-        decls = vcat $ (text "(declare-const startS State)") :
-                       map (\i -> text $ "(declare-const " ++ i ++ " Inputs)")
-                           inpts
+        decls = vcat $ (text $ "(declare-const startS " ++ stType ++ ")") :
+                  map (\i -> text $ "(declare-const "++i++" "++inptType++")")
+                      inpts
         assertion = applyOp (text "assert") [ letBind bindArgs matchInvoke ]
-        bindArgs = [ (text "inpts", mkListX inpts "Inputs") ]
+        bindArgs = [ (text "inpts", mkListX inpts inptType) ]
         matchInvoke = matchBind (applyOp (text cFun)
                                          [text "inpts", text "startS"])
                                 [( text "(mkTuple2 oks ss)"
@@ -128,27 +141,31 @@ assertInductionStep cFun depth restrict = decls $+$ assertion
           applyOp (text "impliesReduce")
                   if not restrict then [ text "oks" ]
                   else [ applyOp (text "cons")
-                                 [ applyOp (text "allDifferent_ListX_State")
-                                           [applyOp (text "init_ListX_State")
-                                                    [text "ss"]]
+                                 [ applyOp
+                                     (text $ "allDifferent_ListX_" ++ stType)
+                                     [applyOp (text $ "init_ListX_" ++ stType)
+                                              [text "ss"]]
                                  , text "oks" ]]
-
 
 -- | Wrap an induction base case in a push-pop context for interaction with SMT
 --   solvers and adds a check-sat command
-checkInductionBase :: String -> [(Integer, InputWidth)] -> Int -> Doc
-checkInductionBase cFun initS depth =
+checkInductionBase :: String
+                   -> (String, String)
+                   -> [(Integer, InputWidth)]
+                   -> Int
+                   -> Doc
+checkInductionBase cFun argTypes initS depth =
       text "(push)"
-  $+$ assertInductionBase cFun initS depth
+  $+$ assertInductionBase cFun argTypes initS depth
   $+$ text "(check-sat)"
   $+$ text "(pop)"
 
 -- | Wrap an induction step in a push-pop context for interaction with SMT
 --   solvers and adds a check-sat command
-checkInductionStep :: String -> Int -> Bool -> Doc
-checkInductionStep cFun depth restrictStates =
+checkInductionStep :: String -> (String, String) -> Int -> Bool -> Doc
+checkInductionStep cFun argTypes depth restrictStates =
       text "(push)"
-  $+$ assertInductionStep cFun depth restrictStates
+  $+$ assertInductionStep cFun argTypes depth restrictStates
   $+$ text "(check-sat)"
   $+$ text ("(pop)")
 

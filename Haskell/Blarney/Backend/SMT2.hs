@@ -82,8 +82,8 @@ verifyWithSMT2 VerifyConf{..} nl =
     say 2 $ rStr (showSpecificDefs ctxt True)
     hPutStrLn hIn $ rStr (showSpecificDefs ctxt True)
     when verifyConfRestrictStates do
-      say 2 $ rStr (defineDistinctListX "State")
-      hPutStrLn hIn $ rStr (defineDistinctListX "State")
+      say 2 $ rStr (defineDistinctListX $ ctxtStateType ctxt)
+      hPutStrLn hIn $ rStr (defineDistinctListX $ ctxtStateType ctxt)
     -- iterative depening for induction proof
     deepen ctxt (hIn, hOut) (legalDepth verifyConfDepth)
   where
@@ -99,8 +99,14 @@ verifyWithSMT2 VerifyConf{..} nl =
     deepen c@Context{..} (hI, hO) (curD, maxD) = do
       say 2 $ "=================> depth " ++ show curD
       --
-      let base = assertInductionBase ctxtCFunName ctxtStateInits curD
-      let step = assertInductionStep ctxtCFunName curD verifyConfRestrictStates
+      let base = assertInductionBase ctxtCFunName
+                                     (ctxtInputType, ctxtStateType)
+                                     ctxtStateInits
+                                     curD
+      let step = assertInductionStep ctxtCFunName
+                                     (ctxtInputType, ctxtStateType)
+                                     curD
+                                     verifyConfRestrictStates
       sndLn "(push)"
       say 2 $ rStr base
       sndLn $ rStr base
@@ -167,16 +173,21 @@ showSpecificDefs Context{..} quiet =
   $+$ text ("(push)")
   $+$ shush (char ';' <> text (replicate 79 '-'))
   $+$ shush (text "; Defining the specific Inputs record type")
-  $+$ declareNLDatatype ctxtNetlist ctxtInputIds "Inputs"
+  $+$ declareNLDatatype ctxtNetlist ctxtInputIds ctxtInputType
   $+$ shush (char ';' <> text (replicate 79 '-'))
   $+$ shush (text "; Defining the specific State record type")
-  $+$ declareNLDatatype ctxtNetlist ctxtStateIds "State"
+  $+$ declareNLDatatype ctxtNetlist ctxtStateIds ctxtStateType
   $+$ shush (char ';' <> text (replicate 79 '-'))
   $+$ shush (text "; Defining the specific transition function")
-  $+$ defineNLTransition ctxtNetlist ctxtRootNet ctxtStateIds ctxtTFunName
+  $+$ defineNLTransition ctxtNetlist ctxtRootNet
+                         (ctxtInputType, ctxtStateType)
+                         ctxtStateIds
+                         ctxtTFunName
   $+$ shush (char ';' <> text (replicate 79 '-'))
   $+$ shush (text "; Defining the specific chaining of the transition function")
-  $+$ defineChainTransition ctxtTFunName ctxtCFunName
+  $+$ defineChainTransition ctxtTFunName
+                            (ctxtInputType, ctxtStateType)
+                            ctxtCFunName
   where shush doc = if quiet then empty else doc
 
 showSpecificAssert :: Context -> Int -> Bool -> Bool -> Doc
@@ -189,14 +200,20 @@ showSpecificAssert ctxt@Context{..} depth restrictStates quiet =
   $+$ shush (text ("(echo \"" ++ replicate 80 '-' ++ "\")"))
   $+$ shush (char ';' <> text (replicate 79 '-'))
   $+$ shush (text "; Base case")
-  $+$ checkInductionBase ctxtCFunName ctxtStateInits depth
+  $+$ checkInductionBase ctxtCFunName
+                         (ctxtInputType, ctxtStateType)
+                         ctxtStateInits
+                         depth
   $+$ shush (char ';' <> text (replicate 79 '-'))
   $+$ (if restrictStates then
              shush (text "; Defining helpers for restricted state checking")
-         $+$ defineDistinctListX "State"
+         $+$ defineDistinctListX ctxtStateType
        else empty)
   $+$ shush (text "; Induction step")
-  $+$ checkInductionStep ctxtCFunName depth restrictStates
+  $+$ checkInductionStep ctxtCFunName
+                         (ctxtInputType, ctxtStateType)
+                         depth
+                         restrictStates
   $+$ shush (text ("(echo \"" ++ replicate 80 '-' ++ "\")"))
   $+$ text ("(pop)")
   where shush doc = if quiet then empty else doc
@@ -217,7 +234,9 @@ showAll nl depth restrictStates quiet =
 ---
 
 data Context = Context { ctxtNetlist    :: Netlist
+                       , ctxtInputType  :: String
                        , ctxtInputIds   :: [InstId]
+                       , ctxtStateType  :: String
                        , ctxtStateIds   :: [InstId]
                        , ctxtStateInits :: [(Integer, InputWidth)]
                        , ctxtRootNet    :: Net
@@ -227,7 +246,9 @@ data Context = Context { ctxtNetlist    :: Netlist
 
 mkContext :: Netlist -> Net -> Context
 mkContext nl n = Context { ctxtNetlist    = nl
+                         , ctxtInputType  = inptType
                          , ctxtInputIds   = inputIds
+                         , ctxtStateType  = stType
                          , ctxtStateIds   = stateIds
                          , ctxtStateInits = stateInits
                          , ctxtRootNet    = n
@@ -247,6 +268,8 @@ mkContext nl n = Context { ctxtNetlist    = nl
         stateInit Net{netPrim=Register   init w} = (init, w)
         stateInit n = error $ "SMT2 backend error: non state net " ++ show n ++
                               " encountered where state net was expected"
+        inptType = "Input_" ++ nm
+        stType = "State_" ++ nm
         tFun = "tFun_" ++ nm
         cFun = "chain_" ++ tFun
         (nm, msg) = case netPrim n of
