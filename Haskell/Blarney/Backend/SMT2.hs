@@ -21,6 +21,7 @@ module Blarney.Backend.SMT2 (
 
 -- Standard imports
 import System.IO
+import Data.List
 import Data.Maybe
 import Control.Monad
 import System.Process
@@ -33,6 +34,7 @@ import Blarney.Netlist
 import Blarney.Backend.SMT2.Utils
 import Blarney.Backend.SMT2.NetlistUtils
 import Blarney.Backend.SMT2.BasicDefinitions
+import Blarney.Misc.ANSIEscapeSequences
 
 -- Toplevel API
 --------------------------------------------------------------------------------
@@ -70,6 +72,9 @@ verifyWithSMT2 VerifyConf{..} nl =
     -- set stdin handle to unbuffered for communication with SMT solver
     hSetBuffering hIn LineBuffering
     say 0 $ "---- now verifying property so and so ----"
+    say 1 $ "restricted states: " ++
+            if verifyConfRestrictStates then blue "enabled"
+                                        else yellow "disabled"
     -- send general SMT sort definitions
     say 2 $ rStr (showGeneralDefs True)
     hPutStrLn hIn $ rStr (showGeneralDefs True)
@@ -92,44 +97,52 @@ verifyWithSMT2 VerifyConf{..} nl =
                                 _          -> False ]
     ctxt = mkContext nl root
     deepen c@Context{..} (hI, hO) (curD, maxD) = do
-      say 1 $ "----> depth " ++ show curD
+      say 2 $ "=================> depth " ++ show curD
       --
       let base = assertInductionBase ctxtCFunName ctxtStateInits curD
       let step = assertInductionStep ctxtCFunName curD verifyConfRestrictStates
-      say 2 $ rStr base
       sndLn "(push)"
+      say 2 $ rStr base
       sndLn $ rStr base
       sndLn "(check-sat)"
       ln <- rcvLn
-      say 1 $ "base: " ++ ln
-      if | ln == "unsat" -> do sndLn "(pop)"
-                               say 2 $ rStr step
-                               sndLn "(push)"
-                               sndLn $ rStr step
-                               sndLn "(check-sat)"
-                               ln <- rcvLn
-                               say 1 $ "step: " ++ ln
-                               if | ln == "unsat" -> do sndLn "(pop)"
-                                                        say 0 "verified"
-                                  | curD == maxD  -> failVerify
-                                  | otherwise     -> do sndLn "(pop)"
-                                                        say 2 "failed to verify induction step ---> deepen"
-                                                        deepen c (hI, hO)
-                                                                 (curD + 1, maxD)
-         | curD == maxD  -> failVerify
-         | otherwise     -> do sndLn "(pop)"
-                               say 2 "failed to verify base case ---> deepen"
-                               deepen c (hI, hO) (curD + 1, maxD)
+      say 2 $ "check-sat of base: " ++ ln
+      if | ln == "unsat" -> do
+           say 1 $ "base " ++ show curD ++ "... " ++ blue "valid"
+           sndLn "(pop)"
+           sndLn "(push)"
+           --
+           say 2 $ rStr step
+           sndLn $ rStr step
+           sndLn "(check-sat)"
+           ln <- rcvLn
+           say 2 $ "check-sat of step: " ++ ln
+           if | ln == "unsat" -> do
+                say 1 $ "step " ++ show curD ++ "... " ++ blue "valid"
+                sndLn "(pop)"
+                say 0 $ "property so and so: " ++ green "verified"
+              | curD == maxD -> failVerify
+              | otherwise -> do
+                sndLn "(pop)"
+                say 1 $ "step " ++ show curD ++ "... " ++ yellow "falsifiable"
+                say 2 "failed to verify induction step ---> deepen"
+                deepen c (hI, hO) (curD + 1, maxD)
+         | curD == maxD -> failVerify
+         | otherwise -> do
+           sndLn "(pop)"
+           say 1 $ "base " ++ show curD ++ "... " ++ yellow "falsifiable"
+           say 2 "failed to verify base case ---> deepen"
+           deepen c (hI, hO) (curD + 1, maxD)
       where sndLn = hPutStrLn hI
             rcvLn = hGetLine hO
             rcvAll = hGetContents hO
-            failVerify = do say 0 "Couldn't verify property"
+            failVerify = do say 0 $ "property so and so: " ++
+                                    red "couldn't verify"
                             say 0 "Show current counter-example? y/N"
                             ln <- getLine
-                            -- XXX TODO sort out hang on rcvAll...
-                            when (ln == "y" || ln == "Y") do sndLn "(get-model)"
-                                                             say 0 =<< rcvAll
-                            sndLn "(pop)"
+                            when (ln == "y" || ln == "Y") $ sndLn "(get-model)"
+                            sndLn "(exit)"
+                            say 0 =<< rcvAll
 
 -- internal helpers specific to blarney netlists
 --------------------------------------------------------------------------------
