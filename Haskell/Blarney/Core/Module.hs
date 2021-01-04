@@ -286,8 +286,8 @@ finish :: Action ()
 finish = A RTL.finish
 
 -- | Assert that a predicate holds
-assert :: (Bits a, SizeOf a ~ 1) => a -> String -> String -> Action ()
-assert pred nm msg = A $ RTL.assert pred nm msg
+assert :: Bit 1 -> String -> Action ()
+assert pred msg = A $ RTL.assert pred msg
 
 -- |Simulation-time assertion
 dynamicAssert :: Bit 1 -> String -> Action ()

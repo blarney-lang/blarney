@@ -20,6 +20,7 @@ module Blarney.Backend.SMT2.NetlistUtils (
 , assertInductionStep
 , checkInductionBase
 , checkInductionStep
+, wireName
 ) where
 
 -- Standard imports
@@ -60,7 +61,7 @@ defineNLTransition :: Netlist
 defineNLTransition nl n@Net { netPrim = p, netInputs = ins }
                    (inptType, stType) state name
   | case p of Output _ _ -> True
-              Assert _ _ -> True
+              Assert _   -> True
               _          -> False =
     defineFun (text name) fArgs fRet fBody
   | otherwise = error $ "Blarney.Backend.SMT2.NetlistUtils: " ++
@@ -77,11 +78,14 @@ defineNLTransition nl n@Net { netPrim = p, netInputs = ins }
                                                     RegisterEn _ _ -> False
                                                     Register   _ _ -> False
                                                     Output     _ _ -> False
-                                                    Assert     _ _ -> False
+                                                    Assert     _   -> False
                                                     _              -> True
         sorted = topologicalSort nl
         filtered = [i | i <- sorted, dontPrune i]
-        assertE = bvIsTrue $ showNetInput ctx (head ins)
+        assertE = case p of
+          Output _ _ -> bvIsTrue $ showNetInput ctx (head ins)
+          Assert _ ->
+            applyOp (text "=>") $ map (bvIsTrue . showNetInput ctx) ins
         stateUpdtE = mkNLDatatype stType $ regsInpts state
         regsInpts = map (regInpts . getNet nl)
         regInpts Net{ netInstId = idx
@@ -169,6 +173,18 @@ checkInductionStep cFun argTypes depth restrictStates =
   $+$ text "(check-sat)"
   $+$ text ("(pop)")
 
+-- | Derive the name of the signal referred to by the given 'WireId'
+wireName :: Netlist -> WireId -> String
+wireName nl (iId, m_outnm) = name ++ richNm ++ outnm ++ "_" ++ show iId
+  where outnm = case m_outnm of Just nm -> nm
+                                _       -> ""
+        net = getNet nl iId
+        richNm = case netPrim net of Input      _ nm -> "inpt_" ++ nm
+                                     RegisterEn _ _  -> "reg"
+                                     Register   _ _  -> "reg"
+                                     _               -> ""
+        name = genName $ netNameHints net
+
 -- internal helpers
 
 -- | Pretty print the provided blarney 'Prim' with its inputs
@@ -214,18 +230,6 @@ showPrim (Mux n w) (sel:ins) = mux $ zip [0..] ins
 -- unsupported primitives
 showPrim p ins = error $
   "Blarney.Backend.SMT2.NetlistUtils: cannot showPrim Prim '" ++ show p ++ "'"
-
--- | Derive the wire name for the net output (= net id + net output name)
-wireName :: Netlist -> WireId -> String
-wireName nl (iId, m_outnm) = name ++ richNm ++ outnm ++ "_" ++ show iId
-  where outnm = case m_outnm of Just nm -> nm
-                                _       -> ""
-        net = getNet nl iId
-        richNm = case netPrim net of Input      _ nm -> "inpt_" ++ nm
-                                     RegisterEn _ _  -> "reg"
-                                     Register   _ _  -> "reg"
-                                     _               -> ""
-        name = genName $ netNameHints net
 
 -- | Generate a 'String' from a 'NameHints'
 genName :: NameHints -> String
@@ -301,7 +305,7 @@ topologicalSort nl = runST do
                                   , case p of RegisterEn _ _ -> True
                                               Register   _ _ -> True
                                               Output     _ _ -> True
-                                              Assert     _ _ -> True
+                                              Assert     _   -> True
                                               _              -> False ]
 
     whileM_ :: Monad m => m Bool -> m a -> m ()

@@ -11,12 +11,12 @@ data QueueCmd a =
 cosim :: (Num a, Bits a) => Queue a -> Queue a -> Module (QueueCmd a)
 cosim q1 q2 = do
   always do
-    assert (q1.notFull .==. q2.notFull) "prop_notFull"
+    assert (nameBits "prop_notFull" $ q1.notFull .==. q2.notFull)
            "q1 and q2 notFull signal should be equal"
-    assert (q1.notEmpty .==. q2.notEmpty) "prop_notEmpty"
+    assert (nameBits "prop_notEmpty" $ q1.notEmpty .==. q2.notEmpty)
            "q1 and q2 notEmtpy signal should be equal"
-    assert (q1.canDeq .&. q2.canDeq .==>. q1.first === q2.first)
-           "prop_First"
+    assert (nameBits "prop_First" $
+                     q1.canDeq .&. q2.canDeq .==>. q1.first === q2.first)
            "q1 and q2 first elements should be equal"
   return
     QueueCmd {

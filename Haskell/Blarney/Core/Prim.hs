@@ -199,10 +199,11 @@ data Prim =
     -- | Test presence of plusargs (output: 1-bit boolean)
   | TestPlusArgs String
 
-    -- | Assertion that a predicate holds (1 input, 0 outputs)
-    --   First argument is the property's name
-    --   Second argument is an assertion message
-  | Assert String String
+    -- | Assertion that a predicate holds (2 inputs, 0 outputs)
+    --   * String argument is an assertion message
+    --   * First input is the current RTL condition
+    --   * Second input is the predicate
+  | Assert String
 
     -- | Register file declaration
     --   (only used in RTL context, not expression context)
@@ -572,13 +573,13 @@ primInfo (TestPlusArgs arg) = PrimInfo { isInlineable = False
                                        , isRoot = True
                                        , inputs = []
                                        , outputs = [("out", 1)] }
-primInfo (Assert _ _) = PrimInfo { isInlineable = False
-                                 , inputsInlineable = True
-                                 , strRep = "Assert"
-                                 , dontKill = True
-                                 , isRoot = True
-                                 , inputs = [("in", 1)]
-                                 , outputs = [] }
+primInfo (Assert _) = PrimInfo { isInlineable = False
+                               , inputsInlineable = True
+                               , strRep = "Assert"
+                               , dontKill = True
+                               , isRoot = True
+                               , inputs = [("cond", 1), ("pred", 1)]
+                               , outputs = [] }
 primInfo RegFileMake{} =
   PrimInfo { isInlineable = False
            , inputsInlineable = True

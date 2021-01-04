@@ -229,7 +229,7 @@ showAll nl depth restrictStates quiet =
            | n <- roots ]
   where roots = [ n | Just n@Net{netPrim=p} <- elems nl
                     , case p of Output _ _ -> True
-                                Assert _ _ -> True
+                                Assert _   -> True
                                 _          -> False ]
 ---
 
@@ -274,7 +274,9 @@ mkContext nl n = Context { ctxtNetlist    = nl
         cFun = "chain_" ++ tFun
         (nm, msg) = case netPrim n of
           Output _      outnm   -> ("output_"++outnm,  Nothing)
-          Assert propnm propmsg -> ("assert_"++propnm, Just propmsg)
+          Assert propmsg -> ("assert_"++propnm, Just propmsg)
+            where propnm = wireName nl propWire
+                  propWire = head . netInputWireIds $ (netInputs n !! 1)
           _ -> error $ "SMT2 backend error: expected Output or Assert net " ++
                        "but got " ++ show n
 

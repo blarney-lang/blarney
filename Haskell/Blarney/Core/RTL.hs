@@ -312,10 +312,11 @@ finish = do
   write (RTLRoots [root])
 
 -- | Assert that a predicate holds
-assert :: (Bits a, SizeOf a ~ 1) => a -> String -> String -> RTL ()
-assert pred nm msg = do
-  let root = makePrim0 (Assert nm msg) [toBV $ pack pred]
-  write (RTLRoots [root])
+assert :: Bit 1 -> String -> RTL ()
+assert pred msg = do
+  r <- ask
+  let root = makePrim0 (Assert msg) [toBV (cond r), toBV $ pack pred]
+  write $ RTLRoots [root]
 
 -- |To support a display statement with variable number of arguments
 class Displayable a where
