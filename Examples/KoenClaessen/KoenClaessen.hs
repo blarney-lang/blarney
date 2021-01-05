@@ -125,5 +125,7 @@ main = do
   verifyWith verifConf prop_ToggleTogglesWhenHigh
   verifyWith verifConf prop_Toggle_vs_Puls
   verifyWith verifConf prop_AdderPeriod2
-  where verifConf = dfltVerifyConf { verifyConfDepth = (1,4)
-                                   , verifyConfRestrictStates = True }
+  where verifConf =
+          dfltVerifyConf { verifyConfMode = Induction (IncreaseFrom 1) True
+                         , verifyConfUser =
+                             dfltUserConf { userConfInteractive = True } }

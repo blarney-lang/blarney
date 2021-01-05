@@ -37,10 +37,11 @@ prop_add :: KnownNat n => (Bit n -> Bit n -> Bit n) -> Bit n -> Bit n -> Bit 1
 prop_add adder_imp x y = adder_imp x y .==. x + y
 
 testAssert :: KnownNat n => Bit n -> Bit n -> Module ()
-testAssert x y = always do assert (prop_add adder x y) "prop_add"
-                                  "the prop_add property"
-                           assert (prop_add doom_adder x y) "doom_prop_add"
-                                  "the doom_prop_add property"
+testAssert x y = always do
+  assert (nameBits "prop_add" $ prop_add adder x y)
+         "the prop_add property"
+  assert (nameBits "doom_prop_add" $ prop_add doom_adder x y)
+         "the doom_prop_add property"
 
 --------------------------------------------------------------------------------
 

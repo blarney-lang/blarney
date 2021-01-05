@@ -16,10 +16,8 @@ module Blarney.Backend.SMT2.NetlistUtils (
 , mkNLDatatype
 , defineNLTransition
 , defineChainTransition
-, assertInductionBase
-, assertInductionStep
-, checkInductionBase
-, checkInductionStep
+, assertBounded
+, assertInduction
 , wireName
 ) where
 
@@ -102,15 +100,15 @@ defineChainTransition :: String -> (String, String) -> String -> Doc
 defineChainTransition tName argTypes cName =
   defineChain cName (tName, argTypes, "Bool")
 
--- | Define inputs and assertion of the base case for proof by induction of the
---   provided chaining function for the checked property, with a given initial
---   state, and for a given induction depth
-assertInductionBase :: String
-                    -> (String, String)
-                    -> [(Integer, InputWidth)]
-                    -> Int
-                    -> Doc
-assertInductionBase cFun (inptType, stType) initS depth = decls $+$ assertion
+-- | Define inputs and assertion of the bounded property represented by the
+--   provided chaining function, with a given initial state, and for a given
+--   depth
+assertBounded :: String
+              -> (String, String)
+              -> [(Integer, InputWidth)]
+              -> Int
+              -> Doc
+assertBounded cFun (inptType, stType) initS depth = decls $+$ assertion
   where inpts = [ "in" ++ show i | i <- [0 .. depth-1] ]
         decls = vcat $
                   map (\i -> text $ "(declare-const "++i++" "++inptType++")")
@@ -128,9 +126,10 @@ assertInductionBase cFun (inptType, stType) initS depth = decls $+$ assertion
 
 -- | Define inputs and assertion of the induction step for proof by induction of
 --   the provided chaining function for the checked property, for a given
---   induction depth and with optional state restriction
-assertInductionStep :: String -> (String, String) -> Int -> Bool -> Doc
-assertInductionStep cFun (inptType, stType) depth restrict = decls $+$ assertion
+--   induction depth and with optional state restriction.
+--   To assert a base case, the 'assertBounded' function can be used.
+assertInduction :: String -> (String, String) -> Int -> Bool -> Doc
+assertInduction cFun (inptType, stType) depth restrict = decls $+$ assertion
   where inpts = [ "in" ++ show i | i <- [0 .. depth] ]
         decls = vcat $ (text $ "(declare-const startS " ++ stType ++ ")") :
                   map (\i -> text $ "(declare-const "++i++" "++inptType++")")
@@ -150,28 +149,6 @@ assertInductionStep cFun (inptType, stType) depth restrict = decls $+$ assertion
                                      [applyOp (text $ "init_ListX_" ++ stType)
                                               [text "ss"]]
                                  , text "oks" ]]
-
--- | Wrap an induction base case in a push-pop context for interaction with SMT
---   solvers and adds a check-sat command
-checkInductionBase :: String
-                   -> (String, String)
-                   -> [(Integer, InputWidth)]
-                   -> Int
-                   -> Doc
-checkInductionBase cFun argTypes initS depth =
-      text "(push)"
-  $+$ assertInductionBase cFun argTypes initS depth
-  $+$ text "(check-sat)"
-  $+$ text "(pop)"
-
--- | Wrap an induction step in a push-pop context for interaction with SMT
---   solvers and adds a check-sat command
-checkInductionStep :: String -> (String, String) -> Int -> Bool -> Doc
-checkInductionStep cFun argTypes depth restrictStates =
-      text "(push)"
-  $+$ assertInductionStep cFun argTypes depth restrictStates
-  $+$ text "(check-sat)"
-  $+$ text ("(pop)")
 
 -- | Derive the name of the signal referred to by the given 'WireId'
 wireName :: Netlist -> WireId -> String
