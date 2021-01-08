@@ -147,6 +147,7 @@ data Context = Context { ctxtNetlist    :: Netlist
                        , ctxtRootNet    :: Net
                        , ctxtTFunName   :: String
                        , ctxtCFunName   :: String
+                       , ctxtPropName   :: String
                        , ctxtAssertMsg  :: Maybe String }
 
 -- | Make a 'Context' from a 'Netlist' and a 'Net' in that 'Netlist'
@@ -160,6 +161,7 @@ mkContext nl n = Context { ctxtNetlist    = nl
                          , ctxtRootNet    = n
                          , ctxtTFunName   = tFun
                          , ctxtCFunName   = cFun
+                         , ctxtPropName   = nm
                          , ctxtAssertMsg  = msg }
   where inputIds = [ netInstId n | Just n@Net{netPrim = p} <- elems nl
                                  , case p of Input _ _ -> True
@@ -204,7 +206,7 @@ showGeneralDefs quiet =
 showSpecificDefs :: Context -> Bool -> Doc
 showSpecificDefs Context{..} quiet =
       shush (char ';' <> text (replicate 79 '-'))
-  $+$ shush (text ("; code gen for net" ++ show ctxtRootNet))
+  $+$ shush (text ("; code gen for " ++ show ctxtPropName))
   $+$ shush (char ';' <> text (replicate 79 '-'))
   $+$ text ("(push)")
   $+$ shush (char ';' <> text (replicate 79 '-'))
@@ -287,7 +289,7 @@ verifyWithSMT2 VerifyConf{..} nl =
   withCreateProcess smtP \(Just hIn) (Just hOut) _ _ -> do
     -- set stdin handle to unbuffered for communication with SMT solver
     hSetBuffering hIn LineBuffering
-    say 0 $ "---- now verifying property so and so ----"
+    say 0 $ "------ verifying property " ++ ctxtPropName  ctxt ++ " ------"
     say 1 $ "restricted states: " ++ if restrictStates then blue "enabled"
                                                        else yellow "disabled"
     -- send general SMT sort definitions
@@ -309,15 +311,16 @@ verifyWithSMT2 VerifyConf{..} nl =
                           , True, rSt )
     interactive = userConfInteractive verifyConfUser
     diveStep = userConfIncreasePeriod verifyConfUser
-    say n msg = when (max 0 n <= verifyConfVerbosity) $ putStrLn msg
-    smtP = (uncurry proc verifyConfSolverCmd){ std_in  = CreatePipe
-                                             , std_out = CreatePipe
-                                             , std_err = CreatePipe }
-    rStr = renderStyle $ Style OneLineMode 0 0
     root = head [ n | Just n@Net{netPrim=p} <- elems nl
                     , case p of Output _ _ -> True
                                 _          -> False ]
     ctxt = mkContext nl root
+    smtP = (uncurry proc verifyConfSolverCmd){ std_in  = CreatePipe
+                                             , std_out = CreatePipe
+                                             , std_err = CreatePipe }
+    rStr = renderStyle $ Style OneLineMode 0 0
+    say n msg = when (max 0 n <= verifyConfVerbosity) $ putStrLn msg
+    justifyLeft n c str = str ++ replicate (n - length str) c
     deepen c@Context{..} (hI, hO) (curD, maxD) = do
       -- send assertion for the bounded proof of current depth
       let bounded = assertBounded ctxtCFunName
@@ -332,7 +335,9 @@ verifyWithSMT2 VerifyConf{..} nl =
       sndLn "(pop)"
       say 2 $ "check-sat: " ++ ln
       if | ln == "unsat" -> do
-           say 1 $ "bounded at depth " ++ show curD ++ "... " ++ blue "valid"
+           say 1 $ justifyLeft 30 '.'
+                     ("(depth " ++ show curD ++ ") bounded ")
+                   ++ blue " valid"
            if | doInduction -> do
                 let step = assertInduction ctxtCFunName
                                            (ctxtInputType, ctxtStateType)
@@ -346,17 +351,23 @@ verifyWithSMT2 VerifyConf{..} nl =
                 sndLn "(pop)"
                 say 2 $ "check-sat: " ++ ln
                 if | ln == "unsat" -> do
-                     say 1 $ "induction step at depth " ++ show curD ++ "... " ++ blue "valid"
+                     say 1 $ justifyLeft 30 '.'
+                               ("(depth " ++ show curD ++ ") induction step ")
+                             ++ blue " valid"
                      successVerify
                    | curD == maxD -> failVerify
                    | otherwise -> do
-                     say 1 $ "induction step at depth " ++ show curD ++ "... " ++ yellow "falsifiable"
+                     say 1 $ justifyLeft 30 '.'
+                               ("(depth " ++ show curD ++ ") induction step ")
+                             ++ yellow " falsifiable"
                      say 2 "failed to verify induction step ---> deepen"
                      diveMore
               | otherwise -> successVerify
          | curD == maxD -> failVerify
          | otherwise -> do
-           say 1 $ "bounded at depth " ++ show curD ++ "... " ++ yellow "falsifiable"
+           say 1 $ justifyLeft 30 '.'
+                     ("(depth " ++ show curD ++ ") bounded ")
+                   ++ yellow " falsifiable"
            say 2 "failed to verify bounded property ---> deepen"
            diveMore
       where sndLn = hPutStrLn hI
@@ -364,25 +375,29 @@ verifyWithSMT2 VerifyConf{..} nl =
             rcvAll = hGetContents hO
             diveMore =
               if interactive && curD `mod` diveStep == 0 then do
-                 askYN "Keep searching for a proof?" False do
-                   deepen c (hI, hO) (curD + 1, maxD)
+                 askYN "Keep searching for a proof?" False
+                       (deepen c (hI, hO) (curD + 1, maxD))
+                       failVerify
               else deepen c (hI, hO) (curD + 1, maxD)
-            successVerify = say 0 $ "property so and so: " ++ green "verified"
+            successVerify = say 0 $ " >>> property " ++ ctxtPropName ++ ": "
+                                    ++ green "verified"
             failVerify = do
-              say 0 $ "property so and so: " ++ red "couldn't verify"
+              say 0 $ " >>> property " ++ ctxtPropName ++ ": "
+                      ++ red "couldn't verify"
               if interactive then do
-                askYN "Show current counter-example?" False do
-                  sndLn "(get-model)"
+                askYN "Show current counter-example?" False
+                      (sndLn "(get-model)") (pure ())
                 sndLn "(exit)"
                 say 0 =<< rcvAll
               else do
                 sndLn "(get-model)"
                 sndLn "(exit)"
                 say 0 =<< rcvAll
-            askYN msg dflt act = do
+            askYN msg dflt actY actN = do
               putStrLn (msg ++ " ...... " ++ yes ++ "/" ++ no)
               answer <- getLine
-              if dflt then when (answer /= "n" && answer /= "N") act
-              else when (answer == "y" || answer == "Y") act
+              if dflt then if (answer /= "n" && answer /= "N") then actY
+                                                               else actN
+              else if (answer == "y" || answer == "Y") then actY else actN
               where yes = if dflt then "Y" else "y"
                     no = if dflt then "n" else "N"
