@@ -77,12 +77,12 @@ seqPeriodAdder n = seqPeriodRow n fullAdder
 ---------------------------------------------
 
 -- provable with induction of depth 1
-prop_ToggleEdgeIdentity inpt = ok
+prop_ToggleEdgeIdentity inpt = assert ok "ToggleEdgeIdentity property"
   where mid = toggle inpt
         outpt = edge mid
         ok = outpt .<==>. inpt
 
-prop_ToggleTogglesWhenHigh inpt = ok
+prop_ToggleTogglesWhenHigh inpt = assert ok "ToggleTogglesWhenHigh property"
   where outpt = toggle inpt
         outpt' = delay 0 outpt
         differ = outpt .!=. outpt'
@@ -90,20 +90,20 @@ prop_ToggleTogglesWhenHigh inpt = ok
 
 -- NOT provable with induction of depth 1
 -- need the notion of induction depth
-prop_Toggle_vs_Puls = ok
+prop_Toggle_vs_Puls = assert ok "Toggle Vs Puls property"
   where outpt1 = toggle 1
         outpt2 = puls 2
         ok = inv (outpt1 .<==>. outpt2)
 
 -- NOT provable with simple induction of depth k
 -- need the notion of restricted states
-prop_AdderPeriod2 inpts = ok
+prop_AdderPeriod2 inpts = assert ok "Adder period 2 property"
   where sum1 = seqPeriodAdder 2 inpts
         two = delay 0 (inv two)
         sum2 = seqResetAdder two inpts
         ok = sum1 .<==>. sum2
 
---prop_SameSeqAdder inpts = ok
+--prop_SameSeqAdder inpts = assert ok "Seq addres equivalent"
 --  where outpt1 = seqAdder inpts
 --        outpt2 = seqAdder' inpts
 --        ok = outpt1 .<==>. outpt2

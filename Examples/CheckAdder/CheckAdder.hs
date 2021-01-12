@@ -33,15 +33,10 @@ doom_adder :: KnownNat n => Bit n -> Bit n -> Bit n
 doom_adder x y = fromBitList $ listAdder 1 (toBitList x) (toBitList y)
 
 -- | Adder property
-prop_add :: KnownNat n => (Bit n -> Bit n -> Bit n) -> Bit n -> Bit n -> Bit 1
-prop_add adder_imp x y = adder_imp x y .==. x + y
-
-testAssert :: KnownNat n => Bit n -> Bit n -> Module ()
-testAssert x y = always do
-  assert (nameBits "prop_add" $ prop_add adder x y)
-         "the prop_add property"
-  assert (nameBits "doom_prop_add" $ prop_add doom_adder x y)
-         "the doom_prop_add property"
+prop_add :: KnownNat n => (Bit n -> Bit n -> Bit n) -> Bit n -> Bit n
+                       -> Action ()
+prop_add adder_imp x y = assert (adder_imp x y .==. x + y)
+                                "Adder equivalent to blarney '+' operator"
 
 --------------------------------------------------------------------------------
 
@@ -53,8 +48,10 @@ doom_adderSeq x y = res
   where c_in = delay 0 s
         res@(c_out, s) = fullAdder x y c_in
 -- | prop
-prop_addSeq x y = adderSeq x y === adderSeq x y
-prop_brokenAddSeq x y = adderSeq x y === doom_adderSeq x y
+prop_addSeq x y = assert (adderSeq x y === adderSeq x y)
+                         "Sequential adder equivalent to itself"
+prop_brokenAddSeq x y = assert (adderSeq x y === doom_adderSeq x y)
+                               "Broken seq adder is equivalent to working one"
 
 --------------------------------------------------------------------------------
 
@@ -70,5 +67,4 @@ main = do
   writeSMTScript verifConf (prop_add @16 doom_adder) "brokenAdder16" smtDir
   writeSMTScript verifConf (prop_addSeq)             "goodAddSeq"    smtDir
   writeSMTScript verifConf (prop_brokenAddSeq)       "brokenAddSeq"  smtDir
-  writeSMTScript verifConf (testAssert @4)           "testAssert"    smtDir
   where verifConf = dfltVerifyConf

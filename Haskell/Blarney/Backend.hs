@@ -66,27 +66,30 @@ writeVerilogTop mod modName dirName = do
 -- SMT backend
 --------------------------------------------------------------------------------
 
--- | This function generates an SMT script for the 'pred' Blarney predicate.
+-- | This function generates an SMT script to verify each assertion present in
+--   'circuit', introduced by calls to the 'assert' function.
 --   The name of the generated SMT script is specified with 'scriptName' and
 --   the generated file is `'dirName'/'scriptName'.smt2`.
 writeSMTScript :: Modular a
                 => VerifyConf
-                -> a      -- ^ Blarney predicate
+                -> a      -- ^ Blarney circuit
                 -> String -- ^ Script name
                 -> String -- ^ Output directory
                 -> IO ()
-writeSMTScript conf pred scriptName dirName = do
+writeSMTScript conf circuit scriptName dirName = do
   (opts, _) <- getOpts
-  nl <- toNetlist $ makeModule pred
+  nl <- toNetlist $ makeModule circuit
   let nl' = runDefaultNetlistPasses opts nl
   genSMTScript conf nl' scriptName dirName
 
+-- | This function interacts with an SMT solver to verify each assertion present
+--   in 'circuit', introduced by calls to the 'assert' function.
 verifyWith :: Modular a
            => VerifyConf
-           -> a      -- ^ Blarney predicate
+           -> a      -- ^ Blarney circuit
            -> IO ()
-verifyWith conf pred = do
+verifyWith conf circuit = do
   (opts, _) <- getOpts
-  nl <- toNetlist . makeModule $ pred
+  nl <- toNetlist . makeModule $ circuit
   let nl' = runDefaultNetlistPasses opts nl
   verifyWithSMT conf nl'

@@ -279,8 +279,7 @@ genSMTScript VerifyConf{..} nl nm dir = do
     fileName = dir ++ "/" ++ nm ++ ".smt2"
     rStyle = Style PageMode 80 1.05
     rootCtxts = [ mkContext nl n | Just n@Net{netPrim=p} <- elems nl
-                                 , case p of Output _ _ -> True
-                                             Assert _   -> True
+                                 , case p of Assert _   -> True
                                              _          -> False ]
     smtCode = showGeneralDefs False $+$ vcat defs
     defs = intercalate [text "(echo \"\")"]
@@ -296,20 +295,23 @@ verifyWithSMT VerifyConf{..} nl =
   withCreateProcess smtP \(Just hIn) (Just hOut) _ _ -> do
     -- set stdin handle to unbuffered for communication with SMT solver
     hSetBuffering hIn LineBuffering
-    say 0 $ "------ verifying property " ++ ctxtPropName  ctxt ++ " ------"
-    say 1 $ "restricted states: " ++ if restrictStates then blue "enabled"
-                                                       else yellow "disabled"
     -- send general SMT sort definitions
     say 2 $ rStr (showGeneralDefs True)
     hPutStrLn hIn $ rStr (showGeneralDefs True)
-    -- send netlist-specific SMT sort definitions
-    say 2 $ rStr (showSpecificDefs ctxt True)
-    hPutStrLn hIn $ rStr (showSpecificDefs ctxt True)
-    when restrictStates do
-      say 2 $ rStr (defineDistinctListX $ ctxtStateType ctxt)
-      hPutStrLn hIn $ rStr (defineDistinctListX $ ctxtStateType ctxt)
-    -- iterative deepening for potentially increasing depth
-    deepen ctxt (hIn, hOut) depthRg
+    -- for each assertion...
+    forM_ rootCtxts \ctxt -> do
+      say 0 $ "------ verifying property " ++ ctxtPropName ctxt ++ " ------"
+      maybe (pure ()) (say 0) (ctxtAssertMsg ctxt)
+      say 1 $ "restricted states: " ++ if restrictStates then blue "enabled"
+                                                         else yellow "disabled"
+      -- send netlist-specific SMT sort definitions
+      say 2 $ rStr (showSpecificDefs ctxt True)
+      hPutStrLn hIn $ rStr (showSpecificDefs ctxt True)
+      when restrictStates do
+        say 2 $ rStr (defineDistinctListX $ ctxtStateType ctxt)
+        hPutStrLn hIn $ rStr (defineDistinctListX $ ctxtStateType ctxt)
+      -- iterative deepening for potentially increasing depth
+      deepen ctxt (hIn, hOut) depthRg
   where
     (depthRg, doInduction, restrictStates) = case verifyConfMode of
       Bounded vD -> ( rangeVerifyDepth . legalizeVerifyDepth $ vD
@@ -318,10 +320,9 @@ verifyWithSMT VerifyConf{..} nl =
                           , True, rSt )
     interactive = userConfInteractive verifyConfUser
     diveStep = userConfIncreasePeriod verifyConfUser
-    root = head [ n | Just n@Net{netPrim=p} <- elems nl
-                    , case p of Output _ _ -> True
-                                _          -> False ]
-    ctxt = mkContext nl root
+    rootCtxts = [ mkContext nl n | Just n@Net{netPrim=p} <- elems nl
+                                 , case p of Assert _   -> True
+                                             _          -> False ]
     smtP = (uncurry proc verifyConfSolverCmd){ std_in  = CreatePipe
                                              , std_out = CreatePipe
                                              , std_err = CreatePipe }
@@ -400,6 +401,8 @@ verifyWithSMT VerifyConf{..} nl =
                 sndLn "(get-model)"
                 sndLn "(exit)"
                 say 0 =<< rcvAll
+                -- XXX TODO deal with parsing the model and exit at the top
+                -- XXX currently cannot recover for next assertiong...
             askYN msg dflt actY actN = do
               putStrLn (msg ++ " ...... " ++ yes ++ "/" ++ no)
               answer <- getLine
