@@ -114,18 +114,21 @@ main :: IO ()
 main = do
   -- path to script output directory
   cwd <- getCurrentDirectory
-  let oDir = cwd ++ "/KoenClaessen-SMT/"
+  let oDir = cwd ++ "/CheckBasicCircuits-SMT/"
   -- generate smt2 scripts
-  writeSMTScript verifConf (prop_ToggleEdgeIdentity)    "prop_ToggleEdgeIdentity"    oDir
-  writeSMTScript verifConf (prop_ToggleTogglesWhenHigh) "prop_ToggleTogglesWhenHigh" oDir
-  writeSMTScript verifConf (prop_Toggle_vs_Puls)        "prop_Toggle_vs_Puls"        oDir
-  writeSMTScript verifConf (prop_AdderPeriod2)          "prop_AdderPeriod2"          oDir
+  writeSMTScript vCnf (prop_ToggleEdgeIdentity)
+                 "prop_ToggleEdgeIdentity" oDir
+  writeSMTScript vCnf (prop_ToggleTogglesWhenHigh)
+                 "prop_ToggleTogglesWhenHigh" oDir
+  writeSMTScript vCnf (prop_Toggle_vs_Puls)
+                 "prop_Toggle_vs_Puls" oDir
+  writeSMTScript vCnf (prop_AdderPeriod2)
+                 "prop_AdderPeriod2" oDir
   -- verify
-  verifyWith verifConf prop_ToggleEdgeIdentity
-  verifyWith verifConf prop_ToggleTogglesWhenHigh
-  verifyWith verifConf prop_Toggle_vs_Puls
-  verifyWith verifConf prop_AdderPeriod2
-  where verifConf =
-          dfltVerifyConf { verifyConfMode = Induction (IncreaseFrom 1) True
-                         , verifyConfUser =
-                             dfltUserConf { userConfInteractive = True } }
+  verifyWith vCnf prop_ToggleEdgeIdentity
+  verifyWith vCnf prop_ToggleTogglesWhenHigh
+  verifyWith vCnf prop_Toggle_vs_Puls
+  verifyWith vCnf prop_AdderPeriod2
+  where vCnf = dfltVerifyConf { verifyConfMode = Induction (IncreaseFrom 1) True
+                              , verifyConfUser =
+                                  dfltUserConf { userConfInteractive = True } }

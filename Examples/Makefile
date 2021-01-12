@@ -8,7 +8,9 @@ top:
 
 .PHONY: clean
 clean:
-	make -C Adder clean
+	make -C CheckAdder clean
+	make -C CheckBasicCircuits clean
+	make -C CheckQueue clean
 	make -C Background clean
 	make -C BasicRTL clean
 	make -C Bit0 clean

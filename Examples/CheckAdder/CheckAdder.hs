@@ -62,28 +62,13 @@ main :: IO ()
 main = do
   -- path to script output directory
   cwd <- getCurrentDirectory
-  let smtDir = cwd ++ "/Adder-SMT/"
-  let verilogDir = cwd ++ "/Adder-Verilog/"
-  -- verilog
-  writeVerilogModule (testAssert @4) "testAssert" verilogDir
+  let smtDir = cwd ++ "/CheckAdder-SMT/"
   -- generate smt2 scripts
   writeSMTScript verifConf (prop_add @2  adder)      "goodAdder2"    smtDir
   writeSMTScript verifConf (prop_add @16 adder)      "goodAdder16"   smtDir
   writeSMTScript verifConf (prop_add @2  doom_adder) "brokenAdder2"  smtDir
   writeSMTScript verifConf (prop_add @16 doom_adder) "brokenAdder16" smtDir
-  writeSMTScript verifConf (prop_addSeq)       "goodAddSeq"   smtDir
-  writeSMTScript verifConf (prop_brokenAddSeq) "brokenAddSeq" smtDir
-  writeSMTScript verifConf (testAssert @4) "testAssert" smtDir
-  -- helper usage message
-  putStrLn $ "SMT scripts generated under " ++ smtDir
-  putStrLn $ "Run an SMT solver such as z3 with an SMT script as input:"
-  putStrLn $ "    $ z3 " ++ smtDir ++ "goodAdder2.smt2"
-  putStrLn $ "This should return \"unsat\". Running:"
-  putStrLn $ "    $ z3 " ++ smtDir ++ "brokenAdder2.smt2"
-  putStrLn $ "should return \"sat\". Run:"
-  putStrLn $ "    $ echo \"(get-model)\" >> "
-             ++ smtDir ++ "brokenAdder2.smt2"
-  putStrLn $ "    $ z3 " ++ smtDir ++ "brokenAdder2.smt2"
-  putStrLn $ "to get a set of input assignments for which the tested property"
-             ++ " does not hold."
+  writeSMTScript verifConf (prop_addSeq)             "goodAddSeq"    smtDir
+  writeSMTScript verifConf (prop_brokenAddSeq)       "brokenAddSeq"  smtDir
+  writeSMTScript verifConf (testAssert @4)           "testAssert"    smtDir
   where verifConf = dfltVerifyConf
