@@ -1,10 +1,4 @@
-EXAMPLES += Factorial
-EXAMPLES += FIFO
-EXAMPLES += MeanFilter
-EXAMPLES += UnweightedASP
-EXAMPLES += UpDownCounter
-
-top:
+all:
 
 .PHONY: clean
 clean:
