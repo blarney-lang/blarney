@@ -1,15 +1,15 @@
 {-|
-Module      : Blarney.Backend.SMT2.BasicDefinitions
-Description : Basic SMT2 helper types and functions definitions
+Module      : Blarney.Backend.SMT.BasicDefinitions
+Description : Basic SMT helper types and functions definitions
 Copyright   : (c) Alexandre Joannou, 2020-2021
 License     : MIT
 Stability   : experimental
 
-This module provides basic SMT2 types and functions to assist in blarney Netlist
+This module provides basic SMT types and functions to assist in blarney Netlist
 code generation
 -}
 
-module Blarney.Backend.SMT2.BasicDefinitions (
+module Blarney.Backend.SMT.BasicDefinitions (
 -- * datatypes declaration
   declareTupleTypes
 , declareListXType
@@ -29,9 +29,9 @@ import Text.PrettyPrint
 import Prelude hiding ((<>))
 
 -- Blarney imports
-import Blarney.Backend.SMT2.Utils
+import Blarney.Backend.SMT.Utils
 
--- | Declare an SMT2 tuple sort per entry in the argument list. Each sort is
+-- | Declare an SMT tuple sort per entry in the argument list. Each sort is
 --   defined as a function of the 'Int' "N", as the parametric sort "TupleN"
 --   parameterised on "X", and a constructor "mkTupleN" with N fields named
 --   "tplN_i" for i ranging from 1 to N
@@ -59,7 +59,7 @@ mkListX :: [String] -> String -> Doc
 mkListX [] lstSort = qualify (text "nil") (text $ "(ListX "++lstSort++")")
 mkListX (e:es) lstSort = applyOp (text "cons") [ text e, mkListX es lstSort ]
 
--- | Define the "andReduce" SMT2 function operating on a "(ListX Bool)",
+-- | Define the "andReduce" SMT function operating on a "(ListX Bool)",
 --   reducing it using "and"
 defineAndReduce :: Doc
 defineAndReduce = defineFunRec (text "andReduce")
@@ -74,7 +74,7 @@ defineAndReduce = defineFunRec (text "andReduce")
                                       , applyOp (text "andReduce")
                                                 [text "t"] ] ) ]
 
--- | Define the "impliesReduce" SMT2 function operating on a "(ListX Bool)",
+-- | Define the "impliesReduce" SMT function operating on a "(ListX Bool)",
 --   reducing it using "=>" (implication)
 defineImpliesReduce :: Doc
 defineImpliesReduce = defineFunRec (text "impliesReduce")

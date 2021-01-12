@@ -62,21 +62,21 @@ main :: IO ()
 main = do
   -- path to script output directory
   cwd <- getCurrentDirectory
-  let smtDir = cwd ++ "/Adder-SMT2/"
+  let smtDir = cwd ++ "/Adder-SMT/"
   let verilogDir = cwd ++ "/Adder-Verilog/"
   -- verilog
   writeVerilogModule (testAssert @4) "testAssert" verilogDir
   -- generate smt2 scripts
-  writeSMT2Script verifConf (prop_add @2  adder)      "goodAdder2"    smtDir
-  writeSMT2Script verifConf (prop_add @16 adder)      "goodAdder16"   smtDir
-  writeSMT2Script verifConf (prop_add @2  doom_adder) "brokenAdder2"  smtDir
-  writeSMT2Script verifConf (prop_add @16 doom_adder) "brokenAdder16" smtDir
-  writeSMT2Script verifConf (prop_addSeq)       "goodAddSeq"   smtDir
-  writeSMT2Script verifConf (prop_brokenAddSeq) "brokenAddSeq" smtDir
-  writeSMT2Script verifConf (testAssert @4) "testAssert" smtDir
+  writeSMTScript verifConf (prop_add @2  adder)      "goodAdder2"    smtDir
+  writeSMTScript verifConf (prop_add @16 adder)      "goodAdder16"   smtDir
+  writeSMTScript verifConf (prop_add @2  doom_adder) "brokenAdder2"  smtDir
+  writeSMTScript verifConf (prop_add @16 doom_adder) "brokenAdder16" smtDir
+  writeSMTScript verifConf (prop_addSeq)       "goodAddSeq"   smtDir
+  writeSMTScript verifConf (prop_brokenAddSeq) "brokenAddSeq" smtDir
+  writeSMTScript verifConf (testAssert @4) "testAssert" smtDir
   -- helper usage message
-  putStrLn $ "SMT2 scripts generated under " ++ smtDir
-  putStrLn $ "Run an SMT solver such as z3 with an SMT2 script as input:"
+  putStrLn $ "SMT scripts generated under " ++ smtDir
+  putStrLn $ "Run an SMT solver such as z3 with an SMT script as input:"
   putStrLn $ "    $ z3 " ++ smtDir ++ "goodAdder2.smt2"
   putStrLn $ "This should return \"unsat\". Running:"
   putStrLn $ "    $ z3 " ++ smtDir ++ "brokenAdder2.smt2"

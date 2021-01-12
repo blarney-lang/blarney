@@ -1,14 +1,14 @@
 {-|
-Module      : Blarney.Backend.SMT2.Utils
-Description : Basic utility functions for SMT2 pretty printing
-Copyright   : (c) Alexandre Joannou, 2020
+Module      : Blarney.Backend.SMT.Utils
+Description : Basic utility functions for SMT pretty printing
+Copyright   : (c) Alexandre Joannou, 2020-2021
 License     : MIT
 Stability   : experimental
 
-This module provides basic pretty printing utilities for SMT2 code generation
+This module provides basic pretty printing utilities for SMT code generation
 -}
 
-module Blarney.Backend.SMT2.Utils (
+module Blarney.Backend.SMT.Utils (
 -- * general numerical helpers
   showAtBase
 , showHex
@@ -17,7 +17,7 @@ module Blarney.Backend.SMT2.Utils (
 , psep
 , plist
 , applyOp
--- SMT2 BitVec helpers
+-- SMT BitVec helpers
 , bvHexLit
 , bvBinLit
 , bvSlice
@@ -28,7 +28,7 @@ module Blarney.Backend.SMT2.Utils (
 , bvIsTrue
 , bv2Bool
 , bool2bv
--- * SMT2 binders and qualifiers
+-- * SMT binders and qualifiers
 , qualify
 , parBind
 , forallBind
@@ -36,10 +36,10 @@ module Blarney.Backend.SMT2.Utils (
 , matchBind
 , letBind
 , nestLetBind
--- * SMT2 datatype declarations
+-- * SMT datatype declarations
 , declareDataTypes
 , declareDataType
--- * SMT2 function definitions
+-- * SMT function definitions
 , defineFun
 , defineFunRec
 , defineFunsRec
@@ -63,45 +63,45 @@ showHex n = showAtBase 16 n
 showBin :: (Integral a, Show a) => a -> Doc
 showBin n = showAtBase 2 n
 
--- | pretty print an 'Integer' as an SMT2 BitVec hexadecimal literal
+-- | pretty print an 'Integer' as an SMT BitVec hexadecimal literal
 bvHexLit :: Integer -> Doc
 bvHexLit n = text "#x" <> showHex n
 
--- | pretty print an 'Integer' as an SMT2 BitVec binary literal
+-- | pretty print an 'Integer' as an SMT BitVec binary literal
 bvBinLit :: Integer -> Doc
 bvBinLit n = text "#b" <> showBin n
 
--- | extract the bitslice from 'lo' to 'hi' from the 'bv' SMT2 BitVec
+-- | extract the bitslice from 'lo' to 'hi' from the 'bv' SMT BitVec
 bvSlice :: Int-> Int-> Doc -> Doc
 bvSlice hi lo bv =
   parens $ (parens $ char '_' <+> text "extract" <+> int hi <+> int lo) <+> bv
 
--- | return a string representing the BitVec SMT2 sort of the given width 'n'
+-- | return a string representing the BitVec SMT sort of the given width 'n'
 bvSortStr :: Int -> String
 bvSortStr n = "(_ BitVec " ++ show n ++ ")"
 
--- | pretty print the BitVec SMT2 sort of the given width 'n'
+-- | pretty print the BitVec SMT sort of the given width 'n'
 bvSort :: Int -> Doc
 bvSort = text . bvSortStr
 
--- | cast the Int sorted SMT2 value 'n' to a (BitVec 'w') sorted SMT2 value
+-- | cast the Int sorted SMT value 'n' to a (BitVec 'w') sorted SMT value
 int2bv :: Int -> Integer -> Doc
 int2bv w n =
   parens $ parens (char '_' <+> text "int2bv" <+> int w) <+> int (fromInteger n)
 
--- | test a (BitVec 1) sorted SMT2 value for "false"
+-- | test a (BitVec 1) sorted SMT value for "false"
 bvIsFalse :: Doc -> Doc
 bvIsFalse doc = parens $ text "=" <+> doc <+> text "#b0"
 
--- | test a (BitVec 1) sorted SMT2 value for "true"
+-- | test a (BitVec 1) sorted SMT value for "true"
 bvIsTrue :: Doc -> Doc
 bvIsTrue doc = parens $ text "=" <+> doc <+> text "#b1"
 
--- | cast a (BitVec 1) sorted SMT2 value to a Bool sorted SMT2 value
+-- | cast a (BitVec 1) sorted SMT value to a Bool sorted SMT value
 bv2Bool :: Doc -> Doc
 bv2Bool = bvIsTrue
 
--- | cast a Bool sorted SMT2 value to a (BitVec 1) sorted SMT2 value
+-- | cast a Bool sorted SMT value to a (BitVec 1) sorted SMT value
 bool2bv :: Doc -> Doc
 bool2bv doc = parens $ text "ite" <+> doc <+> text "#b1" <+> text "#b0"
 
@@ -118,11 +118,11 @@ plist = psep . map (\(v, s) -> psep [v, s])
 applyOp :: Doc -> [Doc] -> Doc
 applyOp opName opArgs = psep $ opName : opArgs
 
--- | wrap the SMT2 expression 'expr' in the "as" qualifier with the given 'sort'
+-- | wrap the SMT expression 'expr' in the "as" qualifier with the given 'sort'
 qualify :: Doc -> Doc -> Doc
 qualify expr sort = applyOp (text "as") [ expr, sort ]
 
--- | wrap the SMT2 parametric expression 'expr' in the "par" sort parameter
+-- | wrap the SMT parametric expression 'expr' in the "par" sort parameter
 --   binder with the 'pars' list of sort parameters
 parBind :: [String] -> Doc -> Doc
 parBind [] expr = expr
@@ -134,29 +134,29 @@ flatBind _ [] doc = doc
 --flatBind binder xs doc = applyOp binder [ plist xs, doc ]
 flatBind binder xs doc = parens $ binder <+> sep [ plist xs, doc ]
 
--- | wrap an SMT2 expression in the "forall" universal quantifier with the
+-- | wrap an SMT expression in the "forall" universal quantifier with the
 --   provided list of pairs of (variable name, sort)
 forallBind :: [(Doc, Doc)] -> Doc -> Doc
 forallBind = flatBind $ text "forall"
 
--- | wrap an SMT2 expression in the "exists" existential quantifier with the
+-- | wrap an SMT expression in the "exists" existential quantifier with the
 --   provided list of pairs of (variable name, sort)
 existsBind :: [(Doc, Doc)] -> Doc -> Doc
 existsBind = flatBind $ text "exists"
 
--- | wrap an SMT2 expression in the "match" binder, pattern matching the SMT2
+-- | wrap an SMT expression in the "match" binder, pattern matching the SMT
 --   expression against each of the patterns provided in the argument list of
 --   pairs of (pattern, expression)
 matchBind :: Doc -> [(Doc, Doc)] -> Doc
 matchBind doc [] = doc
 matchBind doc matches = applyOp (text "match") [ doc, plist matches ]
 
--- | wrap an SMT2 expression in the "let" binder with the provided list of pairs
+-- | wrap an SMT expression in the "let" binder with the provided list of pairs
 --   of (variable name, sort)
 letBind :: [(Doc, Doc)] -> Doc -> Doc
 letBind = flatBind $ text "let"
 
--- | wrap an SMT2 expression in a sequence of nested "let" binders, each
+-- | wrap an SMT expression in a sequence of nested "let" binders, each
 --   introducing one of the variables provided by the argument list of pairs of
 --   (variable name, sort), in the provided order
 nestLetBind :: [[(Doc, Doc)]] -> Doc -> Doc

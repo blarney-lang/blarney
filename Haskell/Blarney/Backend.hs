@@ -12,9 +12,9 @@ module Blarney.Backend (
   module Blarney.Backend.Verilog
 , writeVerilogModule
 , writeVerilogTop
-  -- * SMT2 backend
-, module Blarney.Backend.SMT2
-, writeSMT2Script
+  -- * SMT backend
+, module Blarney.Backend.SMT
+, writeSMTScript
 , verifyWith
 ) where
 
@@ -27,7 +27,7 @@ import Blarney.Core.Module
 import Blarney.Netlist
 
 import Blarney.Backend.Verilog
-import Blarney.Backend.SMT2
+import Blarney.Backend.SMT
 
 -- Verilog backend
 --------------------------------------------------------------------------------
@@ -63,23 +63,23 @@ writeVerilogTop mod modName dirName = do
   let nl' = runDefaultNetlistPasses opts nl
   genVerilogTop nl' modName dirName
 
--- SMT2 backend
+-- SMT backend
 --------------------------------------------------------------------------------
 
--- | This function generates an SMT2 script for the 'pred' Blarney predicate.
---   The name of the generated SMT2 script is specified with 'scriptName' and
+-- | This function generates an SMT script for the 'pred' Blarney predicate.
+--   The name of the generated SMT script is specified with 'scriptName' and
 --   the generated file is `'dirName'/'scriptName'.smt2`.
-writeSMT2Script :: Modular a
+writeSMTScript :: Modular a
                 => VerifyConf
                 -> a      -- ^ Blarney predicate
                 -> String -- ^ Script name
                 -> String -- ^ Output directory
                 -> IO ()
-writeSMT2Script conf pred scriptName dirName = do
+writeSMTScript conf pred scriptName dirName = do
   (opts, _) <- getOpts
   nl <- toNetlist $ makeModule pred
   let nl' = runDefaultNetlistPasses opts nl
-  genSMT2Script conf nl' scriptName dirName
+  genSMTScript conf nl' scriptName dirName
 
 verifyWith :: Modular a
            => VerifyConf
@@ -89,4 +89,4 @@ verifyWith conf pred = do
   (opts, _) <- getOpts
   nl <- toNetlist . makeModule $ pred
   let nl' = runDefaultNetlistPasses opts nl
-  verifyWithSMT2 conf nl'
+  verifyWithSMT conf nl'

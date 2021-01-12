@@ -114,12 +114,12 @@ main :: IO ()
 main = do
   -- path to script output directory
   cwd <- getCurrentDirectory
-  let oDir = cwd ++ "/KoenClaessen-SMT2/"
+  let oDir = cwd ++ "/KoenClaessen-SMT/"
   -- generate smt2 scripts
-  writeSMT2Script verifConf (prop_ToggleEdgeIdentity)    "prop_ToggleEdgeIdentity"    oDir
-  writeSMT2Script verifConf (prop_ToggleTogglesWhenHigh) "prop_ToggleTogglesWhenHigh" oDir
-  writeSMT2Script verifConf (prop_Toggle_vs_Puls)        "prop_Toggle_vs_Puls"        oDir
-  writeSMT2Script verifConf (prop_AdderPeriod2)          "prop_AdderPeriod2"          oDir
+  writeSMTScript verifConf (prop_ToggleEdgeIdentity)    "prop_ToggleEdgeIdentity"    oDir
+  writeSMTScript verifConf (prop_ToggleTogglesWhenHigh) "prop_ToggleTogglesWhenHigh" oDir
+  writeSMTScript verifConf (prop_Toggle_vs_Puls)        "prop_Toggle_vs_Puls"        oDir
+  writeSMTScript verifConf (prop_AdderPeriod2)          "prop_AdderPeriod2"          oDir
   -- verify
   verifyWith verifConf prop_ToggleEdgeIdentity
   verifyWith verifConf prop_ToggleTogglesWhenHigh

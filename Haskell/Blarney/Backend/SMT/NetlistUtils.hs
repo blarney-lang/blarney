@@ -1,17 +1,17 @@
 {-# LANGUAGE NoRebindableSyntax #-}
 
 {-|
-Module      : Blarney.Backend.SMT2.NetlistUtils
-Description : Netlist utility functions for SMT2 pretty printing
+Module      : Blarney.Backend.SMT.NetlistUtils
+Description : Netlist utility functions for SMT pretty printing
 Copyright   : (c) Alexandre Joannou, 2020-2021
 License     : MIT
 Stability   : experimental
 
-This module provides blarney Netlist pretty printing utilities for SMT2 code
+This module provides blarney Netlist pretty printing utilities for SMT code
 generation
 -}
 
-module Blarney.Backend.SMT2.NetlistUtils (
+module Blarney.Backend.SMT.NetlistUtils (
   declareNLDatatype
 , mkNLDatatype
 , defineNLTransition
@@ -33,8 +33,8 @@ import qualified Data.Set as Set
 
 -- Blarney imports
 import Blarney.Netlist
-import Blarney.Backend.SMT2.Utils
-import Blarney.Backend.SMT2.BasicDefinitions
+import Blarney.Backend.SMT.Utils
+import Blarney.Backend.SMT.BasicDefinitions
 
 -- | Declare a datatype whose fields are specific to the provided 'Netlist'
 declareNLDatatype :: Netlist -> [InstId] -> String -> Doc
@@ -62,7 +62,7 @@ defineNLTransition nl n@Net { netPrim = p, netInputs = ins }
               Assert _   -> True
               _          -> False =
     defineFun (text name) fArgs fRet fBody
-  | otherwise = error $ "Blarney.Backend.SMT2.NetlistUtils: " ++
+  | otherwise = error $ "Blarney.Backend.SMT.NetlistUtils: " ++
                         "cannot defineNLTransition on " ++ show n
   where inVar = "inpts"
         stVar = "prev"
@@ -206,7 +206,7 @@ showPrim (Mux n w) (sel:ins) = mux $ zip [0..] ins
                                  , e, mux xs ]
 -- unsupported primitives
 showPrim p ins = error $
-  "Blarney.Backend.SMT2.NetlistUtils: cannot showPrim Prim '" ++ show p ++ "'"
+  "Blarney.Backend.SMT.NetlistUtils: cannot showPrim Prim '" ++ show p ++ "'"
 
 -- | Generate a 'String' from a 'NameHints'
 genName :: NameHints -> String
@@ -249,7 +249,7 @@ withBoundNets _ [] doc = doc
 withBoundNets ctx@(nl, _, _) instIds doc = nestLetBind decls doc
   where decls = map (\i -> [(showWire nl (i, Nothing), showNet ctx i)]) instIds
 
--- | Return a 'String' representation of the SMT2 sort of the net with the given
+-- | Return a 'String' representation of the SMT sort of the net with the given
 --   'WireId'
 strSort :: Netlist -> WireId -> String
 strSort nl (instId, m_outnm) = bvSortStr w
@@ -315,7 +315,7 @@ topologicalSort nl = runST do
         Permanent -> return ()
         -- For nets under visit, we identified a combinational cycle
         -- (unsupported ==> error out)
-        Temporary -> error $ "Blarney.Backend.SMT2.NetlistUtils: " ++
+        Temporary -> error $ "Blarney.Backend.SMT.NetlistUtils: " ++
                              "combinational cycle detected -- " ++ show net
         -- For new visits:
         Unmarked -> do

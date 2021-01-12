@@ -3,4 +3,4 @@ all:
 	blc $(BLC_FLAGS) Adder.hs
 
 clean:
-	rm -rf *.o *.hi Adder Adder-Verilog Adder-SMT2
+	rm -rf *.o *.hi Adder Adder-Verilog Adder-SMT

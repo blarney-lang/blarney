@@ -3,16 +3,16 @@
 {-# LANGUAGE NoRebindableSyntax #-}
 
 {-|
-Module      : Blarney.Backend.SMT2
-Description : SMT2 generation
+Module      : Blarney.Backend.SMT
+Description : SMT generation
 Copyright   : (c) Alexandre Joannou, 2020-2021
 License     : MIT
 Stability   : experimental
 
-Convert Blarney Netlist to SMT2 scripts.
+Convert Blarney Netlist to SMT scripts.
 -}
 
-module Blarney.Backend.SMT2 (
+module Blarney.Backend.SMT (
   VerifyDepth (..)
 , fixedDepth
 , VerifyMode (..)
@@ -20,8 +20,8 @@ module Blarney.Backend.SMT2 (
 , dfltUserConf
 , VerifyConf (..)
 , dfltVerifyConf
-, genSMT2Script
-, verifyWithSMT2
+, genSMTScript
+, verifyWithSMT
 ) where
 
 -- Standard imports
@@ -36,9 +36,9 @@ import Prelude hiding ((<>))
 
 -- Blarney imports
 import Blarney.Netlist
-import Blarney.Backend.SMT2.Utils
-import Blarney.Backend.SMT2.NetlistUtils
-import Blarney.Backend.SMT2.BasicDefinitions
+import Blarney.Backend.SMT.Utils
+import Blarney.Backend.SMT.NetlistUtils
+import Blarney.Backend.SMT.BasicDefinitions
 import Blarney.Misc.ANSIEscapeSequences
 
 -- configuration types
@@ -174,7 +174,7 @@ mkContext nl n = Context { ctxtNetlist    = nl
         stateInits = map stateInit stateElems
         stateInit Net{netPrim=RegisterEn init w} = (init, w)
         stateInit Net{netPrim=Register   init w} = (init, w)
-        stateInit n = error $ "SMT2 backend error: non state net " ++ show n ++
+        stateInit n = error $ "SMT backend error: non state net " ++ show n ++
                               " encountered where state net was expected"
         inptType = "Input_" ++ nm
         stType = "State_" ++ nm
@@ -185,7 +185,7 @@ mkContext nl n = Context { ctxtNetlist    = nl
           Assert propmsg -> ("assert_"++propnm, Just propmsg)
             where propnm = wireName nl propWire
                   propWire = head . netInputWireIds $ (netInputs n !! 1)
-          _ -> error $ "SMT2 backend error: expected Output or Assert net " ++
+          _ -> error $ "SMT backend error: expected Output or Assert net " ++
                        "but got " ++ show n
 
 -- Internal helpers
@@ -258,13 +258,13 @@ showSpecificAssert ctxt@Context{..} vMode =
           Induction vD rSt -> ( collapseVerifyDepth . legalizeVerifyDepth $ vD
                               , True, rSt )
 
--- | Convert given blarney 'Netlist' to an SMT2 script
-genSMT2Script :: VerifyConf -- ^ configuration for the verification
+-- | Convert given blarney 'Netlist' to an SMT script
+genSMTScript :: VerifyConf -- ^ configuration for the verification
               -> Netlist    -- ^ blarney netlist
               -> String     -- ^ script name
               -> String     -- ^ output directory
               -> IO ()
-genSMT2Script VerifyConf{..} nl nm dir = do
+genSMTScript VerifyConf{..} nl nm dir = do
   system ("mkdir -p " ++ dir)
   withFile fileName WriteMode \h -> do
     hPutStr h $ renderStyle rStyle smtCode
@@ -282,10 +282,10 @@ genSMT2Script VerifyConf{..} nl nm dir = do
                | ctxt <- rootCtxts ]
 
 -- | Verify given blarney 'Netlist' predicate using an SMT solver
-verifyWithSMT2 :: VerifyConf -- ^ configuration for the verification
+verifyWithSMT :: VerifyConf -- ^ configuration for the verification
                -> Netlist    -- ^ blarney property
                -> IO ()
-verifyWithSMT2 VerifyConf{..} nl =
+verifyWithSMT VerifyConf{..} nl =
   withCreateProcess smtP \(Just hIn) (Just hOut) _ _ -> do
     -- set stdin handle to unbuffered for communication with SMT solver
     hSetBuffering hIn LineBuffering

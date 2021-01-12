@@ -3,4 +3,4 @@ all:
 	blc $(BLC_FLAGS) KoenClaessen.hs
 
 clean:
-	rm -rf *.o *.hi KoenClaessen KoenClaessen-Verilog KoenClaessen-SMT2
+	rm -rf *.o *.hi KoenClaessen KoenClaessen-Verilog KoenClaessen-SMT
