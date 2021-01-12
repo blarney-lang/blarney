@@ -159,12 +159,10 @@ a .>>>. b = FromBV $ arithRightBV (toBV a) (toBV b)
 infixr 3 .==>.
 (.==>.) :: Bit 1 -> Bit 1 -> Bit 1
 a .==>. b = inv a .|. b
---a .==>. b = inv (a .&. inv b)
 
 infixr 3 .<==>.
 (.<==>.) :: Bit 1 -> Bit 1 -> Bit 1
 a .<==>. b = a .==. b
---a .<==>. b = (a .==>. b) .&. (b .==>. a)
 
 -- * Bit-vector comparison primitives
 
