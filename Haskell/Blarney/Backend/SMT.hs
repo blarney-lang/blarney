@@ -245,18 +245,25 @@ showSpecificAssert ctxt@Context{..} vMode =
                   $+$ defineDistinctListX ctxtStateType
         cmnt0 =
               char ';' <> text (replicate 79 '-')
-          $+$ (if doInduction then
-                  text "; Proof by induction, induction depth =" <+> int depth
-               else text "; Bounded proof for depth =" <+> int depth)
-          $+$ maybe empty (\msg -> text $ "(echo \"" ++ msg ++ "\")")
-                          ctxtAssertMsg
-          $+$ text ("(echo \"" ++ replicate 80 '-' ++ "\")")
-        cmnt1 = char ';' <> text (replicate 79 '-')
+          $+$ maybe empty (\msg -> say msg) ctxtAssertMsg
+          $+$ say (replicate 80 '-')
+          $+$ (if doInduction
+                  then     say ("Using induction of depth " ++ show depth)
+                       $+$ (if restrictStates
+                               then say "Using restricted states"
+                               else empty)
+                       $+$ say "Base case refutation:"
+                  else     say ("Using bounded verification of depth " ++
+                                show depth)
+                       $+$ say "Bounded property refutation:")
+        cmnt1 =     char ';' <> text (replicate 79 '-')
+                $+$ say "Inductive case refutation:"
         (depth, doInduction, restrictStates) = case vMode of
           Bounded vD -> ( collapseVerifyDepth . legalizeVerifyDepth $ vD
                         , False, False )
           Induction vD rSt -> ( collapseVerifyDepth . legalizeVerifyDepth $ vD
                               , True, rSt )
+        say = parens . (text "echo" <+>) . doubleQuotes . text
 
 -- | Convert given blarney 'Netlist' to an SMT script
 genSMTScript :: VerifyConf -- ^ configuration for the verification
@@ -275,11 +282,11 @@ genSMTScript VerifyConf{..} nl nm dir = do
                                  , case p of Output _ _ -> True
                                              Assert _   -> True
                                              _          -> False ]
-    smtCode =
-          showGeneralDefs False
-      $+$ vcat [ vcat [ showSpecificDefs ctxt False
-                      , showSpecificAssert ctxt verifyConfMode ]
-               | ctxt <- rootCtxts ]
+    smtCode = showGeneralDefs False $+$ vcat defs
+    defs = intercalate [text "(echo \"\")"]
+                       [ [ showSpecificDefs ctxt False
+                         , showSpecificAssert ctxt verifyConfMode ]
+                       | ctxt <- rootCtxts ]
 
 -- | Verify given blarney 'Netlist' predicate using an SMT solver
 verifyWithSMT :: VerifyConf -- ^ configuration for the verification
