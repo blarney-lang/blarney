@@ -302,24 +302,25 @@ verifyWithSMT VerifyConf{..} nl =
     -- set stdin handle to unbuffered for communication with SMT solver
     hSetBuffering hIn LineBuffering
     -- send general SMT sort definitions
-    say 2 $ rStr (showGeneralDefs True)
+    say 3 $ rStr (showGeneralDefs True)
     hPutStrLn hIn $ rStr (showGeneralDefs True)
     -- for each assertion...
     forM_ rootCtxts \ctxt -> do
-      say 0 $ "------ verifying property " ++ ctxtPropName ctxt ++ " ------"
-      maybe (pure ()) (say 0) (ctxtAssertMsg ctxt)
-      say 1 $ "restricted states: " ++ if restrictStates then blue "enabled"
-                                                         else yellow "disabled"
+      maybe (pure ()) (say 0 . (\s -> "------ " ++ s ++ " ------"))
+            (ctxtAssertMsg ctxt)
+      say 0 $ "\tproperty \"" ++ ctxtPropName ctxt ++ "\""
+      say 1 $ "\trestricted states: " ++ if restrictSt then blue "enabled"
+                                                       else yellow "disabled"
       -- send netlist-specific SMT sort definitions
-      say 2 $ rStr (showSpecificDefs ctxt True)
+      say 3 $ rStr (showSpecificDefs ctxt True)
       hPutStrLn hIn $ rStr (showSpecificDefs ctxt True)
-      when restrictStates do
-        say 2 $ rStr (defineDistinctListX $ ctxtStateType ctxt)
+      when restrictSt do
+        say 3 $ rStr (defineDistinctListX $ ctxtStateType ctxt)
         hPutStrLn hIn $ rStr (defineDistinctListX $ ctxtStateType ctxt)
       -- iterative deepening for potentially increasing depth
       deepen ctxt (hIn, hOut) depthRg
   where
-    (depthRg, doInduction, restrictStates) = case verifyConfMode of
+    (depthRg, doInduction, restrictSt) = case verifyConfMode of
       Bounded vD -> ( rangeVerifyDepth . legalizeVerifyDepth $ vD
                     , False, False )
       Induction vD rSt -> ( rangeVerifyDepth . legalizeVerifyDepth $ vD
@@ -341,14 +342,17 @@ verifyWithSMT VerifyConf{..} nl =
                                   (ctxtInputType, ctxtStateType)
                                   ctxtStateInits
                                   curD
-      say 2 $ rStr bounded
+      say 2 "(push)"
       sndLn "(push)"
+      say 3 $ rStr bounded
       sndLn $ rStr bounded
+      say 2 "(check-sat)"
       sndLn "(check-sat)"
       ln <- rcvLn
-      sndLn "(pop)"
-      say 2 $ "check-sat: " ++ ln
+      say 2 ln
       if | ln == "unsat" -> do
+           say 2 "(pop)"
+           sndLn "(pop)"
            say 1 $ justifyLeft 30 '.'
                      ("(depth " ++ show curD ++ ") bounded ")
                    ++ blue " valid"
@@ -356,15 +360,18 @@ verifyWithSMT VerifyConf{..} nl =
                 let step = assertInduction ctxtCFunName
                                            (ctxtInputType, ctxtStateType)
                                            curD
-                                           restrictStates
-                say 2 $ rStr step
+                                           restrictSt
+                say 2 "(push)"
                 sndLn "(push)"
+                say 3 $ rStr step
                 sndLn $ rStr step
+                say 2 "(check-sat)"
                 sndLn "(check-sat)"
                 ln <- rcvLn
-                sndLn "(pop)"
-                say 2 $ "check-sat: " ++ ln
+                say 2 ln
                 if | ln == "unsat" -> do
+                     say 2 "(pop)"
+                     sndLn "(pop)"
                      say 1 $ justifyLeft 30 '.'
                                ("(depth " ++ show curD ++ ") induction step ")
                              ++ blue " valid"
@@ -374,7 +381,7 @@ verifyWithSMT VerifyConf{..} nl =
                      say 1 $ justifyLeft 30 '.'
                                ("(depth " ++ show curD ++ ") induction step ")
                              ++ yellow " falsifiable"
-                     say 2 "failed to verify induction step ---> deepen"
+                     say 3 "failed to verify induction step ---> deepen"
                      diveMore
               | otherwise -> successVerify
          | curD == maxD -> failVerify
@@ -382,7 +389,7 @@ verifyWithSMT VerifyConf{..} nl =
            say 1 $ justifyLeft 30 '.'
                      ("(depth " ++ show curD ++ ") bounded ")
                    ++ yellow " falsifiable"
-           say 2 "failed to verify bounded property ---> deepen"
+           say 3 "failed to verify bounded property ---> deepen"
            diveMore
       where sndLn = hPutStrLn hI
             rcvLn = hGetLine hO
@@ -390,25 +397,24 @@ verifyWithSMT VerifyConf{..} nl =
             diveMore =
               if interactive && curD `mod` diveStep == 0 then do
                  askYN "Keep searching for a proof?" False
-                       (deepen c (hI, hO) (curD + 1, maxD))
-                       failVerify
-              else deepen c (hI, hO) (curD + 1, maxD)
-            successVerify = say 0 $ " >>> property " ++ ctxtPropName ++ ": "
+                       doDive failVerify
+              else doDive
+            doDive = do say 2 "(pop)"
+                        sndLn "(pop)"
+                        deepen c (hI, hO) (curD + 1, maxD)
+            successVerify = say 0 $ " >>> property \"" ++ ctxtPropName ++ "\": "
                                     ++ green "verified"
             failVerify = do
-              say 0 $ " >>> property " ++ ctxtPropName ++ ": "
+              say 0 $ " >>> property \"" ++ ctxtPropName ++ "\": "
                       ++ red "couldn't verify"
-              if interactive then do
-                askYN "Show current counter-example?" False
-                      (sndLn "(get-model)") (pure ())
-                sndLn "(exit)"
-                say 0 =<< rcvAll
-              else do
-                sndLn "(get-model)"
-                sndLn "(exit)"
-                say 0 =<< rcvAll
-                -- XXX TODO deal with parsing the model and exit at the top
-                -- XXX currently cannot recover for next assertiong...
+              if interactive then askYN "Show current counter-example?" False
+                                        (sndLn "(get-model)") (pure ())
+              else sndLn "(get-model)"
+              sndLn "(pop)"
+              sndLn "(exit)"
+              say 0 =<< rcvAll
+              -- XXX TODO deal with parsing the model and exit at the top
+              -- XXX currently cannot recover for next assertiong...
             askYN msg dflt actY actN = do
               putStrLn (msg ++ " ...... " ++ yes ++ "/" ++ no)
               answer <- getLine
