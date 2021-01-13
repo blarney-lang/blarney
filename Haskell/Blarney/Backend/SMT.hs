@@ -139,6 +139,7 @@ dfltVerifyConf = VerifyConf { verifyConfMode      = Bounded (Range 1 1)
 -- | A context netlist and target root net together with extra list of nets of
 --   interest to identify inputs, registers, etc...
 data Context = Context { ctxtNetlist    :: Netlist
+                       , ctxtSortedIds  :: [InstId]
                        , ctxtInputType  :: String
                        , ctxtInputIds   :: [InstId]
                        , ctxtStateType  :: String
@@ -153,6 +154,7 @@ data Context = Context { ctxtNetlist    :: Netlist
 -- | Make a 'Context' from a 'Netlist' and a 'Net' in that 'Netlist'
 mkContext :: Netlist -> Net -> Context
 mkContext nl n = Context { ctxtNetlist    = nl
+                         , ctxtSortedIds  = topoSortIds
                          , ctxtInputType  = inptType
                          , ctxtInputIds   = inputIds
                          , ctxtStateType  = stType
@@ -163,19 +165,22 @@ mkContext nl n = Context { ctxtNetlist    = nl
                          , ctxtCFunName   = cFun
                          , ctxtPropName   = nm
                          , ctxtAssertMsg  = msg }
-  where inputIds = [ netInstId n | Just n@Net{netPrim = p} <- elems nl
-                                 , case p of Input _ _ -> True
-                                             _         -> False ]
-        stateElems = [ n | Just n@Net{netPrim = p} <- elems nl
-                         , case p of RegisterEn _ _ -> True
-                                     Register   _ _ -> True
-                                     _              -> False ]
-        stateIds = map netInstId stateElems
-        stateInits = map stateInit stateElems
+  where topoSortIds = partialTopologicalSort nl $ netInstId n
+        inputIds = [ i | Just x@Net{netInstId = i, netPrim = p} <- elems nl
+                       , case p of Input _ _ -> True
+                                   _         -> False
+                       , elem i topoSortIds ]
+        stateElems =
+          [ (i, stateInit x) | Just x@Net{netInstId=i, netPrim=p} <- elems nl
+                             , case p of RegisterEn _ _ -> True
+                                         Register   _ _ -> True
+                                         _              -> False
+                             , elem i topoSortIds ]
         stateInit Net{netPrim=RegisterEn init w} = (init, w)
         stateInit Net{netPrim=Register   init w} = (init, w)
-        stateInit n = error $ "SMT backend error: non state net " ++ show n ++
+        stateInit x = error $ "Blarney.Backend.SMT: non state net " ++ show x ++
                               " encountered where state net was expected"
+        (stateIds, stateInits) = unzip stateElems
         inptType = "Input_" ++ nm
         stType = "State_" ++ nm
         tFun = "tFun_" ++ nm
@@ -185,7 +190,7 @@ mkContext nl n = Context { ctxtNetlist    = nl
           Assert propmsg -> ("assert_"++propnm, Just propmsg)
             where propnm = wireName nl propWire
                   propWire = head . netInputWireIds $ (netInputs n !! 1)
-          _ -> error $ "SMT backend error: expected Output or Assert net " ++
+          _ -> error $ "Blarney.Backend.SMT: expected Output or Assert net " ++
                        "but got " ++ show n
 
 -- Internal helpers
@@ -219,6 +224,7 @@ showSpecificDefs Context{..} quiet =
   $+$ shush (text "; Defining the specific transition function")
   $+$ defineNLTransition ctxtNetlist ctxtRootNet
                          (ctxtInputType, ctxtStateType)
+                         ctxtSortedIds
                          ctxtStateIds
                          ctxtTFunName
   $+$ shush (char ';' <> text (replicate 79 '-'))

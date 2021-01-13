@@ -29,7 +29,6 @@ import qualified Data.Set as Set
 
 -- Blarney imports
 import Blarney.Netlist
---import Blarney.Core
 import Blarney.Backend.SMT.Utils
 import Blarney.Backend.SMT.BasicDefinitions
 
@@ -51,10 +50,11 @@ defineNLTransition :: Netlist
                    -> Net
                    -> (String, String)
                    -> [InstId]
+                   -> [InstId]
                    -> String
                    -> Doc
 defineNLTransition nl n@Net { netPrim = p, netInputs = ins }
-                   (inptType, stType) state name
+                   (inptType, stType) sortedNl state name
   | case p of Output _ _ -> True
               Assert _   -> True
               _          -> False =
@@ -67,7 +67,7 @@ defineNLTransition nl n@Net { netPrim = p, netInputs = ins }
         fArgs = [ (text inVar, text inptType)
                 , (text stVar,  text stType) ]
         fRet  = text $ "(Tuple2 Bool " ++ stType ++ ")"
-        fBody = withBoundNets ctx filtered $ newTuple2 assertE stateUpdtE
+        fBody = withBoundNets ctx filteredNl $ newTuple2 assertE stateUpdtE
         newTuple2 a b = applyOp (text "mkTuple2") [a, b]
         dontPrune i = case netPrim (getNet nl i) of Input      _ _ -> False
                                                     RegisterEn _ _ -> False
@@ -75,8 +75,7 @@ defineNLTransition nl n@Net { netPrim = p, netInputs = ins }
                                                     Output     _ _ -> False
                                                     Assert     _   -> False
                                                     _              -> True
-        sorted = topologicalSort nl
-        filtered = [i | i <- sorted, dontPrune i]
+        filteredNl = [i | i <- sortedNl, dontPrune i]
         assertE = case p of
           Output _ _ -> bvIsTrue $ showNetInput ctx (head ins)
           Assert _ ->

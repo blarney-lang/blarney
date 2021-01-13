@@ -7,7 +7,7 @@
 Module      : Blarney.Core.Net
 Description : Net primitive for Netlist construction
 Copyright   : (c) Matthew Naylor, 2019
-              (c) Alexandre Joannou, 2019-2020
+              (c) Alexandre Joannou, 2019-2021
 License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
@@ -25,6 +25,8 @@ module Blarney.Core.Net (
 , Netlist         -- 'Netlist' type to represent a circuit
 , getNet          -- Extract the 'Net' from a 'Netlist' at the provided 'InstId'
 , topologicalSort -- Topologically sort a 'Netlist'
+, partialTopologicalSort -- Topologically sort a subset of a 'Netlist' from a
+                         -- single given root
 ) where
 
 import Prelude
@@ -82,29 +84,35 @@ getNet nl i = fromMaybe err (nl ! i)
 -- | the 'Mark' type is only useful to the 'topologicalSort' function and should
 --   not be exported
 data Mark = Unmarked | Temporary | Permanent
+
 -- | get a topologically sorted '[InstId]' for the given 'Netlist'
 topologicalSort :: Netlist -> [InstId]
-topologicalSort nl = runST do
+topologicalSort nl = topoSort nl relevantRoots
+  where relevantRoots = [ netInstId n | Just n@Net{netPrim = p} <- elems nl
+                                      , case p of Output _ _ -> True
+                                                  Assert _   -> True
+                                                  _          -> False ]
+
+-- | get a partially topologically sorted '[InstId]' for the subset of the given
+--   'Netlist' from the given 'Net''s 'InstId'
+partialTopologicalSort :: Netlist -> InstId -> [InstId]
+partialTopologicalSort nl instId = topoSort nl [instId]
+
+-- | internalhelper for topological sort of 'Netlist's
+topoSort :: Netlist -> [InstId] -> [InstId]
+topoSort nl rootIds = runST do
   -- initialise state for the topological sorting
   visited <- newArray (bounds nl) Unmarked -- track visit through the netlist
   sorted  <- newSTRef [] -- sorted list as a result
-  roots  <- newSTRef relevantRoots -- queue of roots to explore next
+  roots  <- newSTRef rootIds -- list of roots to explore next
   -- run the internal topological sort while there are roots to explore
   whileM_ (notEmpty roots) do
     root <- pop roots -- consume a root
-    topoSort visited sorted roots root -- explore from the consumed root
+    go visited sorted roots root -- explore from the consumed root
   -- return the sorted list of InstId
   reverse <$> readSTRef sorted
   -- helpers
   where
-    -- identify Netlist's outputs and state holding elements
-    relevantRoots = [ netInstId n | Just n@Net{netPrim = p} <- elems nl
-                                  , case p of RegisterEn _ _ -> True
-                                              Register   _ _ -> True
-                                              Output     _ _ -> True
-                                              Assert     _   -> True
-                                              _              -> False ]
-
     whileM_ :: Monad m => m Bool -> m a -> m ()
     whileM_ pred act = pred >>= \x -> if x then act >> whileM_ pred act
                                            else return ()
@@ -123,10 +131,10 @@ topologicalSort nl = runST do
     notEmpty stck = do l <- readSTRef stck
                        return (not . null $ l)
     -- the actual recursive topological sort algorithm
-    topoSort :: STArray s InstId Mark -> STRef s [InstId] -> STRef s [InstId]
-             -> InstId
-             -> ST s ()
-    topoSort visited sorted roots netId = do
+    go :: STArray s InstId Mark -> STRef s [InstId] -> STRef s [InstId]
+       -> InstId
+       -> ST s ()
+    go visited sorted roots netId = do
       let net = getNet nl netId
       -- retrieve the 'visited' array entry for the current net
       netVisit <- readArray visited netId
@@ -147,7 +155,7 @@ topologicalSort nl = runST do
           -- For non leaf nets, mark net as temporarily under visit and explore
           -- all inputs recursively
           else do writeArray visited netId Temporary
-                  mapM_ (topoSort visited sorted roots) allInputIds
+                  mapM_ (go visited sorted roots) allInputIds
           -- Mark net as permanent and insert it into the sorted list
           writeArray visited netId Permanent
           push sorted netId

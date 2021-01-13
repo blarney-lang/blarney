@@ -108,6 +108,12 @@ prop_AdderPeriod2 inpts = assert ok "Adder period 2 property"
 --        outpt2 = seqAdder' inpts
 --        ok = outpt1 .<==>. outpt2
 
+prop_all i0 i1 i2 = do
+  prop_ToggleEdgeIdentity i0
+  prop_ToggleTogglesWhenHigh i1
+  prop_Toggle_vs_Puls
+  prop_AdderPeriod2 i2
+
 --------------------------------------------------------------------------------
 
 main :: IO ()
@@ -116,19 +122,23 @@ main = do
   cwd <- getCurrentDirectory
   let oDir = cwd ++ "/CheckBasicCircuits-SMT/"
   -- generate smt2 scripts
-  writeSMTScript vCnf (prop_ToggleEdgeIdentity)
+  writeSMTScript cnfA (prop_ToggleEdgeIdentity)
                  "prop_ToggleEdgeIdentity" oDir
-  writeSMTScript vCnf (prop_ToggleTogglesWhenHigh)
+  writeSMTScript cnfA (prop_ToggleTogglesWhenHigh)
                  "prop_ToggleTogglesWhenHigh" oDir
-  writeSMTScript vCnf (prop_Toggle_vs_Puls)
+  writeSMTScript cnfA (prop_Toggle_vs_Puls)
                  "prop_Toggle_vs_Puls" oDir
-  writeSMTScript vCnf (prop_AdderPeriod2)
+  writeSMTScript cnfA (prop_AdderPeriod2)
                  "prop_AdderPeriod2" oDir
+  --writeSMTScript cnfA (prop_all)
+  --               "prop_all" oDir
   -- verify
-  verifyWith vCnf prop_ToggleEdgeIdentity
-  verifyWith vCnf prop_ToggleTogglesWhenHigh
-  verifyWith vCnf prop_Toggle_vs_Puls
-  verifyWith vCnf prop_AdderPeriod2
-  where vCnf = dfltVerifyConf { verifyConfMode = Induction (IncreaseFrom 1) True
+  --verifyWith cnfB prop_ToggleEdgeIdentity
+  --verifyWith cnfB prop_ToggleTogglesWhenHigh
+  --verifyWith cnfB prop_Toggle_vs_Puls
+  --verifyWith cnfB prop_AdderPeriod2
+  verifyWith cnfB prop_all
+  where cnfA = dfltVerifyConf { verifyConfMode = Induction (fixedDepth 5) True }
+        cnfB = dfltVerifyConf { verifyConfMode = Induction (IncreaseFrom 1) True
                               , verifyConfUser =
                                   dfltUserConf { userConfInteractive = True } }
