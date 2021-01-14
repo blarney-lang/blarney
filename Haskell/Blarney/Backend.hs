@@ -2,7 +2,7 @@
 Module      : Blarney.Backend
 Description : Backend module for the blarney hardware description library
 Copyright   : (c) Matthew Naylor, 2020
-              (c) Alexandre Joannou, 2020
+              (c) Alexandre Joannou, 2020-2021
 License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
@@ -12,8 +12,10 @@ module Blarney.Backend (
   module Blarney.Backend.Verilog
 , writeVerilogModule
 , writeVerilogTop
-  -- * SMT2 backend
-, writeSMT2Script
+  -- * SMT backend
+, module Blarney.Backend.SMT
+, writeSMTScript
+, verifyWith
 ) where
 
 import Prelude
@@ -25,7 +27,7 @@ import Blarney.Core.Module
 import Blarney.Netlist
 
 import Blarney.Backend.Verilog
-import Blarney.Backend.SMT2
+import Blarney.Backend.SMT
 
 -- Verilog backend
 --------------------------------------------------------------------------------
@@ -61,19 +63,33 @@ writeVerilogTop mod modName dirName = do
   let nl' = runDefaultNetlistPasses opts nl
   genVerilogTop nl' modName dirName
 
--- SMT2 backend
+-- SMT backend
 --------------------------------------------------------------------------------
 
--- | This function generates an SMT2 script for the 'pred' Blarney predicate.
---   The name of the generated SMT2 script is specified with 'scriptName' and
+-- | This function generates an SMT script to verify each assertion present in
+--   'circuit', introduced by calls to the 'assert' function.
+--   The name of the generated SMT script is specified with 'scriptName' and
 --   the generated file is `'dirName'/'scriptName'.smt2`.
-writeSMT2Script :: Modular a
-                   => a      -- ^ Blarney predicate
-                   -> String -- ^ Script name
-                   -> String -- ^ Output directory
-                   -> IO ()
-writeSMT2Script pred scriptName dirName = do
+writeSMTScript :: Modular a
+                => VerifyConf
+                -> a      -- ^ Blarney circuit
+                -> String -- ^ Script name
+                -> String -- ^ Output directory
+                -> IO ()
+writeSMTScript conf circuit scriptName dirName = do
   (opts, _) <- getOpts
-  nl <- toNetlist $ makeModule pred
+  nl <- toNetlist $ makeModule circuit
   let nl' = runDefaultNetlistPasses opts nl
-  genSMT2Script nl' scriptName dirName
+  genSMTScript conf nl' scriptName dirName
+
+-- | This function interacts with an SMT solver to verify each assertion present
+--   in 'circuit', introduced by calls to the 'assert' function.
+verifyWith :: Modular a
+           => VerifyConf
+           -> a      -- ^ Blarney circuit
+           -> IO ()
+verifyWith conf circuit = do
+  (opts, _) <- getOpts
+  nl <- toNetlist . makeModule $ circuit
+  let nl' = runDefaultNetlistPasses opts nl
+  verifyWithSMT conf nl'

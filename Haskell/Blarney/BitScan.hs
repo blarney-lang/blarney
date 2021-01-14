@@ -58,7 +58,7 @@ module Blarney.BitScan
   , is
   ) where
 
-import Blarney
+import Blarney hiding (Range)
 import Blarney.Option
 
 import Data.Char
