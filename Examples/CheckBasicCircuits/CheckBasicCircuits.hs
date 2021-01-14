@@ -108,7 +108,7 @@ prop_AdderPeriod2 inpts = assert ok "Adder period 2 property"
 --        outpt2 = seqAdder' inpts
 --        ok = outpt1 .<==>. outpt2
 
-prop_all i0 i1 i2 = do
+prop_all i0 i1 i2 = always do
   prop_ToggleEdgeIdentity i0
   prop_ToggleTogglesWhenHigh i1
   prop_Toggle_vs_Puls
