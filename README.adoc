@@ -682,7 +682,7 @@ outputs, being converted to Verilog.  In fact, any Blarney function whose
 inputs and outputs are members of the
 http://mn416.github.io/blarney/Blarney-Core-Interface.html[Interface] class can
 be converted to Verilog (and the `Interface` class supports generic deriving).
-To illustrate, we can convert the function `inc` (defined in <<Streams>>) into
+To illustrate, we can convert the function `inc` (defined in xref:Streams[xrefstyle=short]) into
 a Verilog module as follows.
 
 [source, haskell]
