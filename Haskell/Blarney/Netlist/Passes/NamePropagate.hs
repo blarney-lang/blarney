@@ -1,9 +1,11 @@
-{-# LANGUAGE NoRebindableSyntax #-}
+{-# LANGUAGE RankNTypes          #-}
+{-# LANGUAGE NoRebindableSyntax  #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 {-|
 Module      : Blarney.Netlist.Passes.NamePropagate
 Description : A blarney netlist pass to propagate names
-Copyright   : (c) Alexandre Joannou, 2020
+Copyright   : (c) Alexandre Joannou, 2020-2021
 License     : MIT
 Stability   : experimental
 -}

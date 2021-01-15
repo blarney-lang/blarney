@@ -1,11 +1,15 @@
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE NoStarIsType          #-}
+{-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 
 {-|
 Module      : Blarney.Core.RAM
 Description : Library of various block RAM components
 Copyright   : (c) Matthew Naylor, 2019
-              (c) Alexandre Joannou, 2019
+              (c) Alexandre Joannou, 2019-2021
 License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental

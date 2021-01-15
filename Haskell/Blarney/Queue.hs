@@ -1,16 +1,18 @@
-{-# LANGUAGE Rank2Types            #-}
 {-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE Rank2Types            #-}
+{-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE DeriveAnyClass        #-}
 {-# LANGUAGE BlockArguments        #-}
 {-# LANGUAGE RebindableSyntax      #-}
+{-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FlexibleInstances     #-}
 
 {-|
 Module      : Blarney.Queue
 Description : Library of various queue implementations
 Copyright   : (c) Matthew Naylor, 2019
-              (c) Alexandre Joannou, 2019
+              (c) Alexandre Joannou, 2019-2021
 License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental

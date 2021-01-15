@@ -1,3 +1,4 @@
+{-# LANGUAGE BlockArguments      #-}
 {-# LANGUAGE PatternSynonyms     #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE NoRebindableSyntax  #-}

@@ -1,3 +1,6 @@
+{-# LANGUAGE DataKinds      #-}
+{-# LANGUAGE BlockArguments #-}
+
 {-|
 Module      : Blarney.Recipe
 Description : Basic imperative programming on top of RTL

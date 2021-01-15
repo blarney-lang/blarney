@@ -2,6 +2,7 @@
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE Rank2Types            #-}
 {-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE NoStarIsType          #-}
 {-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE TypeApplications      #-}
@@ -14,7 +15,7 @@
 Module      : Blarney.Core.Bit
 Description : Typed bit-vectors and circuit primitives
 Copyright   : (c) Matthew Naylor, 2019
-              (c) Alexandre Joannou, 2019-2020
+              (c) Alexandre Joannou, 2019-2021
 License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
