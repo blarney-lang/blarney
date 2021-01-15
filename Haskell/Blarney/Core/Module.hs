@@ -13,7 +13,7 @@
 Module      : Blarney.Core.Module
 Description : Blarney modules
 Copyright   : (c) Matthew Naylor, 2019
-              (c) Alexandre Joannou, 2019-2020
+              (c) Alexandre Joannou, 2019-2021
 License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
@@ -316,5 +316,5 @@ runPureModule mod errStr
   | null (JL.toList w) && s == 0 = a
   | otherwise = error errStr
   where
-    r = RTL.R { nameHints = mempty, cond = 0, assigns = mempty}
+    r = RTL.R { RTL.nameHints = mempty, RTL.cond = 0, RTL.assigns = mempty}
     (s, w, a) = RTL.runRTL (runModule mod) r 0

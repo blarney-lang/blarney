@@ -2,19 +2,25 @@
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE Rank2Types            #-}
 {-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE NoStarIsType          #-}
 {-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE DeriveAnyClass        #-}
 {-# LANGUAGE KindSignatures        #-}
+{-# LANGUAGE RebindableSyntax      #-}
+{-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE AllowAmbiguousTypes   #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE UndecidableInstances  #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 
 {-|
 Module      : Blarney.Vector
 Description : A module for handling vectors
-Copyright   : (c) Alexandre Joannou, 2019
+Copyright   : (c) Alexandre Joannou, 2019-2021
 License     : MIT
 Maintainer  : alexandre.joannou@gmail.com
 Stability   : experimental

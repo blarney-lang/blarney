@@ -1,9 +1,10 @@
-{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RankNTypes     #-}
+{-# LANGUAGE BlockArguments #-}
 
 {-|
 Module      : Blarney.Netlist.Passes
 Description : Blarney netlist passes
-Copyright   : (c) Alexandre Joannou, 2020
+Copyright   : (c) Alexandre Joannou, 2020-2021
 License     : MIT
 Stability   : experimental
 -}

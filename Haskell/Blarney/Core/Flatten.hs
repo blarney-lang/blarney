@@ -1,11 +1,12 @@
-{-# LANGUAGE PatternSynonyms   #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE PatternSynonyms     #-}
+{-# LANGUAGE FlexibleInstances   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 {-|
 Module      : Blarney.Flatten
 Description : Flatten BV into Net
 Copyright   : (c) Matthew Naylor, 2019
-              (c) Alexandre Joannou, 2019-2020
+              (c) Alexandre Joannou, 2019-2021
 License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental

@@ -1,3 +1,4 @@
+{-# LANGUAGE BlockArguments     #-}
 {-# LANGUAGE NoRebindableSyntax #-}
 
 {-|

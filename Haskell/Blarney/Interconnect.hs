@@ -1,8 +1,10 @@
 {-# LANGUAGE DataKinds              #-}
-{-# LANGUAGE Rank2Types            #-}
+{-# LANGUAGE Rank2Types             #-}
 {-# LANGUAGE DeriveGeneric          #-}
-{-# LANGUAGE BlockArguments        #-}
+{-# LANGUAGE BlockArguments         #-}
 {-# LANGUAGE DeriveAnyClass         #-}
+{-# LANGUAGE TypeApplications       #-}
+{-# LANGUAGE RebindableSyntax       #-}
 {-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE ScopedTypeVariables    #-}
 {-# LANGUAGE MultiParamTypeClasses  #-}
@@ -49,14 +51,10 @@ mergeTree = tree mergeTwo nullStream
 
 -- | Buffered fair merger of two streams
 makeGenericFairMergeTwo :: Bits a =>
-     -- | Queue kind to use for buffering
-     Module (Queue a)
-     -- | Guard on whether data is consumed by merger
-  -> (a -> Bit 1)
-     -- | Input streams to be merged
-  -> (Stream a, Stream a)
-     -- | Output stream
-  -> Module (Stream a)
+     Module (Queue a)     -- ^ Queue kind to use for buffering
+  -> (a -> Bit 1)         -- ^ Guard on whether data is consumed by merger
+  -> (Stream a, Stream a) -- ^ Input streams to be merged
+  -> Module (Stream a)    -- ^ Output stream
 makeGenericFairMergeTwo makeQueue g (origInA, origInB) = do
   -- Output buffer
   buffer <- makeQueue
@@ -85,14 +83,10 @@ makeGenericFairMergeTwo makeQueue g (origInA, origInB) = do
 
 -- | Buffered fair switch between two streams, based on routing function
 makeFairExchange :: Bits a =>
-     -- | Queue kind to use for buffering
-     Module (Queue a)
-     -- | Routing function
-  -> (a -> Bit 1)
-     -- | Input streams
-  -> (Stream a, Stream a)
-     -- | Output streams
-  -> Module (Stream a, Stream a)
+     Module (Queue a)            -- ^ Queue kind to use for buffering
+  -> (a -> Bit 1)                -- ^ Routing function
+  -> (Stream a, Stream a)        -- ^ Input streams
+  -> Module (Stream a, Stream a) -- ^ Output streams
 makeFairExchange q route (inA, inB) = do
   -- Determine first output
   outA <- makeGenericFairMergeTwo q (\x -> inv (route x)) (inA, inB)
@@ -117,14 +111,10 @@ makeFairExchange q route (inA, inB) = do
 -- throughput is equivalent to that of a full crossbar.  Indeed, the
 -- network is similar to that found in a barrel shifter.
 makeShuffleExchange :: forall n a. (KnownNat n, Bits a) =>
-     -- | Queue kind to use for buffering
-     Module (Queue a)
-     -- | Routing function
-  -> (a -> Bit n)
-     -- | Input streams
-  -> [Stream a] 
-     -- | Output streams
-  -> Module [Stream a]
+     Module (Queue a)  -- ^ Queue kind to use for buffering
+  -> (a -> Bit n)      -- ^ Routing function
+  -> [Stream a]        -- ^ Input streams
+  -> Module [Stream a] -- ^ Output streams
 makeShuffleExchange makeQueue route ins
   | length ins == 2 ^ valueOf @n = shuffEx (valueOf @n) ins
   | otherwise = error $

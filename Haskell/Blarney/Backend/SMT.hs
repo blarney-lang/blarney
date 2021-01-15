@@ -1,4 +1,5 @@
 {-# LANGUAGE MultiWayIf         #-}
+{-# LANGUAGE BlockArguments     #-}
 {-# LANGUAGE RecordWildCards    #-}
 {-# LANGUAGE NoRebindableSyntax #-}
 
