@@ -82,7 +82,7 @@ We use Blarney's `always` construct
 always :: Action a -> Module a
 ----
 
-to perform the given action *on every clock cycle*.  Blarney actions
+to perform the given action _on every clock cycle_.  Blarney actions
 include statements for displaying values during simulation
 (`display`), terminating the simulator (`finish`), and mutating state
 (see below).  All statements in an `Action` execute in parallel,
@@ -103,7 +103,7 @@ compiled at the command-line using
 $ blc Sorter.hs
 ----
 
-where `blc` stands for *Blarney compiler*.  This is just a script
+where `blc` stands for _Blarney compiler_.  This is just a script
 (from Blarney's `Scripts` directory) that invokes GHC with the
 appropriate compiler flags.  Running the resulting executable
 `./Sorter` will produce Verilog in the `/tmp/twoSort` directory,
@@ -123,9 +123,9 @@ Looks like `twoSort` is working!
 
 === Bubble sort
 
-We can build a general *N*-element sorter by connecting together
+We can build a general _N_-element sorter by connecting together
 multiple two-sorters.  One of the simplest ways to do this is the
-*bubble sort* network.  The key component of this network is a
+_bubble sort_ network.  The key component of this network is a
 function `bubble` that takes a list of inputs and returns a new list
 in which the smallest element comes first.
 
@@ -257,8 +257,8 @@ top = do
 
 This example introduces a number of new library functions: `makeReg` creates a
 register, initialised to the given value; `val` returns the value of a
-register; the `.` operator is defined by Blarney as *reverse function
-application* rather than the usual *function composition*; and `when` allows
+register; the `.` operator is defined by Blarney as _reverse function
+application_ rather than the usual _function composition_; and `when` allows
 conditional actions to be introduced.  In addition to `when`, we can also use
 if-then-else in an `Action` context.  For example, the final three lines above
 could have been written as:
@@ -377,16 +377,16 @@ top = do
 
 === Mutable wires
 
-*Wires* are a feature of the `Action` monad that offer a way for separate
-action blocks to communicate *within the same clock cycle*.  Whereas assignment
+_Wires_ are a feature of the `Action` monad that offer a way for separate
+action blocks to communicate _within the same clock cycle_.  Whereas assignment
 to a register becomes visible on the clock cycle after the assigment occurs,
 assignment to a wire is visible on the same cycle as the assignment.  If no
 assignment is made to a wire on a particular cycle, then the wire emits its
-*default value* on that cycle.  When multiple assignments to the same wire
+_default value_ on that cycle.  When multiple assignments to the same wire
 occur on the same cycle, the wire emits the bitwise disjunction of all the
 assigned values.
 
-To illustrate, let's implement an *n*-bit counter module that supports
+To illustrate, let's implement an _n_-bit counter module that supports
 increment and decrement operations.
 
 [source, haskell]
@@ -400,7 +400,7 @@ data Counter n =
   }
 ----
 
-We'd like the counter to support *parallel calls* to `inc` and `dec`.  That is,
+We'd like the counter to support _parallel calls_ to `inc` and `dec`.  That is,
 if `inc` and `dec` are called on the same cycle then the counter's `output` is
 unchanged.  We'll achieve this using wires.
 
@@ -602,7 +602,7 @@ top = do
 Somewhat-related to block RAMs are
 http://mn416.github.io/blarney/Blarney-Core-Module.html#t:RegFile[register
 files].  The difference is that a register file allows the value at an address
-to be determined *within* a clock cycle.  It also allows any number of reads
+to be determined _within_ a clock cycle.  It also allows any number of reads
 and writes to be performed within the same cycle.  Register files have the
 following interface.
 
@@ -862,7 +862,7 @@ top = mdo
 
 Bit selection operators are used to extract a subset of bits out of a
 bit-vector.  There are different flavours, depending on whether the indices are
-*type-level* numbers, *elaboration-time* numbers, or *circuit-level* numbers.
+_type-level_ numbers, _elaboration-time_ numbers, or _circuit-level_ numbers.
 
 For type-level indices, we provide functions
 http://mn416.github.io/blarney/Blarney-Core-Bit.html#v:at[at] and
@@ -957,7 +957,7 @@ top = always do
   finish
 ----
 
-The nice thing about this decoder is that the *scattered immediate* field `imm`
+The nice thing about this decoder is that the _scattered immediate_ field `imm`
 in the `sw` instruction is automatically assembled by the library.  That is,
 the `imm[11:5]` part of the immediate is combined with the `imm[4:0]` part to
 give the final 12-bit immediate value passed to the right-hand-side function.
@@ -1007,7 +1007,7 @@ http://mn416.github.io/blarney/Blarney-Core-Module.html#v:withName[withName] is
 a Blarney primitive that introduces name information inside `m` This simple
 approach captures quite a lot of useful names.
 
-The plugin is *completely optional*, and disabled by default.  To enable it,
+The plugin is _completely optional_, and disabled by default.  To enable it,
 first install using cabal
 
 [source, shell]
@@ -1040,7 +1040,7 @@ class Bits a where
   unpack        :: Bit (SizeOf a) -> a
 ----
 
-The `Bits` class supports *generic deriving*.  For example, suppose we have a
+The `Bits` class supports _generic deriving_.  For example, suppose we have a
 simple data type for memory requests:
 
 [source, haskell]
@@ -1056,7 +1056,7 @@ data MemReq =
 
 To make this type a member of the `Bits` class, we have suffixed it with
 `derving (Generic, Bits)`.  The generic deriving mechanism for `Bits` does not
-support *sum types*: there is no way to convert a bit-vector (run-time circuit
+support _sum types_: there is no way to convert a bit-vector (run-time circuit
 value) to a sum type (elaboration-time value) using the circuit primitives
 provided by Blarney.
 
