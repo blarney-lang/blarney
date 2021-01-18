@@ -5,7 +5,7 @@
 :source-highlighter:
 :sectnums:
 
-image::blarney-logo.svg[Blarney logo, width=200]
+image::blarney-logo.svg[Blarney logo, width=275]
 
 Blarney is a Haskell library for hardware description that builds a range of
 HDL abstractions on top of a small set of pure functional circuit primitives.
@@ -15,6 +15,8 @@ Some aspects of the library are also inspired by
 https://github.com/B-Lang-org/bsc[Bluespec].  Below, we introduce the library
 by example, supplementing the http://mn416.github.io/blarney/index.html[Haddock
 docs].
+
+== Contents
 
 toc::[]
 
