@@ -3,7 +3,6 @@
 :toc-title: Contents
 :toc-placement!:
 :source-highlighter:
-:sectnums:
 
 image::blarney-logo.svg[Blarney logo, width=275]
 
@@ -19,6 +18,8 @@ docs].
 == Contents
 
 toc::[]
+
+:sectnums:
 
 == Prerequisites
 
