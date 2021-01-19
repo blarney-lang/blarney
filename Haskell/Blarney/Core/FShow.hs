@@ -108,8 +108,47 @@ instance FShow Format where
 instance FShow a => FShow [a] where
   fshow = fshowList
 
+instance FShow () where
+  fshow _ = fshow "()"
+
 instance (FShow a, FShow b) => FShow (a, b) where
   fshow (a, b) = fshow "(" <> fshow a <> fshow "," <> fshow b <> fshow ")"
+
+instance (FShow a, FShow b, FShow c) => FShow (a, b, c) where
+  fshow (a, b, c) =
+      fshow "("
+   <> fshow a <> fshow ","
+   <> fshow b <> fshow ","
+   <> fshow c <> fshow ")"
+
+instance (FShow a, FShow b, FShow c, FShow d) => FShow (a, b, c, d) where
+  fshow (a, b, c, d) =
+      fshow "("
+   <> fshow a <> fshow ","
+   <> fshow b <> fshow ","
+   <> fshow c <> fshow ","
+   <> fshow d <> fshow ")"
+
+instance (FShow a, FShow b, FShow c, FShow d, FShow e) =>
+         FShow (a, b, c, d, e) where
+  fshow (a, b, c, d, e) =
+      fshow "("
+   <> fshow a <> fshow ","
+   <> fshow b <> fshow ","
+   <> fshow c <> fshow ","
+   <> fshow d <> fshow ","
+   <> fshow e <> fshow ")"
+
+instance (FShow a, FShow b, FShow c, FShow d, FShow e, FShow f) =>
+         FShow (a, b, c, d, e, f) where
+  fshow (a, b, c, d, e, f) =
+      fshow "("
+   <> fshow a <> fshow ","
+   <> fshow b <> fshow ","
+   <> fshow c <> fshow ","
+   <> fshow d <> fshow ","
+   <> fshow e <> fshow ","
+   <> fshow f <> fshow ")"
 
 -- Generic deriving for FShow
 class GFShow f where
