@@ -989,9 +989,10 @@ analyse, say, the critical-path of our circuit using a third-party tool, but
 there is no way to map the netlist names reported by the tool back to the Lava
 names in the original description.
 
-Blarney provides a solution to this problem in the form of the [Namer
-plugin](Haskell/BlarneyPlugins/Namer).  This is a simple GHC plugin (around 150
-lines of code) that looks for monadic bindings of the form
+Blarney provides a solution to this problem in the form of the 
+https://github.com/mn416/blarney/blob/master/Haskell/BlarneyPlugins/Namer[Namer plugin].
+This is a simple GHC plugin (around 150 lines of code) that looks for monadic
+bindings of the form
 
 [source, haskell]
 ----
