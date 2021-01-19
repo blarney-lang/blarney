@@ -226,7 +226,7 @@ data ReadWrite a =
   ReadWrite {
     rwReadVal :: a,
     rwWriteVal :: a -> Action ()
-  }
+  } deriving Generic
 
 instance Val (ReadWrite t) t where
   val = rwReadVal
@@ -237,7 +237,7 @@ instance Assign ReadWrite where
 data WriteOnly a =
   WriteOnly {
     woWriteVal :: a -> Action ()
-  }
+  } deriving Generic
 
 instance Assign WriteOnly where
   (<==) = woWriteVal

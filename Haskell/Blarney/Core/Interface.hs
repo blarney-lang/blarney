@@ -171,6 +171,8 @@ instance (Interface a, Interface b, Interface c, Interface d,
   Interface (a, b, c, d, e, f, g)
 instance (Interface a, Bits a) => Interface (Reg a)
 instance (Interface a, Bits a) => Interface (Wire a)
+instance (Interface a, Bits a) => Interface (ReadWrite a)
+instance (Interface a, Bits a) => Interface (WriteOnly a)
 
 -- |Declaration reader/writer monad for declaring named inputs and outputs.
 -- The writer part of the monad collects declarations.  Any names
