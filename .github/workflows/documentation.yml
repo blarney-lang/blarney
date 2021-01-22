@@ -1,0 +1,50 @@
+name: Generate and deploy documentation
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+
+  GenDoc:
+    name: Generate documentation
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-haskell@v1
+    - name: Generate documentation
+      run: |
+       haddock --source-module=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$GITHUB_SHA/%{FILE} \
+               --source-entity=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$GITHUB_SHA/%{FILE}#L%{LINE} \
+               --title=blarney \
+               --optghc=-XNoImplicitPrelude \
+               --html \
+               --odir doc \
+               $(find Haskell/ -name "*.hs" | grep -v BlarneyPlugins)
+    - name: Upload documentation artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: doc
+        path: doc
+
+  PublishDoc:
+    name: Publish documentation
+    needs: GenDoc
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download documentation artifact
+      uses: actions/download-artifact@v2
+      with:
+        name: doc
+    - name: Deploy documentation
+      run: |
+        git init
+        git checkout --orphan haddock
+        git remote add origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/$GITHUB_REPOSITORY
+        git config user.name the-blarney-fairy
+        git config user.email the-blarney-fairy@users.noreply.github.com
+        git add --all
+        git commit -m "deploy documentation for $GITHUB_SHA"
+        git push origin -f haddock
