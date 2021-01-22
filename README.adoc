@@ -12,7 +12,7 @@ It is a modern variant of
 http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.110.5587&rep=rep1&type=pdf[Lava].
 Some aspects of the library are also inspired by
 https://github.com/B-Lang-org/bsc[Bluespec].  Below, we introduce the library
-by example, supplementing the http://mn416.github.io/blarney/index.html[Haddock
+by example, supplementing the http://blarney-lang.github.io/blarney/index.html[Haddock
 docs].
 
 [discrete]
@@ -211,7 +211,7 @@ actually has a more general type.
 ----
 
 So `.<.` can be used on any type in the
-http://mn416.github.io/blarney/Blarney-Core-Bit.html#t:Cmp[Cmp] (comparator)
+http://blarney-lang.github.io/blarney/Blarney-Core-Bit.html#t:Cmp[Cmp] (comparator)
 class.  Similarly, `?` can be used on any type in the [Bits](#class-1-bits)
 class (which allows packing to a bit vector and back again). So a more generic
 definition of `twoSort` would be:
@@ -298,7 +298,7 @@ Finished
 === Queues
 
 Queues (also known as FIFOs) are a commonly used abstraction in hardware
-design.  Blarney provides http://mn416.github.io/blarney/Blarney-Queue.html[a
+design.  Blarney provides http://blarney-lang.github.io/blarney/Blarney-Queue.html[a
 range of different queue implementations], all of which implement the following
 interface available when importing `Blarney.Queue`.
 
@@ -441,7 +441,7 @@ makeCounter = do
 State machines are a common way of defining the control-path of a circuit. They
 are typically expressed by doing case-analysis of the current state and
 manually setting the next state. Quite often however, they can be expressed
-more neatly in a http://mn416.github.io/blarney/Blarney-Recipe.html[Recipe] --
+more neatly in a http://blarney-lang.github.io/blarney/Blarney-Recipe.html[Recipe] --
 a simple imperative language with various control-flow constructs.
 
 [source, haskell]
@@ -526,7 +526,7 @@ fourth cycle, we display the value and terminate the simulator.
 === Statements
 
 For convenience, recipes can also be constucted using `do` notation.  The
-http://mn416.github.io/blarney/Blarney-Stmt.html[Stmt] monad is simply a
+http://blarney-lang.github.io/blarney/Blarney-Stmt.html[Stmt] monad is simply a
 wrapper around `Recipe`, which defines monadic bind as sequential composition.
 It is entirely syntatic sugar, providing no new functionality.
 
@@ -561,7 +561,7 @@ We have found that some users prefer `Recipe` syntax, while others prefer
 
 === Block RAMs
 
-Blarney provides http://mn416.github.io/blarney/Blarney-Core-RAM.html[a variety
+Blarney provides http://blarney-lang.github.io/blarney/Blarney-Core-RAM.html[a variety
 of block RAM modules] commonly supported on FPGAs.  They are all based around
 the following interface.
 
@@ -604,7 +604,7 @@ top = do
 ----
 
 Somewhat-related to block RAMs are
-http://mn416.github.io/blarney/Blarney-Core-Module.html#t:RegFile[register
+http://blarney-lang.github.io/blarney/Blarney-Core-Module.html#t:RegFile[register
 files].  The difference is that a register file allows the value at an address
 to be determined _within_ a clock cycle.  It also allows any number of reads
 and writes to be performed within the same cycle.  Register files have the
@@ -629,7 +629,7 @@ Streams are another commonly-used abstraction in hardware description.  They
 are often used to implement hardware modules that consume data at a *variable
 rate*, depending on internal details of the module that the implementer does
 not wish to (or is unable to) expose.  In Blarney,
-http://mn416.github.io/blarney/Blarney-Stream.html[streams] are captured by the
+http://blarney-lang.github.io/blarney/Blarney-Stream.html[streams] are captured by the
 following interface.
 
 [source, haskell]
@@ -684,7 +684,7 @@ inc xs = do
 So far we've seen examples of top-level modules, i.e. modules with no inputs or
 outputs, being converted to Verilog.  In fact, any Blarney function whose
 inputs and outputs are members of the
-http://mn416.github.io/blarney/Blarney-Core-Interface.html[Interface] class can
+http://blarney-lang.github.io/blarney/Blarney-Core-Interface.html[Interface] class can
 be converted to Verilog (and the `Interface` class supports generic deriving).
 To illustrate, we can convert the function `inc` (defined in xref:Streams[xrefstyle=short]) into
 a Verilog module as follows.
@@ -869,8 +869,8 @@ bit-vector.  There are different flavours, depending on whether the indices are
 _type-level_ numbers, _elaboration-time_ numbers, or _circuit-level_ numbers.
 
 For type-level indices, we provide functions
-http://mn416.github.io/blarney/Blarney-Core-Bit.html#v:at[at] and
-http://mn416.github.io/blarney/Blarney-Core-Bit.html#v:slice[slice], and use
+http://blarney-lang.github.io/blarney/Blarney-Core-Bit.html#v:at[at] and
+http://blarney-lang.github.io/blarney/Blarney-Core-Bit.html#v:slice[slice], and use
 type application to specify the type-level indices:
 
 [source, haskell]
@@ -885,8 +885,8 @@ upperNibble x = slice @7 @4 x
 ----
 
 For elaboration-time indices of type `Int`, we provide
-http://mn416.github.io/blarney/Blarney-Core-Bit.html#v:unsafeAt[unsafeAt] and
-http://mn416.github.io/blarney/Blarney-Core-Bit.html#v:unsafeSlice[unsafeSlice]:
+http://blarney-lang.github.io/blarney/Blarney-Core-Bit.html#v:unsafeAt[unsafeAt] and
+http://blarney-lang.github.io/blarney/Blarney-Core-Bit.html#v:unsafeSlice[unsafeSlice]:
 
 [source, haskell]
 ----
@@ -922,10 +922,10 @@ details.
 
 Recent work on specifying and implementing ISAs led us to develop two libraries
 for doing bit-string pattern matching.  The first,
-http://mn416.github.io/blarney/Blarney-BitPat.html[BitPat], is statically-typed
+http://blarney-lang.github.io/blarney/Blarney-BitPat.html[BitPat], is statically-typed
 and based on the paper https://core.ac.uk/download/pdf/50525461.pdf[Type-safe
 pattern combinators].  The second,
-http://mn416.github.io/blarney/Blarney-BitScan.html[BitScan], is dynamically
+http://blarney-lang.github.io/blarney/Blarney-BitScan.html[BitScan], is dynamically
 typed but more expressive.  As an example, `BitScan`, let's us define the
 following instruction decoder for a tiny subset of RISC-V.
 
@@ -972,7 +972,7 @@ Woodruff for suggesting this feature!
 
 A few processor cores have been implemented in Blarney:
 
-* https://github.com/mn416/blarney/blob/master/Examples/CPU/CPU.hs[Simple]:
+* https://github.com/blarney-lang/blarney/blob/master/Examples/CPU/CPU.hs[Simple]:
 4-stage 8-bit CPU, with just 4 instructions, which resolves both control and
 data hazards.
 * https://github.com/blarney-lang/pebbles/[Pebbles]:
@@ -990,7 +990,7 @@ there is no way to map the netlist names reported by the tool back to the Lava
 names in the original description.
 
 Blarney provides a solution to this problem in the form of the 
-https://github.com/mn416/blarney/blob/master/Haskell/BlarneyPlugins/Namer[Namer plugin].
+https://github.com/blarney-lang/blarney/blob/master/Haskell/BlarneyPlugins/Namer[Namer plugin].
 This is a simple GHC plugin (around 150 lines of code) that looks for monadic
 bindings of the form
 
@@ -1008,7 +1008,7 @@ binding as
 ----
 
 where
-http://mn416.github.io/blarney/Blarney-Core-Module.html#v:withName[withName] is
+http://blarney-lang.github.io/blarney/Blarney-Core-Module.html#v:withName[withName] is
 a Blarney primitive that introduces name information inside `m` This simple
 approach captures quite a lot of useful names.
 
@@ -1032,7 +1032,7 @@ simplification passes respectively.
 
 === Bits
 
-Any type in the http://mn416.github.io/blarney/Blarney-Core-Bits.html[Bits]
+Any type in the http://blarney-lang.github.io/blarney/Blarney-Core-Bits.html[Bits]
 class can be represented in hardware, e.g.  stored in a wire, a register, or a
 RAM.
 
@@ -1068,7 +1068,7 @@ provided by Blarney.
 === Interface
 
 Any type in the
-http://mn416.github.io/blarney/Blarney-Core-Interface.html[Interface] class can
+http://blarney-lang.github.io/blarney/Blarney-Core-Interface.html[Interface] class can
 be used as a module input or output when doing <<modular-compilation, modular
 compilation>>.  Furthermore, collections of interfaces can be indexed by
 circuit-time values using the `!` operator.  To illustrate, here is an example
@@ -1100,7 +1100,7 @@ deriving clause for the datatype.  In the above example, `MemReq` is an
 === Lookup
 
 The generic lookup operator `!` is provided by the
-http://mn416.github.io/blarney/Blarney-Core-Lookup.html[Lookup] class.
+http://blarney-lang.github.io/blarney/Blarney-Core-Lookup.html[Lookup] class.
 
 [source, haskell]
 ----
@@ -1115,7 +1115,7 @@ A wide range of combinations of types are supported.  The functional dependency
 === FShow
 
 Any value whose type is in the
-http://mn416.github.io/blarney/Blarney-Core-FShow.html[FShow] class, or any
+http://blarney-lang.github.io/blarney/Blarney-Core-FShow.html[FShow] class, or any
 value of type `Format`, can be passed as arguments to the variadic `display`
 function.
 
