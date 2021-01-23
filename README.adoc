@@ -6,14 +6,17 @@
 
 image::blarney-logo.svg[Blarney logo, width=275]
 
-Blarney is a Haskell library for hardware description that builds a range of
-HDL abstractions on top of a small set of pure functional circuit primitives.
-It is a modern variant of
-http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.110.5587&rep=rep1&type=pdf[Lava].
-Some aspects of the library are also inspired by
-https://github.com/B-Lang-org/bsc[Bluespec].  Below, we introduce the library
-by example, supplementing the http://blarney-lang.github.io/blarney/index.html[Haddock
-docs].
+Blarney is a Haskell library for hardware description that builds a
+range of HDL abstractions on top of a small set of pure functional
+circuit primitives.  It is a modern variant of
+http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.110.5587&rep=rep1&type=pdf[Lava]
+with Verilog and
+https://en.wikipedia.org/wiki/Satisfiability_modulo_theories[SMT]
+backends, and FPGA support.  Some aspects of the library are also
+inspired by https://github.com/B-Lang-org/bsc[Bluespec], such as
+first-class actions and method-based interfaces.  Below, we
+introduce the library by example, supplementing the
+http://blarney-lang.github.io/blarney/index.html[Haddock docs].
 
 [discrete]
 == Contents
@@ -53,9 +56,8 @@ equivalent) for future logins.
 === Two-sort
 
 Sorting makes for a good introduction to the library.  Let's start
-with perhaps the simplest kind of sorter possible: one that sorts just
-two inputs.  Given a pair of 8-bit values, the function `twoSort`
-returns the sorted pair.
+with perhaps the simplest kind of sorter possible: given a pair of
+8-bit values, the function `twoSort` returns the sorted pair.
 
 [source, haskell]
 ----
@@ -188,15 +190,13 @@ Inputs  -->+---+---.
                 Outputs
 ----
 
-The input list is supplied on the left, and the sorted output list is produced
-at the bottom.  Each `+` denotes a two-sorter that takes inputs from the top
-and the left, and produces the smaller value to the bottom and the larger value
-to the right.
-
-See
+The input list is supplied on the left, and the sorted output list is
+produced at the bottom.  Each `+` denotes a two-sorter that takes
+inputs from the top and the left, and produces the smaller value to
+the bottom and the larger value to the right.  See
 https://pdfs.semanticscholar.org/de30/22efc5aec833d7b52bd4770a382fea729bba.pdf[The
-design and verification of a sorter core] for a more in-depth exploration of
-sorting circuits in Haskell.
+design and verification of a sorter core] for a more in-depth
+exploration of sorting circuits in Haskell.
 
 === Polymorphism
 
@@ -337,16 +337,16 @@ makeSimpleQueue = do
   full :: Reg (Bit 1) <- makeReg 0
 
   -- Methods
-  let notFull  = full.val .==. 0
-  let notEmpty = full.val .==. 1
-  let enq a    = do reg <== a
-                    full <== 1
-  let deq      = full <== 0
-  let canDeq   = full.val .==. 1
-  let first    = reg.val
-
-  -- Return interface
-  return (Queue notEmpty notFull enq deq canDeq first)
+  return
+    Queue {
+      notFull  = full.val .==. 0
+    , notEmpty = full.val .==. 1
+    , enq      = \a -> do reg <== a
+                          full <== 1
+    , deq      = full <== 0
+    , canDeq   = full.val .==. 1
+    , first    = reg.val
+    }
 ----
 
 The following simple test bench illustrates how to use a queue.
