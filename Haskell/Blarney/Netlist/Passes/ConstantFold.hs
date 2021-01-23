@@ -1,12 +1,16 @@
 {-# LANGUAGE PatternSynonyms    #-}
 {-# LANGUAGE NoRebindableSyntax #-}
 
-{-|
+{- |
 Module      : Blarney.Netlist.Passes.ConstantFold
 Description : A blarney netlist pass to fold constant values
-Copyright   : (c) Alexandre Joannou, 2020
+Copyright   : (c) Alexandre Joannou, 2020-2021
 License     : MIT
 Stability   : experimental
+
+'MNetlistPass' simplyfying 'Net's with constant inputs and returns whether any
+such change occured during the pass.
+
 -}
 
 module Blarney.Netlist.Passes.ConstantFold (
@@ -19,7 +23,7 @@ import Control.Monad
 import Data.Array.MArray
 import qualified Data.Bits as B
 
-import Blarney.Netlist.Passes.Utils
+import Blarney.Netlist.Utils
 
 -- pattern helper to identify constant InputTree NetInputs
 pattern Lit i <- InputTree (Const _ i) []
@@ -170,4 +174,3 @@ constantFold nl = do
   -- DEBUG HELP -- x <- readSTRef changed
   -- DEBUG HELP -- putStrLn $ "foldConstant pass changed? " ++ show x
   readSTRef changed -- return whether a change occured
-

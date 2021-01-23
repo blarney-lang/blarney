@@ -2,25 +2,35 @@
 {-# LANGUAGE NoRebindableSyntax #-}
 
 {-|
-Module      : Blarney.Netlist.Passes.Utils
-Description : Blarney netlist common pass utils
-Copyright   : (c) Alexandre Joannou, 2020
+Module      : Blarney.Netlist.Utils
+Description : Blarney utils for interaction with 'Netlist's
+Copyright   : (c) Alexandre Joannou, 2020-2021
 License     : MIT
 Stability   : experimental
+
+This module provides means to work with Blarney 'Netlist's. Mainly, it defines
+the notions of mutable netlists 'MNetlist's and passes 'MNetlistPass'es which
+can be used to write 'Netlist' optimisation passes.
+
 -}
 
-module Blarney.Netlist.Passes.Utils (
-  MNetlist       -- 'MNetlist' type, mutable netlist
-, MNetlistPass   -- Type to capture a pass on a mutable netlist
+module Blarney.Netlist.Utils (
+-- * Types to work with mutable 'Netlist's
+  MNetlist
+, MNetlistPass
+-- * Queries on individual 'Net's
 , netIsRoot
 , netDontKill
 , readNet
+-- * Simple 'Net' reference counting pass
 , NetCounts
 , countNetRef
-, untilM
-, untilM_
+-- * Exported relevant 'Blarney.Core' modules
 , module Blarney.Core.Net
 , module Blarney.Core.Prim
+-- * Relevant, not already defined monadic operations
+, untilM
+, untilM_
 ) where
 
 import Prelude
@@ -37,10 +47,6 @@ type MNetlist s = STArray s InstId (Maybe Net)
 
 -- | A type for running a pass over an 'MNetlist'
 type MNetlistPass s a = MNetlist s -> ST s a
-
---instance Monad (MNetlistPass s) where
---  a >>= f = \mnl -> do x <- a mnl
---                       f x mnl
 
 -- | A helper function to tell if a 'Net' is a netlist root
 netIsRoot :: Net -> Bool

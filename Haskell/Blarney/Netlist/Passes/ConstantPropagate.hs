@@ -1,9 +1,13 @@
-{-|
+{- |
 Module      : Blarney.Netlist.Passes.ConstantPropage
 Description : A blarney netlist pass to propagate constant values
-Copyright   : (c) Alexandre Joannou, 2020
+Copyright   : (c) Alexandre Joannou, 2020-2021
 License     : MIT
 Stability   : experimental
+
+'MNetlistPass' propagating constant 'Net's as 'InputTree' 'NetInput's to the
+'Net's using them, and return whether such propagation occured during the pass.
+
 -}
 
 module Blarney.Netlist.Passes.ConstantPropagate (
@@ -15,7 +19,7 @@ import Data.STRef
 import Control.Monad
 import Data.Array.MArray
 
-import Blarney.Netlist.Passes.Utils
+import Blarney.Netlist.Utils
 
 -- | Constant propagation pass
 constantPropagate :: MNetlistPass s Bool
