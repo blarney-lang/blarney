@@ -4,7 +4,7 @@
 Module      : Blarney.Backend.Verilog
 Description : Verilog generation
 Copyright   : (c) Matthew Naylor, 2019
-              (c) Alexandre Joannou, 2019-2020
+              (c) Alexandre Joannou, 2019-2021
 License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
@@ -140,7 +140,7 @@ showVerilogModule modName netlst =
               hang (text "if (reset) begin") 2 (sep (catMaybes $ map rst netVs))
           $+$ hang (text "end else begin") 2 (sep (catMaybes $ map alws netVs))
           $+$ text "end"
-        nets = catMaybes $ elems netlst
+        nets = elems netlst
         netVs = map (genNetVerilog netlst) nets
         netPrims = map netPrim nets
         ins = [Input w s | (w, s) <- nub [(w, s) | Input w s <- netPrims]]
@@ -253,9 +253,7 @@ genNetVerilog netlist net = case netPrim net of
   showWire (iId, m_nm) = text name <> case m_nm of Just nm -> text nm
                                                    _       -> mempty
                                    <> char '_' <> int iId
-                            where wNet = fromMaybe
-                                    (error "Trying to show non existing Net")
-                                    (netlist Data.Array.IArray.! iId)
+                            where wNet = netlist Data.Array.IArray.! iId
                                   name = genName $ netNameHints wNet
   showWireWidth :: Int -> (InstId, OutputName) -> Doc
   showWireWidth w wId = brackets (int (w-1) <> text ":0") <+> showWire wId

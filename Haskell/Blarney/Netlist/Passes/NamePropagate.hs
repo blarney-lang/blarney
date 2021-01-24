@@ -20,6 +20,7 @@ module Blarney.Netlist.Passes.NamePropagate (
 ) where
 
 import Prelude
+import Data.STRef
 import Data.Array.ST
 import Control.Monad
 import Control.Monad.ST
@@ -29,7 +30,8 @@ import Blarney.Netlist.Utils
 
 -- | Name propagation pass
 namePropagate :: forall s. MNetlistPass s ()
-namePropagate mnl = do
+namePropagate ctxtRef = do
+  mnl <- mnpNetlist <$> readSTRef ctxtRef -- expose the 'MNetlist'
   bounds <- getBounds mnl
   visited :: STUArray s InstId Bool <- newArray bounds False
   -- Push destination name down through netlist
@@ -39,7 +41,7 @@ namePropagate mnl = do
           net@Net{ netPrim = prim
                  , netInputs = inpts
                  , netNameHints = hints
-                 } <- readNet instId mnl
+                 } <- readNet instId ctxtRef
           let inpts' = [instId | x@(InputWire (instId, _)) <- inpts]
           writeArray visited instId True
           -- Detect new destination and update destination name in recursive call
@@ -52,7 +54,7 @@ namePropagate mnl = do
   --
   pairs <- getAssocs mnl -- list of nets with their index
   forM_ [i | x@(i, Just n) <- pairs, netIsRoot n] $ \instId -> do
-    net <- readNet instId mnl
+    net <- readNet instId ctxtRef
     visit (bestName net) instId
   --
   where bestName Net{ netPrim = prim

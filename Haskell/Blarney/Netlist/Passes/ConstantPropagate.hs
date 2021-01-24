@@ -23,7 +23,8 @@ import Blarney.Netlist.Utils
 
 -- | Constant propagation pass
 constantPropagate :: MNetlistPass s Bool
-constantPropagate mnl = do
+constantPropagate ctxtRef = do
+  mnl <- mnpNetlist <$> readSTRef ctxtRef -- expose the 'MNetlist'
   pairs <- getAssocs mnl -- list of nets with their index
   changed <- newSTRef False -- keep track of modifications to the 'Netlist'
   -- Turn constant 'InputWire' for each 'Net' into constant 'InputTree'
@@ -32,7 +33,7 @@ constantPropagate mnl = do
     inputs' <- forM (netInputs net) $ \inpt -> do
       case inpt of
         InputWire (instId, _) -> do
-          inptNet <- readNet instId mnl
+          inptNet <- readNet instId ctxtRef
           -- keep track of change when transforming into an 'InputTree'
           case netPrim inptNet of
             p@(Const _ _)  -> writeSTRef changed True >> return (InputTree p [])

@@ -162,14 +162,15 @@ evalConstNet n = (n, False)
 
 -- | Constant folding pass
 constantFold :: MNetlistPass s Bool
-constantFold nl = do
-  pairs <- getAssocs nl -- list of nets with their index
+constantFold ctxtRef = do
+  mnl <- mnpNetlist <$> readSTRef ctxtRef -- expose the 'MNetlist'
+  pairs <- getAssocs mnl -- list of nets with their index
   changed <- newSTRef False -- keep track of modifications to the 'Netlist'
   -- Evaluate each constant 'Net' and update it in the 'Netlist'
   forM_ [(a, b) | x@(a, Just b) <- pairs] $ \(idx, net) -> do
     let (net', change) = evalConstNet net
     when change $ do writeSTRef changed True -- keep track of changes
-                     writeArray nl idx $ Just net' -- update 'Netlist'
+                     writeArray mnl idx $ Just net' -- update 'Netlist'
   -- finish pass
   -- DEBUG HELP -- x <- readSTRef changed
   -- DEBUG HELP -- putStrLn $ "foldConstant pass changed? " ++ show x

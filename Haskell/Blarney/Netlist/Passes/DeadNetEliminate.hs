@@ -23,15 +23,16 @@ import Blarney.Netlist.Utils
 
 -- | Dead Net elimination pass
 deadNetEliminate :: MNetlistPass s Bool
-deadNetEliminate nl = do
-  refCounts <- countNetRef nl -- reference count for each 'Net'
-  pairs <- getAssocs nl -- list of nets with their index
+deadNetEliminate ctxtRef = do
+  mnl <- mnpNetlist <$> readSTRef ctxtRef -- expose the 'MNetlist'
+  refCounts <- countNetRef ctxtRef -- reference count for each 'Net'
+  pairs <- getAssocs mnl -- list of nets with their index
   changed <- newSTRef False -- keep track of modifications to the 'Netlist'
   -- kill Nets with a null reference count
   forM_ [(a,b) | x@(a, Just b) <- pairs] $ \(idx, net) -> do
     refCnt <- readArray refCounts idx
     when (refCnt == 0 && (not . netIsRoot) net && (not . netDontKill) net) $ do
-      writeArray nl idx Nothing
+      writeArray mnl idx Nothing
       writeSTRef changed True
   -- finish pass
   -- DEBUG HELP -- x <- readSTRef changed

@@ -28,6 +28,7 @@ module Blarney.Netlist (
 import Prelude
 import Control.Monad
 import Control.Monad.ST
+import Data.Array.IArray (amap)
 import Data.Array.MArray (newArray, thaw, freeze)
 
 import Data.STRef
@@ -38,35 +39,38 @@ import Blarney.Netlist.Passes
 
 -- | Wrap a custom pass with the mandatory netlist transformation passes
 wrapWithMandatoryNetlistPasses :: MNetlistPass s a -> MNetlistPass s ()
-wrapWithMandatoryNetlistPasses customPass mnl = do
+wrapWithMandatoryNetlistPasses customPass ctxtRef = do
   -- remove 'Bit 0' instances
-  zeroWidthNetIgnore mnl
+  zeroWidthNetIgnore ctxtRef
   -- run custom netlist pass
-  customPass mnl
+  customPass ctxtRef
   -- eliminate 'Net' entries in the netlist for 'Net's that are no longer
   -- referenced
-  untilM_ not $ deadNetEliminate mnl
+  untilM_ not $ deadNetEliminate ctxtRef
 
 ---- | Netlist pass combining optional passes
 optionalNetlistPasses :: Opts -> MNetlistPass s ()
-optionalNetlistPasses opts mnl = do
+optionalNetlistPasses opts ctxtRef = do
   -- netlist optimisation passes
-  when (optEnableSimplifier opts) do constantEliminate mnl
-                                     singleRefNetInline mnl
+  when (optEnableSimplifier opts) do constantEliminate ctxtRef
+                                     singleRefNetInline ctxtRef
                                      return ()
   -- propagates existing names through the netlist
-  when (optEnableNamePropagation opts) $ namePropagate mnl
+  when (optEnableNamePropagation opts) $ namePropagate ctxtRef
 
 -- | Run an 'MNetlistPass' on a 'Netlist' and return the resulting 'Netlist'
 runNetlistPass :: (forall s. MNetlistPass s a) -> Netlist -> Netlist
-runNetlistPass pass netlist = runST m
-  where m :: ST s Netlist
-        m = do -- get a mutable netlist
-               mnl <- thaw netlist
-               -- apply netlist transformations
-               pass mnl
-               -- return transformed netlist as immutable
-               freeze mnl
+runNetlistPass pass netlist = runST wrappedPass
+  where wrappedPass :: ST s Netlist
+        wrappedPass = do
+          -- get a mutable netlist
+          mnl <- thaw $ amap Just netlist
+          -- create a MNetlistPassCtxt to run passes on
+          ctxtRef <- newSTRef MNetlistPassCtxt{ mnpNetlist = mnl }
+          -- apply netlist transformations
+          pass ctxtRef
+          -- return transformed netlist as immutable
+          toNetlist ctxtRef
 
 -- | Run the default set of netlist passes
 runDefaultNetlistPasses :: Opts -> Netlist -> Netlist

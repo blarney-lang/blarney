@@ -84,23 +84,23 @@ zeroWidthRootNetEliminationRule Net{ netPrim = prim } =
 
 -- | Zero-width 'Net' elimination pass
 zeroWidthNetIgnore :: MNetlistPass s Bool
-zeroWidthNetIgnore nl = do
-  pairs <- getAssocs nl -- list of nets with their index
+zeroWidthNetIgnore ctxtRef = do
+  mnl <- mnpNetlist <$> readSTRef ctxtRef -- expose the 'MNetlist'
+  pairs <- getAssocs mnl -- list of nets with their index
   changed <- newSTRef False -- keep track of modifications to the 'Netlist'
   -- For each 'Net' (in particular, those with a non-zero-width output) with at
   -- least one zero-width input, transform it into a 'Net' with no reference to
   -- any zero-width output 'Net'.
   forM_ [(a,b) | x@(a, Just b) <- pairs] $ \(idx, net@Net{netPrim = prim}) -> do
     let (net', netChanged) = zeroWidthNetTransform net
-    when netChanged $ do writeArray nl idx (Just net')
+    when netChanged $ do writeArray mnl idx (Just net')
                          writeSTRef changed True
   -- Remove each zero-width root 'Net'
   forM_ [ i | x@(i, Just n) <- pairs
             , zeroWidthRootNetEliminationRule n ] $ \idx -> do
-    writeArray nl idx Nothing
+    writeArray mnl idx Nothing
     writeSTRef changed True
   -- finish pass
   -- DEBUG HELP -- x <- readSTRef changed
   -- DEBUG HELP -- putStrLn $ "ignoreZeroWidthNet pass changed? " ++ show x
   readSTRef changed
-
