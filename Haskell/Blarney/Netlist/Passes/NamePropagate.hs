@@ -2,12 +2,17 @@
 {-# LANGUAGE NoRebindableSyntax  #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-{-|
+{- |
 Module      : Blarney.Netlist.Passes.NamePropagate
 Description : A blarney netlist pass to propagate names
 Copyright   : (c) Alexandre Joannou, 2020-2021
 License     : MIT
 Stability   : experimental
+
+'MNetlistPass' propagating through the netlist the name of the current
+"destination" (register, bram, output...), augmenting individual 'Net's' name
+hints.
+
 -}
 
 module Blarney.Netlist.Passes.NamePropagate (
@@ -20,9 +25,9 @@ import Control.Monad
 import Control.Monad.ST
 import Data.Set (insert, toList)
 
-import Blarney.Netlist.Passes.Utils
+import Blarney.Netlist.Utils
 
--- | propagate names through the Netlist
+-- | Name propagation pass
 namePropagate :: forall s. MNetlistPass s ()
 namePropagate mnl = do
   bounds <- getBounds mnl

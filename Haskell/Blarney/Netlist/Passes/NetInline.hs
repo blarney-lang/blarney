@@ -1,11 +1,15 @@
 {-# LANGUAGE NoRebindableSyntax #-}
 
-{-|
+{- |
 Module      : Blarney.Netlist.Passes.NetInline
 Description : A blarney netlist pass to inline a Net into an other Net's inputs
-Copyright   : (c) Alexandre Joannou, 2020
+Copyright   : (c) Alexandre Joannou, 2020-2021
 License     : MIT
 Stability   : experimental
+
+'MNetlistPass' embedding 'Net's with a single reference into the 'NetInput's of
+the referencing 'Net' if possible, and returns whether such embedding occurred.
+
 -}
 
 module Blarney.Netlist.Passes.NetInline (
@@ -18,7 +22,7 @@ import Control.Monad
 import Control.Monad.ST
 import Data.Array.MArray
 
-import Blarney.Netlist.Passes.Utils
+import Blarney.Netlist.Utils
 
 -- | Helper to inline a 'Net''s inputs
 netInputInline :: MNetlist s -> NetCounts s -> NetInput -> ST s (NetInput, Bool)
@@ -40,7 +44,7 @@ netInputInline mnl nc (InputTree prim inpts) = do
   (inpts', changes) <- unzip <$> mapM (netInputInline mnl nc) inpts
   return $ (InputTree prim inpts', or changes)
 
--- | Single reference 'Net' inlining pass
+-- | Single-reference 'Net' inlining pass
 singleRefNetInline :: MNetlistPass s Bool
 singleRefNetInline mnl = do
   refCounts <- countNetRef mnl -- reference count for each 'Net'

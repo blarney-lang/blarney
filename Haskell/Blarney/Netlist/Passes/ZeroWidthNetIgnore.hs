@@ -1,9 +1,13 @@
-{-|
+{- |
 Module      : Blarney.Netlist.Passes.ZeroWidthNetIgnore
 Description : A blarney netlist pass to ignore zero-width nets
-Copyright   : (c) Alexandre Joannou, 2020
+Copyright   : (c) Alexandre Joannou, 2020-2021
 License     : MIT
 Stability   : experimental
+
+'MNetlistPass' removing zero-width 'Net's from the netlist and returning whether
+such elimination occurred.
+
 -}
 
 module Blarney.Netlist.Passes.ZeroWidthNetIgnore (
@@ -15,7 +19,7 @@ import Data.STRef
 import Control.Monad
 import Data.Array.MArray
 
-import Blarney.Netlist.Passes.Utils
+import Blarney.Netlist.Utils
 
 -- | Transform a 'Net' with non-zero-width output and at least one zero-width
 --   input into an equivalent 'Net' with no reference to any other zero-width
@@ -78,7 +82,7 @@ zeroWidthRootNetEliminationRule Net{ netPrim = prim } =
   where ins = primInputs prim
         outs = primOutputs prim
 
--- | Ignore 0-width Nets pass
+-- | Zero-width 'Net' elimination pass
 zeroWidthNetIgnore :: MNetlistPass s Bool
 zeroWidthNetIgnore nl = do
   pairs <- getAssocs nl -- list of nets with their index

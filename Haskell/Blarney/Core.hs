@@ -2,10 +2,15 @@
 Module      : Blarney.Core
 Description : Core module for the blarney hardware description library
 Copyright   : (c) Matthew Naylor, 2019
-              (c) Alexandre Joannou, 2019-2020
+              (c) Alexandre Joannou, 2019-2021
 License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
+
+This module re-exports some Blarney internals. It should not be imported
+directly, but the 'Blarney' module which re-exports it should be imported
+instead.
+
 -}
 module Blarney.Core (
   module Blarney.Core.Bit
