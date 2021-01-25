@@ -23,7 +23,8 @@ import Control.Monad
 import Data.Array.MArray
 import qualified Data.Bits as B
 
-import Blarney.Netlist.Utils
+import Blarney.Netlist.Passes.Types
+import Blarney.Netlist.Passes.Utils
 
 -- pattern helper to identify constant InputTree NetInputs
 pattern Lit i <- InputTree (Const _ i) []
@@ -162,8 +163,8 @@ evalConstNet n = (n, False)
 
 -- | Constant folding pass
 constantFold :: MNetlistPass s Bool
-constantFold ctxtRef = do
-  mnl <- mnpNetlist <$> readSTRef ctxtRef -- expose the 'MNetlist'
+constantFold mnlRef = do
+  mnl <- readSTRef mnlRef -- expose the 'MNetlist'
   pairs <- getAssocs mnl -- list of nets with their index
   changed <- newSTRef False -- keep track of modifications to the 'Netlist'
   -- Evaluate each constant 'Net' and update it in the 'Netlist'

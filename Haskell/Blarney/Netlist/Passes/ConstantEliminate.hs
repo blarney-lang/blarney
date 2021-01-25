@@ -16,13 +16,14 @@ module Blarney.Netlist.Passes.ConstantEliminate (
 
 import Prelude
 
-import Blarney.Netlist.Utils
+import Blarney.Netlist.Passes.Types
+import Blarney.Netlist.Passes.Utils
 import Blarney.Netlist.Passes.ConstantFold
 import Blarney.Netlist.Passes.ConstantPropagate
 
 -- | Constant elimination pass
 constantEliminate :: MNetlistPass s ()
-constantEliminate ctxtRef = untilM not constElim >> return ()
-                            where constElim = do a <- constantFold ctxtRef
-                                                 b <- constantPropagate ctxtRef
-                                                 return $ a || b
+constantEliminate mnlRef = untilM not constElim >> return ()
+                           where constElim = do a <- constantFold mnlRef
+                                                b <- constantPropagate mnlRef
+                                                return $ a || b

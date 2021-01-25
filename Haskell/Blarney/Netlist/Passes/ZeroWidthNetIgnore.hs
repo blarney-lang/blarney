@@ -19,7 +19,8 @@ import Data.STRef
 import Control.Monad
 import Data.Array.MArray
 
-import Blarney.Netlist.Utils
+import Blarney.Netlist.Passes.Types
+import Blarney.Netlist.Passes.Utils
 
 -- | Transform a 'Net' with non-zero-width output and at least one zero-width
 --   input into an equivalent 'Net' with no reference to any other zero-width
@@ -84,8 +85,8 @@ zeroWidthRootNetEliminationRule Net{ netPrim = prim } =
 
 -- | Zero-width 'Net' elimination pass
 zeroWidthNetIgnore :: MNetlistPass s Bool
-zeroWidthNetIgnore ctxtRef = do
-  mnl <- mnpNetlist <$> readSTRef ctxtRef -- expose the 'MNetlist'
+zeroWidthNetIgnore mnlRef = do
+  mnl <- readSTRef mnlRef -- expose the 'MNetlist'
   pairs <- getAssocs mnl -- list of nets with their index
   changed <- newSTRef False -- keep track of modifications to the 'Netlist'
   -- For each 'Net' (in particular, those with a non-zero-width output) with at
