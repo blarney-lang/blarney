@@ -66,7 +66,7 @@ countNetRef mnlRef = do
   -- count references for each Net
   let innerCount (InputWire (instId, _)) = do
         cnt <- readArray refCounts instId
-        writeArray refCounts instId (cnt + 1)
+        writeArray refCounts instId $! (cnt + 1)
       innerCount (InputTree _ inpts) = mapM_ innerCount inpts
   forM_ [e | Just e <- es] $ \net -> mapM_ innerCount (netInputs net)
   -- return reference counts
