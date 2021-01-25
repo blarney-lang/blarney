@@ -112,15 +112,14 @@ countNetRef ctxtRef = do
 prune :: MNetlistPass s ()
 prune ctxtRef = do
   mnl <- mnpNetlist <$> readSTRef ctxtRef -- expose the 'MNetlist'
-  pairs <- catMaybes . (liveNet <$>) <$> getAssocs mnl
+  assocs <- getAssocs mnl
+  let pairs = [(i, n) | (i, Just n) <- assocs]
   let remap old =
         fromMaybe (error "Blarney.Netlist.Passes.Prune")
                   (lookup old $ zipWith (\(i, _) i' -> (i, i')) pairs [0..])
   pruned <- newListArray (0, length pairs - 1)
                          (Just <$> remapNetInstId remap <$> snd <$> pairs)
   writeSTRef ctxtRef MNetlistPassCtxt{ mnpNetlist = pruned }
-  where liveNet (i, Just n) = Just (i, n)
-        liveNet _ = Nothing
 
 -- | Repeat computation until a predicate holds
 untilM :: Monad m => (a -> Bool) -> m a -> m a
