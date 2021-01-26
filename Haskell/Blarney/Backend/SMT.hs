@@ -167,12 +167,12 @@ mkContext nl n = Context { ctxtNetlist    = nl
                          , ctxtPropName   = nm
                          , ctxtAssertMsg  = msg }
   where topoSortIds = partialTopologicalSort nl $ netInstId n
-        inputIds = [ i | Just x@Net{netInstId = i, netPrim = p} <- elems nl
+        inputIds = [ i | x@Net{netInstId = i, netPrim = p} <- elems nl
                        , case p of Input _ _ -> True
                                    _         -> False
                        , elem i topoSortIds ]
         stateElems =
-          [ (i, stateInit x) | Just x@Net{netInstId=i, netPrim=p} <- elems nl
+          [ (i, stateInit x) | x@Net{netInstId=i, netPrim=p} <- elems nl
                              , case p of RegisterEn _ _ -> True
                                          Register   _ _ -> True
                                          _              -> False
@@ -285,7 +285,7 @@ genSMTScript VerifyConf{..} nl nm dir = do
   where
     fileName = dir ++ "/" ++ nm ++ ".smt2"
     rStyle = Style PageMode 80 1.05
-    rootCtxts = [ mkContext nl n | Just n@Net{netPrim=p} <- elems nl
+    rootCtxts = [ mkContext nl n | n@Net{netPrim=p} <- elems nl
                                  , case p of Assert _   -> True
                                              _          -> False ]
     smtCode = showGeneralDefs False $+$ vcat defs
@@ -328,7 +328,7 @@ verifyWithSMT VerifyConf{..} nl =
                           , True, rSt )
     interactive = userConfInteractive verifyConfUser
     diveStep = userConfIncreasePeriod verifyConfUser
-    rootCtxts = [ mkContext nl n | Just n@Net{netPrim=p} <- elems nl
+    rootCtxts = [ mkContext nl n | n@Net{netPrim=p} <- elems nl
                                  , case p of Assert _   -> True
                                              _          -> False ]
     smtP = (uncurry proc verifyConfSolverCmd){ std_in  = CreatePipe

@@ -1,8 +1,9 @@
-{-# LANGUAGE BlockArguments      #-}
-{-# LANGUAGE PatternSynonyms     #-}
-{-# LANGUAGE FlexibleContexts    #-}
-{-# LANGUAGE NoRebindableSyntax  #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE BlockArguments        #-}
+{-# LANGUAGE PatternSynonyms       #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE NoRebindableSyntax    #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 {-|
 Module      : Blarney.Core.Net
@@ -23,7 +24,10 @@ module Blarney.Core.Net (
 , WireId          -- 'WireId' type to uniquely identify wires
 , NetInput(..)    -- 'NetInput' type to represent inputs to 'Net's
 , netInputWireIds -- Helper function to extract all 'NetInput''s 'WireId's
+, remapNetInputInstId -- Helper to remap a 'NetInput''s 'InstId's
+, remapNetInstId  -- Helper to remap a 'Net''s 'InstId's
 , Netlist         -- 'Netlist' type to represent a circuit
+, ToNetlist(..)   -- Class of types that can be turned into 'Netlist's
 , getNet          -- Extract the 'Net' from a 'Netlist' at the provided 'InstId'
 , topologicalSort -- Topologically sort a 'Netlist'
 , partialTopologicalSort -- Topologically sort a subset of a 'Netlist' from a
@@ -31,7 +35,6 @@ module Blarney.Core.Net (
 ) where
 
 import Prelude
-import Data.Maybe
 import Data.Array
 import Data.STRef
 import Data.Array.ST
@@ -69,15 +72,28 @@ netInputWireIds :: NetInput -> [WireId]
 netInputWireIds (InputWire wId) = [wId]
 netInputWireIds (InputTree _ ins) = concatMap netInputWireIds ins
 
--- | A 'Netlist', represented as an 'Array InstId (Maybe Net)'
-type Netlist = Array InstId (Maybe Net)
+-- | Helper function remap the 'InstId's of a 'NetInput'
+remapNetInputInstId :: (InstId -> InstId) -> NetInput -> NetInput
+remapNetInputInstId f (InputWire (instId, outNm)) = InputWire (f instId, outNm)
+remapNetInputInstId f (InputTree p ins) =
+  InputTree p (remapNetInputInstId f <$> ins)
+
+-- | Helper function remap the 'InstId's of a 'Net'
+remapNetInstId :: (InstId -> InstId) -> Net -> Net
+remapNetInstId remap net@Net{ netInstId = instId, netInputs = inpts } =
+  net { netInstId = remap instId
+      , netInputs = remapNetInputInstId remap <$> inpts }
+
+-- | A 'Netlist', represented as an 'Array InstId Net'
+type Netlist = Array InstId Net
+
+class Monad m => ToNetlist a m where
+  toNetlist :: a -> m Netlist
 
 -- | Extract the 'Net' from a 'Netlist' at the provided 'InstId'. Raise an error
 --   if no 'Net' with this 'InstId' is present.
 getNet :: Netlist -> InstId -> Net
-getNet nl i = fromMaybe err (nl ! i)
-  where err = error $ "Blarney.Core.Net: " ++
-                      "access to non existing Net at instId " ++ show i
+getNet nl i = nl ! i
 
 -- topological stort of a netlist
 --------------------------------------------------------------------------------
@@ -89,7 +105,7 @@ data Mark = Unmarked | Temporary | Permanent
 -- | get a topologically sorted '[InstId]' for the given 'Netlist'
 topologicalSort :: Netlist -> [InstId]
 topologicalSort nl = topoSort nl relevantRoots
-  where relevantRoots = [ netInstId n | Just n@Net{netPrim = p} <- elems nl
+  where relevantRoots = [ netInstId n | n@Net{netPrim = p} <- elems nl
                                       , case p of Output _ _ -> True
                                                   Assert _   -> True
                                                   _          -> False ]
@@ -105,7 +121,7 @@ topoSort nl rootIds = runST do
   -- initialise state for the topological sorting
   visited <- newArray (bounds nl) Unmarked -- track visit through the netlist
   sorted  <- newSTRef [] -- sorted list as a result
-  roots  <- newSTRef rootIds -- list of roots to explore next
+  roots   <- newSTRef rootIds -- list of roots to explore next
   -- run the internal topological sort while there are roots to explore
   whileM_ (notEmpty roots) do
     root <- pop roots -- consume a root

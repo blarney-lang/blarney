@@ -1,6 +1,7 @@
-{-# LANGUAGE PatternSynonyms     #-}
-{-# LANGUAGE FlexibleInstances   #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE PatternSynonyms       #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 {-|
 Module      : Blarney.Flatten
@@ -18,7 +19,7 @@ module Blarney.Core.Flatten (
 , freshInstId   -- Obtain a fresh instance id
 , addNet        -- Add a net to the netlist
 , flatten       -- Flatten a bit vector to a netlist
-, ToNetlist(..) -- Class of types that can be turned into 'Netlist's
+, ToNetlist(..) -- re-export the class
 ) where
 
 import Prelude
@@ -109,26 +110,19 @@ flatten bv@BV{bvNameHints=hints,bvInstRef=instRef} = do
     Just instId -> do when hasNameHints $ addNameHints (instId, hints)
                       return $ InputWire (instId, bvOutput bv)
 
-class ToNetlist a where
-  toNetlist :: a -> IO Netlist
-
 -- | Convert RTL monad to a netlist
-instance ToNetlist (RTL ()) where
+instance ToNetlist (RTL ()) IO where
   toNetlist rtl = do
     -- flatten BVs into a Netlist
     i <- newIORef (0 :: InstId)
     ((nl, nms, undo), _) <- runFlatten flattenRoots i
-    maxId <- readIORef i
-    mnl :: IOArray InstId (Maybe Net) <-
-      thaw $ listArray (0, maxId) (replicate (maxId+1) Nothing)
-          // [(netInstId n, Just n) | n <- JL.toList nl]
+    maxId <- readIORef i -- by construction, maxId == length (JL.toList nl)
+    mnl :: IOArray InstId Net <-
+      thaw $ array (0, maxId - 1) [(netInstId n, n) | n <- JL.toList nl]
     -- update netlist with gathered names
     forM_ (JL.toList nms) $ \(idx, hints) -> do
-      mnet <- readArray mnl idx
-      case mnet of
-        Just net@Net{ netNameHints = oldHints } ->
-          writeArray mnl idx (Just net { netNameHints = oldHints <> hints })
-        _ -> return ()
+      net@Net{ netNameHints = oldHints } <- readArray mnl idx
+      writeArray mnl idx net{ netNameHints = oldHints <> hints }
     -- run undo computations
     undo
     -- return final netlist
@@ -143,5 +137,5 @@ instance ToNetlist (RTL ()) where
       flattenRoots = mapM flatten (concat [rts | RTLRoots rts <- acts])
 
 -- | Convert Module monad to a netlist
-instance ToNetlist (Module ()) where
+instance ToNetlist (Module ()) IO where
   toNetlist = toNetlist . runModule

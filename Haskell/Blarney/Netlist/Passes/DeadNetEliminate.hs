@@ -19,19 +19,21 @@ import Data.STRef
 import Control.Monad
 import Data.Array.MArray
 
-import Blarney.Netlist.Utils
+import Blarney.Netlist.Passes.Types
+import Blarney.Netlist.Passes.Utils
 
 -- | Dead Net elimination pass
 deadNetEliminate :: MNetlistPass s Bool
-deadNetEliminate nl = do
-  refCounts <- countNetRef nl -- reference count for each 'Net'
-  pairs <- getAssocs nl -- list of nets with their index
+deadNetEliminate mnlRef = do
+  mnl <- readSTRef mnlRef -- expose the 'MNetlist'
+  refCounts <- countNetRef mnlRef -- reference count for each 'Net'
+  pairs <- getAssocs mnl -- list of nets with their index
   changed <- newSTRef False -- keep track of modifications to the 'Netlist'
   -- kill Nets with a null reference count
   forM_ [(a,b) | x@(a, Just b) <- pairs] $ \(idx, net) -> do
     refCnt <- readArray refCounts idx
     when (refCnt == 0 && (not . netIsRoot) net && (not . netDontKill) net) $ do
-      writeArray nl idx Nothing
+      writeArray mnl idx Nothing
       writeSTRef changed True
   -- finish pass
   -- DEBUG HELP -- x <- readSTRef changed
