@@ -49,13 +49,14 @@ module Blarney.BitScan
   , MatchOpts(..)
   , matchMap
   , TagMap
+  , packTagMap
   , FieldMap
   , matchSel
   , SelMap
   , getField
   , getFieldStrict
   , getFieldSel
-  , is
+  , makeFieldSelector
   ) where
 
 import Blarney hiding (Range)
@@ -63,7 +64,8 @@ import Blarney.Option
 
 import Data.Char
 import Data.List
-import Data.Map (Map, fromList, fromListWith, toList, lookup, mapWithKey)
+import Data.Map (Map, fromList, fromListWith,
+                   toList, lookup, mapWithKey, elems)
 
 type BitList = [Bit 1]
 
@@ -431,6 +433,18 @@ matchMap strict alts subj = (tagMap, mapWithKey combine fieldMap)
               error ("BitScan.matchMap: different widths for field " ++ field)
           | otherwise = take maxLen (xs ++ repeat (last xs))
 
+-- Pack the tag map into a bit vector
+packTagMap :: KnownNat n => TagMap tag -> Bit n
+packTagMap tagMap
+  | w >= numBits = vec
+  | otherwise = error
+      "BitScan.packTagMap: bit vector not big enough capture all tags"
+  where
+    w = widthOf vec
+    bits = elems tagMap
+    numBits = length bits
+    vec = fromBitList $ take w (bits ++ repeat 0)
+
 -- |Get field value from a map, and cast to required size using
 -- truncation or sign-extension.
 getField :: KnownNat n => FieldMap -> String -> Option (Bit n)
@@ -487,15 +501,14 @@ matchSel alts = mapWithKey combine fieldMap
                 Just i  -> subj' !! i
             | b <- bits ]
 
--- |Get field selector function from a map.  If the field is not
--- defined, the selector will return dont care.
+-- |Get field selector function from a selector map.
 getFieldSel :: (KnownNat n, KnownNat m) =>
   SelMap n -> String -> Bit n -> Bit m
 getFieldSel m key subj = result
   where
     result =
       case Data.Map.lookup key m of
-        Nothing -> dontCare
+        Nothing -> error ("BitScan.getFieldSel: undefined field " ++ key)
         Just f -> fromBitList (resize (f subj))
 
     resize list
@@ -503,11 +516,9 @@ getFieldSel m key subj = result
       | otherwise = error ("BitScan.getFieldSel: width mismatch "  ++
                              "for result of field selector " ++ key)
 
--- |Helper function for determining if tag is present in tag map
-infix 8 `is`
-is :: (Ord tag, Show tag) => TagMap tag -> [tag] -> Bit 1
-is m [] = false
-is m (key:keys) =
-  case Data.Map.lookup key m of
-    Nothing -> error ("BitScan: unknown tag " ++ show key)
-    Just b -> b .|. is m keys
+-- |Make field selector function from a list of alternatives.
+makeFieldSelector :: (KnownNat n, KnownNat m) =>
+  [(String, tag)] -> String -> Bit n -> Bit m
+makeFieldSelector alts field =
+  let selMap = matchSel alts in
+    \subj -> getFieldSel selMap field subj
