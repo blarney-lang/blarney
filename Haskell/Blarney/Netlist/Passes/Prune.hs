@@ -18,7 +18,7 @@ import Prelude
 import Data.Maybe
 import Data.STRef
 import Data.Array.ST
-import Data.Array.IArray
+import Data.Array.Unboxed
 
 import Blarney.Netlist.Passes.Types
 import Blarney.Netlist.Passes.Utils
@@ -28,13 +28,15 @@ prune :: MNetlistPass s ()
 prune mnlRef = do
   mnl <- readSTRef mnlRef -- expose the 'MNetlist'
   assocs <- getAssocs mnl
-  let pairs = [(i, n) | (i, Just n) <- assocs]
+  let usedAssocs = [(i, n) | (i, Just n) <- assocs]
+  let oldIds = map fst usedAssocs
+  let oldNets = map snd usedAssocs
   -- Mapping from old ids to new ids
-  (_, maxOldId) <- getBounds mnl
-  let mapping :: Array InstId InstId =
-        array (0, maxOldId) (zip (map fst pairs) [0..])
+  bounds <- getBounds mnl
+  let mapping :: UArray InstId InstId =
+        array bounds (zip oldIds [0..])
   -- Compute compact netlist
-  let maxNewId = length pairs - 1
-  pruned <- newListArray (0, maxNewId)
-    [Just (remapNetInstId (mapping !) net) | (_, net) <- pairs]
+  pruned <- newListArray (0, length oldNets - 1)
+                         [ Just (remapNetInstId (mapping !) net)
+                         | net <- oldNets ]
   writeSTRef mnlRef pruned
