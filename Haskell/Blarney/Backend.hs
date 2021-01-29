@@ -16,6 +16,9 @@ module Blarney.Backend (
 , module Blarney.Backend.SMT
 , writeSMTScript
 , verifyWith
+  -- * Simulation backend
+, module Blarney.Backend.Simulation
+, simulate
 ) where
 
 import Prelude
@@ -26,6 +29,7 @@ import Blarney.Core.Flatten (ToNetlist(..))
 import Blarney.Core.Module
 import Blarney.Netlist
 
+import Blarney.Backend.Simulation
 import Blarney.Backend.Verilog
 import Blarney.Backend.SMT
 
@@ -93,3 +97,16 @@ verifyWith conf circuit = do
   nl <- toNetlist . makeModule $ circuit
   let nl' = runDefaultNetlistPasses opts nl
   verifyWithSMT conf nl'
+
+-- Simulation backend
+--------------------------------------------------------------------------------
+
+-- | TODO write doc
+simulate :: Modular a
+         => a      -- ^ Blarney circuit
+         -> IO ()
+simulate circuit = do
+  (opts, _) <- getOpts
+  nl <- toNetlist $ makeModule circuit
+  let nl' = runDefaultNetlistPasses opts nl
+  simulateNetlist nl'

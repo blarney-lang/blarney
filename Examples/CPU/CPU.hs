@@ -149,4 +149,4 @@ main :: IO ()
 main = do
   writeVerilogTop makeCPU "top" "CPU-Verilog/"
   system "cp instrs.hex CPU-Verilog/"
-  return ()
+  simulate makeCPU

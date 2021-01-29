@@ -44,4 +44,5 @@ top t w h = do
 
 -- Main function
 main :: IO ()
-main = writeVerilogTop (top 5000 16 16) "top" "Heat-Verilog/"
+main = do writeVerilogTop (top 5000 16 16) "top" "Heat-Verilog/"
+          simulate (top 5000 16 16)

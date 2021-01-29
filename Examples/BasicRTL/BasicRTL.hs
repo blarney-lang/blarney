@@ -24,4 +24,6 @@ top = do
       display "running with +DEBUG"
 
 main :: IO ()
-main = writeVerilogTop top "top" "BasicRTL-Verilog/"
+main = do
+  writeVerilogTop top "top" "BasicRTL-Verilog/"
+  simulate top

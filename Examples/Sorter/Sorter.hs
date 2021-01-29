@@ -29,4 +29,5 @@ top = always do
   finish
 
 main :: IO ()
-main = writeVerilogTop top "top" "Sorter-Verilog/"
+main = do writeVerilogTop top "top" "Sorter-Verilog/"
+          simulate top
