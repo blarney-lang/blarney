@@ -1,6 +1,6 @@
-{-# LANGUAGE NoRebindableSyntax    #-}
+{-# LANGUAGE NoRebindableSyntax #-}
 
-{-|
+{- |
 Module      : Blarney.Netlist.Passes.Utils
 Description : Utility functions for netlist passes
 Copyright   : (c) Alexandre Joannou, 2020-2021
@@ -22,9 +22,6 @@ module Blarney.Netlist.Passes.Utils (
 -- * Exported 'Blarney' modules
 , module Blarney.Core.Net
 , module Blarney.Core.Prim
--- * Relevant, not already defined monadic operations
-, untilM
-, untilM_
 ) where
 
 import Prelude
@@ -71,13 +68,3 @@ countNetRef mnlRef = do
   forM_ [e | Just e <- es] $ \net -> mapM_ innerCount (netInputs net)
   -- return reference counts
   return refCounts
-
--- | Repeat computation until a predicate holds
-untilM :: Monad m => (a -> Bool) -> m a -> m a
-untilM pred act =
-  act >>= \x -> if pred x then return x else untilM pred act
-
--- | Same as 'untilM' but discard the final result
-untilM_ :: Monad m => (a -> Bool) -> m a -> m ()
-untilM_ pred act = do untilM pred act
-                      return ()

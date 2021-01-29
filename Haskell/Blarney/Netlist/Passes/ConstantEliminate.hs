@@ -16,6 +16,7 @@ module Blarney.Netlist.Passes.ConstantEliminate (
 
 import Prelude
 
+import Blarney.Misc.MonadLoops
 import Blarney.Netlist.Passes.Types
 import Blarney.Netlist.Passes.Utils
 import Blarney.Netlist.Passes.ConstantFold
@@ -23,7 +24,7 @@ import Blarney.Netlist.Passes.ConstantPropagate
 
 -- | Constant elimination pass
 constantEliminate :: MNetlistPass s ()
-constantEliminate mnlRef = untilM not constElim >> return ()
+constantEliminate mnlRef = constElim `untilPredM_` not
                            where constElim = do a <- constantFold mnlRef
                                                 b <- constantPropagate mnlRef
                                                 return $ a || b

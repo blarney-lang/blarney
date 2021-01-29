@@ -76,7 +76,7 @@ zeroWidthNetTransform
 zeroWidthNetTransform net = (net, False)
 
 -- | Tell if a root 'Net' can be optimized away during zero-witdh elimination,
--- that is a root 'Net' with no non-zero-width inputs or outputs
+--   that is a root 'Net' with no non-zero-width inputs or outputs
 zeroWidthRootNetEliminationRule Net{ netPrim = prim } =
   primIsRoot prim && not (primDontKill prim) &&
   not (any (\(_, w) -> w /= 0) ins || any (\(_, w) -> w /= 0) outs)

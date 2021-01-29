@@ -36,6 +36,7 @@ import Data.Array.MArray
 
 import Data.STRef
 
+import Blarney.Misc.MonadLoops
 import Blarney.Core.Opts
 import Blarney.Netlist.Passes
 
@@ -61,7 +62,7 @@ wrapWithMandatoryNetlistPasses customPass mnlRef = do
   customPass mnlRef
   -- eliminate 'Net' entries in the netlist for 'Net's that are no longer
   -- referenced
-  untilM_ not $ deadNetEliminate mnlRef
+  deadNetEliminate mnlRef `untilPredM_` not
 
 ---- | Netlist pass combining optional passes
 optionalNetlistPasses :: Opts -> MNetlistPass s ()
