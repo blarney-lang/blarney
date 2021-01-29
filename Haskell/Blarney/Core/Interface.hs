@@ -307,13 +307,13 @@ declareIn t@(IfcTypeFun _ _) = do
   -- this assumption, but let's check anyway)
   case retType of
     IfcTypeAction{} -> do
+      -- Declare each argument as an output
+      drivers <- forM argTypes \argType ->
+        newScope "" (driver argType)
       -- Declare return type as input
       ret <- declareIn retType
       case ret of
         IfcTermAction retAct -> do
-          -- Declare each argument as an output
-          drivers <- forM argTypes \argType ->
-            newScope "" (driver argType)
           -- Construct a function which assigns the args and
           -- executes the return action
           let driveArgs act (driver:rest) =
