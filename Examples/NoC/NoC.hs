@@ -172,4 +172,5 @@ top = do
 
 -- Main
 main :: IO ()
-main = writeVerilogTop top "top" "NoC-Verilog/"
+main = do writeVerilogTop top "top" "NoC-Verilog/"
+          simulate top
