@@ -1,3 +1,5 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+
 {- |
 Module      : Blarney.Netlist.Passes.Prune
 Description : A blarney netlist pass to prune a netlist
