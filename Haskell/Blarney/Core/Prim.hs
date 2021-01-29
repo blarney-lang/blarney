@@ -43,15 +43,16 @@ import Data.Maybe
 
 import Blarney.Core.Utils
 
--- | Every instance of a component in the circuit has a unique id
+-- | Unique identifier used to identify every instance of a component in a
+--   circuit
 type InstId = Int
 
--- | A 'NameHint' type describing name hints
-data NameHint = NmPrefix Int String
-              | NmRoot Int String
-              | NmSuffix Int String
+-- | Hint to generate useful names when working with 'Net's
+data NameHint = NmPrefix Int String -- ^ Suggested name prefix
+              | NmRoot Int String   -- ^ Suggested name
+              | NmSuffix Int String -- ^ Suggested name suffix
               deriving (Eq, Ord, Show)
--- | A 'NameHints' type to gather name hints
+-- | A set of 'NameHint's
 type NameHints = Set NameHint
 
 -- | Bit vector width
@@ -66,14 +67,16 @@ type OutputWidth = Width
 -- | Reference to a named output of a 'Prim'
 type OutputName = Maybe String
 
--- | For indexing a bit vector
+-- | Index into a bit vector
 type BitIndex = Int
 
 -- | Register file primitive parameters
-data RegFileInfo = RegFileInfo { regFileId        :: Int
-                               , regFileInitFile  :: String
-                               , regFileAddrWidth :: InputWidth
-                               , regFileDataWidth :: Width } deriving Show
+data RegFileInfo = RegFileInfo {
+  regFileId        :: Int        -- ^ Register file unique identifier
+, regFileInitFile  :: String     -- ^ Initialisation file
+, regFileAddrWidth :: InputWidth -- ^ Address width
+, regFileDataWidth :: Width      -- ^ Data width
+} deriving Show
 
 -- | Custom components may have compile-time parameters.
 --   A parameter has a name and a value, both represented as strings
@@ -98,80 +101,222 @@ data DisplayArg =
   deriving Show
 
 -- | Format for displaying bit vectors
-data DisplayArgRadix = Bin | Dec | Hex
+data DisplayArgRadix = Bin -- ^ Binary radix
+                     | Dec -- ^ Decimal radix
+                     | Hex -- ^ Hexadecimal radix
   deriving Show
 
--- | Primitive components
+-- | The 'Prim' type is used to represent the fundamental operations in blarney.
+--   Each 'Prim' constructor can expect some statically known arguments such as
+--   desired widths for inputs or outputs, initial values for registers, etc...
+--   Each 'Prim' will expect to be used with a list of inputs, and to provide a
+--   list of outputs. These shape of these are documented here for convenience,
+--   but these are /not/ enforced in the 'Prim' type.
+--   The 'primInputs' and 'primOutputs' functions can be used to query the shape
+--   of the inputs and outpus lists that can be used for a given 'Prim'.
 data Prim =
-    -- | Constant value (0 inputs, 1 output)
+    -- | @Const w n@ represents a constant value
+    --
+    --   [__inputs__]  no input, i.e. @[]@
+    --   [__outputs__] a single output, the @w@-bit value @n@
     Const OutputWidth Integer
 
-    -- | Don't care value (0 input, 1 output)
+    -- | @DontCare w@ represents a don't care value
+    --
+    --   [__inputs__]  no input, i.e. @[]@
+    --   [__outputs__] a single output, a @w@-bit don't care value
   | DontCare OutputWidth
 
-    -- | Adder (2 inputs, 1 output)
+    -- | @Add w@ represents an adder
+    --
+    --   [__inputs__]  @[x, y]@, two @w@-bit values
+    --   [__outputs__] a single output, the @w@-bit sum @x + y@
   | Add OutputWidth
-    -- | Subtractor (2 inputs, 1 output)
+
+    -- | @Sub w@ represents an subtractor
+    --
+    --   [__inputs__]  @[x, y]@, two @w@-bit values
+    --   [__outputs__] a single output, the @w@-bit difference @x - y@
   | Sub OutputWidth
-    -- | Multiplier (2 inputs, 1 output).
-    --   In full-precision mode, output width is 2x input width.
-    --   Otherwise, input and output width are the same.
-  | Mul { primMulInputWidth    :: InputWidth
-        , primMulSigned        :: Bool
-        , primMulFullPrecision :: Bool
+
+    -- | @
+    --   Mul { primMulInputWidth    = w
+    --       , primMulSigned        = isSigned
+    --       , primMulFullPrecision = isFullPrecision }
+    --   @
+    --   represents a multiplier
+    --
+    --   [__inputs__]  @[x, y]@, two @w@-bit values
+    --   [__outputs__] a single output, the @wout@-bit product @x * y@ with
+    --                 @wout = 2*w@ if @isFullPrecision@ is @True@ and
+    --                 @wout = w@ if @isFullPrecision@ is @False@
+  | Mul { primMulInputWidth    :: InputWidth -- ^ Input width
+        , primMulSigned        :: Bool       -- ^ Operation is signed
+        , primMulFullPrecision :: Bool       -- ^ Operation is full precision
         }
-    -- | Quotient (2 inputs, 1 output)
+
+    -- | @Div w@ represents a quotient
+    --
+    --   [__inputs__]  @[x, y]@, two @w@-bit values
+    --   [__outputs__] a single output, the @w@-bit quotient @x \`div\` y@
   | Div OutputWidth
-    -- | Remainder (2 inputs, 1 output)
+
+    -- | @Mod w@ represents a remainder
+    --
+    --   [__inputs__]  @[x, y]@, two @w@-bit values
+    --   [__outputs__] a single output, the @w@-bit remainder @x \`mod\` y@
   | Mod OutputWidth
 
-    -- | Bitwise not (1 input, 1 output)
+    -- | @Not w@ represents a bitwise not
+    --
+    --   [__inputs__]  @[x]@, a single @w@-bit value
+    --   [__outputs__] a single output, the @w@-bit bitwise not of @x@
   | Not OutputWidth
-    -- | Bitwise and (2 inputs, 1 output)
+
+    -- | @And w@ represents a bitwise and
+    --
+    --   [__inputs__]  @[x, y]@, two @w@-bit values
+    --   [__outputs__] a single output, the @w@-bit bitwise and @x \`&\` y@
   | And OutputWidth
-    -- | Bitwise or (2 inputs, 1 output)
+
+    -- | @Or w@ represents a bitwise or
+    --
+    --   [__inputs__]  @[x, y]@, two @w@-bit values
+    --   [__outputs__] a single output, the @w@-bit bitwise or @x \`|\` y@
   | Or OutputWidth
-    -- | Bitwise xor (2 inputs, 1 output)
+
+    -- | @Xor w@ represents a bitwise xor
+    --
+    --   [__inputs__]  @[x, y]@, two @w@-bit values
+    --   [__outputs__] a single output, the @w@-bit bitwise xor @x \`^\` y@
   | Xor OutputWidth
 
-    -- | Left shift (2 inputs, 1 output)
+    -- | @ShiftLeft iw ow@ represents a logical left shifter
+    --
+    --   [__inputs__]  @[x, y]@, with @x@ an @ow@-bit value and @y@ an @iw@-bit
+    --                 value
+    --   [__outputs__] a single output, the @ow@-bit logical
+    --                (i.e. zero-injecting) left shift of @x@ by @y@
   | ShiftLeft InputWidth OutputWidth
-    -- | Logical right shift (2 inputs, 1 output)
+
+    -- | @ShiftRight iw ow@ represents a logical right shifter
+    --
+    --   [__inputs__]  @[x, y]@, with @x@ an @ow@-bit value and @y@ an @iw@-bit
+    --                 value
+    --   [__outputs__] a single output, the @ow@-bit logical
+    --                (i.e. zero-injecting) right shift of @x@ by @y@
   | ShiftRight InputWidth OutputWidth
-    -- | Arithmetic right shift (2 inputs, 1 output)
+
+    -- | @ArithShiftRight iw ow@ represents an arithmetic right shifter
+    --
+    --   [__inputs__]  @[x, y]@, with @x@ an @ow@-bit value and @y@ an @iw@-bit
+    --                 value
+    --   [__outputs__] a single output, the @ow@-bit arithmetic
+    --                 (i.e. sign-preserving) right shift of @x@ by @y@
   | ArithShiftRight InputWidth OutputWidth
 
-    -- | Equality comparator (2 inputs, 1 bit output)
+    -- | @Equal w@ represents an equality comparator
+    --
+    --   [__inputs__]  @[x, y]@, two @w@-bit values
+    --   [__outputs__] a single output, the single-bit result of @x == y@
   | Equal InputWidth
-    -- | Disequality comparator (2 inputs, 1 bit output)
+
+    -- | @NotEqual w@ represents a difference comparator
+    --
+    --   [__inputs__]  @[x, y]@, two @w@-bit values
+    --   [__outputs__] a single output, the single-bit result of @x /= y@
   | NotEqual InputWidth
-    -- | Less-than comparator (2 inputs, 1 bit output)
+
+    -- | @LessThan w@ represents a less-than comparator
+    --
+    --   [__inputs__]  @[x, y]@, two @w@-bit values
+    --   [__outputs__] a single output, the single-bit result of @x < y@
   | LessThan InputWidth
-    -- | Less-than-or-equal comparator (2 inputs, 1 bit output)
+
+    -- | @LessThanEq w@ represents a less-than-or-equal comparator
+    --
+    --   [__inputs__]  @[x, y]@, two @w@-bit values
+    --   [__outputs__] a single output, the single-bit result of @x <= y@
   | LessThanEq InputWidth
 
-    -- | Replicate a bit (1 input, 1 output)
+    -- | @ReplicateBit w@ represents the replication of a single bit
+    --
+    --   [__inputs__]  @[x]@, a single 1-bit value
+    --   [__outputs__] a single output, the @w@-bit value obtained with @w@
+    --                 replications of @x@
   | ReplicateBit OutputWidth
-    -- | Zero-extend a bit vector (1 input, 1 output)
+
+    -- | @ZeroExtend iw ow@ represents zero-extension
+    --
+    --   [__inputs__]  @[x]@, a single @iw@-bit value
+    --   [__outputs__] a single output, the @ow@-bit zero-extension of @x@
   | ZeroExtend InputWidth OutputWidth
-    -- | Sign-extend a bit vector (1 input, 1 output)
+
+    -- | @SignExtend iw ow@ represents sign-extension
+    --
+    --   [__inputs__]  @[x]@, a single @iw@-bit value
+    --   [__outputs__] a single output, the @ow@-bit sign-extension of @x@
   | SignExtend InputWidth OutputWidth
 
-    -- | Bit selection (compile-time range, 1 input, 1 output)
+    -- | @SelectBits iw hi lo@ represents bit selection (compile-time range)
+    --
+    --   [__inputs__]  @[x]@, a single @iw@-bit value
+    --   [__outputs__] a single output, the @(hi - lo + 1)@-bit slice @x[hi:lo]@
   | SelectBits InputWidth BitIndex BitIndex -- Hi then Low
-    -- | Bit vector concatenation (2 inputs, 1 output)
+
+    -- | @Concat w0 w1@ represents bit vector concatenation
+    --
+    --   [__inputs__]  @[x, y]@, with @x@ a @w0@-bit value and @y@ an @w1@-bit
+    --                 value
+    --   [__outputs__] a single output, the @(w0 + w1)@-bit concatenation
+    --                 @{x, y}@
   | Concat InputWidth InputWidth
 
-    -- | Multiplexer (n inputs, 1 output)
+    -- | @Mux n w@ represents an @n@-inputs multiplexer
+    --
+    --   [__inputs__]  @sel:inpts@, with @sel@ a @(log2 n)0@-bit value and
+    --                 @inpts@ an @n@-sized list of @w@-bit values
+    --   [__outputs__] a single output, the @w@-bit value at position @sel@ in
+    --                 @inpts@
   | Mux Int OutputWidth
-    -- | Identity function (1 input, 1 output)
+
+    -- | @Identity w@ represents an identity function
+    --
+    --   [__inputs__]  @[x]@, a single @w@-bit value
+    --   [__outputs__] a single output, the @w@-bit input value @x@
   | Identity OutputWidth
 
-    -- | Register with initial value (1 input, 1 output)
+    -- | @Register initial w@ represents a register with an initial value
+    --
+    --   [__inputs__]  @[x]@, a single @w@-bit value
+    --   [__outputs__] a single output, the @w@-bit value @initial@ or the last
+    --                 written input value @x@
   | Register Integer InputWidth
-    -- | Register with initial value and enable wire (2 inputs, 1 output)
+
+    -- | @RegisterEn initial w@ represents a register with an initial value and
+    --   an enable signal
+    --
+    --   [__inputs__]  @[en, x]@, with @en@ a 1-bit value and @x@ a @w@-bit
+    --                 value
+    --   [__outputs__] a single output, the @w@-bit value @initial@ or the last
+    --                 written input value @x@ when @en@ was asserted
   | RegisterEn Integer InputWidth
 
+    -- | @Input w name@ represents a named external input
+    --
+    --   [__inputs__]  no input, i.e. @[]@
+    --   [__outputs__] a single output, the @w@-bit value received as an input
+    --                 from outside the circuit
+  | Input OutputWidth String
+
+    -- | @Output w name@ represents a named external output
+    --
+    --   [__inputs__]  @[x]@, a single @w@-bit value
+    --   [__outputs__] no output, as this primitive stands for the node that
+    --                 exports @x@ outside of the circuit
+  | Output InputWidth String
+
+    -- TODO document
     -- | Block RAM
   | BRAM { ramKind      :: BRAMKind
          , ramInitFile  :: Maybe String
@@ -179,6 +324,7 @@ data Prim =
          , ramDataWidth :: Width
          , ramHasByteEn :: Bool }
 
+    -- TODO document
     -- | Custom component
   | Custom { customName      :: String                  -- component name
            , customInputs    :: [(String, InputWidth)]  -- input names
@@ -186,32 +332,59 @@ data Prim =
            , customParams    :: [Param]                 -- parameters
            , customIsClocked :: Bool }                  -- pass clock (reset?)
 
-    -- | External input (0 inputs, 1 output)
-  | Input OutputWidth String
-    -- | External output (only used in RTL context, not expression context)
-  | Output InputWidth String
-
-    -- | Simulation-time I/O
-    --   (only used in RTL context, not expression context)
-  | Display [DisplayArg]
-    -- | Finish simulation (input: 1-bit enable wire)
-  | Finish
-    -- | Test presence of plusargs (output: 1-bit boolean)
-  | TestPlusArgs String
-
-    -- | Assertion that a predicate holds (2 inputs, 0 outputs)
-    --   * String argument is an assertion message
-    --   * First input is the current RTL condition
-    --   * Second input is the predicate
-  | Assert String
-
+    -- TODO document
     -- | Register file declaration
     --   (only used in RTL context, not expression context)
   | RegFileMake RegFileInfo
+    -- TODO document
     -- | Register file lookup (input: index, output: data)
   | RegFileRead RegFileInfo
+    -- TODO document
     -- | Register file update (inputs: write-enable, address, data)
   | RegFileWrite RegFileInfo
+
+    -- | /Not for synthesis/
+    --
+    --   @Display args@ outputs messages, useful for simulation
+    --
+    --   [__inputs__]  @en:inpts@, with @en@ a 1-bit value, and @inpts@ a list
+    --                 of values to be used in conjunction with @args@
+    --   [__outputs__] no output, this primitive captures displaying of
+    --                 information provided through @args@ and @inpt@ when
+    --                 @en@ is asserted
+  | Display [DisplayArg]
+
+    -- | /Not for synthesis/
+    --
+    --   @Finish@ asks for termination, useful to end simulation
+    --
+    --   [__inputs__]  @en@, a single 1-bit value
+    --   [__outputs__] no output, this primitive simply signals termination when
+    --                 @en@ is asserted
+  | Finish
+
+    -- | /Not for synthesis/
+    --
+    --   @TestPlusArgs plusArg@ tests for a plus-args command line argument,
+    --                          useful to dynamically parameterise simulation
+    --
+    --   [__inputs__]  no input, i.e. @[]@
+    --   [__outputs__] a single output, a 1-bit value signifying the presence or
+    --                 absence of the queried @plusArg@ string on the command
+    --                 line
+  | TestPlusArgs String
+
+
+    -- | /Not for synthesis/
+    --
+    --   @Assert msg@ asserts that a predicate holds
+    --
+    --   [__inputs__]  @[en, pred]@, two 1-bit values
+    --   [__outputs__] no output, this primitive asserts that @pred@ holds when
+    --                 @en@ is asserted, and may display additional information
+    --                 together with @msg@
+  | Assert String
+
   deriving Show
 
 -- | Kind of block RAM
@@ -555,7 +728,8 @@ primInfo (Display args) =
            , strRep = "Display"
            , dontKill = True
            , isRoot = True
-           , inputs = [ ("in" ++ show i, w)
+           , inputs = ("en", 1) :
+                      [ ("in" ++ show i, w)
                       | (i, DisplayArgBit w _ _ _) <- zip [0..] args ]
            , outputs = [] }
 primInfo Finish =
@@ -564,7 +738,7 @@ primInfo Finish =
            , strRep = "Finish"
            , dontKill = True
            , isRoot = True
-           , inputs = []
+           , inputs = [("en", 1)]
            , outputs = [] }
 primInfo (TestPlusArgs arg) = PrimInfo { isInlineable = False
                                        , inputsInlineable = True
