@@ -31,7 +31,7 @@ prune mnlRef = do
   let pairs = [(i, n) | (i, Just n) <- assocs]
   -- Mapping from old ids to new ids
   (_, maxOldId) <- getBounds mnl
-  let mapping :: Array Int Int =
+  let mapping :: Array InstId InstId =
         array (0, maxOldId) (zip (map fst pairs) [0..])
   -- Compute compact netlist
   let maxNewId = length pairs - 1
