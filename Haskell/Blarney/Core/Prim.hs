@@ -110,8 +110,8 @@ data DisplayArgRadix = Bin -- ^ Binary radix
 --   Each 'Prim' constructor can expect some statically known arguments such as
 --   desired widths for inputs or outputs, initial values for registers, etc...
 --   Each 'Prim' will expect to be used with a list of inputs, and to provide a
---   list of outputs. These shape of these are documented here for convenience,
---   but these are /not/ enforced in the 'Prim' type.
+--   list of outputs. The shape of these lists is documented here for
+--   convenience, but these are /not/ enforced in the 'Prim' type.
 --   The 'primInputs' and 'primOutputs' functions can be used to query the shape
 --   of the inputs and outpus lists that can be used for a given 'Prim'.
 data Prim =
@@ -274,7 +274,7 @@ data Prim =
 
     -- | @Mux n w@ represents an @n@-inputs multiplexer
     --
-    --   [__inputs__]  @sel:inpts@, with @sel@ a @(log2 n)0@-bit value and
+    --   [__inputs__]  @sel:inpts@, with @sel@ a @(log2 n)@-bit value and
     --                 @inpts@ an @n@-sized list of @w@-bit values
     --   [__outputs__] a single output, the @w@-bit value at position @sel@ in
     --                 @inpts@
