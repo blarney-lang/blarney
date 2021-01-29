@@ -106,9 +106,7 @@ data Mark = Unmarked | Temporary | Permanent
 topologicalSort :: Netlist -> [InstId]
 topologicalSort nl = topoSort nl relevantRoots
   where relevantRoots = [ netInstId n | n@Net{netPrim = p} <- elems nl
-                                      , case p of Output _ _ -> True
-                                                  Assert _   -> True
-                                                  _          -> False ]
+                                      , primIsRoot p ]
 
 -- | get a partially topologically sorted '[InstId]' for the subset of the given
 --   'Netlist' from the given 'Net''s 'InstId'
