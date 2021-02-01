@@ -26,7 +26,7 @@ data PulseWire =
   PulseWire { pulseWireSend   :: Action () -- ^ Sends a pulse
             , pulseWirePulsed :: Bit 1     -- ^ Checks whether a pulse was sent
                                            --   this cycle
-            }
+            } deriving (Generic, Interface)
 
 -- | 'Pulse' class
 class Pulse v where
