@@ -35,6 +35,7 @@ module Blarney.Core.Interface (
 , Modular(..)   -- Types that can be turned into external modules
 , makeModule    -- Convert a Blarney function to an external module
 , makeInstance  -- Instantiate an external module in a Blarney description
+, makeInstanceOf -- Use type of argument rather than needing type sig
 , makeInstanceWithParams  -- Allow static parameters
 ) where
 
@@ -420,3 +421,7 @@ makeInstanceWithParams s ps = makeInst s ps 0 (return ())
 
 makeInstance :: Modular a => String -> a
 makeInstance s = makeInstanceWithParams s []
+
+-- | Use type of argument to specify type of result
+makeInstanceOf :: Modular a => a -> String -> a
+makeInstanceOf _ s = makeInstanceWithParams s []
