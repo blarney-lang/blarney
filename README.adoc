@@ -10,9 +10,7 @@ Blarney is a Haskell library for hardware description that builds a
 range of HDL abstractions on top of a small set of pure functional
 circuit primitives.  It is a modern variant of
 http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.110.5587&rep=rep1&type=pdf[Lava]
-with Verilog and
-https://en.wikipedia.org/wiki/Satisfiability_modulo_theories[SMT]
-backends, and FPGA support.  Some aspects of the library are also
+with Verilog and SMT backends.  Some aspects of the library are also
 inspired by https://github.com/B-Lang-org/bsc[Bluespec], such as
 first-class actions and method-based interfaces.  Below, we
 introduce the library by example, supplementing the
@@ -914,9 +912,9 @@ getBit :: Bit 8 -> Bit 3 -> Bit 1
 getBit x i = x!i
 ----
 
-Blarney's generic lookup operator `x!i` returns the `i`'th element of `x`, and
-works for many different types of `x` and `i`.  See <<Lookup>> for more
-details.
+Blarney's generic lookup operator `x!i` returns the element of `x` at
+index `i`, and works for many different types of `x` and `i`.  See
+<<Lookup>> for more details.
 
 === Bit-string pattern matching
 
