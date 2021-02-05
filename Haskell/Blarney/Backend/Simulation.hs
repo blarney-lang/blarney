@@ -32,54 +32,52 @@ import Blarney.Netlist
 import Blarney.Misc.MonadLoops
 
 err str = error $ "Blarney.Backend.Simulation: " ++ str
+type Signal = Integer
 
-data SimEntry = SimUninitialized
-              | SimValue Integer
-              | SimReg Integer deriving (Show)
-mkSimEntry :: Net -> IO SimEntry
-mkSimEntry Net{ netPrim = (Const _ val) } = return $ SimValue val
-mkSimEntry Net{ netPrim = (DontCare _) } = return $ SimValue 0 -- TODO other value?
-mkSimEntry Net{ netPrim = (Register val _) } = return $ SimReg val
-mkSimEntry Net{ netPrim = (RegisterEn val _) } = return $ SimReg val
+mkSimEntry :: Net -> IO (Maybe Signal)
+mkSimEntry Net{ netPrim = (Const _ val) }       = return $ Just val
+mkSimEntry Net{ netPrim = (DontCare _) }        = return $ Just 0 -- TODO other value?
+mkSimEntry Net{ netPrim = (Register val _) }    = return $ Just val
+mkSimEntry Net{ netPrim = (RegisterEn val _) }  = return $ Just val
 mkSimEntry Net{ netPrim = TestPlusArgs plsArg } = do
   args <- getArgs
-  return $ SimValue if '+' : plsArg `elem` args then 1 else 0
-mkSimEntry _ = return SimUninitialized
+  return $ Just if '+' : plsArg `elem` args then 1 else 0
+mkSimEntry _ = return Nothing
 
 data SimCtxt = SimCtxt { simNetlist        :: Netlist
-                       , simEntriesCurrent :: IORef (IOArray InstId SimEntry)
-                       , simEntriesNext    :: IORef (IOArray InstId SimEntry)
+                       , simEntriesReset   :: Array InstId (Maybe Signal)
+                       , simEntriesCurrent :: IOArray InstId (Maybe Signal)
+                       , simEntriesNext    :: IOArray InstId (Maybe Signal)
                        , simTerminate      :: IORef Bool }
 
 mkSimCtxt :: Netlist -> IO SimCtxt
-mkSimCtxt nl = do entries <- mapM mkSimEntry $ elems nl
-                  currentArr <- newListArray (bounds nl) entries
-                  currentRef <- newIORef currentArr
-                  nextArr <- newListArray (bounds nl) entries
-                  nextRef <- newIORef nextArr
+mkSimCtxt nl = do resetEntries <- mapM mkSimEntry $ elems nl
+                  let resetArr = listArray (bounds nl) resetEntries
+                  currentArr <- thaw resetArr
+                  nextArr <- thaw resetArr
                   terminateRef <- newIORef False
-                  return $ SimCtxt nl currentRef nextRef terminateRef
-readCurrent :: SimCtxt -> InstId -> IO SimEntry
-readCurrent SimCtxt{..} instId = do
-  entries <- readIORef simEntriesCurrent
-  readArray entries instId
-writeCurrent :: SimCtxt -> InstId -> SimEntry -> IO ()
-writeCurrent SimCtxt{..} instId !entry = do
-  entries <- readIORef simEntriesCurrent
-  writeArray entries instId entry
-writeNext :: SimCtxt -> InstId -> SimEntry -> IO ()
-writeNext SimCtxt{..} instId !entry = do
-  entries <- readIORef simEntriesNext
-  writeArray entries instId entry
-isOver :: SimCtxt -> IO Bool
-isOver SimCtxt{..} = readIORef simTerminate
-terminate :: SimCtxt -> IO ()
-terminate SimCtxt{..} = writeIORef simTerminate True
-stepCtxt :: SimCtxt -> IO ()
-stepCtxt SimCtxt{..} = do current <- readIORef simEntriesCurrent
-                          next <- readIORef simEntriesNext
-                          writeIORef simEntriesCurrent next
-                          writeIORef simEntriesNext current
+                  return $ SimCtxt nl resetArr currentArr nextArr terminateRef
+readCurrent :: SimCtxt -> InstId -> IO Signal
+readCurrent ctxt@SimCtxt{..} instId = do
+  msig <- readArray simEntriesCurrent instId
+  case msig of Just sig -> return sig
+               Nothing  -> do evalCurrentSignal ctxt instId
+                              readCurrent ctxt instId
+writeCurrent :: SimCtxt -> InstId -> Signal -> IO ()
+writeCurrent SimCtxt{..} instId !sig = do
+  writeArray simEntriesCurrent instId $ Just sig
+writeNext :: SimCtxt -> InstId -> Maybe Signal -> IO ()
+writeNext SimCtxt{..} instId !msig = do
+  writeArray simEntriesNext instId msig
+cleanCurrent :: SimCtxt -> IO ()
+cleanCurrent SimCtxt{..} = do
+  simEntriesCurrent :: IOArray InstId (Maybe Signal) <- thaw simEntriesReset
+  return ()
+
+primIsSimRoot :: Prim -> Bool
+primIsSimRoot (RegisterEn _ _) = True
+primIsSimRoot (Register   _ _) = True
+primIsSimRoot p = primIsRoot p
 
 simulateNetlist :: Netlist -> IO ()
 simulateNetlist nl = do
@@ -87,23 +85,38 @@ simulateNetlist nl = do
   --mapM_ print nl
   --putStrLn "============================"
   --
-  ctxt <- mkSimCtxt nl
-  let rootSteps = [ stepPrim n ctxt
-                  | n@Net{ netPrim = p } <- elems nl, primIsRoot p ]
-  sequence_ rootSteps >> stepCtxt ctxt `untilM_` isOver ctxt
+  let rootSteps c = [ stepPrim n c
+                    | n@Net{ netPrim = p } <- elems nl, primIsSimRoot p ]
+  ctxt@SimCtxt{..} <- mkSimCtxt nl
+  let evenCtxt = ctxt
+  let oddCtxt  = ctxt{ simEntriesCurrent = simEntriesNext
+                     , simEntriesNext    = simEntriesCurrent }
+  let stepEven  = sequence_ $ rootSteps evenCtxt
+  let stepOdd   = sequence_ $ rootSteps oddCtxt
+  let cleanEven = cleanCurrent evenCtxt
+  let cleanOdd  = cleanCurrent oddCtxt
+  let loop isEven = do if isEven then stepEven >> cleanEven
+                                 else stepOdd  >> cleanOdd
+                       done <- readIORef simTerminate
+                       when (not done) do loop $ not isEven
+  loop True
+
+evalCurrentSignal :: SimCtxt -> InstId -> IO ()
+evalCurrentSignal ctxt instId = stepPrim (simNetlist ctxt ! instId) ctxt
 
 -- step a primitive for each root
 -- Inputs
 -- Outputs
--- mutually recursive with evalInput
+-- mutually recursive with readInput
 stepPrim :: Net -> SimCtxt -> IO ()
-stepPrim net@Net{ netPrim = Display args, .. } ctxt = do
+stepPrim net@Net{ netPrim = Display args, netInputs = en:inpts } ctxt = do
   -- DBG
   --putStrLn $ "start stepPrim " ++ show netInstId
   --print net
   --
-  doDisplay:inptArgs <- mapM (evalInput ctxt) netInputs
-  when (doDisplay /= 0) do putStr . concat $ fmt args inptArgs
+  en' <- readInput ctxt en
+  when (en' /= 0) do inpts' <- mapM (readInput ctxt) inpts
+                     putStr . concat $ fmt args inpts'
   -- DBG
   --putStrLn $ "ending stepPrim " ++ show netInstId
   --
@@ -117,23 +130,25 @@ stepPrim net@Net{ netPrim = Display args, .. } ctxt = do
         radixShow Hex n = showIntAtBase 16 intToDigit n ""
         pad n zero str =
           replicate (n - length str) (if zero then '0' else ' ') ++ str
-stepPrim net@Net{ netPrim = Finish, netInputs = [finish] } ctxt = do
+stepPrim net@Net{ netPrim = Finish, netInputs = [en] } ctxt = do
   -- DBG
   --putStrLn $ "start stepPrim " ++ show (netInstId net)
   --print net
   --
-  doFinish <- evalInput ctxt finish
-  when (doFinish /= 0) do terminate ctxt
+  en' <- readInput ctxt en
+  when (en' /= 0) do writeIORef (simTerminate ctxt) True
   -- DBG
   --putStrLn $ "ending stepPrim " ++ show (netInstId net)
   --
-stepPrim net@Net{ netPrim = Assert msg, .. } ctxt = do
+stepPrim net@Net{ netPrim = Assert msg, netInputs = [en, pred] } ctxt = do
   -- DBG
   --putStrLn $ "start stepPrim " ++ show netInstId
   --print net
   --
-  [doAssert, pred] <- mapM (evalInput ctxt) netInputs
-  when (doAssert /= 0 && pred == 0) do putStrLn msg >> terminate ctxt
+  en' <- readInput ctxt en
+  when (en' /= 0) do pred' <- readInput ctxt pred
+                     when (pred' == 0) do putStrLn msg
+                                          writeIORef (simTerminate ctxt) True
   -- DBG
   --putStrLn $ "ending stepPrim " ++ show netInstId
   --
@@ -142,72 +157,41 @@ stepPrim net@Net{ netPrim = Register _ _, netInputs = [inpt], .. } ctxt = do
   --putStrLn $ "start stepPrim " ++ show netInstId
   --print net
   --
-  SimReg val <- readCurrent ctxt netInstId
-  writeCurrent ctxt netInstId $ SimValue val
-  inpt' <- evalInput ctxt inpt
-  -- DBG
-  --putStrLn $ "stepPrim Register new val " ++ show inpt
-  --
-  SimReg val <- readCurrent ctxt netInstId
-  writeCurrent ctxt netInstId $ SimValue val
-  writeNext ctxt netInstId $ SimReg inpt'
-  -- DBG
-  --putStrLn $ "ending stepPrim " ++ show netInstId
-  --
-stepPrim net@Net{ netPrim = RegisterEn _ _, .. } ctxt = do
+  inpt' <- readInput ctxt inpt
+  writeNext ctxt netInstId $ Just inpt'
+stepPrim net@Net{ netPrim = RegisterEn _ _
+                , netInputs = [en, inpt]
+                , .. } ctxt = do
   -- DBG
   --putStrLn $ "start stepPrim " ++ show netInstId
   --print net
   --
-  SimReg val <- readCurrent ctxt netInstId
-  writeCurrent ctxt netInstId $ SimValue val
-  [en, inpt] <- mapM (evalInput ctxt) netInputs
-  -- DBG
-  --putStrLn $ "stepPrim RegisterEn, en " ++ show en ++ ", new val " ++ show inpt
-  --
-  when (en /= 0) do writeNext ctxt netInstId $ SimReg inpt
-  -- DBG
-  --putStrLn $ "ending stepPrim " ++ show netInstId
-  --
-stepPrim net@Net{ netPrim = TestPlusArgs _ } ctxt = do
-  -- DBG
-  --print net
-  --
-  return ()
-stepPrim net@Net{ .. } ctxt = do -- DBG
-                                 --putStrLn $ "start stepPrim " ++ show netInstId
-                                 --print net
-                                 --
-                                 ins <- mapM (evalInput ctxt) netInputs
-                                 let val = evalPrim netPrim ins
-                                 writeCurrent ctxt netInstId $ SimValue val
-                                 writeNext ctxt netInstId SimUninitialized
-                                 -- DBG
-                                 --putStrLn $ "ending stepPrim " ++ show netInstId
-                                 --
+  en' <- readInput ctxt en
+  when (en' /= 0) do inpt' <- readInput ctxt inpt
+                     writeNext ctxt netInstId $ Just inpt'
+stepPrim net@Net{ netPrim = TestPlusArgs _ } ctxt = return ()
+stepPrim net@Net{..} ctxt = do -- DBG
+                               --putStrLn $ "start stepPrim " ++ show netInstId
+                               --print net
+                               --
+                               ins <- mapM (readInput ctxt) netInputs
+                               let val = evalPrim netPrim ins
+                               writeCurrent ctxt netInstId val
+                               writeNext ctxt netInstId Nothing
+                               -- DBG
+                               --putStrLn $ "ending stepPrim " ++ show netInstId
+                               --
 
 -- mutually recursive with stepPrim
-evalInput :: SimCtxt -> NetInput -> IO Integer
-evalInput ctxt (InputWire wId@(instId, _)) = do
-  simEntry <- readCurrent ctxt instId
-  -- DBG
-  --print simEntry
-  --
-  case simEntry of
-    SimUninitialized -> do let net = simNetlist ctxt ! instId
-                           stepPrim net ctxt
-                           evalInput ctxt (InputWire wId)
-    SimReg val -> do let net = simNetlist ctxt ! instId
-                     stepPrim net ctxt
-                     return val
-    SimValue val -> return val
-evalInput ctxt (InputTree prim ins) = do ins' <- mapM (evalInput ctxt) ins
+readInput :: SimCtxt -> NetInput -> IO Signal
+readInput ctxt (InputWire wId@(instId, _)) = readCurrent ctxt instId
+readInput ctxt (InputTree prim ins) = do ins' <- mapM (readInput ctxt) ins
                                          return $ evalPrim prim ins'
 
-withW :: Int -> Integer -> Integer
+withW :: Int -> Signal -> Signal
 withW w i = (bit w - 1) .&. i
 
-evalPrim :: Prim -> [Integer] -> Integer
+evalPrim :: Prim -> [Signal] -> Signal
 evalPrim (Const w val) [] = withW w val
 evalPrim (DontCare w) [] = 0 -- TODO some other value?
 evalPrim (Add outW) [i0, i1] = withW outW $ i0 + i1
@@ -220,14 +204,14 @@ evalPrim (Div outW) [i0, i1] = withW outW $ i0 `div` i1
 evalPrim (Mod outW) [i0, i1] = withW outW $ i0 `mod` i1
 evalPrim (Not outW) [i0] = withW outW $ complement i0
 evalPrim (And outW) [i0, i1] = withW outW $ i0 .&. i1
-evalPrim (Or outW) [i0, i1] = withW outW $ i0 .|. i1
+evalPrim (Or outW)  [i0, i1] = withW outW $ i0 .|. i1
 evalPrim (Xor outW) [i0, i1] = withW outW $ i0 `xor` i1
-evalPrim (ShiftLeft inW outW) [i0, i1] = withW outW $ i0 `shiftL` fromInteger i1
-evalPrim (ShiftRight inW outW) [i0, i1] = withW outW $ i0 `shiftR` fromInteger i1 -- TODO force usigned 'i0' (use 'Natural')
+evalPrim (ShiftLeft inW outW)       [i0, i1] = withW outW $ i0 `shiftL` fromInteger i1
+evalPrim (ShiftRight inW outW)      [i0, i1] = withW outW $ i0 `shiftR` fromInteger i1 -- TODO force usigned 'i0' (use 'Natural')
 evalPrim (ArithShiftRight inW outW) [i0, i1] = withW outW $ i0 `shiftR` fromInteger i1
-evalPrim (Equal inW) [i0, i1] = if i0 == i1 then 1 else 0
-evalPrim (NotEqual inW) [i0, i1] = if i0 == i1 then 0 else 1
-evalPrim (LessThan inW) [i0, i1] = if i0 < i1 then 1 else 0
+evalPrim (Equal inW)      [i0, i1] = if i0 == i1 then 1 else 0
+evalPrim (NotEqual inW)   [i0, i1] = if i0 /= i1 then 1 else 0
+evalPrim (LessThan inW)   [i0, i1] = if i0  < i1 then 1 else 0
 evalPrim (LessThanEq inW) [i0, i1] = if i0 <= i1 then 1 else 0
 evalPrim (ReplicateBit outW) [i0] = withW outW if i0 == 0 then zeroBits else complement zeroBits
 evalPrim (ZeroExtend inW outW) [i0] = withW inW i0
