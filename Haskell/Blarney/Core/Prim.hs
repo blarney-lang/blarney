@@ -1,8 +1,10 @@
-{-|
+{-# LANGUAGE NoRebindableSyntax #-}
+
+{- |
 Module      : Blarney.Core.Prim
 Description : circuit primitives
 Copyright   : (c) Matthew Naylor, 2019
-              (c) Alexandre Joannou, 2019-2020
+              (c) Alexandre Joannou, 2019-2021
 License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
@@ -20,6 +22,7 @@ module Blarney.Core.Prim (
 , primIsRoot      -- tell if a 'Prim' is a netlist root
 , primInputs      -- get the inputs of a 'Prim'
 , primOutputs     -- get the outputs of a 'Prim'
+, primOutIndex    -- get output index from name
 , primOutWidth    -- get 'OutputWidth' for a given named output of a 'Prim'
 , BRAMKind(..)    -- Block RAM kind
   -- * Other primitive types
@@ -39,6 +42,7 @@ module Blarney.Core.Prim (
 
 import Prelude
 import Data.Set
+import Data.List (elemIndex)
 import Data.Maybe
 
 import Blarney.Core.Utils
@@ -374,7 +378,6 @@ data Prim =
     --                 line
   | TestPlusArgs String
 
-
     -- | /Not for synthesis/
     --
     --   @Assert msg@ asserts that a predicate holds
@@ -422,6 +425,12 @@ primInputs = inputs . primInfo
 -- | Helper to get the outputs of a 'Prim'
 primOutputs :: Prim -> [(String, OutputWidth)]
 primOutputs = outputs . primInfo
+
+-- | Helper to get the index of a given named output of a 'Prim'
+primOutIndex :: Prim -> OutputName -> Maybe Int
+primOutIndex prim (Just nm) = elemIndex nm (fmap fst $ primOutputs prim)
+primOutIndex prim Nothing = if length (primOutputs prim) == 1 then Just 0
+                                                              else Nothing
 
 -- | Helper to get the 'OutputWidth' for a given named output of a 'Prim'
 primOutWidth :: Prim -> OutputName -> OutputWidth
@@ -704,7 +713,7 @@ primInfo Custom{ customName = custNm
            , inputsInlineable = True
            , strRep = custNm
            , dontKill = False
-           , isRoot = False
+           , isRoot = True
            , inputs = ins
            , outputs = outs }
 primInfo (Input w nm) = PrimInfo { isInlineable = False
