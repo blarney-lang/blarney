@@ -210,7 +210,7 @@ actually has a more general type.
 
 So `.<.` can be used on any type in the
 http://blarney-lang.github.io/blarney/Blarney-Core-Bit.html#t:Cmp[Cmp] (comparator)
-class.  Similarly, `?` can be used on any type in the [Bits](#class-1-bits)
+class.  Similarly, `?` can be used on any type in the <<Bits>>
 class (which allows packing to a bit vector and back again). So a more generic
 definition of `twoSort` would be:
 
@@ -624,8 +624,8 @@ always map efficiently onto hardware, so use with care!
 === Streams
 
 Streams are another commonly-used abstraction in hardware description.  They
-are often used to implement hardware modules that consume data at a *variable
-rate*, depending on internal details of the module that the implementer does
+are often used to implement hardware modules that consume data at a _variable
+rate_, depending on internal details of the module that the implementer does
 not wish to (or is unable to) expose.  In Blarney,
 http://blarney-lang.github.io/blarney/Blarney-Stream.html[streams] are captured by the
 following interface.
@@ -971,11 +971,9 @@ Woodruff for suggesting this feature!
 A few processor cores have been implemented in Blarney:
 
 * https://github.com/blarney-lang/blarney/blob/master/Examples/CPU/CPU.hs[Simple]:
-4-stage 8-bit CPU, with just 4 instructions, which resolves both control and
-data hazards.
+4-stage 8-bit CPU, with just 4 instructions, for learning.
 * https://github.com/blarney-lang/pebbles/[Pebbles]:
-5-stage 32-bit RISC-V core separating the ISA from the pipeline
-microarchitecture.
+RISC-V CPU+GPU using plugable pipelines.
 * https://github.com/blarney-lang/actora/[Actora]: 3-stage stack
 machine that runs code written a subset of Erlang.
 
