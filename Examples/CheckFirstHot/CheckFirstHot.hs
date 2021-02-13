@@ -14,7 +14,7 @@ countOnes x = tree (+) 0 $ map zeroExtend $ toBitList x
 
 -- | Check that 'firstHot' returns a one-hot vector
 prop_oneHot :: (KnownNat n, 1 <= n) => Bit n -> Bit 1
-prop_oneHot x = x .!=. 0 .==>. countOnes (firstHot x) .==. 1
+prop_oneHot x = countOnes (firstHot x) .==. (if x .==. 0 then 0 else 1)
 
 -- | Assert properties for 8-bit vectors
 prop_firstHot :: Bit 8 -> Module ()
