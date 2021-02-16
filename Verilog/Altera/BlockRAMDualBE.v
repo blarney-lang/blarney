@@ -69,7 +69,7 @@ module BlockRAMDualBE (
         .addressstall_a (1'b0),
         .addressstall_b (1'b0),
         .byteena_b (-1),
-        .clock1 (CLK),
+        .clock1 (1'b1),
         .clocken0 (1'b1),
         .clocken1 (1'b1),
         .clocken2 (1'b1),
