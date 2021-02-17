@@ -16,6 +16,7 @@ module Blarney.Core (
   module Blarney.Core.Bit
 , module Blarney.Core.RAM
 , module Blarney.Core.Bits
+, module Blarney.Core.Utils
 , module Blarney.Core.FShow
 , module Blarney.Core.Module
 , module Blarney.Core.Lookup
@@ -27,6 +28,7 @@ module Blarney.Core (
 import Blarney.Core.Bit
 import Blarney.Core.Bits
 import Blarney.Core.RAM
+import Blarney.Core.Utils
 import Blarney.Core.FShow
 import Blarney.Core.Module
 import Blarney.Core.Lookup
