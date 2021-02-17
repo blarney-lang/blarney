@@ -314,7 +314,6 @@ genNetVerilog netlist net = case netPrim net of
   showNetInput (InputWire wId) = showWire wId
   showNetInput (InputTree p@(Const _ _) ins) = showPrim p ins
   showNetInput (InputTree p@(DontCare _) ins) = showPrim p ins
-  showNetInput (InputTree p@(Not _) ins) = showPrim p ins
   showNetInput (InputTree p@(ReplicateBit _) ins) = showPrim p ins
   showNetInput (InputTree p@(ZeroExtend _ _) ins) = showPrim p ins
   showNetInput (InputTree p@(SignExtend _ _) ins) = showPrim p ins
