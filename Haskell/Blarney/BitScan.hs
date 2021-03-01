@@ -434,14 +434,18 @@ matchMap strict alts subj = (tagMap, mapWithKey combine fieldMap)
           | otherwise = take maxLen (xs ++ repeat (last xs))
 
 -- Pack the tag map into a bit vector
-packTagMap :: KnownNat n => TagMap tag -> Bit n
+packTagMap :: (KnownNat n, Ord tag, Enum tag, Bounded tag)
+           => TagMap tag -> Bit n
 packTagMap tagMap
   | w >= numBits = vec
   | otherwise = error
       "BitScan.packTagMap: bit vector not big enough capture all tags"
   where
     w = widthOf vec
-    bits = elems tagMap
+    bits = [ case Data.Map.lookup tag tagMap of
+               Nothing -> 0
+               Just v -> v
+           | tag <- [minBound..maxBound] ]
     numBits = length bits
     vec = fromBitList $ take w (bits ++ repeat 0)
 
