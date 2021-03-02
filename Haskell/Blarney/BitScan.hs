@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ConstraintKinds   #-}
 
 {-|
 Module      : Blarney.BitScan
@@ -49,6 +50,7 @@ module Blarney.BitScan
   , MatchOpts(..)
   , matchMap
   , TagMap
+  , Tag
   , packTagMap
   , FieldMap
   , matchSel
@@ -386,6 +388,9 @@ type FieldMap = Map String (Option BitList)
 -- |Mapping from tag names to hot bits
 type TagMap tag = Map tag (Bit 1)
 
+-- |Common constraint of tags in a TagMap
+type Tag a = (Ord a, Enum a, Bounded a)
+
 -- |Options for the match
 data MatchMapOpts =
   MatchMapOpts {
@@ -433,9 +438,8 @@ matchMap strict alts subj = (tagMap, mapWithKey combine fieldMap)
               error ("BitScan.matchMap: different widths for field " ++ field)
           | otherwise = take maxLen (xs ++ repeat (last xs))
 
--- Pack the tag map into a bit vector
-packTagMap :: (KnownNat n, Ord tag, Enum tag, Bounded tag)
-           => TagMap tag -> Bit n
+-- |Pack the tag map into a bit vector
+packTagMap :: (KnownNat n, Tag tag) => TagMap tag -> Bit n
 packTagMap tagMap
   | w >= numBits = vec
   | otherwise = error
