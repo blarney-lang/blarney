@@ -34,19 +34,50 @@ import Blarney.Misc.MonadLoops
 debugEnabled = False
 dbg act = when debugEnabled act
 err str = error $ "Blarney.Backend.Simulation: " ++ str
+
+-- | Simulate a 'Netlist' until a 'Finish' 'Prim' is triggered
+simulateNetlist :: Netlist -> IO ()
+simulateNetlist nl = do
+  -- DBG
+  dbg do mapM_ print nl
+         putStrLn "============================"
+  --
+  -- simulation steps for Net primitives on each simulation cycle
+  let stepPrims ctxt = [ stepPrim net ctxt
+                       | net@Net{..} <- elems nl, primIsSimRoot netPrim ]
+  -- Note: could also force evaluation of all Nets in topological order...
+  ctxt <- mkSimCtxt nl
+  sequence_ (stepPrims ctxt) >> stepSimCtxt ctxt
+                             >> dbg (putStrLn "TICK ============================ TICK")
+    `untilM_` readIORef (simTerminate ctxt)
+
+-- | Determine whether a 'Prim' is a simulation root
+primIsSimRoot :: Prim -> Bool
+primIsSimRoot (RegisterEn _ _) = True
+primIsSimRoot (Register   _ _) = True
+primIsSimRoot BRAM{}           = True
+primIsSimRoot p = primIsRoot p
+
+-- | a simulation 'Signal' type (an 'Integer')
 type Signal = Integer
 
-data SignalThunk = Value | ValueBRAM Signal (IOArray Signal Signal)
-data SignalHandle = Unevaluated SignalThunk | Evaluated Signal
-mkSignalHandle :: Net -> IO [SignalHandle]
-mkSignalHandle Net{ netPrim = (Const _ val) }      = return [Evaluated val]
-mkSignalHandle Net{ netPrim = (DontCare _) }       = return [Evaluated 0] -- TODO other value?
-mkSignalHandle Net{ netPrim = (Register val _) }   = return [Evaluated val]
-mkSignalHandle Net{ netPrim = (RegisterEn val _) } = return [Evaluated val]
-mkSignalHandle Net{ netPrim = TestPlusArgs plsArg } = do
+-- | a simulation context for specific primitives
+data PrimCtxt = NoCtxt | BRAMCtxt (IOArray Signal Signal)
+
+-- | a simulation handle to a 'Net', that is a pair of a list of possibly
+--   evaluated 'Signal's and a context for the 'Net''s primitive
+type NetHandle = ([Maybe Signal], PrimCtxt)
+
+-- create the 'NetHandle's representing a given 'Net'
+mkNetHandle :: Net -> IO NetHandle
+mkNetHandle Net{ netPrim = (Const _ val) }      = return ([Just val], NoCtxt)
+mkNetHandle Net{ netPrim = (DontCare _) }       = return ([Just   0], NoCtxt) -- TODO other value?
+mkNetHandle Net{ netPrim = (Register val _) }   = return ([Just val], NoCtxt)
+mkNetHandle Net{ netPrim = (RegisterEn val _) } = return ([Just val], NoCtxt)
+mkNetHandle Net{ netPrim = TestPlusArgs plsArg } = do
   args <- getArgs
-  return [Evaluated if '+' : plsArg `elem` args then 1 else 0]
-mkSignalHandle Net{ netPrim = BRAM{..} } = do
+  return ([Just if '+' : plsArg `elem` args then 1 else 0], NoCtxt)
+mkNetHandle Net{ netPrim = BRAM{..} } = do
   firstBytes <- case ramInitFile of
                   Just f -> do initContent <- lines <$> readFile f
                                return $ fst . head . readHex <$> initContent
@@ -54,86 +85,68 @@ mkSignalHandle Net{ netPrim = BRAM{..} } = do
   dataArray <- newListArray (0, 2^ramAddrWidth-1)
                             (firstBytes ++ repeat errUninit)
   fstVal <- readArray dataArray 0
-  let sigHandle = Unevaluated $ ValueBRAM fstVal dataArray
-  return case ramKind of BRAMTrueDualPort -> [sigHandle, sigHandle]
-                         _ -> [sigHandle]
+  return case ramKind of
+           BRAMTrueDualPort -> ([Just fstVal, Just fstVal], BRAMCtxt dataArray)
+           _ -> ([Just fstVal], BRAMCtxt dataArray)
   --where errUninit = err "accessing uninitialized memory"
   where errUninit = 0
-mkSignalHandle _ = return [Unevaluated Value]
+mkNetHandle _ = return ([Nothing], NoCtxt)
 
-data SimCtxt = SimCtxt { simNetlist        :: Netlist
-                       , simResetHandles   :: Array   InstId [SignalHandle]
-                       , simCurrentHandles :: IOArray InstId [SignalHandle]
-                       , simNextHandles    :: IOArray InstId [SignalHandle]
-                       , simTerminate      :: IORef Bool }
+-- | Simulation Context
+data SimCtxt = SimCtxt { simNetlist    :: Netlist
+                       , simNetHandles :: IOArray InstId NetHandle
+                       , simStepIO     :: IORef (IO ())
+                       , simTerminate  :: IORef Bool }
 
+-- | create a 'SimCtxt' simulation context from a netlist
 mkSimCtxt :: Netlist -> IO SimCtxt
-mkSimCtxt nl = do resetHandles <- mapM mkSignalHandle $ elems nl
-                  let resetArr = listArray (bounds nl) resetHandles
-                  currentArr <- thaw resetArr
-                  nextArr <- thaw resetArr
+mkSimCtxt nl = do resetHandles <- mapM mkNetHandle $ elems nl
+                  handlesArr <- newListArray (bounds nl) resetHandles
+                  stepIORef <- newIORef $ return ()
                   terminateRef <- newIORef False
-                  return $ SimCtxt nl resetArr currentArr nextArr terminateRef
-readCurrentHandles :: SimCtxt -> InstId -> IO [SignalHandle]
-readCurrentHandles ctxt@SimCtxt{..} = readArray simCurrentHandles
-readCurrentSignal :: SimCtxt -> WireId -> IO Signal
-readCurrentSignal ctxt@SimCtxt{..} wId@(instId, outNm) = do
-  sigHandles <- readCurrentHandles ctxt instId
+                  return $ SimCtxt nl handlesArr stepIORef terminateRef
+
+-- | add an IO for the current simulation step
+addIO :: SimCtxt -> IO () -> IO ()
+addIO SimCtxt{..} act = modifyIORef' simStepIO (>> act)
+
+-- | step a simulation context, performing accumulated IOs and reseting them for
+--   the next simulation cycle
+stepSimCtxt :: SimCtxt -> IO ()
+stepSimCtxt SimCtxt{..} = do act <- readIORef simStepIO
+                             act
+                             writeIORef simStepIO $ return ()
+
+-- | get the list of 'Maybe Signal' output from the net at the given 'InstId'
+readThunks :: SimCtxt -> InstId -> IO [Maybe Signal]
+readThunks SimCtxt{..} instId = do (thunks, _) <- readArray simNetHandles instId
+                                   return thunks
+
+-- | get the evaluated 'Signal' output from the net at the given 'InstId'
+readSignal :: SimCtxt -> WireId -> IO Signal
+readSignal ctxt@SimCtxt{..} wId@(instId, outNm) = do
+  sigThunks <- readThunks ctxt instId
   let Net{..} = simNetlist ! instId
   let Just idx = primOutIndex netPrim outNm
-  case sigHandles !! idx of Evaluated sig -> return sig
-                            Unevaluated _ -> do evalCurrentSignal ctxt wId
-                                                readCurrentSignal ctxt wId
+  case sigThunks !! idx of Just sig -> return sig
+                           Nothing  -> do evalCurrentSignal ctxt wId
+                                          readSignal ctxt wId
 
-writeCurrent :: SimCtxt -> InstId -> [SignalHandle] -> IO ()
-writeCurrent SimCtxt{..} instId !sighs = do
-  writeArray simCurrentHandles instId sighs
-writeNext :: SimCtxt -> InstId -> [SignalHandle] -> IO ()
-writeNext SimCtxt{..} instId !sighs = do
-  writeArray simNextHandles instId sighs
-cleanCurrent :: SimCtxt -> IO ()
-cleanCurrent SimCtxt{..} = do
-  simEntriesCurrent :: IOArray InstId [SignalHandle] <- thaw simResetHandles
-  return ()
-
-primIsSimRoot :: Prim -> Bool
-primIsSimRoot (RegisterEn _ _) = True
-primIsSimRoot (Register   _ _) = True
-primIsSimRoot BRAM{}           = True
-primIsSimRoot p = primIsRoot p
-
-simulateNetlist :: Netlist -> IO ()
-simulateNetlist nl = do
-  -- DBG
-  dbg do mapM_ print nl
-         putStrLn "============================"
-  --
-  let rootSteps c = [ stepPrim n c
-                    | n@Net{ netPrim = p } <- elems nl, primIsSimRoot p ]
-  ctxt@SimCtxt{..} <- mkSimCtxt nl
-  let evenCtxt = ctxt
-  let oddCtxt  = ctxt{ simCurrentHandles = simNextHandles
-                     , simNextHandles    = simCurrentHandles }
-  let stepEven  = sequence_ $ rootSteps evenCtxt
-  let stepOdd   = sequence_ $ rootSteps oddCtxt
-  let cleanEven = cleanCurrent evenCtxt
-  let cleanOdd  = cleanCurrent oddCtxt
-  let loop isEven = do if isEven then stepEven >> cleanEven
-                                 else stepOdd  >> cleanOdd
-                       done <- readIORef simTerminate
-                       -- DBG
-                       dbg do putStrLn "TICK ============================ TICK"
-                       when (not done) do loop $ not isEven
-  loop True
-
+-- | evaluate the net output signal at the give 'WireId' by invoking the
+--   appropriate 'stepPrim' function
 -- TODO: could be more lazi and only pass desired output of the prim under eval
 evalCurrentSignal :: SimCtxt -> WireId -> IO ()
 evalCurrentSignal ctxt (instId, _) = stepPrim (simNetlist ctxt ! instId) ctxt
 
--- step a primitive for each root
--- Inputs
--- Outputs
--- mutually recursive with readInput
+-- | set the value of the output signal thunks of the net at the given 'InstId'
+--   (useful to actually reflect evaluation of thunks)
+writeThunks :: SimCtxt -> InstId -> [Maybe Signal] -> IO ()
+writeThunks SimCtxt{..} instId !sigThunks = do
+  (_, ctxt) <- readArray simNetHandles instId
+  writeArray simNetHandles instId (sigThunks, ctxt)
+
+-- | step a primitive for each root
+-- mutually recursive with 'readInput'
 stepPrim :: Net -> SimCtxt -> IO ()
 stepPrim net@Net{ netPrim = Display args, netInputs = en:inpts, .. } ctxt = do
   -- DBG
@@ -142,7 +155,7 @@ stepPrim net@Net{ netPrim = Display args, netInputs = en:inpts, .. } ctxt = do
   --
   en' <- readInput ctxt en
   when (en' /= 0) do inpts' <- mapM (readInput ctxt) inpts
-                     putStr . concat $ fmt args inpts'
+                     addIO ctxt do putStr . concat $ fmt args inpts'
   -- DBG
   dbg do putStrLn $ "ending stepPrim " ++ show netInstId
   --
@@ -162,7 +175,7 @@ stepPrim net@Net{ netPrim = Finish, netInputs = [en], .. } ctxt = do
          print net
   --
   en' <- readInput ctxt en
-  when (en' /= 0) do writeIORef (simTerminate ctxt) True
+  when (en' /= 0) do addIO ctxt do writeIORef (simTerminate ctxt) True
   -- DBG
   dbg do putStrLn $ "ending stepPrim " ++ show netInstId
   --
@@ -172,9 +185,10 @@ stepPrim net@Net{ netPrim = Assert msg, netInputs = [en, pred], .. } ctxt = do
          print net
   --
   en' <- readInput ctxt en
-  when (en' /= 0) do pred' <- readInput ctxt pred
-                     when (pred' == 0) do putStrLn msg
-                                          writeIORef (simTerminate ctxt) True
+  when (en' /= 0) do
+    pred' <- readInput ctxt pred
+    when (pred' == 0) do addIO ctxt do putStrLn msg
+                                       writeIORef (simTerminate ctxt) True
   -- DBG
   dbg do putStrLn $ "ending stepPrim " ++ show netInstId
   --
@@ -184,9 +198,9 @@ stepPrim net@Net{ netPrim = Register _ _, netInputs = [inpt], .. } ctxt = do
          print net
   --
   inpt' <- readInput ctxt inpt
-  writeNext ctxt netInstId [Evaluated inpt']
+  addIO ctxt do writeThunks ctxt netInstId [Just inpt']
   -- DBG
-  dbg do currVal <- readCurrentSignal ctxt (netInstId, Nothing)
+  dbg do currVal <- readSignal ctxt (netInstId, Nothing)
          putStrLn $ "ending stepPrim " ++ show netInstId ++ " with currVal " ++ show currVal
   --
 stepPrim net@Net{ netPrim = RegisterEn _ _
@@ -198,9 +212,9 @@ stepPrim net@Net{ netPrim = RegisterEn _ _
   --
   en' <- readInput ctxt en
   when (en' /= 0) do inpt' <- readInput ctxt inpt
-                     writeNext ctxt netInstId [Evaluated inpt']
+                     addIO ctxt do writeThunks ctxt netInstId [Just inpt']
   -- DBG
-  dbg do currVal <- readCurrentSignal ctxt (netInstId, Nothing)
+  dbg do currVal <- readSignal ctxt (netInstId, Nothing)
          putStrLn $ "ending stepPrim " ++ show netInstId ++ " with currVal " ++ show currVal
   --
 stepPrim net@Net{ netPrim = BRAM {ramKind = BRAMSinglePort, ..}
@@ -209,29 +223,24 @@ stepPrim net@Net{ netPrim = BRAM {ramKind = BRAMSinglePort, ..}
   dbg do putStrLn $ "start stepPrim " ++ show netInstId
          print net
   --
-  [sigHandle] <- readCurrentHandles ctxt netInstId
-  case sigHandle of
-    Evaluated _ -> return ()
-    Unevaluated (ValueBRAM val bramArray) -> do
-      -- first, evaluate value for current cycle
-      writeCurrent ctxt netInstId [Evaluated val]
-      -- then, prepare thunk for next cycle
-      re' <- readInput ctxt re
-      when (re' /= 0) do
-        addr' <- readInput ctxt addr
-        readVal <- readArray bramArray addr'
-        let bramThunk = Unevaluated $ ValueBRAM readVal bramArray
-        writeNext ctxt netInstId [bramThunk]
-      we' <- readInput ctxt we
-      -- TODO: * for multiport BRAM, move before read for read to read the
-      --         current write?
-      --       * writes cause a change in the read bram output for the given
-      --         port?
-      when (we' /= 0) do addr' <- readInput ctxt addr
-                         di' <- readInput ctxt di
-                         writeArray bramArray addr' di'
+  (_, BRAMCtxt bramArray) <- readArray (simNetHandles ctxt) netInstId
+  -- prepare thunk for next cycle on read
+  re' <- readInput ctxt re
+  when (re' /= 0) do
+    addr' <- readInput ctxt addr
+    readVal <- readArray bramArray addr'
+    addIO ctxt do writeThunks ctxt netInstId [Just readVal]
+  -- on write, perform array update
+  we' <- readInput ctxt we
+  -- TODO: * for multiport BRAM, move before read for read to read the
+  --         current write?
+  --       * writes cause a change in the read bram output for the given
+  --         port?
+  when (we' /= 0) do addr' <- readInput ctxt addr
+                     di' <- readInput ctxt di
+                     addIO ctxt do writeArray bramArray addr' di'
   -- DBG
-  dbg do currVal <- readCurrentSignal ctxt (netInstId, Nothing)
+  dbg do currVal <- readSignal ctxt (netInstId, Nothing)
          putStrLn $ "ending stepPrim " ++ show netInstId ++ " with currVal " ++ show currVal
   --
 stepPrim net@Net{ netPrim = BRAM {ramKind = BRAMDualPort, ..}
@@ -240,34 +249,29 @@ stepPrim net@Net{ netPrim = BRAM {ramKind = BRAMDualPort, ..}
   dbg do putStrLn $ "start stepPrim " ++ show netInstId
          print net
   --
-  [sigHandle] <- readCurrentHandles ctxt netInstId
-  case sigHandle of
-    Evaluated _ -> return ()
-    Unevaluated (ValueBRAM val bramArray) -> do
-      -- first, evaluate value for current cycle
-      writeCurrent ctxt netInstId [Evaluated val]
-      -- then, prepare thunk for next cycle
-      re' <- readInput ctxt re
-      when (re' /= 0) do
-        rdAddr' <- readInput ctxt rdAddr
-        readVal <- readArray bramArray rdAddr'
-        writeNext ctxt netInstId [Unevaluated $ ValueBRAM readVal bramArray]
-      we' <- readInput ctxt we
-      -- TODO: * for multiport BRAM, move before read for read to read the
-      --         current write?
-      --       * writes cause a change in the read bram output for the given
-      --         port?
-      when (we' /= 0) do wrAddr' <- readInput ctxt wrAddr
-                         di' <- readInput ctxt di
-                         writeArray bramArray wrAddr' di'
+  (_, BRAMCtxt bramArray) <- readArray (simNetHandles ctxt) netInstId
+  -- prepare thunk for next cycle on read
+  re' <- readInput ctxt re
+  when (re' /= 0) do
+    rdAddr' <- readInput ctxt rdAddr
+    readVal <- readArray bramArray rdAddr'
+    addIO ctxt do writeThunks ctxt netInstId [Just readVal]
+  -- on write, perform array update
+  we' <- readInput ctxt we
+  -- TODO: * for multiport BRAM, move before read for read to read the
+  --         current write?
+  --       * writes cause a change in the read bram output for the given
+  --         port?
+  when (we' /= 0) do wrAddr' <- readInput ctxt wrAddr
+                     di' <- readInput ctxt di
+                     addIO ctxt do writeArray bramArray wrAddr' di'
   -- DBG
-  dbg do currVal <- readCurrentSignal ctxt (netInstId, Nothing)
+  dbg do currVal <- readSignal ctxt (netInstId, Nothing)
          putStrLn $ "ending stepPrim " ++ show netInstId ++ " with currVal " ++ show currVal
   --
 stepPrim Net{ netPrim = BRAM {..} } _ =
   err $ "unsupported ramKind: " ++ show ramKind
 stepPrim net@Net{ netPrim = TestPlusArgs _ } ctxt = return ()
-{-
 stepPrim net@Net{ netPrim = Mux _ _, netInputs = sel:ins, .. } ctxt = do
   -- DBG
   dbg do putStrLn $ "start stepPrim " ++ show netInstId
@@ -275,13 +279,12 @@ stepPrim net@Net{ netPrim = Mux _ _, netInputs = sel:ins, .. } ctxt = do
   --
   sel' <- readInput ctxt sel
   val <- readInput ctxt $ ins !! fromInteger sel'
-  writeCurrent ctxt netInstId [Evaluated val]
-  writeNext ctxt netInstId [Unevaluated Value]
+  writeThunks ctxt netInstId [Just val]
+  addIO ctxt do writeThunks ctxt netInstId [Nothing]
   -- DBG
-  dbg do currVal <- readCurrentSignal ctxt (netInstId, Nothing)
+  dbg do currVal <- readSignal ctxt (netInstId, Nothing)
          putStrLn $ "ending stepPrim " ++ show netInstId ++ " with currVal " ++ show currVal
   --
--}
 stepPrim net@Net{..} ctxt = do
   -- DBG
   dbg do putStrLn $ "start stepPrim " ++ show netInstId
@@ -289,16 +292,16 @@ stepPrim net@Net{..} ctxt = do
   --
   ins <- mapM (readInput ctxt) netInputs
   let val = evalPrim netPrim ins
-  writeCurrent ctxt netInstId [Evaluated val]
-  writeNext ctxt netInstId [Unevaluated Value]
+  writeThunks ctxt netInstId [Just val]
+  addIO ctxt do writeThunks ctxt netInstId [Nothing]
   -- DBG
-  dbg do currVal <- readCurrentSignal ctxt (netInstId, Nothing)
+  dbg do currVal <- readSignal ctxt (netInstId, Nothing)
          putStrLn $ "ending stepPrim " ++ show netInstId ++ " with currVal " ++ show currVal
   --
 
 -- mutually recursive with stepPrim
 readInput :: SimCtxt -> NetInput -> IO Signal
-readInput ctxt (InputWire wId) = readCurrentSignal ctxt wId
+readInput ctxt (InputWire wId) = readSignal ctxt wId
 readInput ctxt (InputTree prim ins) = do ins' <- mapM (readInput ctxt) ins
                                          return $ evalPrim prim ins'
 
