@@ -242,67 +242,51 @@ compileNetInputSignal ctxt (InputTree prim ins) = do
 -- | Describe how a primitive, given some input 'Signal's produces its output
 --   'Signals' (most often only the one output 'Signal' returned as a singleton
 --   list)
+--   Note: the CompCtxt argument is needed for primitives such as TestPlusArgs
 compilePrim :: CompFun s (Prim, [Signal]) [Signal]
 compilePrim CompCtxt{..} (TestPlusArgs plsArg, []) = return [repeat isPresent]
   where isPresent = if '+' : plsArg `elem` compArgs then 1 else 0
-compilePrim _ (Const w val, []) = return [repeat $ withW w $ fromInteger val]
+compilePrim _ (Const w val, []) = return [repeat $ clamp w $ fromInteger val]
 compilePrim _ (DontCare w,  []) = return [repeat 0] -- TODO some other value?
+compilePrim _ (Add w, [i0, i1]) = return [zipWith (\x y -> clamp w (x + y)) i0 i1]
+compilePrim _ (Sub w, [i0, i1]) = return [zipWith (\x y -> clamp w (x - y)) i0 i1]
+compilePrim _ ( Mul { primMulInputWidth    = w
+                    , primMulSigned        = sgn
+                    , primMulFullPrecision = precise }
+              , [i0, i1] ) = -- TODO proper implementation
+  return [zipWith (\x y -> clamp (2*w) (x * y)) i0 i1]
+compilePrim _ (Div w, [i0, i1]) = return [zipWith (\x y -> clamp w (x `div` y)) i0 i1]
+compilePrim _ (Mod w, [i0, i1]) = return [zipWith (\x y -> clamp w (x `mod` y)) i0 i1]
+compilePrim _ (Not w, [i0]) = return [map (clamp w . complement) i0]
+compilePrim _ (And w, [i0, i1]) = return [zipWith (\x y -> clamp w (x .&. y)) i0 i1]
+compilePrim _ (Or w, [i0, i1]) = return [zipWith (\x y -> clamp w (x .|. y)) i0 i1]
+compilePrim _ (Xor w, [i0, i1]) = return [zipWith (\x y -> clamp w (x `xor` y)) i0 i1]
+compilePrim _ (ShiftLeft _ w,       [i0, i1]) = return [zipWith (\x y -> clamp w $ x `shiftL` fromIntegral y) i0 i1]
+compilePrim _ (ShiftRight _ w,      [i0, i1]) = return [zipWith (\x y -> clamp w $ x `shiftR` fromIntegral y) i0 i1] -- TODO force usigned 'i0' (use 'Natural')
+compilePrim _ (ArithShiftRight _ w, [i0, i1]) = return [zipWith (\x y -> clamp w $ x `shiftR` fromIntegral y) i0 i1]
+compilePrim _ (Equal _,      [i0, i1]) = return [zipWith (\x y -> if x == y then 1 else 0) i0 i1]
+compilePrim _ (NotEqual _,   [i0, i1]) = return [zipWith (\x y -> if x /= y then 1 else 0) i0 i1]
+compilePrim _ (LessThan _,   [i0, i1]) = return [zipWith (\x y -> if x  < y then 1 else 0) i0 i1]
+compilePrim _ (LessThanEq _, [i0, i1]) = return [zipWith (\x y -> if x <= y then 1 else 0) i0 i1]
+compilePrim _ (ReplicateBit w, [i0]) = return [map (\x -> clamp w if x == 0 then zeroBits else complement zeroBits) i0]
+compilePrim _ (ZeroExtend w _, [i0]) = return [map (clamp w) i0]
+compilePrim _ (SignExtend inW w, [i0]) =
+  return [map (\x -> let sgn = testBit x (inW - 1)
+                         sgnMask = (bit (w - inW + 1) - 1) `shiftL` inW
+                         sgnExt = x .|. sgnMask
+                     in if sgn then sgnExt else clamp w x) i0]
+compilePrim _ (SelectBits _ hi lo, [i0]) = return [map (\x -> clamp (hi + 1) x `shiftR` lo) i0]
+compilePrim _ (Concat w0 w1, [i0, i1]) = return [zipWith (\x y -> clamp (w0 + w1) $ x `shiftL` w1 + y) i0 i1]
+compilePrim _ (Identity _, [i0]) = return [i0]
+compilePrim _ (Mux _ w, [ss, i0, i1]) =
+  return [zipWith3 (\s x y -> if s == 0 then x else y) ss i0 i1]
 compilePrim _ (RegisterEn i w, [ens, inpts]) = return [scanl f i (zip ens inpts)]
   where f prev (en, inpt) = if en /= 0 then inpt else prev
 compilePrim _ (prim, ins) =
-  return $ List.transpose $ evalPrim prim <$> (List.transpose ins)
+  return $ List.transpose $ primSemEval prim <$> (List.transpose ins)
 --compilePrim _ (prim, ins) = return $ transpose $ evalPrim prim <$> (transpose ins)
 --compilePrim _ (prim, ins) = return $ err $ "can't compilePrim " ++ show prim ++ ", " ++ show ins
 
-
-
-
-
-
-
-
---------------------------------------------------------------------------------
--- The helpers below belong in different files (likely Prim.hs)
---------------------------------------------------------------------------------
-
-
-
-withW :: (Num a, Bits a) => Int -> a -> a
-withW w i = (bit w - 1) .&. i
-
-evalPrim :: (Num a, Integral a, Bits a) => Prim -> [a] -> [a]
-evalPrim (Const w val) [] = [withW w $ fromInteger val]
-evalPrim (DontCare w) [] = [0] -- TODO some other value?
-evalPrim (Add outW) [i0, i1] = [withW outW $ i0 + i1]
-evalPrim (Sub outW) [i0, i1] = [withW outW $ i0 - i1]
-evalPrim Mul { primMulInputWidth    = inW
-             , primMulSigned        = sgn
-             , primMulFullPrecision = precise }
-             [i0, i1] = [withW (2 * inW) (i0 * i1)] -- TODO proper implementation
-evalPrim (Div outW) [i0, i1] = [withW outW $ i0 `div` i1]
-evalPrim (Mod outW) [i0, i1] = [withW outW $ i0 `mod` i1]
-evalPrim (Not outW) [i0] = [withW outW $ complement i0]
-evalPrim (And outW) [i0, i1] = [withW outW $ i0 .&. i1]
-evalPrim (Or outW)  [i0, i1] = [withW outW $ i0 .|. i1]
-evalPrim (Xor outW) [i0, i1] = [withW outW $ i0 `xor` i1]
-evalPrim (ShiftLeft inW outW)       [i0, i1] = [withW outW $ i0 `shiftL` fromIntegral i1]
-evalPrim (ShiftRight inW outW)      [i0, i1] = [withW outW $ i0 `shiftR` fromIntegral i1] -- TODO force usigned 'i0' (use 'Natural')
-evalPrim (ArithShiftRight inW outW) [i0, i1] = [withW outW $ i0 `shiftR` fromIntegral i1]
-evalPrim (Equal inW)      [i0, i1] = [if i0 == i1 then 1 else 0]
-evalPrim (NotEqual inW)   [i0, i1] = [if i0 /= i1 then 1 else 0]
-evalPrim (LessThan inW)   [i0, i1] = [if i0  < i1 then 1 else 0]
-evalPrim (LessThanEq inW) [i0, i1] = [if i0 <= i1 then 1 else 0]
-evalPrim (ReplicateBit outW) [i0] = [withW outW if i0 == 0 then zeroBits else complement zeroBits]
-evalPrim (ZeroExtend inW outW) [i0] = [withW inW i0]
-evalPrim (SignExtend inW outW) [i0] = [if sgn then sgnExt else withW outW i0]
-  where sgn = testBit i0 (inW - 1)
-        sgnMask = (bit (outW - inW + 1) - 1) `shiftL` inW
-        sgnExt = i0 .|. sgnMask
-evalPrim (SelectBits inW hi lo) [i0] = [withW (hi + 1) i0 `shiftR` lo]
-evalPrim (Concat i0W i1W) [i0, i1] = [withW (i0W + i1W) $ i0 `shiftL` i1W + i1]
-evalPrim (Mux nIns outW) (sel:ins) = [ins !! fromIntegral sel]
-evalPrim (Identity outW) [i0] = [i0]
-evalPrim prim ins = error $ "Blarney.Backend.Simulation: unsupported evalPrim primitive: " ++ show prim ++ " inputs: " ++ show (length ins)
 
 -- XXX unclear if needed XXX
 ---- | Lazy transpose, assumes all rows have same length

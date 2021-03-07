@@ -1,3 +1,4 @@
+{-# LANGUAGE ConstraintKinds    #-}
 {-# LANGUAGE NoRebindableSyntax #-}
 
 {- |
@@ -18,6 +19,9 @@ module Blarney.Core.Prim (
 , canInline       -- Tell if a 'Prim' can be inlined
 , canInlineInput  -- Tell if a 'Prim' inputs can be inlined
 , primStr         -- get useful name strings out of a 'Prim'
+, PrimSample
+, clamp
+, primSemEval
 , primDontKill    -- tell if a 'Prim' can be optimised away
 , primIsRoot      -- tell if a 'Prim' is a netlist root
 , primInputs      -- get the inputs of a 'Prim'
@@ -43,9 +47,13 @@ module Blarney.Core.Prim (
 import Prelude
 import Data.Set
 import Data.List (elemIndex)
+import Data.Bits
 import Data.Maybe
 
 import Blarney.Core.Utils
+
+-- module-local "error" helper
+err str = error $ "Blarney.Core.prim: " ++ str
 
 -- | Unique identifier used to identify every instance of a component in a
 --   circuit
@@ -410,6 +418,13 @@ canInlineInput = inputsInlineable . primInfo
 primStr :: Prim -> String
 primStr = strRep . primInfo
 
+-- | constraint on samples that can be fed to primitives
+type PrimSample a = (Num a, Integral a, Bits a)
+
+-- | Helper to retrieve a primitive's semantic evaluation function
+primSemEval :: PrimSample a => Prim -> [a] -> [a]
+primSemEval = semEval . primInfo
+
 -- | Helper to tell if a 'Prim' can be optimized away or not
 primDontKill :: Prim -> Bool
 primDontKill = dontKill . primInfo
@@ -435,14 +450,14 @@ primOutIndex prim Nothing = if length (primOutputs prim) == 1 then Just 0
 -- | Helper to get the 'OutputWidth' for a given named output of a 'Prim'
 primOutWidth :: Prim -> OutputName -> OutputWidth
 primOutWidth prim out
-  | length outs == 0 = error $ "primOutWidth: " ++
-                               primStr prim ++ " has no output"
+  | length outs == 0 = err $ "primOutWidth: " ++
+                             primStr prim ++ " has no output"
   | length outs == 1 = (snd . head) outs
   | otherwise = case out of
-                  Just nm -> fromMaybe (error $ "primOutWidth: " ++
+                  Just nm -> fromMaybe (err $ "primOutWidth: " ++
                                         show out ++ " output does not exist")
                                        (lookup nm outs)
-                  _ -> error "Must use primOutWidth with a 'Just name'"
+                  _ -> err "Must use primOutWidth with a 'Just name'"
   where outs = primOutputs prim
 
 -- | A 'Name' type that handles name hints
@@ -467,8 +482,10 @@ data PrimInfo = PrimInfo {
   -- inlining inputs to 'Prim's involving bit-slicing (specifically,
   -- 'SelectBits' and 'SignExtend') due to lack of underlying support.
 , inputsInlineable :: Bool
-  -- | Tells a 'String' representation of a 'Prim'.
+  -- | Gives a 'String' representation of a 'Prim'.
 , strRep :: String
+  -- | if possible, provides a semantic evaluation function for primitives
+, semEval :: forall a. PrimSample a => [a] -> [a]
   -- | Tells if a 'Prim' can be optimized away or not
 , dontKill :: Bool
   -- | Tells if a 'Prim' is a netlist root
@@ -478,209 +495,273 @@ data PrimInfo = PrimInfo {
   -- | Tells the number and widths of outputs of a 'Prim'
 , outputs :: [(String, OutputWidth)]
 }
+
+-- | clamp a given sample to the provided width
+clamp :: (Num a, Bits a) => Width -> a -> a
+clamp w i = (bit w - 1) .&. i
+
 -- | Helper getting general metadata about a 'Prim'
 primInfo :: Prim -> PrimInfo
-primInfo (Const w x) = PrimInfo { isInlineable = True
-                                , inputsInlineable = True
-                                , strRep = "Const" ++ show x
-                                , dontKill = False
-                                , isRoot = False
-                                , inputs = []
-                                , outputs = [("out", w)] }
-primInfo (DontCare w) = PrimInfo { isInlineable = True
-                                 , inputsInlineable = True
-                                 , strRep = "DontCare"
-                                 , dontKill = False
-                                 , isRoot = False
-                                 , inputs = []
-                                 , outputs = [("out", w)] }
-primInfo (Add w) = PrimInfo { isInlineable = True
-                            , inputsInlineable = True
-                            , strRep = "Add"
-                            , dontKill = False
-                            , isRoot = False
-                            , inputs = [("in0", w), ("in1", w)]
-                            , outputs = [("out", w)] }
-primInfo (Sub w) = PrimInfo { isInlineable = True
-                            , inputsInlineable = True
-                            , strRep = "Sub"
-                            , dontKill = False
-                            , isRoot = False
-                            , inputs = [("in0", w), ("in1", w)]
-                            , outputs = [("out", w)] }
+primInfo (Const w x) =
+  PrimInfo { isInlineable = True
+           , inputsInlineable = True
+           , strRep = "Const" ++ show x
+           , semEval = \_ -> [clamp w (fromIntegral x)]
+           , dontKill = False
+           , isRoot = False
+           , inputs = []
+           , outputs = [("out", w)] }
+primInfo (DontCare w) =
+  PrimInfo { isInlineable = True
+           , inputsInlineable = True
+           , strRep = "DontCare"
+           , semEval = \_ -> [0]
+           , dontKill = False
+           , isRoot = False
+           , inputs = []
+           , outputs = [("out", w)] }
+primInfo (Add w) =
+  PrimInfo { isInlineable = True
+           , inputsInlineable = True
+           , strRep = "Add"
+           , semEval = \[i0, i1] -> [clamp w $ i0 + i1]
+           , dontKill = False
+           , isRoot = False
+           , inputs = [("in0", w), ("in1", w)]
+           , outputs = [("out", w)] }
+primInfo (Sub w) =
+  PrimInfo { isInlineable = True
+           , inputsInlineable = True
+           , strRep = "Sub"
+           , semEval = \[i0, i1] -> [clamp w $ i0 - i1]
+           , dontKill = False
+           , isRoot = False
+           , inputs = [("in0", w), ("in1", w)]
+           , outputs = [("out", w)] }
 primInfo (Mul w isSigned isFull) =
   PrimInfo { isInlineable = not isFull
            , inputsInlineable = True
            , strRep = "Mul"
+           -- XXX: not fully implemented
+           , semEval = \[i0, i1] -> [clamp (2 * w) (i0 * i1)]
            , dontKill = False
            , isRoot = False
            , inputs = [("in0", w), ("in1", w)]
            , outputs = [("out", wout)] }
   where
     wout = case isFull of { True -> 2*w; False -> w }
-primInfo (Div w) = PrimInfo { isInlineable = True
-                            , inputsInlineable = True
-                            , strRep = "Div"
-                            , dontKill = False
-                            , isRoot = False
-                            , inputs = [("in0", w), ("in1", w)]
-                            , outputs = [("out", w)] }
-primInfo (Mod w) = PrimInfo { isInlineable = True
-                            , inputsInlineable = True
-                            , strRep = "Mod"
-                            , dontKill = False
-                            , isRoot = False
-                            , inputs = [("in0", w), ("in1", w)]
-                            , outputs = [("out", w)] }
-primInfo (Not w) = PrimInfo { isInlineable = True
-                            , inputsInlineable = True
-                            , strRep = "Not"
-                            , dontKill = False
-                            , isRoot = False
-                            , inputs = [("in", w)]
-                            , outputs = [("out", w)] }
-primInfo (And w) = PrimInfo { isInlineable = True
-                            , inputsInlineable = True
-                            , strRep = "And"
-                            , dontKill = False
-                            , isRoot = False
-                            , inputs = [("in0", w), ("in1", w)]
-                            , outputs = [("out", w)] }
-primInfo (Or w) = PrimInfo { isInlineable = True
-                           , inputsInlineable = True
-                           , strRep = "Or"
-                           , dontKill = False
-                           , isRoot = False
-                           , inputs = [("in0", w), ("in1", w)]
-                           , outputs = [("out", w)] }
-primInfo (Xor w) = PrimInfo { isInlineable = True
-                            , inputsInlineable = True
-                            , strRep = "Xor"
-                            , dontKill = False
-                            , isRoot = False
-                            , inputs = [("in0", w), ("in1", w)]
-                            , outputs = [("out", w)] }
-primInfo (ShiftLeft iw ow) = PrimInfo { isInlineable = True
-                                      , inputsInlineable = True
-                                      , strRep = "ShiftLeft"
-                                      , dontKill = False
-                                      , isRoot = False
-                                      , inputs = [("in0", ow), ("in1", iw)]
-                                      , outputs = [("out", ow)] }
-primInfo (ShiftRight iw ow) = PrimInfo { isInlineable = True
-                                       , inputsInlineable = True
-                                       , strRep = "ShiftRight"
-                                       , dontKill = False
-                                       , isRoot = False
-                                       , inputs = [("in0", ow), ("in1", iw)]
-                                       , outputs = [("out", ow)] }
-primInfo (ArithShiftRight iw ow) = PrimInfo { isInlineable = True
-                                            , inputsInlineable = True
-                                            , strRep = "ArithShiftRight"
-                                            , dontKill = False
-                                            , isRoot = False
-                                            , inputs = [("in0", ow), ("in1", iw)]
-                                            , outputs = [("out", ow)] }
-primInfo (Equal w) = PrimInfo { isInlineable = True
-                              , inputsInlineable = True
-                              , strRep = "Equal"
-                              , dontKill = False
-                              , isRoot = False
-                              , inputs = [("in0", w), ("in1", w)]
-                              , outputs = [("out", 1)] }
-primInfo (NotEqual w) = PrimInfo { isInlineable = True
-                                 , inputsInlineable = True
-                                 , strRep = "NotEqual"
-                                 , dontKill = False
-                                 , isRoot = False
-                                 , inputs = [("in0", w), ("in1", w)]
-                                 , outputs = [("out", 1)] }
-primInfo (LessThan w) = PrimInfo { isInlineable = True
-                                 , inputsInlineable = True
-                                 , strRep = "LessThan"
-                                 , dontKill = False
-                                 , isRoot = False
-                                 , inputs = [("in0", w), ("in1", w)]
-                                 , outputs = [("out", 1)] }
-primInfo (LessThanEq w) = PrimInfo { isInlineable = True
-                                   , inputsInlineable = True
-                                   , strRep = "LessThanEq"
-                                   , dontKill = False
-                                   , isRoot = False
-                                   , inputs = [("in0", w), ("in1", w)]
-                                   , outputs = [("out", 1)] }
-primInfo (ReplicateBit w) = PrimInfo { isInlineable = True
-                                     , inputsInlineable = True
-                                     , strRep = "ReplicateBit"
-                                     , dontKill = False
-                                     , isRoot = False
-                                     , inputs = [("in", 1)]
-                                     , outputs = [("out", w)] }
-primInfo (ZeroExtend iw ow) = PrimInfo { isInlineable = True
-                                       , inputsInlineable = True
-                                       , strRep = "ZeroExtend"
-                                       , dontKill = False
-                                       , isRoot = False
-                                       , inputs = [("in", iw)]
-                                       , outputs = [("out", ow)] }
-primInfo (SignExtend iw ow) = PrimInfo { isInlineable = True
-                                       , inputsInlineable = False
-                                       , strRep = "SignExtend"
-                                       , dontKill = False
-                                       , isRoot = False
-                                       , inputs = [("in", iw)]
-                                       , outputs = [("out", ow)] }
+primInfo (Div w) =
+  PrimInfo { isInlineable = True
+           , inputsInlineable = True
+           , strRep = "Div"
+           , semEval = \[i0, i1] -> [clamp w $ i0 `div` i1]
+           , dontKill = False
+           , isRoot = False
+           , inputs = [("in0", w), ("in1", w)]
+           , outputs = [("out", w)] }
+primInfo (Mod w) =
+  PrimInfo { isInlineable = True
+           , inputsInlineable = True
+           , strRep = "Mod"
+           , semEval = \[i0, i1] -> [clamp w $ i0 `mod` i1]
+           , dontKill = False
+           , isRoot = False
+           , inputs = [("in0", w), ("in1", w)]
+           , outputs = [("out", w)] }
+primInfo (Not w) =
+  PrimInfo { isInlineable = True
+           , inputsInlineable = True
+           , strRep = "Not"
+           , semEval = \[i0] -> [clamp w $ complement i0]
+           , dontKill = False
+           , isRoot = False
+           , inputs = [("in", w)]
+           , outputs = [("out", w)] }
+primInfo (And w) =
+  PrimInfo { isInlineable = True
+           , inputsInlineable = True
+           , strRep = "And"
+           , semEval = \[i0, i1] -> [clamp w $ i0 .&. i1]
+           , dontKill = False
+           , isRoot = False
+           , inputs = [("in0", w), ("in1", w)]
+           , outputs = [("out", w)] }
+primInfo (Or w) =
+  PrimInfo { isInlineable = True
+           , inputsInlineable = True
+           , strRep = "Or"
+           , semEval = \[i0, i1] -> [clamp w $ i0 .|. i1]
+           , dontKill = False
+           , isRoot = False
+           , inputs = [("in0", w), ("in1", w)]
+           , outputs = [("out", w)] }
+primInfo (Xor w) =
+  PrimInfo { isInlineable = True
+           , inputsInlineable = True
+           , strRep = "Xor"
+           , semEval = \[i0, i1] -> [clamp w $ i0 `xor` i1]
+           , dontKill = False
+           , isRoot = False
+           , inputs = [("in0", w), ("in1", w)]
+           , outputs = [("out", w)] }
+primInfo (ShiftLeft iw ow) =
+  PrimInfo { isInlineable = True
+           , inputsInlineable = True
+           , strRep = "ShiftLeft"
+           , semEval = \[i0, i1] -> [clamp ow $ i0 `shiftL` fromIntegral i1]
+           , dontKill = False
+           , isRoot = False
+           , inputs = [("in0", ow), ("in1", iw)]
+           , outputs = [("out", ow)] }
+primInfo (ShiftRight iw ow) =
+  PrimInfo { isInlineable = True
+           , inputsInlineable = True
+           , strRep = "ShiftRight"
+           -- XXX 'i0' must be unsigned
+           , semEval = \[i0, i1] -> [clamp ow $ i0 `shiftR` fromIntegral i1]
+           , dontKill = False
+           , isRoot = False
+           , inputs = [("in0", ow), ("in1", iw)]
+           , outputs = [("out", ow)] }
+primInfo (ArithShiftRight iw ow) =
+  PrimInfo { isInlineable = True
+           , inputsInlineable = True
+           , strRep = "ArithShiftRight"
+           , semEval = \[i0, i1] -> [clamp ow $ i0 `shiftR` fromIntegral i1]
+           , dontKill = False
+           , isRoot = False
+           , inputs = [("in0", ow), ("in1", iw)]
+           , outputs = [("out", ow)] }
+primInfo (Equal w) =
+  PrimInfo { isInlineable = True
+           , inputsInlineable = True
+           , strRep = "Equal"
+           , semEval = \[i0, i1] -> [if i0 == i1 then 1 else 0]
+           , dontKill = False
+           , isRoot = False
+           , inputs = [("in0", w), ("in1", w)]
+           , outputs = [("out", 1)] }
+primInfo (NotEqual w) =
+  PrimInfo { isInlineable = True
+           , inputsInlineable = True
+           , strRep = "NotEqual"
+           , semEval = \[i0, i1] -> [if i0 /= i1 then 1 else 0]
+           , dontKill = False
+           , isRoot = False
+           , inputs = [("in0", w), ("in1", w)]
+           , outputs = [("out", 1)] }
+primInfo (LessThan w) =
+  PrimInfo { isInlineable = True
+           , inputsInlineable = True
+           , strRep = "LessThan"
+           , semEval = \[i0, i1] -> [if i0 < i1 then 1 else 0]
+           , dontKill = False
+           , isRoot = False
+           , inputs = [("in0", w), ("in1", w)]
+           , outputs = [("out", 1)] }
+primInfo (LessThanEq w) =
+  PrimInfo { isInlineable = True
+           , inputsInlineable = True
+           , strRep = "LessThanEq"
+           , semEval = \[i0, i1] -> [if i0 <= i1 then 1 else 0]
+           , dontKill = False
+           , isRoot = False
+           , inputs = [("in0", w), ("in1", w)]
+           , outputs = [("out", 1)] }
+primInfo (ReplicateBit w) =
+  PrimInfo { isInlineable = True
+           , inputsInlineable = True
+           , strRep = "ReplicateBit"
+           , semEval = \[i0] -> [clamp w if i0 == 0 then zeroBits
+                                                    else complement zeroBits]
+           , dontKill = False
+           , isRoot = False
+           , inputs = [("in", 1)]
+           , outputs = [("out", w)] }
+primInfo (ZeroExtend iw ow) =
+  PrimInfo { isInlineable = True
+           , inputsInlineable = True
+           , strRep = "ZeroExtend"
+           , semEval = \[i0] -> [clamp iw i0]
+           , dontKill = False
+           , isRoot = False
+           , inputs = [("in", iw)]
+           , outputs = [("out", ow)] }
+primInfo (SignExtend iw ow) =
+  PrimInfo { isInlineable = True
+           , inputsInlineable = False
+           , strRep = "SignExtend"
+           , semEval = \[i0] -> let sgn = testBit i0 (iw - 1)
+                                    sgnMask = (bit (ow-iw+1) - 1) `shiftL` iw
+                                    sgnExt = i0 .|. sgnMask
+                                in [if sgn then sgnExt else clamp ow i0]
+           , dontKill = False
+           , isRoot = False
+           , inputs = [("in", iw)]
+           , outputs = [("out", ow)] }
 primInfo (SelectBits iw hi lo) =
   PrimInfo { isInlineable = True
            , inputsInlineable = False
            , strRep = "SelectBits"
+           , semEval = \[i0] -> [clamp (hi + 1) i0 `shiftR` lo]
            , dontKill = False
            , isRoot = False
            , inputs = [("in", iw)]
            , outputs = [("out", hi - lo + 1)] }
-primInfo (Concat w0 w1) = PrimInfo { isInlineable = True
-                                   , inputsInlineable = True
-                                   , strRep = "Concat"
-                                   , dontKill = False
-                                   , isRoot = False
-                                   , inputs = [("in0", w0), ("in1", w1)]
-                                   , outputs = [("out", w0 + w1)] }
-primInfo (Mux n w) = PrimInfo { isInlineable = False
-                              , inputsInlineable = True
-                              , strRep = "Mux"
-                              , dontKill = False
-                              , isRoot = False
-                              , inputs = ("sel", log2ceil n)
-                                         : [("in" ++ show i, w) | i <- [0..n-1]]
-                              , outputs = [("out", w)] }
-primInfo (Identity w) = PrimInfo { isInlineable = True
-                                 , inputsInlineable = True
-                                 , strRep = "Identity"
-                                 , dontKill = False
-                                 , isRoot = False
-                                 , inputs = [("in", w)]
-                                 , outputs = [("out", w)] }
-primInfo (Register _ w) = PrimInfo { isInlineable = False
-                                   , inputsInlineable = True
-                                   , strRep = "Register"
-                                   , dontKill = False
-                                   , isRoot = False
-                                   , inputs = [("in", w)]
-                                   , outputs = [("out", w)] }
-primInfo (RegisterEn _ w) = PrimInfo { isInlineable = False
-                                     , inputsInlineable = True
-                                     , strRep = "RegisterEn"
-                                     , dontKill = False
-                                     , isRoot = False
-                                     , inputs = [("en", 1), ("in", w)]
-                                     , outputs = [("out", w)] }
-primInfo BRAM{ ramAddrWidth = aw
-             , ramDataWidth = dw
-             , ramHasByteEn = hasBE
-             , ramKind      = kind } =
+primInfo (Concat w0 w1) =
+  PrimInfo { isInlineable = True
+           , inputsInlineable = True
+           , strRep = "Concat"
+           , semEval = \[i0, i1] -> [clamp (w0 + w1) $ i0 `shiftL` w1 + i1]
+           , dontKill = False
+           , isRoot = False
+           , inputs = [("in0", w0), ("in1", w1)]
+           , outputs = [("out", w0 + w1)] }
+primInfo (Mux n w) =
+  PrimInfo { isInlineable = False
+           , inputsInlineable = True
+           , strRep = "Mux"
+           , semEval = \(s:is) -> [is !! fromIntegral s]
+           , dontKill = False
+           , isRoot = False
+           , inputs = ("sel", log2ceil n)
+                      : [("in" ++ show i, w) | i <- [0..n-1]]
+           , outputs = [("out", w)] }
+primInfo (Identity w) =
+  PrimInfo { isInlineable = True
+           , inputsInlineable = True
+           , strRep = "Identity"
+           , semEval = id
+           , dontKill = False
+           , isRoot = False
+           , inputs = [("in", w)]
+           , outputs = [("out", w)] }
+primInfo prim@(Register _ w) =
+  PrimInfo { isInlineable = False
+           , inputsInlineable = True
+           , strRep = "Register"
+           , semEval = err $ "no semEval for " ++ show prim
+           , dontKill = False
+           , isRoot = False
+           , inputs = [("in", w)]
+           , outputs = [("out", w)] }
+primInfo prim@(RegisterEn _ w) =
+  PrimInfo { isInlineable = False
+           , inputsInlineable = True
+           , strRep = "RegisterEn"
+           , semEval = err $ "no semEval for " ++ show prim
+           , dontKill = False
+           , isRoot = False
+           , inputs = [("en", 1), ("in", w)]
+           , outputs = [("out", w)] }
+primInfo prim@BRAM{ ramAddrWidth = aw
+                  , ramDataWidth = dw
+                  , ramHasByteEn = hasBE
+                  , ramKind      = kind } =
   PrimInfo { isInlineable = False
            , inputsInlineable = True
            , strRep = str ++ (case hasBE of True -> "BE"; False -> "")
+           , semEval = err $ "no semEval for " ++ show prim
            , dontKill = False
            , isRoot = False
            , inputs = ins
@@ -706,85 +787,98 @@ primInfo BRAM{ ramAddrWidth = aw
     outs = case kind of
              BRAMTrueDualPort -> [("DO_A", dw), ("DO_B", dw)]
              other            -> [("DO", dw)]
-primInfo Custom{ customName = custNm
-               , customInputs = ins
-               , customOutputs = outs } =
+primInfo prim@Custom{ customName = custNm
+                    , customInputs = ins
+                    , customOutputs = outs } =
   PrimInfo { isInlineable = False
            , inputsInlineable = True
            , strRep = custNm
+           , semEval = err $ "no semEval for " ++ show prim
            , dontKill = False
            , isRoot = False
            , inputs = ins
            , outputs = outs }
-primInfo (Input w nm) = PrimInfo { isInlineable = False
-                                 , inputsInlineable = True
-                                 , strRep = nm
-                                 , dontKill = False
-                                 , isRoot = True
-                                 , inputs = []
-                                 , outputs = [("out", w)] }
-primInfo (Output w nm) =
+primInfo prim@(Input w nm) =
   PrimInfo { isInlineable = False
            , inputsInlineable = True
            , strRep = nm
+           , semEval = err $ "no semEval for " ++ show prim
+           , dontKill = False
+           , isRoot = True
+           , inputs = []
+           , outputs = [("out", w)] }
+primInfo prim@(Output w nm) =
+  PrimInfo { isInlineable = False
+           , inputsInlineable = True
+           , strRep = nm
+           , semEval = err $ "no semEval for " ++ show prim
            , dontKill = False
            , isRoot = True
            , inputs = [("in", w)]
            , outputs = [] }
-primInfo (Display args) =
+primInfo prim@(Display args) =
   PrimInfo { isInlineable = False
            , inputsInlineable = True
            , strRep = "Display"
+           , semEval = err $ "no semEval for " ++ show prim
            , dontKill = True
            , isRoot = True
            , inputs = ("en", 1) :
                       [ ("in" ++ show i, w)
                       | (i, DisplayArgBit w _ _ _) <- zip [0..] args ]
            , outputs = [] }
-primInfo Finish =
+primInfo prim@Finish =
   PrimInfo { isInlineable = False
            , inputsInlineable = True
            , strRep = "Finish"
+           , semEval = err $ "no semEval for " ++ show prim
            , dontKill = True
            , isRoot = True
            , inputs = [("en", 1)]
            , outputs = [] }
-primInfo (TestPlusArgs arg) = PrimInfo { isInlineable = False
-                                       , inputsInlineable = True
-                                       , strRep = "PlusArgs_" ++ arg
-                                       , dontKill = True
-                                       , isRoot = True
-                                       , inputs = []
-                                       , outputs = [("out", 1)] }
-primInfo (Assert _) = PrimInfo { isInlineable = False
-                               , inputsInlineable = True
-                               , strRep = "Assert"
-                               , dontKill = True
-                               , isRoot = True
-                               , inputs = [("cond", 1), ("pred", 1)]
-                               , outputs = [] }
-primInfo RegFileMake{} =
+primInfo prim@(TestPlusArgs arg) =
+  PrimInfo { isInlineable = False
+           , inputsInlineable = True
+           , strRep = "PlusArgs_" ++ arg
+           , semEval = err $ "no semEval for " ++ show prim
+           , dontKill = True
+           , isRoot = True
+           , inputs = []
+           , outputs = [("out", 1)] }
+primInfo prim@(Assert _) =
+  PrimInfo { isInlineable = False
+           , inputsInlineable = True
+           , strRep = "Assert"
+           , semEval = err $ "no semEval for " ++ show prim
+           , dontKill = True
+           , isRoot = True
+           , inputs = [("cond", 1), ("pred", 1)]
+           , outputs = [] }
+primInfo prim@RegFileMake{} =
   PrimInfo { isInlineable = False
            , inputsInlineable = True
            , strRep = "RegFileMake"
+           , semEval = err $ "no semEval for " ++ show prim
            , dontKill = True
            , isRoot = True
            , inputs = []
            , outputs = [] }
-primInfo (RegFileRead RegFileInfo{ regFileAddrWidth = aw
-                                 , regFileDataWidth = dw }) =
+primInfo prim@(RegFileRead RegFileInfo{ regFileAddrWidth = aw
+                                      , regFileDataWidth = dw }) =
   PrimInfo { isInlineable = False
            , inputsInlineable = True
            , strRep = "RegFileRead"
+           , semEval = err $ "no semEval for " ++ show prim
            , dontKill = False
            , isRoot = False
            , inputs = [("idx", aw)]
            , outputs = [("data", dw)] }
-primInfo (RegFileWrite RegFileInfo{ regFileAddrWidth = aw
-                                  , regFileDataWidth = dw }) =
+primInfo prim@(RegFileWrite RegFileInfo{ regFileAddrWidth = aw
+                                       , regFileDataWidth = dw }) =
   PrimInfo { isInlineable = False
            , inputsInlineable = True
            , strRep = "RegFileWrite"
+           , semEval = err $ "no semEval for " ++ show prim
            , dontKill = False
            , isRoot = True
            , inputs = [("idx", aw), ("data", dw)]
