@@ -39,6 +39,7 @@ import Blarney.Misc.MonadLoops
 debugEnabled = False
 dbg act = when debugEnabled act
 err str = error $ "Blarney.Backend.Simulation: " ++ str
+simDontCare = 0
 -- debugging facilities
 
 -- | Simulate a 'Netlist' until a 'Finish' 'Prim' is triggered. This is
@@ -53,10 +54,10 @@ simulateNetlist nl = do
          --putStrLn $ "length simEffects = " ++ show (length simEffects)
          --print simTerminate
   {- DBG -}
-  -- get command line arguments
-  args <- getArgs
+  -- prepare compilation context
+  ctxt <- mkCompCtxt nl
   -- simulator compiled from the input netlist
-  let SimulatorIfc{..} = compile nl args Map.empty
+  let SimulatorIfc{..} = compile ctxt Map.empty
   -- here, while the termination stream does not indicate the end of the
   -- simulation, we apply all effects from the current simulation cycle and
   -- also print TICK
@@ -75,29 +76,32 @@ type Sample = Integer
 -- | A type representing a signal
 type Signal = [Sample]
 
+-- | Context for compilation
+data CompCtxt = CompCtxt { compArgs  :: [String]
+                         , compBRAMs :: Map.Map InstId (Map.Map Sample Sample)
+                         , compNl    :: Netlist }
+
+-- | create a 'CompCtxt' from a 'Netlist'
+mkCompCtxt :: Netlist -> IO CompCtxt
+mkCompCtxt nl = do
+  -- get command line arguments
+  args <- getArgs
+  -- get the BRAM initial contents
+  brams <- sequence [ prepBRAMContent ramInitFile >>= return . (,) instId
+                    | Net { netPrim = BRAM {..}
+                          , netInstId = instId } <- IArray.elems nl ]
+  return $ CompCtxt { compArgs = args
+                    , compBRAMs = Map.fromList brams
+                    , compNl = nl }
+  where a2i = fst . head . readHex
+        prepBRAMContent (Just f) = do
+          initContent <- lines <$> readFile f
+          return $ Map.fromList (zip [0..] $  a2i <$> initContent)
+        prepBRAMContent Nothing = return Map.empty
+
 -- | A type representing s stream of simulation 'IO's to supplement output
 --   'Signal's
 type SimEffect = [IO ()]
-
--- | Array to memoize 'Signal' during compilation
-type MemoSignals s = STArray s InstId [Maybe Signal]
-
--- | Context for compilation
-data CompCtxt s = CompCtxt { compMemo :: MemoSignals s
-                           , compArgs :: [String]
-                           , compNl   :: Netlist }
-
--- | create a 'CompCtxt' from a 'Netlist'
-mkCompCtxt :: Netlist -> [String] -> ST s (CompCtxt s)
-mkCompCtxt nl args = do
-  -- signal memoization table
-  memo <- newListArray (IArray.bounds nl)
-                       [ replicate (length $ primOutputs p) Nothing
-                       | Net { netPrim = p } <- IArray.elems nl ]
-  return $ CompCtxt { compMemo = memo, compArgs = args, compNl = nl }
-
--- | compile helper functions
-type CompFun s a b = CompCtxt s -> a -> ST s b
 
 -- | a dictionary of named 'Signal's
 type SignalMap = Map.Map String Signal
@@ -117,24 +121,34 @@ type Simulator = SignalMap -> SimulatorIfc
 --------------------------------------------------------------------------------
 -- netlist compilation utilities
 
+-- | Array to memoize 'Signal' during compilation
+type MemoSignals s = STArray s InstId [Maybe Signal]
+
+-- | compile helper functions
+type CompFun s a b = CompCtxt -> MemoSignals s -> a -> ST s b
+
 -- | A function to turn a 'Netlist' into a 'Simulator'
-compile :: Netlist -> [String] -> Simulator
-compile nl args inputStreams = runST do
-  -- prepare compilation context
-  ctxt <- mkCompCtxt nl args
+compile :: CompCtxt -> Simulator
+compile ctxt inputStreams = runST do
+  -- handle on the netlist
+  let nl = compNl ctxt
+  -- signal memoization table
+  memo <- newListArray (IArray.bounds nl)
+                       [ replicate (length $ primOutputs p) Nothing
+                       | Net { netPrim = p } <- IArray.elems nl ]
   -- compile simulation effects streams
-  effectStreams <- sequence [ compileSimEffect ctxt n
+  effectStreams <- sequence [ compileSimEffect ctxt memo n
                             | n@Net{ netPrim = p } <- IArray.elems nl
                             , case p of Display _ -> True
                                         _         -> False ]
   -- compile simulation termination stream
-  endStreams <- sequence [ compileTermination ctxt n
+  endStreams <- sequence [ compileTermination ctxt memo n
                          | n@Net{ netPrim = p } <- IArray.elems nl
                          , case p of Finish   -> True
                                      Assert _ -> True
                                      _        -> False ]
   -- compile simulation outputs streams
-  let outputs = [ (nm, compileOutputSignal ctxt o)
+  let outputs = [ (nm, compileOutputSignal ctxt memo o)
                 | o@Net{ netPrim = Output _ nm } <- IArray.elems nl ]
   let (nms, sigsST) = unzip outputs
   sigs <- sequence sigsST
@@ -147,8 +161,8 @@ compile nl args inputStreams = runST do
 -- | compile the 'SimEffect' stream of simulation effects for a given simulation
 --   effect capable 'Net' (currently, only 'Display' nets)
 compileSimEffect :: CompFun s Net SimEffect
-compileSimEffect ctxt Net{ netPrim = Display args, .. } = do
-  netInputs' <- mapM (compileNetInputSignal ctxt) netInputs
+compileSimEffect ctxt memo Net{ netPrim = Display args, .. } = do
+  netInputs' <- mapM (compileNetInputSignal ctxt memo) netInputs
   return $ map (\(en:inpts) -> when (en /= 0) do putStr . concat $ fmt args inpts)
                (List.transpose netInputs')
   where fmt [] _ = []
@@ -165,20 +179,20 @@ compileSimEffect ctxt Net{ netPrim = Display args, .. } = do
 -- | compile the termination stream as a '[Bool]' for a given termination
 --   capable 'Net' (currently only 'Finish' nets)
 compileTermination :: CompFun s Net [Bool]
-compileTermination ctxt Net{ netPrim = Finish, netInputs = [en] } = do
-  en' <- compileNetInputSignal ctxt en
+compileTermination ctxt memo Net{ netPrim = Finish, netInputs = [en] } = do
+  en' <- compileNetInputSignal ctxt memo en
   return $ (/= 0) <$> en'
 
 -- | compile the output 'Signal' for a given output 'Net'
 --   (currently not supported)
 compileOutputSignal :: CompFun s Net Signal
-compileOutputSignal ctxt n = do
-  return $ repeat 0 -- TODO
+compileOutputSignal ctxt memo n = do
+  return $ repeat simDontCare -- TODO
 
 -- | compile the 'Signal' associated with a 'WireId' (memoized)
 compileWireIdSignal :: CompFun s WireId Signal
-compileWireIdSignal ctxt@CompCtxt{..} (instId, outNm) = do
-  thunks <- readArray compMemo instId
+compileWireIdSignal ctxt@CompCtxt{..} memo (instId, outNm) = do
+  thunks <- readArray memo instId
   let net = getNet compNl instId
   case primOutIndex (netPrim net) outNm of
     Just idx ->
@@ -187,12 +201,12 @@ compileWireIdSignal ctxt@CompCtxt{..} (instId, outNm) = do
         Nothing -> mdo
           -- first write the memoization array
           let thunks' = take idx thunks ++ Just signal : drop (idx+1) thunks
-          writeArray compMemo instId thunks'
+          writeArray memo instId thunks'
           -- then compile the signal
           {- DBG -}
           dbg $ traceM $ "compileWireIdSignal " ++ show (instId, outNm) ++ " >>>> (call) compileNetIndexedOuptutSignal " ++ show (net, idx)
           {- DBG -}
-          signal <- compileNetIndexedOuptutSignal ctxt (net, idx)
+          signal <- compileNetIndexedOuptutSignal ctxt memo (net, idx)
           {- DBG -}
           dbg $ traceM $ "compileNetIndexedOuptutSignal " ++ show (net, idx) ++ " >>>> (return) compileWireIdSignal " ++ show (instId, outNm)
           {- DBG -}
@@ -202,38 +216,38 @@ compileWireIdSignal ctxt@CompCtxt{..} (instId, outNm) = do
 -- | compile the 'Signal' associated with an indexed output of a given 'Net'
 --   (not memoized)
 compileNetIndexedOuptutSignal :: CompFun s (Net, Int) Signal
-compileNetIndexedOuptutSignal ctxt (Net{..}, idx) = do
+compileNetIndexedOuptutSignal ctxt memo (Net{..}, idx) = do
   {- DBG -}
   dbg $ traceM $ "compileNetIndexedOuptutSignal " ++ show (netPrim, netInstId, idx) ++ " >>>> (call) map compileNetInputSignal " ++ show netInputs
   {- DBG -}
-  ins <- mapM (compileNetInputSignal ctxt) netInputs
+  ins <- mapM (compileNetInputSignal ctxt memo) netInputs
   {- DBG -}
   dbg $ traceM $ "map compileNetInputSignal " ++ show netInputs ++ " >>>> (return) compileNetIndexedOuptutSignal " ++ show (netPrim, netInstId, idx)
   {- DBG -}
-  primOuts <- compilePrim ctxt (netPrim, ins)
-  return $ primOuts !! idx
+  return $ (compilePrim ctxt netInstId netPrim ins) !! idx
 
 -- | compile the 'Signal' associated with a 'NetInput' (not memoized)
 compileNetInputSignal :: CompFun s NetInput Signal
-compileNetInputSignal ctxt (InputWire wId) = do
+compileNetInputSignal ctxt memo (InputWire wId) = do
   {- DBG -}
   dbg $ traceM $ "compileNetInputSignal InputWire " ++ show wId ++ " >>>> (call) compileWireIdSignal " ++ show wId
   {- DBG -}
-  signal <- compileWireIdSignal ctxt wId
+  signal <- compileWireIdSignal ctxt memo wId
   {- DBG -}
   dbg $ traceM $ "compileWireIdSignal " ++ show wId ++ " >>>> (return) compileNetInputSignal InputWire " ++ show wId
   {- DBG -}
   return signal
-compileNetInputSignal ctxt (InputTree prim ins) = do
+compileNetInputSignal ctxt memo (InputTree prim ins) = do
   {- DBG -}
   dbg $ traceM $ "compileNetInputSignal InputTree " ++ show (prim, ins) ++ " >>>> (call) map compileNetInputSignal " ++ show ins
   {- DBG -}
-  ins' <- mapM (compileNetInputSignal ctxt) ins
+  ins' <- mapM (compileNetInputSignal ctxt memo) ins
   {- DBG -}
   dbg $ traceM $ "map compileNetInputSignal " ++ show ins ++ " >>>> (return) compileNetInputSignal InputTree " ++ show (prim, ins)
   {- DBG -}
-  primOuts <- compilePrim ctxt (prim, ins')
-  return $ primOuts !! 0 -- TODO check that we only eval single output primitives
+  let instID = err "no InstId for InputTree Prims"
+  -- TODO check that we only eval single output primitives
+  return $ (compilePrim ctxt instID prim ins') !! 0
 
 
 
@@ -243,58 +257,69 @@ compileNetInputSignal ctxt (InputTree prim ins) = do
 --   'Signals' (most often only the one output 'Signal' returned as a singleton
 --   list)
 --   Note: the CompCtxt argument is needed for primitives such as TestPlusArgs
-compilePrim :: CompFun s (Prim, [Signal]) [Signal]
-compilePrim CompCtxt{..} (TestPlusArgs plsArg, []) = return [repeat isPresent]
+--   TODO : comment better:Special cases for no input and stateful
+compilePrim :: CompCtxt -> InstId -> Prim -> [Signal] -> [Signal]
+compilePrim CompCtxt{..} _ (TestPlusArgs plsArg) [] = [repeat isPresent]
   where isPresent = if '+' : plsArg `elem` compArgs then 1 else 0
-compilePrim _ (Const w val, []) = return [repeat $ clamp w $ fromInteger val]
-compilePrim _ (DontCare w,  []) = return [repeat 0] -- TODO some other value?
-compilePrim _ (Add w, [i0, i1]) = return [zipWith (\x y -> clamp w (x + y)) i0 i1]
-compilePrim _ (Sub w, [i0, i1]) = return [zipWith (\x y -> clamp w (x - y)) i0 i1]
-compilePrim _ ( Mul { primMulInputWidth    = w
-                    , primMulSigned        = sgn
-                    , primMulFullPrecision = precise }
-              , [i0, i1] ) = -- TODO proper implementation
-  return [zipWith (\x y -> clamp (2*w) (x * y)) i0 i1]
-compilePrim _ (Div w, [i0, i1]) = return [zipWith (\x y -> clamp w (x `div` y)) i0 i1]
-compilePrim _ (Mod w, [i0, i1]) = return [zipWith (\x y -> clamp w (x `mod` y)) i0 i1]
-compilePrim _ (Not w, [i0]) = return [map (clamp w . complement) i0]
-compilePrim _ (And w, [i0, i1]) = return [zipWith (\x y -> clamp w (x .&. y)) i0 i1]
-compilePrim _ (Or w, [i0, i1]) = return [zipWith (\x y -> clamp w (x .|. y)) i0 i1]
-compilePrim _ (Xor w, [i0, i1]) = return [zipWith (\x y -> clamp w (x `xor` y)) i0 i1]
-compilePrim _ (ShiftLeft _ w,       [i0, i1]) = return [zipWith (\x y -> clamp w $ x `shiftL` fromIntegral y) i0 i1]
-compilePrim _ (ShiftRight _ w,      [i0, i1]) = return [zipWith (\x y -> clamp w $ x `shiftR` fromIntegral y) i0 i1] -- TODO force usigned 'i0' (use 'Natural')
-compilePrim _ (ArithShiftRight _ w, [i0, i1]) = return [zipWith (\x y -> clamp w $ x `shiftR` fromIntegral y) i0 i1]
-compilePrim _ (Equal _,      [i0, i1]) = return [zipWith (\x y -> if x == y then 1 else 0) i0 i1]
-compilePrim _ (NotEqual _,   [i0, i1]) = return [zipWith (\x y -> if x /= y then 1 else 0) i0 i1]
-compilePrim _ (LessThan _,   [i0, i1]) = return [zipWith (\x y -> if x  < y then 1 else 0) i0 i1]
-compilePrim _ (LessThanEq _, [i0, i1]) = return [zipWith (\x y -> if x <= y then 1 else 0) i0 i1]
-compilePrim _ (ReplicateBit w, [i0]) = return [map (\x -> clamp w if x == 0 then zeroBits else complement zeroBits) i0]
-compilePrim _ (ZeroExtend w _, [i0]) = return [map (clamp w) i0]
-compilePrim _ (SignExtend inW w, [i0]) =
-  return [map (\x -> let sgn = testBit x (inW - 1)
-                         sgnMask = (bit (w - inW + 1) - 1) `shiftL` inW
-                         sgnExt = x .|. sgnMask
-                     in if sgn then sgnExt else clamp w x) i0]
-compilePrim _ (SelectBits _ hi lo, [i0]) = return [map (\x -> clamp (hi + 1) x `shiftR` lo) i0]
-compilePrim _ (Concat w0 w1, [i0, i1]) = return [zipWith (\x y -> clamp (w0 + w1) $ x `shiftL` w1 + y) i0 i1]
-compilePrim _ (Identity _, [i0]) = return [i0]
-compilePrim _ (Mux _ w, [ss, i0, i1]) =
-  return [zipWith3 (\s x y -> if s == 0 then x else y) ss i0 i1]
-compilePrim _ (RegisterEn i w, [ens, inpts]) = return [scanl f i (zip ens inpts)]
+compilePrim _ _ (Const w val) [] = [repeat $ clamp w $ fromInteger val]
+compilePrim _ _  (DontCare w) [] = [repeat simDontCare]
+compilePrim _ _ (Add w) [i0, i1] = [zipWith (\x y -> clamp w (x + y)) i0 i1]
+compilePrim _ _ (Sub w) [i0, i1] = [zipWith (\x y -> clamp w (x - y)) i0 i1]
+-- TODO proper implementation
+compilePrim _ _ Mul{ primMulInputWidth    = w
+                   , primMulSigned        = sgn
+                   , primMulFullPrecision = precise }
+                [i0, i1] = [zipWith (\x y -> clamp (2*w) (x * y)) i0 i1]
+compilePrim _ _ (Div w) [i0, i1] = [zipWith (\x y -> clamp w (x `div` y)) i0 i1]
+compilePrim _ _ (Mod w) [i0, i1] = [zipWith (\x y -> clamp w (x `mod` y)) i0 i1]
+compilePrim _ _ (Not w)     [i0] = [map (clamp w . complement) i0]
+compilePrim _ _ (And w) [i0, i1] = [zipWith (\x y -> clamp w (x .&. y)) i0 i1]
+compilePrim _ _  (Or w) [i0, i1] = [zipWith (\x y -> clamp w (x .|. y)) i0 i1]
+compilePrim _ _ (Xor w) [i0, i1] = [zipWith (\x y -> clamp w (x `xor` y)) i0 i1]
+compilePrim _ _       (ShiftLeft _ w) [i0, i1] = [zipWith (\x y -> clamp w $ x `shiftL` fromIntegral y) i0 i1]
+compilePrim _ _      (ShiftRight _ w) [i0, i1] = [zipWith (\x y -> clamp w $ x `shiftR` fromIntegral y) i0 i1] -- TODO force usigned 'i0' (use 'Natural')
+compilePrim _ _ (ArithShiftRight _ w) [i0, i1] = [zipWith (\x y -> clamp w $ x `shiftR` fromIntegral y) i0 i1]
+compilePrim _ _      (Equal _) [i0, i1] = [zipWith (\x y -> if x == y then 1 else 0) i0 i1]
+compilePrim _ _   (NotEqual _) [i0, i1] = [zipWith (\x y -> if x /= y then 1 else 0) i0 i1]
+compilePrim _ _   (LessThan _) [i0, i1] = [zipWith (\x y -> if x  < y then 1 else 0) i0 i1]
+compilePrim _ _ (LessThanEq _) [i0, i1] = [zipWith (\x y -> if x <= y then 1 else 0) i0 i1]
+compilePrim _ _ (ReplicateBit w) [i0] = [map (\x -> clamp w if x == 0 then zeroBits else complement zeroBits) i0]
+compilePrim _ _ (ZeroExtend w _) [i0] = [map (clamp w) i0]
+compilePrim _ _ (SignExtend inW w) [i0] =
+  [map (\x -> let sgn = testBit x (inW - 1)
+                  sgnMask = (bit (w - inW + 1) - 1) `shiftL` inW
+                  sgnExt = x .|. sgnMask
+              in if sgn then sgnExt else clamp w x) i0]
+compilePrim _ _ (SelectBits _ hi lo) [i0] = [map (\x -> clamp (hi + 1) x `shiftR` lo) i0]
+compilePrim _ _ (Concat w0 w1) [i0, i1] = [zipWith (\x y -> clamp (w0 + w1) $ x `shiftL` w1 + y) i0 i1]
+compilePrim _ _ (Identity _) [i0] = [i0]
+compilePrim _ _ (Mux _ w) [ss, i0, i1] =
+  [zipWith3 (\s x y -> if s == 0 then x else y) ss i0 i1]
+compilePrim _ _ (Register i _) [inpts] = [i:inpts]
+compilePrim _ _ (RegisterEn i _) [ens, inpts] = [scanl f i (zip ens inpts)]
   where f prev (en, inpt) = if en /= 0 then inpt else prev
-compilePrim _ (prim, ins) =
-  return $ List.transpose $ primSemEval prim <$> (List.transpose ins)
---compilePrim _ (prim, ins) = return $ transpose $ evalPrim prim <$> (transpose ins)
---compilePrim _ (prim, ins) = return $ err $ "can't compilePrim " ++ show prim ++ ", " ++ show ins
-
-
--- XXX unclear if needed XXX
----- | Lazy transpose, assumes all rows have same length
---transpose [] = [[]]
---transpose [xs] = [[x] | x <- xs]
-----transpose (xs : xss) = lzw (:) xs (transpose xss)
---transpose (xs : xss) = zipWith (:) xs (transpose xss)
---
----- | Left zipWith, assumes lists are same size
---lzw op [] ys = []
---lzw op (x:xs) ys = (x `op` head ys) : lzw op xs (tail ys)
+-- XXX TODO: check the behaviour of the read enable signal
+compilePrim CompCtxt{..} instId
+            BRAM{ ramKind = BRAMSinglePort
+                , ramHasByteEn = False } -- TODO: support byte enable
+            inpts@[addrs, _, _, _] = [zipWith doRead delayedAddrs bramContents]
+  where delayedAddrs = simDontCare:addrs
+        doRead x y = fromMaybe simDontCare $ Map.lookup x y
+        bramContents = scanl t (compBRAMs Map.! instId) (List.transpose inpts)
+        t prev [addr, di, we, re] =
+          if we /= 0 then Map.alter (const $ Just di) addr prev else prev
+-- XXX TODO: check the behaviour of the read enable signal
+compilePrim CompCtxt{..} instId
+            BRAM{ ramKind = BRAMDualPort
+                , ramHasByteEn = False } -- TODO: support byte enable
+            inpts@[rdAddrs, _, _, _, _] =
+  [zipWith doRead delayedRdAddrs bramContents]
+  where delayedRdAddrs = simDontCare:rdAddrs
+        doRead x y = fromMaybe simDontCare $ Map.lookup x y
+        bramContents = scanl t (compBRAMs Map.! instId) (List.transpose inpts)
+        t prev [rdAddr, wrAddr, di, we, re] =
+          if we /= 0 then Map.alter (const $ Just di) wrAddr prev else prev
+compilePrim _ _ prim ins =
+  List.transpose $ primSemEval prim <$> (List.transpose ins)
+  --transpose $ primSemEval prim <$> (transpose ins)
+  --err $ "can't compilePrim " ++ show prim ++ ", " ++ show ins
