@@ -77,9 +77,10 @@ type Sample = Integer
 type Signal = [Sample]
 
 -- | Context for compilation
-data CompCtxt = CompCtxt { compArgs  :: [String]
-                         , compBRAMs :: Map.Map InstId (Map.Map Sample Sample)
-                         , compNl    :: Netlist }
+data CompCtxt =
+  CompCtxt { compArgs      :: [String]
+           , compInitBRAMs :: Map.Map InstId (Map.Map Sample Sample)
+           , compNl        :: Netlist }
 
 -- | create a 'CompCtxt' from a 'Netlist'
 mkCompCtxt :: Netlist -> IO CompCtxt
@@ -87,11 +88,11 @@ mkCompCtxt nl = do
   -- get command line arguments
   args <- getArgs
   -- get the BRAM initial contents
-  brams <- sequence [ prepBRAMContent ramInitFile >>= return . (,) instId
-                    | Net { netPrim = BRAM {..}
-                          , netInstId = instId } <- IArray.elems nl ]
+  initBRAMs <- sequence [ prepBRAMContent ramInitFile >>= return . (,) instId
+                        | Net { netPrim = BRAM {..}
+                              , netInstId = instId } <- IArray.elems nl ]
   return $ CompCtxt { compArgs = args
-                    , compBRAMs = Map.fromList brams
+                    , compInitBRAMs = Map.fromList initBRAMs
                     , compNl = nl }
   where a2i = fst . head . readHex
         prepBRAMContent (Just f) = do
@@ -305,7 +306,8 @@ compilePrim CompCtxt{..} instId
             inpts@[addrs, _, _, _] = [zipWith doRead delayedAddrs bramContents]
   where delayedAddrs = simDontCare:addrs
         doRead x y = fromMaybe simDontCare $ Map.lookup x y
-        bramContents = scanl t (compBRAMs Map.! instId) (List.transpose inpts)
+        bramContents = scanl t (compInitBRAMs Map.! instId)
+                               (List.transpose inpts)
         t prev [addr, di, we, re] =
           if we /= 0 then Map.alter (const $ Just di) addr prev else prev
 -- XXX TODO: check the behaviour of the read enable signal
@@ -316,7 +318,8 @@ compilePrim CompCtxt{..} instId
   [zipWith doRead delayedRdAddrs bramContents]
   where delayedRdAddrs = simDontCare:rdAddrs
         doRead x y = fromMaybe simDontCare $ Map.lookup x y
-        bramContents = scanl t (compBRAMs Map.! instId) (List.transpose inpts)
+        bramContents = scanl t (compInitBRAMs Map.! instId)
+                               (List.transpose inpts)
         t prev [rdAddr, wrAddr, di, we, re] =
           if we /= 0 then Map.alter (const $ Just di) wrAddr prev else prev
 compilePrim _ _ prim ins =
