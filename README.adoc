@@ -1102,7 +1102,7 @@ http://blarney-lang.github.io/blarney/Blarney-Core-Lookup.html[Lookup] class.
 ----
 -- Index a collection 'c' of elements 'e' using index 'i'
 class Lookup c i e | c -> e where
-  (!) : c -> i -> e
+  (!) :: c -> i -> e
 ----
 
 A wide range of combinations of types are supported.  The functional dependency
