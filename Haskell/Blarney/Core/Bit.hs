@@ -142,6 +142,26 @@ infixl 6 .^.
 (.^.) :: Bit n -> Bit n -> Bit n
 a .^. b = FromBV $ xorBV (toBV a) (toBV b)
 
+-- |Logical and
+infixr 3 .&&.
+(.&&.) :: Bit 1 -> Bit 1 -> Bit 1
+a .&&. b = a .&. b
+
+-- |Logical or
+infixr 2 .||.
+(.||.) :: Bit 1 -> Bit 1 -> Bit 1
+a .||. b = a .|. b
+
+-- |Logical implication
+infixr 1 .==>.
+(.==>.) :: Bit 1 -> Bit 1 -> Bit 1
+a .==>. b = inv a .|. b
+
+-- |Logical equivalence
+infixr 1 .<==>.
+(.<==>.) :: Bit 1 -> Bit 1 -> Bit 1
+a .<==>. b = a .==. b
+
 -- |Shift left
 infixl 8 .<<.
 (.<<.) :: Bit n -> Bit m -> Bit n
@@ -157,14 +177,6 @@ infixl 8 .>>>.
 (.>>>.) :: Bit n -> Bit m -> Bit n
 a .>>>. b = FromBV $ arithRightBV (toBV a) (toBV b)
 
-infixr 3 .==>.
-(.==>.) :: Bit 1 -> Bit 1 -> Bit 1
-a .==>. b = inv a .|. b
-
-infixr 3 .<==>.
-(.<==>.) :: Bit 1 -> Bit 1 -> Bit 1
-a .<==>. b = a .==. b
-
 -- * Bit-vector comparison primitives
 
 -- Comparison operators
@@ -176,6 +188,10 @@ class Cmp a where
   (.>=.) :: a -> a -> Bit 1
   (.!=.) :: a -> a -> Bit 1
 
+  a .>. b = b .<. a
+  a .>=. b = b .<=. a
+  a .!=. b = inv (a .==. b)
+
 infix 4 .<.
 infix 4 .<=.
 infix 4 .>=.
@@ -185,9 +201,7 @@ infix 4 .!=.
 
 instance Cmp (Bit n) where
   a .<.  b = FromBV $ lessThanBV (toBV a) (toBV b)
-  a .>.  b = FromBV $ lessThanBV (toBV b) (toBV a)
   a .<=. b = FromBV $ lessThanEqBV (toBV a) (toBV b)
-  a .>=. b = FromBV $ lessThanEqBV (toBV b) (toBV a)
   a .==. b = FromBV $ equalBV (toBV a) (toBV b)
   a .!=. b = FromBV $ notEqualBV (toBV a) (toBV b)
 
