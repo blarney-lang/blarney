@@ -299,29 +299,30 @@ compilePrim _ _ (Mux _ w) [ss, i0, i1] =
 compilePrim _ _ (Register i _) [inpts] = [i:inpts]
 compilePrim _ _ (RegisterEn i _) [ens, inpts] = [scanl f i (zip ens inpts)]
   where f prev (en, inpt) = if en /= 0 then inpt else prev
--- XXX TODO: check the behaviour of the read enable signal
 compilePrim CompCtxt{..} instId
             BRAM{ ramKind = BRAMSinglePort
                 , ramHasByteEn = False } -- TODO: support byte enable
-            inpts@[addrs, _, _, _] = [zipWith doRead delayedAddrs bramContents]
-  where delayedAddrs = simDontCare:addrs
+            inpts@[addrS, _, _, reS] =
+  [zipWith doRead delayedAddrS bramContentS]
+  where delayedAddrS = scanl (\prv (a, re) -> if re /= 0 then a else prv)
+                             simDontCare (zip addrS reS)
         doRead x y = fromMaybe simDontCare $ Map.lookup x y
-        bramContents = scanl t (compInitBRAMs Map.! instId)
+        bramContentS = scanl t (compInitBRAMs Map.! instId)
                                (List.transpose inpts)
         t prev [addr, di, we, re] =
-          if we /= 0 then Map.alter (const $ Just di) addr prev else prev
--- XXX TODO: check the behaviour of the read enable signal
+          if we /= 0 then Map.insertWith (\x _ -> x) addr di prev else prev
 compilePrim CompCtxt{..} instId
             BRAM{ ramKind = BRAMDualPort
                 , ramHasByteEn = False } -- TODO: support byte enable
-            inpts@[rdAddrs, _, _, _, _] =
-  [zipWith doRead delayedRdAddrs bramContents]
-  where delayedRdAddrs = simDontCare:rdAddrs
+            inpts@[rdAddrS, _, _, _, reS] =
+  [zipWith doRead delayedRdAddrS bramContentS]
+  where delayedRdAddrS = scanl (\prv (a, re) -> if re /= 0 then a else prv)
+                               simDontCare (zip rdAddrS reS)
         doRead x y = fromMaybe simDontCare $ Map.lookup x y
-        bramContents = scanl t (compInitBRAMs Map.! instId)
+        bramContentS = scanl t (compInitBRAMs Map.! instId)
                                (List.transpose inpts)
         t prev [rdAddr, wrAddr, di, we, re] =
-          if we /= 0 then Map.alter (const $ Just di) wrAddr prev else prev
+          if we /= 0 then Map.insertWith (\x _ -> x) wrAddr di prev else prev
 compilePrim _ _ prim ins =
   List.transpose $ primSemEval prim <$> (List.transpose ins)
   --transpose $ primSemEval prim <$> (transpose ins)

@@ -419,7 +419,7 @@ primStr :: Prim -> String
 primStr = strRep . primInfo
 
 -- | constraint on samples that can be fed to primitives
-type PrimSample a = (Num a, Integral a, Bits a)
+type PrimSample a = (Num a, Ord a, Integral a, Bits a)
 
 -- | Helper to retrieve a primitive's semantic evaluation function
 primSemEval :: PrimSample a => Prim -> [a] -> [a]
@@ -499,7 +499,14 @@ data PrimInfo = PrimInfo {
 
 -- | clamp a given sample to the provided width
 clamp :: (Num a, Bits a) => Width -> a -> a
-clamp w i = (bit w - 1) .&. i
+clamp w x = (bit w - 1) .&. x
+
+toSigned :: (Ord a, Num a) => Width -> a -> a
+toSigned w x | x > 0 = if x >= 2^(w-1) then x - 2^w else x
+             | otherwise = err $ "cannot toSigned on negative number"
+
+fromSigned :: (Ord a, Num a) => Width -> a -> a
+fromSigned w x = if x < 0 then x + 2^w else x
 
 -- | Helper getting general metadata about a 'Prim'
 primInfo :: Prim -> PrimInfo
@@ -543,8 +550,12 @@ primInfo (Mul w isSigned isFull) =
   PrimInfo { isInlineable = not isFull
            , inputsInlineable = True
            , strRep = "Mul"
-           -- XXX: not fully implemented
-           , semEval = Just \[i0, i1] -> [clamp (2 * w) (i0 * i1)]
+           , semEval = Just \[i0, i1] ->
+               let ow = if isFull then 2 * w else w
+                   x  = toSigned w i0
+                   y  = toSigned w i1
+                   r  = if isSigned then fromSigned ow (x * y) else i0 * i1
+               in [clamp ow r]
            , dontKill = False
            , isRoot = False
            , inputs = [("in0", w), ("in1", w)]
@@ -619,7 +630,6 @@ primInfo (ShiftRight iw ow) =
   PrimInfo { isInlineable = True
            , inputsInlineable = True
            , strRep = "ShiftRight"
-           -- XXX 'i0' must be unsigned
            , semEval =
                Just \[i0, i1] -> [clamp ow $ i0 `shiftR` fromIntegral i1]
            , dontKill = False
@@ -630,8 +640,10 @@ primInfo (ArithShiftRight iw ow) =
   PrimInfo { isInlineable = True
            , inputsInlineable = True
            , strRep = "ArithShiftRight"
-           , semEval =
-               Just \[i0, i1] -> [clamp ow $ i0 `shiftR` fromIntegral i1]
+           , semEval = Just \[i0, i1] ->
+               let x = toSigned iw i0
+                   r = fromSigned ow (x `shiftR` fromIntegral i1)
+               in [clamp ow r]
            , dontKill = False
            , isRoot = False
            , inputs = [("in0", ow), ("in1", iw)]
