@@ -257,38 +257,17 @@ compileNetInputSignal ctxt memo (InputTree prim ins) = do
 -- | Describe how a primitive, given some input 'Signal's produces its output
 --   'Signals' (most often only the one output 'Signal' returned as a singleton
 --   list)
---   Note: the CompCtxt argument is needed for primitives such as TestPlusArgs
---   TODO : comment better:Special cases for no input and stateful
+--   Note:
+--     * the CompCtxt argument is needed for primitives such as TestPlusArgs
+--     * the InstId argument is needed to identify 'Net' initialization data
 compilePrim :: CompCtxt -> InstId -> Prim -> [Signal] -> [Signal]
 compilePrim CompCtxt{..} instId prim ins = case (prim, ins) of
+  -- no input primitives
   (TestPlusArgs plsArg, []) ->
     [repeat $ if '+' : plsArg `elem` compArgs then 1 else 0]
   (Const w val, []) -> [repeat $ clamp w $ fromInteger val]
   (DontCare w, []) -> [repeat simDontCare]
-  (Add _, [_, _]) -> evalBinOp ins
-  (Sub _, [_, _]) -> evalBinOp ins
-  (Mul{}, [_, _]) -> evalBinOp ins
-  (Div _, [_, _]) -> evalBinOp ins
-  (Mod _, [_, _]) -> evalBinOp ins
-  (Not _,    [_]) -> evalUnOp  ins
-  (And _, [_, _]) -> evalBinOp ins
-  (Or  _, [_, _]) -> evalBinOp ins
-  (Xor _, [_, _]) -> evalBinOp ins
-  (ShiftLeft _ _, [_, _]) -> evalBinOp ins
-  (ShiftRight _ _, [_, _]) -> evalBinOp ins
-  (ArithShiftRight _ _, [_, _]) -> evalBinOp ins
-  (Equal _, [_, _]) -> evalBinOp ins
-  (NotEqual _, [_, _]) -> evalBinOp ins
-  (LessThan _, [_, _]) -> evalBinOp ins
-  (LessThanEq _, [_, _]) -> evalBinOp ins
-  (ReplicateBit _, [_]) -> evalUnOp ins
-  (ZeroExtend _ _, [_]) -> evalUnOp ins
-  (SignExtend _ _, [_]) -> evalUnOp ins
-  (SelectBits _ _ _, [_]) -> evalUnOp ins
-  (Concat _ _, [_, _]) -> evalBinOp ins
-  (Identity _, [_]) -> evalUnOp ins
-  (Mux _ w, [ss, i0, i1]) ->
-    [zipWith3 (\s x y -> if s == 0 then x else y) ss i0 i1]
+  -- stateful primitives
   (Register i _, [inpts]) -> [i:inpts]
   (RegisterEn i _, [ens, inpts]) ->
     [scanl f i (zip ens inpts)]
@@ -313,7 +292,34 @@ compilePrim CompCtxt{..} instId prim ins = case (prim, ins) of
                                  (List.transpose inpts)
           t prev [rdAddr, wrAddr, di, we, re] =
             if we /= 0 then Map.insertWith (\x _ -> x) wrAddr di prev else prev
+  -- special cased primitives (handled by fall through case but explicitly
+  -- pattern matched here for better performance)
+  (Add _, [x, y]) -> evalBinOp x y
+  (Sub _, [x, y]) -> evalBinOp x y
+  (Mul{}, [x, y]) -> evalBinOp x y
+  (Div _, [x, y]) -> evalBinOp x y
+  (Mod _, [x, y]) -> evalBinOp x y
+  (Not _,    [x]) -> evalUnOp x
+  (And _, [x, y]) -> evalBinOp x y
+  (Or  _, [x, y]) -> evalBinOp x y
+  (Xor _, [x, y]) -> evalBinOp x y
+  (ShiftLeft _ _, [x, y]) -> evalBinOp x y
+  (ShiftRight _ _, [x, y]) -> evalBinOp x y
+  (ArithShiftRight _ _, [x, y]) -> evalBinOp x y
+  (Equal _, [x, y]) -> evalBinOp x y
+  (NotEqual _, [x, y]) -> evalBinOp x y
+  (LessThan _, [x, y]) -> evalBinOp x y
+  (LessThanEq _, [x, y]) -> evalBinOp x y
+  (ReplicateBit _, [x]) -> evalUnOp x
+  (ZeroExtend _ _, [x]) -> evalUnOp x
+  (SignExtend _ _, [x]) -> evalUnOp x
+  (SelectBits _ _ _, [x]) -> evalUnOp x
+  (Concat _ _, [x, y]) -> evalBinOp x y
+  (Identity _, [x]) -> evalUnOp x
+  (Mux _ w, [ss, i0, i1]) ->
+    [zipWith3 (\s x y -> if s == 0 then x else y) ss i0 i1]
+  -- fall through case
   _ -> List.transpose $ eval <$> (List.transpose ins)
   where eval = primSemEval prim
-        evalUnOp [i0] = [concatMap eval ((:[]) <$> i0)]
-        evalBinOp [i0, i1] = [zipWith (\x y -> head $ eval [x, y]) i0 i1]
+        evalUnOp i0 = [concatMap eval ((:[]) <$> i0)]
+        evalBinOp i0 i1 = [zipWith (\x y -> head $ eval [x, y]) i0 i1]
