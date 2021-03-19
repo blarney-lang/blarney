@@ -260,70 +260,60 @@ compileNetInputSignal ctxt memo (InputTree prim ins) = do
 --   Note: the CompCtxt argument is needed for primitives such as TestPlusArgs
 --   TODO : comment better:Special cases for no input and stateful
 compilePrim :: CompCtxt -> InstId -> Prim -> [Signal] -> [Signal]
-compilePrim CompCtxt{..} _ (TestPlusArgs plsArg) [] = [repeat isPresent]
-  where isPresent = if '+' : plsArg `elem` compArgs then 1 else 0
-compilePrim _ _ (Const w val) [] = [repeat $ clamp w $ fromInteger val]
-compilePrim _ _  (DontCare w) [] = [repeat simDontCare]
-compilePrim _ _ (Add w) [i0, i1] = [zipWith (\x y -> clamp w (x + y)) i0 i1]
-compilePrim _ _ (Sub w) [i0, i1] = [zipWith (\x y -> clamp w (x - y)) i0 i1]
--- TODO proper implementation
-compilePrim _ _ Mul{ primMulInputWidth    = w
-                   , primMulSigned        = sgn
-                   , primMulFullPrecision = precise }
-                [i0, i1] = [zipWith (\x y -> clamp (2*w) (x * y)) i0 i1]
-compilePrim _ _ (Div w) [i0, i1] = [zipWith (\x y -> clamp w (x `div` y)) i0 i1]
-compilePrim _ _ (Mod w) [i0, i1] = [zipWith (\x y -> clamp w (x `mod` y)) i0 i1]
-compilePrim _ _ (Not w)     [i0] = [map (clamp w . complement) i0]
-compilePrim _ _ (And w) [i0, i1] = [zipWith (\x y -> clamp w (x .&. y)) i0 i1]
-compilePrim _ _  (Or w) [i0, i1] = [zipWith (\x y -> clamp w (x .|. y)) i0 i1]
-compilePrim _ _ (Xor w) [i0, i1] = [zipWith (\x y -> clamp w (x `xor` y)) i0 i1]
-compilePrim _ _       (ShiftLeft _ w) [i0, i1] = [zipWith (\x y -> clamp w $ x `shiftL` fromIntegral y) i0 i1]
-compilePrim _ _      (ShiftRight _ w) [i0, i1] = [zipWith (\x y -> clamp w $ x `shiftR` fromIntegral y) i0 i1] -- TODO force usigned 'i0' (use 'Natural')
-compilePrim _ _ (ArithShiftRight _ w) [i0, i1] = [zipWith (\x y -> clamp w $ x `shiftR` fromIntegral y) i0 i1]
-compilePrim _ _      (Equal _) [i0, i1] = [zipWith (\x y -> if x == y then 1 else 0) i0 i1]
-compilePrim _ _   (NotEqual _) [i0, i1] = [zipWith (\x y -> if x /= y then 1 else 0) i0 i1]
-compilePrim _ _   (LessThan _) [i0, i1] = [zipWith (\x y -> if x  < y then 1 else 0) i0 i1]
-compilePrim _ _ (LessThanEq _) [i0, i1] = [zipWith (\x y -> if x <= y then 1 else 0) i0 i1]
-compilePrim _ _ (ReplicateBit w) [i0] = [map (\x -> clamp w if x == 0 then zeroBits else complement zeroBits) i0]
-compilePrim _ _ (ZeroExtend w _) [i0] = [map (clamp w) i0]
-compilePrim _ _ (SignExtend inW w) [i0] =
-  [map (\x -> let sgn = testBit x (inW - 1)
-                  sgnMask = (bit (w - inW + 1) - 1) `shiftL` inW
-                  sgnExt = x .|. sgnMask
-              in if sgn then sgnExt else clamp w x) i0]
-compilePrim _ _ (SelectBits _ hi lo) [i0] = [map (\x -> clamp (hi + 1) x `shiftR` lo) i0]
-compilePrim _ _ (Concat w0 w1) [i0, i1] = [zipWith (\x y -> clamp (w0 + w1) $ x `shiftL` w1 + y) i0 i1]
-compilePrim _ _ (Identity _) [i0] = [i0]
-compilePrim _ _ (Mux _ w) [ss, i0, i1] =
-  [zipWith3 (\s x y -> if s == 0 then x else y) ss i0 i1]
-compilePrim _ _ (Register i _) [inpts] = [i:inpts]
-compilePrim _ _ (RegisterEn i _) [ens, inpts] = [scanl f i (zip ens inpts)]
-  where f prev (en, inpt) = if en /= 0 then inpt else prev
-compilePrim CompCtxt{..} instId
-            BRAM{ ramKind = BRAMSinglePort
-                , ramHasByteEn = False } -- TODO: support byte enable
-            inpts@[addrS, _, _, reS] =
-  [zipWith doRead delayedAddrS bramContentS]
-  where delayedAddrS = scanl (\prv (a, re) -> if re /= 0 then a else prv)
-                             simDontCare (zip addrS reS)
-        doRead x y = fromMaybe simDontCare $ Map.lookup x y
-        bramContentS = scanl t (compInitBRAMs Map.! instId)
-                               (List.transpose inpts)
-        t prev [addr, di, we, re] =
-          if we /= 0 then Map.insertWith (\x _ -> x) addr di prev else prev
-compilePrim CompCtxt{..} instId
-            BRAM{ ramKind = BRAMDualPort
-                , ramHasByteEn = False } -- TODO: support byte enable
-            inpts@[rdAddrS, _, _, _, reS] =
-  [zipWith doRead delayedRdAddrS bramContentS]
-  where delayedRdAddrS = scanl (\prv (a, re) -> if re /= 0 then a else prv)
-                               simDontCare (zip rdAddrS reS)
-        doRead x y = fromMaybe simDontCare $ Map.lookup x y
-        bramContentS = scanl t (compInitBRAMs Map.! instId)
-                               (List.transpose inpts)
-        t prev [rdAddr, wrAddr, di, we, re] =
-          if we /= 0 then Map.insertWith (\x _ -> x) wrAddr di prev else prev
-compilePrim _ _ prim ins =
-  List.transpose $ primSemEval prim <$> (List.transpose ins)
-  --transpose $ primSemEval prim <$> (transpose ins)
-  --err $ "can't compilePrim " ++ show prim ++ ", " ++ show ins
+compilePrim CompCtxt{..} instId prim ins = case (prim, ins) of
+  (TestPlusArgs plsArg, []) ->
+    [repeat $ if '+' : plsArg `elem` compArgs then 1 else 0]
+  (Const w val, []) -> [repeat $ clamp w $ fromInteger val]
+  (DontCare w, []) -> [repeat simDontCare]
+  (Add _, [_, _]) -> evalBinOp ins
+  (Sub _, [_, _]) -> evalBinOp ins
+  (Mul{}, [_, _]) -> evalBinOp ins
+  (Div _, [_, _]) -> evalBinOp ins
+  (Mod _, [_, _]) -> evalBinOp ins
+  (Not _,    [_]) -> evalUnOp  ins
+  (And _, [_, _]) -> evalBinOp ins
+  (Or  _, [_, _]) -> evalBinOp ins
+  (Xor _, [_, _]) -> evalBinOp ins
+  (ShiftLeft _ _, [_, _]) -> evalBinOp ins
+  (ShiftRight _ _, [_, _]) -> evalBinOp ins
+  (ArithShiftRight _ _, [_, _]) -> evalBinOp ins
+  (Equal _, [_, _]) -> evalBinOp ins
+  (NotEqual _, [_, _]) -> evalBinOp ins
+  (LessThan _, [_, _]) -> evalBinOp ins
+  (LessThanEq _, [_, _]) -> evalBinOp ins
+  (ReplicateBit _, [_]) -> evalUnOp ins
+  (ZeroExtend _ _, [_]) -> evalUnOp ins
+  (SignExtend _ _, [_]) -> evalUnOp ins
+  (SelectBits _ _ _, [_]) -> evalUnOp ins
+  (Concat _ _, [_, _]) -> evalBinOp ins
+  (Identity _, [_]) -> evalUnOp ins
+  (Mux _ w, [ss, i0, i1]) ->
+    [zipWith3 (\s x y -> if s == 0 then x else y) ss i0 i1]
+  (Register i _, [inpts]) -> [i:inpts]
+  (RegisterEn i _, [ens, inpts]) ->
+    [scanl f i (zip ens inpts)]
+    where f prev (en, inpt) = if en /= 0 then inpt else prev
+  (BRAM{ ramKind = BRAMSinglePort, ramHasByteEn = False } -- TODO: support byte enable
+   , inpts@[addrS, _, _, reS] ) ->
+    [zipWith doRead delayedAddrS bramContentS]
+    where delayedAddrS = scanl (\prv (a, re) -> if re /= 0 then a else prv)
+                               simDontCare (zip addrS reS)
+          doRead x y = fromMaybe simDontCare $ Map.lookup x y
+          bramContentS = scanl t (compInitBRAMs Map.! instId)
+                                 (List.transpose inpts)
+          t prev [addr, di, we, re] =
+            if we /= 0 then Map.insertWith (\x _ -> x) addr di prev else prev
+  (BRAM{ ramKind = BRAMDualPort, ramHasByteEn = False } -- TODO: support byte enable
+   , inpts@[rdAddrS, _, _, _, reS] ) ->
+    [zipWith doRead delayedRdAddrS bramContentS]
+    where delayedRdAddrS = scanl (\prv (a, re) -> if re /= 0 then a else prv)
+                                 simDontCare (zip rdAddrS reS)
+          doRead x y = fromMaybe simDontCare $ Map.lookup x y
+          bramContentS = scanl t (compInitBRAMs Map.! instId)
+                                 (List.transpose inpts)
+          t prev [rdAddr, wrAddr, di, we, re] =
+            if we /= 0 then Map.insertWith (\x _ -> x) wrAddr di prev else prev
+  _ -> List.transpose $ eval <$> (List.transpose ins)
+  where eval = primSemEval prim
+        evalUnOp [i0] = [concatMap eval ((:[]) <$> i0)]
+        evalBinOp [i0, i1] = [zipWith (\x y -> head $ eval [x, y]) i0 i1]
