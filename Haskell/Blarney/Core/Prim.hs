@@ -423,7 +423,7 @@ type PrimSample a = (Num a, Ord a, Integral a, Bits a)
 
 -- | Helper to retrieve a primitive's semantic evaluation function
 primSemEval :: PrimSample a => Prim -> [a] -> [a]
-primSemEval prim = fromMaybe (err $ "no semEval for" ++ show prim)
+primSemEval prim = fromMaybe (err $ "no semEval for " ++ show prim)
                              (semEval $ primInfo prim)
 
 -- | Helper to tell if a 'Prim' can be optimized away or not
