@@ -1,3 +1,4 @@
+{-# LANGUAGE MultiWayIf         #-}
 {-# LANGUAGE PatternSynonyms    #-}
 {-# LANGUAGE RecordWildCards    #-}
 {-# LANGUAGE NoRebindableSyntax #-}
@@ -41,10 +42,16 @@ evalConstNet n@Net{..} = case n of
   -- Sub
   NetP (Sub w) [x, Lit 0] -> (modNet (Identity w) [x], True)
   -- Mul
-  NetP (Mul w _ _) [Lit 0, _] -> (modNet (Const w 0) [], True)
-  NetP (Mul w _ _) [_, Lit 0] -> (modNet (Const w 0) [], True)
-  NetP (Mul w _ _) [Lit 1, x] -> (modNet (Identity w) [x], True)
-  NetP (Mul w _ _) [x, Lit 1] -> (modNet (Identity w) [x], True)
+  NetP (Mul w sgn full) ins ->
+    let ow = if full then 2*w else w
+        extend = if | not  full -> Identity w
+                    | not   sgn -> ZeroExtend w ow
+                    | otherwise -> SignExtend w ow
+    in case ins of
+      [Lit 0, _] -> (modNet (Const ow 0) [], True)
+      [_, Lit 0] -> (modNet (Const ow 0) [], True)
+      [Lit 1, x] -> (modNet extend [x], True)
+      [x, Lit 1] -> (modNet extend [x], True)
   -- Div
   NetP (Div w) [Lit 0, _] -> (modNet (Const w 0) [], True)
   NetP (Div w) [x, Lit 1] -> (modNet (Identity w) [x], True)
