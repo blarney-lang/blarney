@@ -133,7 +133,7 @@ data Prim =
     --   [__outputs__] a single output, the @w@-bit sum @x + y@
   | Add OutputWidth
 
-    -- | @Sub w@ represents an subtractor
+    -- | @Sub w@ represents a subtractor
     --
     --   [__inputs__]  @[x, y]@, two @w@-bit values
     --   [__outputs__] a single output, the @w@-bit difference @x - y@
