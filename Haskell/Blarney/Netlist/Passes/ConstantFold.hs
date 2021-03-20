@@ -29,107 +29,74 @@ import Blarney.Netlist.Passes.Utils
 
 -- pattern helper to identify constant InputTree NetInputs
 pattern Lit i <- InputTree (Const _ i) []
+-- pattern helper to identify a 'Net' with specific 'Prim' and 'NetInput's
+pattern NetP p is <- Net{ netPrim = p, netInputs = is }
 -- | Helper to evaluate constant Net
 evalConstNet :: Net -> (Net, Bool)
 evalConstNet n@Net{..} = case n of
   -- special cases --
   -- Add
-  Net{ netPrim = Add w, netInputs = [Lit 0, x] } ->
-    (n { netPrim = Identity w, netInputs = [x] }, True)
-  Net{ netPrim = Add w, netInputs = [x, Lit 0] } ->
-    (n { netPrim = Identity w, netInputs = [x] }, True)
+  NetP (Add w) [Lit 0, x] -> (modNet (Identity w) [x], True)
+  NetP (Add w) [x, Lit 0] -> (modNet (Identity w) [x], True)
   -- Sub
-  Net{ netPrim = Sub w, netInputs = [x, Lit 0] } ->
-    (n { netPrim = Identity w, netInputs = [x] }, True)
+  NetP (Sub w) [x, Lit 0] -> (modNet (Identity w) [x], True)
   -- Mul
-  Net{ netPrim = Mul w _ _, netInputs = [Lit 0, _] } ->
-    (n { netPrim = Const w 0, netInputs = [] }, True)
-  Net{ netPrim = Mul w _ _, netInputs = [_, Lit 0] } ->
-    (n { netPrim = Const w 0, netInputs = [] }, True)
-  Net{ netPrim = Mul w _ _, netInputs = [Lit 1, x] } ->
-    (n { netPrim = Identity w, netInputs = [x] }, True)
-  Net{ netPrim = Mul w _ _, netInputs = [x, Lit 1] } ->
-    (n { netPrim = Identity w, netInputs = [x] }, True)
+  NetP (Mul w _ _) [Lit 0, _] -> (modNet (Const w 0) [], True)
+  NetP (Mul w _ _) [_, Lit 0] -> (modNet (Const w 0) [], True)
+  NetP (Mul w _ _) [Lit 1, x] -> (modNet (Identity w) [x], True)
+  NetP (Mul w _ _) [x, Lit 1] -> (modNet (Identity w) [x], True)
   -- Div
-  Net{ netPrim = Div w, netInputs = [Lit 0, _] } ->
-    (n { netPrim = Const w 0, netInputs = [] }, True)
-  Net{ netPrim = Div w, netInputs = [x, Lit 1] } ->
-    (n { netPrim = Identity w, netInputs = [x] }, True)
+  NetP (Div w) [Lit 0, _] -> (modNet (Const w 0) [], True)
+  NetP (Div w) [x, Lit 1] -> (modNet (Identity w) [x], True)
   -- Mod
-  Net{ netPrim = Mod w, netInputs = [Lit 0, _] } ->
-    (n { netPrim = Const w 0, netInputs = [] }, True)
-  Net{ netPrim = Mod w, netInputs = [_, Lit 1] } ->
-    (n { netPrim = Const w 0, netInputs = [] }, True)
+  NetP (Mod w) [Lit 0, _] -> (modNet (Const w 0) [], True)
+  NetP (Mod w) [_, Lit 1] -> (modNet (Const w 0) [], True)
   -- Not
-  Net{ netPrim = Not w, netInputs = [Lit a0] } ->
-    (n { netPrim = Const w ((2^w-1) `B.xor` a0), netInputs = [] }, True)
+  NetP (Not w) [Lit a0] -> (modNet (Const w ((2^w-1) `B.xor` a0)) [], True)
   -- And
-  Net{ netPrim = And w, netInputs = [Lit 0, _] } ->
-    (n { netPrim = Const w 0, netInputs = [] }, True)
-  Net{ netPrim = And w, netInputs = [_, Lit 0] } ->
-    (n { netPrim = Const w 0, netInputs = [] }, True)
-  Net{ netPrim = And w, netInputs = [Lit v, x] } | v == 2^w-1 ->
-    (n { netPrim = Identity w, netInputs = [x] }, True)
-  Net{ netPrim = And w, netInputs = [x, Lit v] } | v == 2^w-1 ->
-    (n { netPrim = Identity w, netInputs = [x] }, True)
+  NetP (And w) [Lit 0, _] -> (modNet (Const w 0) [], True)
+  NetP (And w) [_, Lit 0] -> (modNet (Const w 0) [], True)
+  NetP (And w) [Lit v, x] | v == 2^w-1 -> (modNet (Identity w) [x], True)
+  NetP (And w) [x, Lit v] | v == 2^w-1 -> (modNet (Identity w) [x], True)
   -- Or
-  Net{ netPrim = Or w, netInputs = [Lit 0, x] } ->
-    (n { netPrim = Identity w, netInputs = [x] }, True)
-  Net{ netPrim = Or w, netInputs = [x, Lit 0] } ->
-    (n { netPrim = Identity w, netInputs = [x] }, True)
-  Net{ netPrim = Or w, netInputs = [Lit v, x] } | v == 2^w-1 ->
-    (n { netPrim = Const w (2^w-1), netInputs = [] }, True)
-  Net{ netPrim = Or w, netInputs = [x, Lit v] } | v == 2^w-1 ->
-    (n { netPrim = Const w (2^w-1), netInputs = [] }, True)
+  NetP (Or w) [Lit 0, x] -> (modNet (Identity w) [x], True)
+  NetP (Or w) [x, Lit 0] -> (modNet (Identity w) [x], True)
+  NetP (Or w) [Lit v, x] | v == 2^w-1 -> (modNet (Const w (2^w-1)) [], True)
+  NetP (Or w) [x, Lit v] | v == 2^w-1 -> (modNet (Const w (2^w-1)) [], True)
   -- Xor
-  Net{ netPrim = Xor w, netInputs = [Lit 0, x] } ->
-    (n { netPrim = Identity w, netInputs = [x] }, True)
-  Net{ netPrim = Xor w, netInputs = [x, Lit 0] } ->
-    (n { netPrim = Identity w, netInputs = [x] }, True)
-  Net{ netPrim = Xor w, netInputs = [Lit v, x] } | v == 2^w-1 ->
-    (n { netPrim = Not w, netInputs = [x] }, True)
-  Net{ netPrim = Xor w, netInputs = [x, Lit v] } | v == 2^w-1 ->
-    (n { netPrim = Not w, netInputs = [x] }, True)
+  NetP (Xor w) [Lit 0, x] -> (modNet (Identity w) [x], True)
+  NetP (Xor w) [x, Lit 0] -> (modNet (Identity w) [x], True)
+  NetP (Xor w) [Lit v, x] | v == 2^w-1 -> (modNet (Not w) [x], True)
+  NetP (Xor w) [x, Lit v] | v == 2^w-1 -> (modNet (Not w) [x], True)
   -- ShiftLeft
-  Net{ netPrim = ShiftLeft _ w, netInputs = [Lit 0, _] } ->
-    (n { netPrim = Const w 0, netInputs = [] }, True)
-  Net{ netPrim = ShiftLeft _ w, netInputs = [x, Lit 0] } ->
-    (n { netPrim = Identity w, netInputs = [x] }, True)
+  NetP (ShiftLeft _ w) [Lit 0, _] -> (modNet (Const w 0) [], True)
+  NetP (ShiftLeft _ w) [x, Lit 0] -> (modNet (Identity w) [x], True)
   -- ShiftRight
-  Net{ netPrim = ShiftRight _ w, netInputs = [Lit 0, _] } ->
-    (n { netPrim = Const w 0, netInputs = [] }, True)
-  Net{ netPrim = ShiftRight _ w, netInputs = [x, Lit 0] } ->
-    (n { netPrim = Identity w, netInputs = [x] }, True)
+  NetP (ShiftRight _ w) [Lit 0, _] -> (modNet (Const w 0) [], True)
+  NetP (ShiftRight _ w) [x, Lit 0] -> (modNet (Identity w) [x], True)
   -- ArithShiftRight
-  Net{ netPrim = ArithShiftRight _ w, netInputs = [Lit 0, _] } ->
-    (n { netPrim = Const w 0, netInputs = [] }, True)
-  Net{ netPrim = ArithShiftRight _ w, netInputs = [x, Lit 0] } ->
-    (n { netPrim = Identity w, netInputs = [x] }, True)
+  NetP (ArithShiftRight _ w) [Lit 0, _] -> (modNet (Const w 0) [], True)
+  NetP (ArithShiftRight _ w) [x, Lit 0] -> (modNet (Identity w) [x], True)
   -- Mux
-  Net{ netPrim = Mux _ w, netInputs = (Lit s):xs } ->
-    (n { netPrim = Identity w, netInputs = [xs !! fromInteger s] }, True)
+  NetP (Mux _ w) (Lit s:xs) -> (modNet (Identity w) [xs !! fromInteger s], True)
   -- Registers
-  Net{ netPrim = RegisterEn i w, netInputs = [Lit 0, _] } ->
-    (n { netPrim = Const w i, netInputs = [] }, True)
-  Net{ netPrim = RegisterEn i w, netInputs = [Lit 1, a] } ->
-    (n { netPrim = Register i w, netInputs = [a] }, True)
-  Net{ netPrim = Register i w, netInputs = [Lit x] } | i == x ->
-    (n { netPrim = Const w i, netInputs = [] }, True)
+  NetP (RegisterEn i w) [Lit 0, _] -> (modNet (Const w i) [], True)
+  NetP (RegisterEn i w) [Lit 1, a] -> (modNet (Register i w) [a], True)
+  NetP (Register i w) [Lit x] | i == x -> (modNet (Const w i) [], True)
   -- Avoid matching Register in general fall through
-  Net{ netPrim = Register i w, netInputs = [a] } -> (n, False)
+  NetP (Register i w) [a] -> (n, False)
   -- general unary op on literal --
   Net{ netInputs = [Lit a0] } ->
-    ( n { netPrim = Const (primOutWidth netPrim Nothing) (head $ eval [a0])
-        , netInputs = [] }
+    ( modNet (Const (primOutWidth netPrim Nothing) (head $ eval [a0])) []
     , True )
   -- general binary op on literals --
   Net{ netInputs = [Lit a0, Lit a1] } ->
-    ( n { netPrim = Const (primOutWidth netPrim Nothing) (head $ eval [a0, a1])
-        , netInputs = [] }
+    ( modNet (Const (primOutWidth netPrim Nothing) (head $ eval [a0, a1])) []
     , True )
   -- Fall-through case, no change --
   _ -> (n, False)
   where eval = primSemEval netPrim
+        modNet p is = n { netPrim = p, netInputs = is }
 
 -- | Constant folding pass
 constantFold :: MNetlistPass s Bool
