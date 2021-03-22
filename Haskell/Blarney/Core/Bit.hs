@@ -6,6 +6,7 @@
 {-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE DeriveGeneric        #-}
 {-# LANGUAGE KindSignatures        #-}
+{-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE TypeApplications      #-}
 {-# LANGUAGE DefaultSignatures    #-}
 {-# LANGUAGE FlexibleInstances     #-}
