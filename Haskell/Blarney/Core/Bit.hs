@@ -457,21 +457,21 @@ instance GCmp U1 where
   gCmpEQ U1 U1 = true
 
 instance (GCmp a, GCmp b) => GCmp (a :*: b) where
-  gCmpLT (a0 :*: b0) (a1 :*: b1) =
-    gCmpLT a0 a1 .||. (gCmpEQ a0 a1 .&&. gCmpLT b0 b1)
-  gCmpLTE (a0 :*: b0) (a1 :*: b1) =
-    gCmpLT a0 a1 .||. (gCmpEQ a0 a1 .&&. gCmpLTE b0 b1)
-  gCmpEQ (a0 :*: b0) (a1 :*: b1) = gCmpEQ a0 a1 .&&. gCmpEQ b0 b1
+  gCmpLT (x0 :*: y0) (x1 :*: y1) =
+    gCmpLT x0 x1 .||. (gCmpEQ x0 x1 .&&. gCmpLT y0 y1)
+  gCmpLTE (x0 :*: y0) (x1 :*: y1) =
+    gCmpLT x0 x1 .||. (gCmpEQ x0 x1 .&&. gCmpLTE y0 y1)
+  gCmpEQ (x0 :*: y0) (x1 :*: y1) = gCmpEQ x0 x1 .&&. gCmpEQ y0 y1
 
 instance GCmp a => GCmp (M1 i c a) where
-  gCmpLT (M1 a) (M1 b) = gCmpLT a b
-  gCmpLTE (M1 a) (M1 b) = gCmpLTE a b
-  gCmpEQ (M1 a) (M1 b) = gCmpEQ a b
+  gCmpLT (M1 x) (M1 y) = gCmpLT x y
+  gCmpLTE (M1 x) (M1 y) = gCmpLTE x y
+  gCmpEQ (M1 x) (M1 y) = gCmpEQ x y
 
 instance Cmp a => GCmp (K1 i a) where
-  gCmpLT (K1 a) (K1 b) = a .<. b
-  gCmpLTE (K1 a) (K1 b) = a .<=. b
-  gCmpEQ (K1 a) (K1 b) = a .==. b
+  gCmpLT (K1 x) (K1 y) = x .<. y
+  gCmpLTE (K1 x) (K1 y) = x .<=. y
+  gCmpEQ (K1 x) (K1 y) = x .==. y
 
 instance Cmp ()
 instance (Cmp a, Cmp b) => Cmp (a, b)
