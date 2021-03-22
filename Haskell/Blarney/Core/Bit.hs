@@ -4,8 +4,10 @@
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE NoStarIsType          #-}
 {-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE DeriveGeneric        #-}
 {-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE TypeApplications      #-}
+{-# LANGUAGE DefaultSignatures    #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE AllowAmbiguousTypes   #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
@@ -35,8 +37,9 @@ import Blarney.Core.Utils
 
 -- Standard imports
 import Prelude
-import GHC.TypeLits
 import Data.Proxy
+import GHC.TypeLits
+import GHC.Generics
 
 -- * Typed bit-vectors
 
@@ -191,6 +194,14 @@ class Cmp a where
   a .>. b = b .<. a
   a .>=. b = b .<=. a
   a .!=. b = inv (a .==. b)
+
+  -- For generic deriving
+  default (.<.) :: (Generic a, GCmp (Rep a)) => a -> a -> Bit 1
+  a .<. b = gCmpLT (from a) (from b)
+  default (.<=.) :: (Generic a, GCmp (Rep a)) => a -> a -> Bit 1
+  a .<=. b = gCmpLTE (from a) (from b)
+  default (.==.) :: (Generic a, GCmp (Rep a)) => a -> a -> Bit 1
+  a .==. b = gCmpEQ (from a) (from b)
 
 infix 4 .<.
 infix 4 .<=.
@@ -433,3 +444,41 @@ cast x = y
           False -> FromBV $ zeroExtendBV wy (toBV x)
     wx = widthOf x
     wy = widthOf y
+
+-- | For generic deriving of Cmp class
+class GCmp f where
+  gCmpLT :: f a -> f a -> Bit 1
+  gCmpLTE :: f a -> f a -> Bit 1
+  gCmpEQ :: f a -> f a -> Bit 1
+
+instance GCmp U1 where
+  gCmpLT U1 U1 = false
+  gCmpLTE U1 U1 = true
+  gCmpEQ U1 U1 = true
+
+instance (GCmp a, GCmp b) => GCmp (a :*: b) where
+  gCmpLT (a0 :*: b0) (a1 :*: b1) =
+    gCmpLT a0 a1 .||. (gCmpEQ a0 a1 .&&. gCmpLT b0 b1)
+  gCmpLTE (a0 :*: b0) (a1 :*: b1) =
+    gCmpLT a0 a1 .||. (gCmpEQ a0 a1 .&&. gCmpLTE b0 b1)
+  gCmpEQ (a0 :*: b0) (a1 :*: b1) = gCmpEQ a0 a1 .&&. gCmpEQ b0 b1
+
+instance GCmp a => GCmp (M1 i c a) where
+  gCmpLT (M1 a) (M1 b) = gCmpLT a b
+  gCmpLTE (M1 a) (M1 b) = gCmpLTE a b
+  gCmpEQ (M1 a) (M1 b) = gCmpEQ a b
+
+instance Cmp a => GCmp (K1 i a) where
+  gCmpLT (K1 a) (K1 b) = a .<. b
+  gCmpLTE (K1 a) (K1 b) = a .<=. b
+  gCmpEQ (K1 a) (K1 b) = a .==. b
+
+instance Cmp ()
+instance (Cmp a, Cmp b) => Cmp (a, b)
+instance (Cmp a, Cmp b, Cmp c) => Cmp (a, b, c)
+instance (Cmp a, Cmp b, Cmp c, Cmp d) => Cmp (a, b, c, d)
+instance (Cmp a, Cmp b, Cmp c, Cmp d, Cmp e) => Cmp (a, b, c, d, e)
+instance (Cmp a, Cmp b, Cmp c, Cmp d, Cmp e, Cmp f) =>
+         Cmp (a, b, c, d, e, f)
+instance (Cmp a, Cmp b, Cmp c, Cmp d, Cmp e, Cmp f, Cmp g) =>
+         Cmp (a, b, c, d, e, f, g)
