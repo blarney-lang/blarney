@@ -66,7 +66,7 @@ twoSort (a, b) = a .<. b ? ((a, b), (b, a))
 ----
 
 This definition makes use of three Blarney constructs: the `Bit` type
-for bit vectors (parametised by the size of the vector); the unsigned
+for bit vectors (parametised by the size of the vector); the
 comparison operator `.<.`; and the ternary conditional operator `?`.
 A quick test bench to check that it works:
 
@@ -1156,3 +1156,22 @@ formatHex :: Int -> Bit n -> Format
 ----
 
 The `FShow` instance for `Bit n` uses decimal format with no padding.
+
+=== Cmp
+
+The `Cmp` (comparator) class provides a range of familiar comparison
+operators, and supports generic deriving.
+
+[source, Haskell]
+----
+class Cmp a where
+  (.<.)  :: a -> a -> Bit 1
+  (.<=.) :: a -> a -> Bit 1
+  (.==.) :: a -> a -> Bit 1
+  (.>.)  :: a -> a -> Bit 1
+  (.>=.) :: a -> a -> Bit 1
+  (.!=.) :: a -> a -> Bit 1
+----
+
+Only the first three operators must be defined; the others have
+default definitions.
