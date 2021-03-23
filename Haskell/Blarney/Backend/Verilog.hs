@@ -337,16 +337,23 @@ genNetVerilog netlist net = case netPrim net of
     $+$ text "endfunction"
     where thisMux = text "mux_" <> int (netInstId net)
           header = text "function" <+> brackets (int (w-1) <> text ":0")
-                   <+> thisMux <> parens (text "input"
-                                          <+> brackets (int (selw - 1)
-                                          <> text ":0") <+> text "sel") <> semi
+                     <+> thisMux <> parens allArgs <> semi
+          selArg = text "input" <+> brackets (int (selw-1) <> text ":0")
+                     <+> text "sel"
+          inArgs = [ text "input" <+> brackets (int (w-1) <> text ":0")
+                       <+> text "in" <> int i
+                   | i <- [0..numIns-1] ]
+          allArgs = hcat $ intersperse comma (selArg : inArgs)
           body = hang (text "case" <+> parens (text "sel")) 2
-                      (sep [ int i <> colon <+> thisMux
-                                   <+> equals <+> showNetInput x <> semi
-                           | (i, x) <- zip [0..] ins])
+                      (sep $ [ int i <> colon <+> thisMux
+                                   <+> equals <+> (text "in" <> int i) <> semi
+                             | i <- [0..numIns-1] ] ++ defaultAlt)
                  $+$ text "endcase"
-          ins = tail $ netInputs net
-          selw = log2ceil $ length ins
+          defaultAlt =
+            [ text "default:" <+> thisMux <+> equals <+>
+               text ("'b" ++ replicate w 'x') <> semi | numIns < 2^selw ]
+          numIns = length (netInputs net) - 1
+          selw = log2ceil numIns
   declRAM initFile 1 _ dw net =
     vcat $ map (\n -> declWire dw (netInstId net, n)) [Nothing]
   declRAM initFile 2 _ dw net =
@@ -405,7 +412,9 @@ genNetVerilog netlist net = case netPrim net of
                     <+> equals <+> text s <> semi
   instMux net = text "assign" <+> showWire (netInstId net, Nothing)
                 <+> equals <+> text "mux_" <> int (netInstId net)
-                <> parens (showNetInput $ netInputs net !! 0) <> semi
+                <> parens args <> semi
+    where
+      args = hcat $ intersperse comma $ map showNetInput $ netInputs net
   instRAM net i aw dw be =
         hang (hang (text modName) 2 (parens $ argStyle ramParams)) 2
           (hang (text "ram" <> int nId) 2 ((parens $ argStyle ramArgs) <> semi))
