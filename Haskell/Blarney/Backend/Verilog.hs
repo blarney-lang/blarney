@@ -351,7 +351,8 @@ genNetVerilog netlist net = case netPrim net of
                  $+$ text "endcase"
           defaultAlt =
             [ text "default:" <+> thisMux <+> equals <+>
-               text ("'b" ++ replicate w 'x') <> semi | numIns < 2^selw ]
+               text (show w ++ "'b" ++ replicate w 'x') <> semi
+            | numIns < 2^selw ]
           numIns = length (netInputs net) - 1
           selw = log2ceil numIns
   declRAM initFile 1 _ dw net =
