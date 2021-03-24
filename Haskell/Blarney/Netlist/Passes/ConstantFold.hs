@@ -37,10 +37,10 @@ evalConstNet :: Net -> (Net, Bool)
 evalConstNet n@Net{..} = case n of
   -- special cases --
   -- Add
-  NetP (Add w) [Lit 0, x] -> (modNet (Identity w) [x], True)
-  NetP (Add w) [x, Lit 0] -> (modNet (Identity w) [x], True)
+  NetP (Add w) [Lit 0, x] -> modNet (Identity w) [x]
+  NetP (Add w) [x, Lit 0] -> modNet (Identity w) [x]
   -- Sub
-  NetP (Sub w) [x, Lit 0] -> (modNet (Identity w) [x], True)
+  NetP (Sub w) [x, Lit 0] -> modNet (Identity w) [x]
   -- Mul
   NetP (Mul w sgn full) ins ->
     let ow = if full then 2*w else w
@@ -48,62 +48,60 @@ evalConstNet n@Net{..} = case n of
                     | not   sgn -> ZeroExtend w ow
                     | otherwise -> SignExtend w ow
     in case ins of
-      [Lit 0, _] -> (modNet (Const ow 0) [], True)
-      [_, Lit 0] -> (modNet (Const ow 0) [], True)
-      [Lit 1, x] -> (modNet extend [x], True)
-      [x, Lit 1] -> (modNet extend [x], True)
+      [Lit 0, _] -> modNet (Const ow 0) []
+      [_, Lit 0] -> modNet (Const ow 0) []
+      [Lit 1, x] -> modNet extend [x]
+      [x, Lit 1] -> modNet extend [x]
+      -- Fall-through case, no change --
+      _ -> (n, False)
   -- Div
-  NetP (Div w) [Lit 0, _] -> (modNet (Const w 0) [], True)
-  NetP (Div w) [x, Lit 1] -> (modNet (Identity w) [x], True)
+  NetP (Div w) [Lit 0, _] -> modNet (Const w 0) []
+  NetP (Div w) [x, Lit 1] -> modNet (Identity w) [x]
   -- Mod
-  NetP (Mod w) [Lit 0, _] -> (modNet (Const w 0) [], True)
-  NetP (Mod w) [_, Lit 1] -> (modNet (Const w 0) [], True)
+  NetP (Mod w) [Lit 0, _] -> modNet (Const w 0) []
+  NetP (Mod w) [_, Lit 1] -> modNet (Const w 0) []
   -- Not
-  NetP (Not w) [Lit a0] -> (modNet (Const w ((2^w-1) `B.xor` a0)) [], True)
+  NetP (Not w) [Lit a0] -> modNet (Const w ((2^w-1) `B.xor` a0)) []
   -- And
-  NetP (And w) [Lit 0, _] -> (modNet (Const w 0) [], True)
-  NetP (And w) [_, Lit 0] -> (modNet (Const w 0) [], True)
-  NetP (And w) [Lit v, x] | v == 2^w-1 -> (modNet (Identity w) [x], True)
-  NetP (And w) [x, Lit v] | v == 2^w-1 -> (modNet (Identity w) [x], True)
+  NetP (And w) [Lit 0, _] -> modNet (Const w 0) []
+  NetP (And w) [_, Lit 0] -> modNet (Const w 0) []
+  NetP (And w) [Lit v, x] | v == 2^w-1 -> modNet (Identity w) [x]
+  NetP (And w) [x, Lit v] | v == 2^w-1 -> modNet (Identity w) [x]
   -- Or
-  NetP (Or w) [Lit 0, x] -> (modNet (Identity w) [x], True)
-  NetP (Or w) [x, Lit 0] -> (modNet (Identity w) [x], True)
-  NetP (Or w) [Lit v, x] | v == 2^w-1 -> (modNet (Const w (2^w-1)) [], True)
-  NetP (Or w) [x, Lit v] | v == 2^w-1 -> (modNet (Const w (2^w-1)) [], True)
+  NetP (Or w) [Lit 0, x] -> modNet (Identity w) [x]
+  NetP (Or w) [x, Lit 0] -> modNet (Identity w) [x]
+  NetP (Or w) [Lit v, x] | v == 2^w-1 -> modNet (Const w (2^w-1)) []
+  NetP (Or w) [x, Lit v] | v == 2^w-1 -> modNet (Const w (2^w-1)) []
   -- Xor
-  NetP (Xor w) [Lit 0, x] -> (modNet (Identity w) [x], True)
-  NetP (Xor w) [x, Lit 0] -> (modNet (Identity w) [x], True)
-  NetP (Xor w) [Lit v, x] | v == 2^w-1 -> (modNet (Not w) [x], True)
-  NetP (Xor w) [x, Lit v] | v == 2^w-1 -> (modNet (Not w) [x], True)
+  NetP (Xor w) [Lit 0, x] -> modNet (Identity w) [x]
+  NetP (Xor w) [x, Lit 0] -> modNet (Identity w) [x]
+  NetP (Xor w) [Lit v, x] | v == 2^w-1 -> modNet (Not w) [x]
+  NetP (Xor w) [x, Lit v] | v == 2^w-1 -> modNet (Not w) [x]
   -- ShiftLeft
-  NetP (ShiftLeft _ w) [Lit 0, _] -> (modNet (Const w 0) [], True)
-  NetP (ShiftLeft _ w) [x, Lit 0] -> (modNet (Identity w) [x], True)
+  NetP (ShiftLeft _ w) [Lit 0, _] -> modNet (Const w 0) []
+  NetP (ShiftLeft _ w) [x, Lit 0] -> modNet (Identity w) [x]
   -- ShiftRight
-  NetP (ShiftRight _ w) [Lit 0, _] -> (modNet (Const w 0) [], True)
-  NetP (ShiftRight _ w) [x, Lit 0] -> (modNet (Identity w) [x], True)
+  NetP (ShiftRight _ w) [Lit 0, _] -> modNet (Const w 0) []
+  NetP (ShiftRight _ w) [x, Lit 0] -> modNet (Identity w) [x]
   -- ArithShiftRight
-  NetP (ArithShiftRight _ w) [Lit 0, _] -> (modNet (Const w 0) [], True)
-  NetP (ArithShiftRight _ w) [x, Lit 0] -> (modNet (Identity w) [x], True)
+  NetP (ArithShiftRight _ w) [Lit 0, _] -> modNet (Const w 0) []
+  NetP (ArithShiftRight _ w) [x, Lit 0] -> modNet (Identity w) [x]
   -- Mux
-  NetP (Mux _ w) (Lit s:xs) -> (modNet (Identity w) [xs !! fromInteger s], True)
+  NetP (Mux _ w) (Lit s:xs) -> modNet (Identity w) [xs !! fromInteger s]
   -- Registers
-  NetP (RegisterEn i w) [Lit 0, _] -> (modNet (Const w i) [], True)
-  NetP (RegisterEn i w) [Lit 1, a] -> (modNet (Register i w) [a], True)
-  NetP (Register i w) [Lit x] | i == x -> (modNet (Const w i) [], True)
-  -- Avoid matching Register in general fall through
-  NetP (Register i w) [a] -> (n, False)
+  NetP (RegisterEn i w) [Lit 0, _] -> modNet (Const w i) []
+  NetP (RegisterEn i w) [Lit 1, a] -> modNet (Register i w) [a]
+  NetP (Register i w) [Lit x] | i == x -> modNet (Const w i) []
   -- general unary op on literal --
-  Net{ netInputs = [Lit a0] } ->
-    ( modNet (Const (primOutWidth netPrim Nothing) (head $ eval [a0])) []
-    , True )
+  NetP _ [Lit a0] | Just f <- eval ->
+    modNet (Const (primOutWidth netPrim Nothing) (head $ f [a0])) []
   -- general binary op on literals --
-  Net{ netInputs = [Lit a0, Lit a1] } ->
-    ( modNet (Const (primOutWidth netPrim Nothing) (head $ eval [a0, a1])) []
-    , True )
+  NetP _ [Lit a0, Lit a1] | Just f <- eval ->
+    modNet (Const (primOutWidth netPrim Nothing) (head $ f [a0, a1])) []
   -- Fall-through case, no change --
   _ -> (n, False)
-  where eval = primSemEval netPrim
-        modNet p is = n { netPrim = p, netInputs = is }
+  where eval = primSemEvalRaw netPrim
+        modNet p is = (n { netPrim = p, netInputs = is }, True)
 
 -- | Constant folding pass
 constantFold :: MNetlistPass s Bool

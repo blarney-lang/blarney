@@ -18,9 +18,9 @@ module Blarney.Core.Prim (
   Prim(..)        -- Primitive components
 , canInline       -- Tell if a 'Prim' can be inlined
 , canInlineInput  -- Tell if a 'Prim' inputs can be inlined
-, primStr         -- get useful name strings out of a 'Prim'
-, PrimSample
 , clamp
+, primStr         -- get useful name strings out of a 'Prim'
+, primSemEvalRaw
 , primSemEval
 , primDontKill    -- tell if a 'Prim' can be optimised away
 , primIsRoot      -- tell if a 'Prim' is a netlist root
@@ -421,10 +421,15 @@ primStr = strRep . primInfo
 -- | constraint on samples that can be fed to primitives
 type PrimSample a = (Num a, Ord a, Integral a, Bits a)
 
+-- | Helper to retrieve a primitive's semantic evaluation function or lack
+--   thereof
+primSemEvalRaw :: PrimSample a => Prim -> Maybe ([a] -> [a])
+primSemEvalRaw = semEval . primInfo
+
 -- | Helper to retrieve a primitive's semantic evaluation function
 primSemEval :: PrimSample a => Prim -> [a] -> [a]
 primSemEval prim = fromMaybe (err $ "no semEval for " ++ show prim)
-                             (semEval $ primInfo prim)
+                             (primSemEvalRaw prim)
 
 -- | Helper to tell if a 'Prim' can be optimized away or not
 primDontKill :: Prim -> Bool
