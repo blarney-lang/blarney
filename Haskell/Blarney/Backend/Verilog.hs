@@ -332,6 +332,9 @@ genNetVerilog netlist net = case netPrim net of
   declReg width reg = text "reg" <+> showWireWidth width reg <> semi
   declRegInit width reg init =     text "reg" <+> showWireWidth width reg
                                <+> equals <+> showIntLit width init <> semi
+  declMux w net | numIns == 2 =
+      declWire w (netInstId net, Nothing)
+    where numIns = length (netInputs net) - 1
   declMux w net = declWire w (netInstId net, Nothing)
     $+$ hang header 2 body
     $+$ text "endfunction"
@@ -411,11 +414,18 @@ genNetVerilog netlist net = case netPrim net of
                      <+> equals <+> showNetInput (netInputs net !! 0) <> semi
   instInput net s =     text "assign" <+> showWire (netInstId net, Nothing)
                     <+> equals <+> text s <> semi
-  instMux net = text "assign" <+> showWire (netInstId net, Nothing)
-                <+> equals <+> text "mux_" <> int (netInstId net)
-                <> parens args <> semi
+  instMux net
+    | numIns == 2 = text "assign" <+> showWire (netInstId net, Nothing)
+        <+> equals <+> showNetInput (ins!!0) <+> char '?'
+        <+> showNetInput (ins!!2) <+> colon <+> showNetInput (ins!!1)
+        <> semi
+    | otherwise = text "assign" <+> showWire (netInstId net, Nothing)
+        <+> equals <+> text "mux_" <> int (netInstId net)
+        <> parens args <> semi
     where
+      ins = netInputs net
       args = hcat $ intersperse comma $ map showNetInput $ netInputs net
+      numIns = length ins - 1
   instRAM net i aw dw be =
         hang (hang (text modName) 2 (parens $ argStyle ramParams)) 2
           (hang (text "ram" <> int nId) 2 ((parens $ argStyle ramArgs) <> semi))
