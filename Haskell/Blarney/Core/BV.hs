@@ -1,3 +1,5 @@
+{-# LANGUAGE RecordWildCards #-}
+
 -- For Observable Sharing
 {-# OPTIONS_GHC -fno-cse -fno-full-laziness #-}
 
@@ -5,7 +7,7 @@
 Module      : Blarney.Core.BV
 Description : Untyped bit vectors and circuit primitives
 Copyright   : (c) Matthew Naylor, 2019
-              (c) Alexandre Joannou, 2019
+              (c) Alexandre Joannou, 2019-2021
 License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
@@ -355,22 +357,11 @@ regFileReadBV inf a = makePrim1 (RegFileRead inf) [a]
 -- which may involve bit manipulations.
 -- Used to determine the initial value of a register.
 getInitBV :: BV -> Integer
-getInitBV = eval
-  where
-    eval a =
-      case bvPrim a of
-        Const _ i -> i
-        DontCare w -> 0  -- TODO: do better here
-        Concat wx wy ->
-          let x = eval (bvInputs a !! 0)
-              y = eval (bvInputs a !! 1)
-          in  x `B.shiftL` wy + y
-        SelectBits w hi lo ->
-          let x = eval (bvInputs a !! 0)
-              mask = (1 `B.shiftL` (hi+1)) - 1
-          in  (x B..&. mask) `B.shiftR` lo
-        ReplicateBit w ->
-          let b = eval (bvInputs a !! 0)
-          in  b * ((2^w) - 1)
-        other -> error $ "Register initialiser must be a constant: " ++
-                         (show other)
+getInitBV BV{..} = case bvPrim of
+  Const _ i -> i
+  DontCare w -> 0  -- TODO: do better here
+  _ | Just f <- eval ->
+    head $ f (map getInitBV bvInputs)
+  _ -> error $ "Register initialiser must be a constant. Encountered: " ++
+               show bvPrim
+  where eval = primSemEvalRaw bvPrim
