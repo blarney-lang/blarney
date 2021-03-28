@@ -311,6 +311,32 @@ compilePrim CompCtxt{..} instId prim ins = case (prim, ins) of
           wrt m_be new old
             | ramHasByteEn, [be] <- m_be = mergeWithBE ramDataWidth be new old
             | otherwise = clamp ramDataWidth new
+  (BRAM{ ramKind = BRAMTrueDualPort, .. }, inpts@(addrAs:addrBs:_:_:weAs:weBs:reAs:reBs:_)) ->
+    [ zipWith4 doRead delayedAddrAs delayedAddrBs delayedWeAs bramContentS
+    , zipWith4 doRead delayedAddrBs delayedAddrAs delayedWeBs bramContentS ]
+    where delayedAddrAs = scanl (\prv (a, re) -> if re /= 0 then a else prv)
+                                simDontCare
+                                (zip (clamp ramAddrWidth <$> addrAs) reAs)
+          delayedAddrBs = scanl (\prv (a, re) -> if re /= 0 then a else prv)
+                                simDontCare
+                                (zip (clamp ramAddrWidth <$> addrBs) reBs)
+          delayedWeAs = simDontCare : weAs
+          delayedWeBs = simDontCare : weBs
+          doRead rdAddr wrAddr we cntnt
+            | we /= 0, rdAddr == wrAddr = simDontCare
+            | otherwise = fromMaybe simDontCare $ Map.lookup rdAddr cntnt
+          bramContentS = scanl t (compInitBRAMs Map.! instId)
+                                 (transpose inpts)
+          t prev (addrA:addrB:diA:diB:weA:weB:_:_:m_bes) =
+            let ones = complement zeroBits
+                [beA, beB] = if ramHasByteEn then m_bes else [ones, ones]
+            in go (go prev addrA diA weA beA) addrB diB weB beB
+          go prev addr di we be
+            | we /= 0 = Map.insertWith (mergeWithBE ramDataWidth be)
+                                       (clamp ramAddrWidth addr)
+                                       di
+                                       prev
+            | otherwise = prev
   -- special cased primitives (handled by fall through case but explicitly
   -- pattern matched here for better performance)
   (Add _, [x, y]) -> evalBinOp x y
