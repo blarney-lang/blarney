@@ -21,14 +21,14 @@ import Debug.Trace
 
 import Prelude
 import Numeric
-import Control.Monad
-import Control.Monad.ST
-import Data.Array.ST
+import Data.List
 import Data.Bits
 import Data.Char
 import Data.Maybe
+import Control.Monad
+import Data.Array.ST
+import Control.Monad.ST
 import System.Environment
-import qualified Data.List as List
 import qualified Data.Map.Strict as Map
 import qualified Data.Array.IArray as IArray
 
@@ -62,7 +62,7 @@ simulateNetlist nl = do
   -- simulation, we apply all effects from the current simulation cycle and
   -- also print TICK
   mapM_ (\(effects, end) -> sequence_ effects {->> print ("TICK: " ++ show end)-})
-        (zip (List.transpose simEffects) (takeWhileInclusive not simTerminate))
+        (zip (transpose simEffects) (takeWhileInclusive not simTerminate))
   where takeWhileInclusive _ [] = []
         takeWhileInclusive p (x:xs) = x : if p x then takeWhileInclusive p xs
                                                  else []
@@ -156,7 +156,7 @@ compile ctxt inputStreams = runST do
   let outputStreams = zip nms sigs
   -- wrap compilation result into a SimulatorIfc
   return $ SimulatorIfc { simEffects   = effectStreams
-                        , simTerminate = map or (List.transpose endStreams)
+                        , simTerminate = map or (transpose endStreams)
                         , simOutputs   = Map.fromList outputStreams }
 
 -- | compile the 'SimEffect' stream of simulation effects for a given simulation
@@ -165,7 +165,7 @@ compileSimEffect :: CompFun s Net SimEffect
 compileSimEffect ctxt memo Net{ netPrim = Display args, .. } = do
   netInputs' <- mapM (compileNetInputSignal ctxt memo) netInputs
   return $ map (\(en:inpts) -> when (en /= 0) do putStr . concat $ fmt args inpts)
-               (List.transpose netInputs')
+               (transpose netInputs')
   where fmt [] _ = []
         fmt (DisplayArgString s : rest) ins = escape s : fmt rest ins
         fmt (DisplayArgBit _ r p z : rest) (x:ins) =
@@ -282,24 +282,35 @@ compilePrim CompCtxt{..} instId prim ins = case (prim, ins) of
             | we /= 0 = simDontCare
             | otherwise = fromMaybe simDontCare $ Map.lookup addr cntnt
           bramContentS = scanl t (compInitBRAMs Map.! instId)
-                                 (List.transpose inpts)
-          t prev (addr:di:we:re:m_be) =
-            if we /= 0
-              then Map.insertWith (wrt m_be) (clamp ramAddrWidth addr) di prev
-              else prev
+                                 (transpose inpts)
+          t prev (addr:di:we:re:m_be)
+            | we /= 0 =
+              Map.insertWith (wrt m_be) (clamp ramAddrWidth addr) di prev
+            | otherwise = prev
           wrt m_be new old
             | ramHasByteEn, [be] <- m_be = mergeWithBE ramDataWidth be new old
             | otherwise = clamp ramDataWidth new
-  (BRAM{ ramKind = BRAMDualPort, ramHasByteEn = False } -- TODO: support byte enable
-   , inpts@[rdAddrS, _, _, _, reS] ) ->
-    [zipWith doRead delayedRdAddrS bramContentS]
+  (BRAM{ ramKind = BRAMDualPort, .. }, inpts@(rdAddrS:wrAddrS:_:weS:reS:_) ) ->
+    [zipWith4 doRead delayedRdAddrS delayedWrAddrS delayedWeS bramContentS]
     where delayedRdAddrS = scanl (\prv (a, re) -> if re /= 0 then a else prv)
-                                 simDontCare (zip rdAddrS reS)
-          doRead x y = fromMaybe simDontCare $ Map.lookup x y
+                                 simDontCare
+                                 (zip (clamp ramAddrWidth <$> rdAddrS) reS)
+          delayedWrAddrS = scanl (\prv (a, we) -> if we /= 0 then a else prv)
+                                 simDontCare
+                                 (zip (clamp ramAddrWidth <$> wrAddrS) weS)
+          delayedWeS = simDontCare : weS
+          doRead rdAddr wrAddr we cntnt
+            | we /= 0, rdAddr == wrAddr = simDontCare
+            | otherwise = fromMaybe simDontCare $ Map.lookup rdAddr cntnt
           bramContentS = scanl t (compInitBRAMs Map.! instId)
-                                 (List.transpose inpts)
-          t prev [rdAddr, wrAddr, di, we, re] =
-            if we /= 0 then Map.insertWith (\x _ -> x) wrAddr di prev else prev
+                                 (transpose inpts)
+          t prev (_:wrAddr:di:we:_:m_be)
+            | we /= 0 =
+              Map.insertWith (wrt m_be) (clamp ramAddrWidth wrAddr) di prev
+            | otherwise = prev
+          wrt m_be new old
+            | ramHasByteEn, [be] <- m_be = mergeWithBE ramDataWidth be new old
+            | otherwise = clamp ramDataWidth new
   -- special cased primitives (handled by fall through case but explicitly
   -- pattern matched here for better performance)
   (Add _, [x, y]) -> evalBinOp x y
@@ -327,7 +338,7 @@ compilePrim CompCtxt{..} instId prim ins = case (prim, ins) of
   (Mux _ w, [ss, i0, i1]) ->
     [zipWith3 (\s x y -> if s == 0 then x else y) ss i0 i1]
   -- fall through case
-  _ -> List.transpose $ eval <$> (List.transpose ins)
+  _ -> transpose $ eval <$> transpose ins
   where eval = primSemEval prim
         evalUnOp i0 = [concatMap eval ((:[]) <$> i0)]
         evalBinOp i0 i1 = [zipWith (\x y -> head $ eval [x, y]) i0 i1]
