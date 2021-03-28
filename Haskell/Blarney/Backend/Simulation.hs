@@ -272,12 +272,15 @@ compilePrim CompCtxt{..} instId prim ins = case (prim, ins) of
   (RegisterEn i _, [ens, inpts]) ->
     [scanl f i (zip ens inpts)]
     where f prev (en, inpt) = if en /= 0 then inpt else prev
-  (BRAM{ ramKind = BRAMSinglePort, .. }, inpts@(addrS:_:_:reS:_) ) ->
-    [zipWith doRead delayedAddrS bramContentS]
+  (BRAM{ ramKind = BRAMSinglePort, .. }, inpts@(addrS:_:weS:reS:_) ) ->
+    [zipWith3 doRead delayedAddrS delayedWeS bramContentS]
     where delayedAddrS = scanl (\prv (a, re) -> if re /= 0 then a else prv)
                                simDontCare
                                (zip (clamp ramAddrWidth <$> addrS) reS)
-          doRead x y = fromMaybe simDontCare $ Map.lookup x y
+          delayedWeS = simDontCare : weS
+          doRead addr we cntnt
+            | we /= 0 = simDontCare
+            | otherwise = fromMaybe simDontCare $ Map.lookup addr cntnt
           bramContentS = scanl t (compInitBRAMs Map.! instId)
                                  (List.transpose inpts)
           t prev (addr:di:we:re:m_be) =
