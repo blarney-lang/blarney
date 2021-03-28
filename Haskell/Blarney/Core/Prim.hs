@@ -19,6 +19,7 @@ module Blarney.Core.Prim (
 , canInline       -- Tell if a 'Prim' can be inlined
 , canInlineInput  -- Tell if a 'Prim' inputs can be inlined
 , clamp
+, mergeWithBE
 , primStr         -- get useful name strings out of a 'Prim'
 , primSemEvalRaw
 , primSemEval
@@ -45,7 +46,7 @@ module Blarney.Core.Prim (
 ) where
 
 import Prelude
-import Data.Set
+import Data.Set (Set, union, empty)
 import Data.List (elemIndex)
 import Data.Bits
 import Data.Maybe
@@ -499,12 +500,19 @@ data PrimInfo = PrimInfo {
   -- | Tells the number and widths of inputs to a 'Prim'
 , inputs :: [(String, InputWidth)]
   -- | Tells the number and widths of outputs of a 'Prim'
-, outputs :: [(String, OutputWidth)]
-}
+, outputs :: [(String, OutputWidth)] }
 
 -- | clamp a given sample to the provided width
 clamp :: (Num a, Bits a) => Width -> a -> a
 clamp w x = (bit w - 1) .&. x
+
+-- | merges a new sample of provided width into an old sample of same width
+--   according to the provided byte enable
+mergeWithBE :: (Num a, Bits a) => Width -> a -> a -> a -> a
+mergeWithBE w be new old = (newMask .&. new) .|. (oldMask .&. old)
+  where newMask = foldl (\a x -> shiftL a 8 .|. if x then 0xff else 0x00) 0 beLst
+        oldMask = foldl (\a x -> shiftL a 8 .|. if x then 0x00 else 0xff) 0 beLst
+        beLst = testBit be <$> [0..(log2ceil w - 1)]
 
 toSigned :: (Ord a, Num a) => Width -> a -> a
 toSigned w x | x > 0 = if x >= 2^(w-1) then x - 2^w else x

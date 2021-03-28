@@ -272,16 +272,21 @@ compilePrim CompCtxt{..} instId prim ins = case (prim, ins) of
   (RegisterEn i _, [ens, inpts]) ->
     [scanl f i (zip ens inpts)]
     where f prev (en, inpt) = if en /= 0 then inpt else prev
-  (BRAM{ ramKind = BRAMSinglePort, ramHasByteEn = False } -- TODO: support byte enable
-   , inpts@[addrS, _, _, reS] ) ->
+  (BRAM{ ramKind = BRAMSinglePort, .. }, inpts@(addrS:_:_:reS:_) ) ->
     [zipWith doRead delayedAddrS bramContentS]
     where delayedAddrS = scanl (\prv (a, re) -> if re /= 0 then a else prv)
-                               simDontCare (zip addrS reS)
+                               simDontCare
+                               (zip (clamp ramAddrWidth <$> addrS) reS)
           doRead x y = fromMaybe simDontCare $ Map.lookup x y
           bramContentS = scanl t (compInitBRAMs Map.! instId)
                                  (List.transpose inpts)
-          t prev [addr, di, we, re] =
-            if we /= 0 then Map.insertWith (\x _ -> x) addr di prev else prev
+          t prev (addr:di:we:re:m_be) =
+            if we /= 0
+              then Map.insertWith (wrt m_be) (clamp ramAddrWidth addr) di prev
+              else prev
+          wrt m_be new old
+            | ramHasByteEn, [be] <- m_be = mergeWithBE ramDataWidth be new old
+            | otherwise = clamp ramDataWidth new
   (BRAM{ ramKind = BRAMDualPort, ramHasByteEn = False } -- TODO: support byte enable
    , inpts@[rdAddrS, _, _, _, reS] ) ->
     [zipWith doRead delayedRdAddrS bramContentS]
