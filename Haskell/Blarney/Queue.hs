@@ -116,12 +116,30 @@ A full-throughput N-element queue implemented using 2 registers and a RAM:
   * There's a mux on the enqueue path.
 -}
 makeSizedQueue :: Bits a => Int -> Module (Queue a)
-makeSizedQueue logSize = do
+makeSizedQueue logSize =
+  makeSizedQueueConfig
+    SizedQueueConfig {
+      sizedQueueLogSize = logSize
+    , sizedQueueBuffer = makeQueue
+    }
+
+-- | Config options for a sized queue
+data SizedQueueConfig a =
+  SizedQueueConfig {
+    sizedQueueLogSize :: Int
+    -- ^ Log of capacity of queue
+  , sizedQueueBuffer :: Module (Queue a)
+    -- ^ Type of queue to use as buffer on output of RAM
+  }
+
+-- | Sized queue with config options
+makeSizedQueueConfig :: Bits a => SizedQueueConfig a -> Module (Queue a)
+makeSizedQueueConfig config = do
   -- Big queue
-  big :: Queue a <- makeSizedQueueCore logSize
+  big :: Queue a <- makeSizedQueueCore (config.sizedQueueLogSize)
 
   -- Small queue, buffering the output of the big queue
-  small :: Queue a <- makeQueue
+  small :: Queue a <- config.sizedQueueBuffer
 
   always do
     -- Connect big queue to small queue
