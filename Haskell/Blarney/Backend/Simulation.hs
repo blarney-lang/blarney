@@ -327,10 +327,12 @@ compilePrim CompCtxt{..} instId prim ins = case (prim, ins) of
             | otherwise = fromMaybe simDontCare $ Map.lookup rdAddr cntnt
           bramContentS = scanl t (compInitBRAMs Map.! instId)
                                  (transpose inpts)
-          t prev (addrA:addrB:diA:diB:weA:weB:_:_:m_bes) =
-            let ones = complement zeroBits
-                [beA, beB] = if ramHasByteEn then m_bes else [ones, ones]
-            in go (go prev addrA diA weA beA) addrB diB weB beB
+          t prev (addrA:addrB:diA:diB:weA:weB:_:_:m_bes)
+            | weA /= 0, weB /= 0, addrA == addrB = Map.insert addrA cnflct prev
+            | otherwise = go (go prev addrA diA weA beA) addrB diB weB beB
+            where ones = complement zeroBits
+                  [beA, beB] = if ramHasByteEn then m_bes else [ones, ones]
+                  cnflct = err "BRAM value written by conflicting writes"
           go prev addr di we be
             | we /= 0 = Map.insertWith (mergeWithBE ramDataWidth be)
                                        (clamp ramAddrWidth addr)
