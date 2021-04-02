@@ -1,5 +1,8 @@
-import BlarneyTest
+{-# LANGUAGE MultiWayIf #-}
+
 import Blarney
+
+import System.Environment
 
 -- Tiny 8-bit CPU with a 4-stage pipeline
 --
@@ -146,4 +149,7 @@ makeCPU = do
 
 -- Main function
 main :: IO ()
-main = blarneyTestMain "CPU" makeCPU
+main = do
+  args <- getArgs
+  if | "--simulate" `elem` args -> simulate makeCPU
+     | otherwise -> writeVerilogTop makeCPU "CPU" "CPU-Verilog/"

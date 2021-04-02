@@ -1,6 +1,9 @@
-import BlarneyTest
+{-# LANGUAGE MultiWayIf #-}
+
 import Blarney
 import Blarney.Queue
+
+import System.Environment
 
 -- Top-level module
 top :: Module ()
@@ -26,4 +29,7 @@ top = do
 
 -- Main function
 main :: IO ()
-main = blarneyTestMain "Queue" top
+main = do
+  args <- getArgs
+  if | "--simulate" `elem` args -> simulate top
+     | otherwise -> writeVerilogTop top "Queue" "Queue-Verilog/"

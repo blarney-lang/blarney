@@ -1,7 +1,10 @@
-import BlarneyTest
+{-# LANGUAGE MultiWayIf #-}
+
 import Blarney
 import Blarney.Queue
 import Blarney.Stream
+
+import System.Environment
 import Data.List (transpose)
 import Control.Monad (forM_, zipWithM_, replicateM)
 
@@ -173,4 +176,7 @@ top = do
 
 -- Main
 main :: IO ()
-main = blarneyTestMain "NoC" top
+main = do
+  args <- getArgs
+  if | "--simulate" `elem` args -> simulate top
+     | otherwise -> writeVerilogTop top "NoC" "NoC-Verilog/"

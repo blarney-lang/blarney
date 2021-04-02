@@ -1,6 +1,9 @@
-import BlarneyTest
+{-# LANGUAGE MultiWayIf #-}
+
 import Blarney
 import Blarney.BitPat
+
+import System.Environment
 
 -- Opcode    | Meaning
 -- ----------+--------------------------------------------------------
@@ -39,4 +42,7 @@ top = always do
 
 -- Main function
 main :: IO ()
-main = blarneyTestMain "BitPat" top
+main = do
+  args <- getArgs
+  if | "--simulate" `elem` args -> simulate top
+     | otherwise -> writeVerilogTop top "BitPat" "BitPat-Verilog/"

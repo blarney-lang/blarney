@@ -1,8 +1,11 @@
-import BlarneyTest
+{-# LANGUAGE MultiWayIf #-}
+
 import Blarney
 import Blarney.Queue
 import Blarney.Stream
 import Blarney.SourceSink
+
+import System.Environment
 
 -- Top-level module
 top :: Module ()
@@ -41,4 +44,7 @@ top = do
 
 -- Main function
 main :: IO ()
-main = blarneyTestMain "SourceSinkStream" top
+main = do
+  args <- getArgs
+  if | "--simulate" `elem` args -> simulate top
+     | otherwise -> writeVerilogTop top "SourceSinkStream" "SourceSinkStream-Verilog/"

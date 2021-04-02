@@ -1,6 +1,9 @@
-import BlarneyTest
+{-# LANGUAGE MultiWayIf #-}
+
 import Blarney
 import Blarney.Recipe
+
+import System.Environment
 
 -- This module implements a full-throughput dual-port stack.
 
@@ -167,4 +170,7 @@ top = do
 -- ===============
 
 main :: IO ()
-main = blarneyTestMain "Stack" top
+main = do
+  args <- getArgs
+  if | "--simulate" `elem` args -> simulate top
+     | otherwise -> writeVerilogTop top "Stack" "Stack-Verilog/"

@@ -1,7 +1,10 @@
-import BlarneyTest
+{-# LANGUAGE MultiWayIf #-}
+
 import Blarney
 import Blarney.Queue
 import Blarney.Stream
+
+import System.Environment
 
 -- Single-element FIFO
 
@@ -51,4 +54,6 @@ top = do
 main :: IO ()
 main = do
   writeVerilogModule inc "inc" "Interface-Verilog/"
-  blarneyTestMain "Interface" top
+  args <- getArgs
+  if | "--simulate" `elem` args -> simulate top
+     | otherwise -> writeVerilogTop top "Interface" "Interface-Verilog/"

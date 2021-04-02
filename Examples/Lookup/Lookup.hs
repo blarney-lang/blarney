@@ -1,6 +1,9 @@
-import BlarneyTest
+{-# LANGUAGE MultiWayIf #-}
+
 import Blarney
 import Blarney.Queue
+
+import System.Environment
 
 top :: Module ()
 top = do
@@ -34,4 +37,7 @@ top = do
       finish
 
 main :: IO ()
-main = blarneyTestMain "Lookup" top
+main = do
+  args <- getArgs
+  if | "--simulate" `elem` args -> simulate top
+     | otherwise -> writeVerilogTop top "Lookup" "Lookup-Verilog/"

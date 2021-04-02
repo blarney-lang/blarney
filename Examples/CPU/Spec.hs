@@ -1,7 +1,10 @@
-import BlarneyTest
+{-# LANGUAGE MultiWayIf #-}
+
 import Blarney
 import Blarney.BitPat
+
 import System.Process
+import System.Environment
 
 -- Tiny 8-bit CPU specification
 --
@@ -66,4 +69,7 @@ makeCPUSpec = do
       fetch <== 1
 
 main :: IO ()
-main = blarneyTestMain "Spec" makeCPUSpec
+main = do
+  args <- getArgs
+  if | "--simulate" `elem` args -> simulate makeCPUSpec
+     | otherwise -> writeVerilogTop makeCPUSpec "Spec" "Spec-Verilog/"

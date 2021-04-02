@@ -1,7 +1,11 @@
-import BlarneyTest
-import Blarney
+{-# LANGUAGE MultiWayIf #-}
+
 import Mesh
+
+import Blarney
+
 import Data.List
+import System.Environment
 
 -- Heat diffusion on a 2D mesh
 
@@ -45,4 +49,7 @@ top t w h = do
 
 -- Main function
 main :: IO ()
-main = blarneyTestMain "Heat" (top 5000 16 16)
+main = do
+  args <- getArgs
+  if | "--simulate" `elem` args -> simulate (top 5000 16 16)
+     | otherwise -> writeVerilogTop (top 5000 16 16) "Heat" "Heat-Verilog/"

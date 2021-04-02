@@ -1,5 +1,8 @@
-import BlarneyTest
+{-# LANGUAGE MultiWayIf #-}
+
 import Blarney
+
+import System.Environment
 
 top :: Module ()
 top = do
@@ -25,4 +28,7 @@ top = do
       display "running with +DEBUG"
 
 main :: IO ()
-main = blarneyTestMain "BasicRTL" top
+main = do
+  args <- getArgs
+  if | "--simulate" `elem` args -> simulate top
+     | otherwise -> writeVerilogTop top "BasicRTL" "BasicRTL-Verilog/"

@@ -1,6 +1,9 @@
-import BlarneyTest
+{-# LANGUAGE MultiWayIf #-}
+
 import Blarney
 import Blarney.Option
+
+import System.Environment
 
 testModule :: Module (Option (Bit 32), Bit 32)
 testModule = do
@@ -28,4 +31,6 @@ top = do
 main :: IO ()
 main = do
   writeVerilogModule testModule "testModule" "OptionExample-Verilog/"
-  blarneyTestMain "OptionExample" top
+  args <- getArgs
+  if | "--simulate" `elem` args -> simulate top
+     | otherwise -> writeVerilogTop top "OptionExample" "OptionExample-Verilog/"

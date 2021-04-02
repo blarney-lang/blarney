@@ -1,5 +1,8 @@
-import BlarneyTest
+{-# LANGUAGE MultiWayIf #-}
+
 import Blarney
+
+import System.Environment
 
 -- Single-element FIFO
 
@@ -65,4 +68,7 @@ top = do
 
 -- Main function
 main :: IO ()
-main = blarneyTestMain "FIFO" top
+main = do
+  args <- getArgs
+  if | "--simulate" `elem` args -> simulate top
+     | otherwise -> writeVerilogTop top "FIFO" "FIFO-Verilog/"

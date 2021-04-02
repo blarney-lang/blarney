@@ -1,5 +1,8 @@
-import BlarneyTest
+{-# LANGUAGE MultiWayIf #-}
+
 import Blarney
+
+import System.Environment
 
 top :: Module ()
 top = do
@@ -23,4 +26,7 @@ top = do
       finish
 
 main :: IO ()
-main = blarneyTestMain "NameBits" top
+main = do
+  args <- getArgs
+  if | "--simulate" `elem` args -> simulate top
+     | otherwise -> writeVerilogTop top "NameBits" "NameBits-Verilog/"

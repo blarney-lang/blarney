@@ -7,14 +7,14 @@ all: $(GENS)
 	$*-Verilog/$*
 
 %-test-simulation: %
-	./$< --test-simulation
+	./$< --simulate
 
 %: %.hs
-	blc -i$(BLARNEY_ROOT)/Examples $(BLC_FLAGS) $<
+	blc $(BLC_FLAGS) $<
 
 .SECONDARY: $(addsuffix -Verilog, $(GEN))
 %-Verilog: %
-	./$< --test-verilog-gen
+	./$< --verilog
 
 .PHONY: clean
 clean:

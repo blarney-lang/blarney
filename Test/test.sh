@@ -167,7 +167,7 @@ for E in ${BLARNEY_EXAMPLES[@]}; do
     ##############
     if [ $doBackendVerilog ]; then
       echo -n "  verilog: "
-      ./$testName $GEN_FLAGS --test-verilog-gen
+      ./$testName $GEN_FLAGS --verilog
       make -s -C $testName-Verilog &> /dev/null
       # Using 'sed \$d' to print all but the last line (works on Linux and OSX)
       # ('head -n -1' isn't available on OSX)
@@ -179,7 +179,7 @@ for E in ${BLARNEY_EXAMPLES[@]}; do
     #################
     if [ $doBackendSimulation ]; then
       echo -n "  simulation: "
-      ./$testName $GEN_FLAGS --test-simulation > $testName-test-sim.out
+      ./$testName $GEN_FLAGS --simulate > $testName-test-sim.out
       compare_outputs $testName.out $testName-test-sim.out || failedTests+=("$testName-sim")
       nbTests=$((nbTests+1))
     fi

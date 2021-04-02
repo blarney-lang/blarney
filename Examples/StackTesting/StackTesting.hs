@@ -1,11 +1,13 @@
+{-# LANGUAGE MultiWayIf #-}
+
 -- Blarney imports
-import BlarneyTest
 import Blarney
 import Blarney.Queue
 import Blarney.Recipe
 
 -- Standard imports
 import Data.Proxy
+import System.Environment
 
 -- Stack interface
 data Stack a =
@@ -114,4 +116,7 @@ testBench = do
 
 -- Main function
 main :: IO ()
-main = blarneyTestMain "StackTesting" testBench
+main = do
+  args <- getArgs
+  if | "--simulate" `elem` args -> simulate testBench
+     | otherwise -> writeVerilogTop testBench "StackTesting" "StackTesting-Verilog/"

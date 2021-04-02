@@ -1,7 +1,10 @@
-import BlarneyTest
+{-# LANGUAGE MultiWayIf #-}
+
 import Blarney
 import Blarney.Stream
 import Blarney.Queue
+
+import System.Environment
 
 type MulReq  = (Bit 32, Bit 32)
 type MulResp = Bit 32
@@ -48,4 +51,6 @@ main :: IO ()
 main = do
   writeVerilogModule slave "slave" "MasterSlave-Verilog/"
   writeVerilogModule master "master" "MasterSlave-Verilog/"
-  blarneyTestMain "MasterSlave" top
+  args <- getArgs
+  if | "--simulate" `elem` args -> simulate top
+     | otherwise -> writeVerilogTop top "MasterSlave" "MasterSlave-Verilog/"
