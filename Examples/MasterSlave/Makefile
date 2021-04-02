@@ -1,6 +1,3 @@
-.PHONEY: all
-all:
-	blc $(BLC_FLAGS) MasterSlave.hs
+SRCS = MasterSlave.hs
 
-clean:
-	rm -rf *.o *.hi MasterSlave MasterSlave-Verilog
+include $(BLARNEY_ROOT)/Examples/blarneyTest.mk

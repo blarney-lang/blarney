@@ -1,3 +1,6 @@
+import BlarneyTest
+import Blarney
+
 -- Tiny 8-bit CPU with a 4-stage pipeline
 --
 -- Opcode    | Meaning
@@ -6,9 +9,6 @@
 -- 01DDAABB  | Add register AA to register BB and store in register DD
 -- 10NNNNBB  | Branch back by NNNN instructions if BB is non-zero
 -- 11NNNNNN  | Halt
-
-import Blarney
-import System.Process
 
 -- Instructions
 type Instr = Bit 8
@@ -146,8 +146,4 @@ makeCPU = do
 
 -- Main function
 main :: IO ()
-main = do
-  writeVerilogTop makeCPU "top" "CPU-Verilog/"
-  system "cp instrs.hex CPU-Verilog/"
-  simulate makeCPU
-  return ()
+main = blarneyTestMain "CPU" makeCPU

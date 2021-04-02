@@ -1,6 +1,3 @@
-.PHONY: all
-all:
-	blc $(BLC_FLAGS) SourceSinkStream.hs -cpp
+SRCS = SourceSinkStream.hs
 
-clean:
-	rm -rf *.o *.hi SourceSinkStream SourceSinkStream-Verilog
+include $(BLARNEY_ROOT)/Examples/blarneyTest.mk

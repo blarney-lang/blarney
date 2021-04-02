@@ -1,5 +1,3 @@
-Fact:
-	blc $(BLC_FLAGS) Heat.hs
+SRCS = Heat.hs
 
-clean:
-	rm -rf *.o *.hi Heat Heat-Verilog
+include $(BLARNEY_ROOT)/Examples/blarneyTest.mk

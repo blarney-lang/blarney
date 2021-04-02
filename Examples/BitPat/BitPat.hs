@@ -1,3 +1,4 @@
+import BlarneyTest
 import Blarney
 import Blarney.BitPat
 
@@ -38,4 +39,4 @@ top = always do
 
 -- Main function
 main :: IO ()
-main = writeVerilogTop top "top" "BitPat-Verilog/"
+main = blarneyTestMain "BitPat" top

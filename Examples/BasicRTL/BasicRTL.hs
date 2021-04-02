@@ -1,3 +1,4 @@
+import BlarneyTest
 import Blarney
 
 top :: Module ()
@@ -23,21 +24,5 @@ top = do
     when isDebug do
       display "running with +DEBUG"
 
---top :: Module ()
---top = do
---  cycleCount :: Reg (Bit 4) <- makeReg 0
---  always do
---    cycleCount <== cycleCount.val + 1
---    display "plop " (cycleCount.val)
---    display (cycleCount.val) " plip"
---    when (cycleCount.val .==. 15) do
---      finish
-
---top :: Module ()
---top = always do
---  when false finish
-
 main :: IO ()
-main = do
-  writeVerilogTop top "top" "BasicRTL-Verilog/"
-  simulate top
+main = blarneyTestMain "BasicRTL" top

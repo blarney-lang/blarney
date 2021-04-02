@@ -1,4 +1,5 @@
 -- Blarney imports
+import BlarneyTest
 import Blarney
 import Blarney.Queue
 import Blarney.Recipe
@@ -113,4 +114,4 @@ testBench = do
 
 -- Main function
 main :: IO ()
-main = writeVerilogTop testBench "top" "Stack-Verilog"
+main = blarneyTestMain "StackTesting" testBench

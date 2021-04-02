@@ -1,5 +1,3 @@
-ram:
-	blc $(BLC_FLAGS) RAM.hs
+SRCS = RAM.hs
 
-clean:
-	rm -rf *.o *.hi RAM RAM-Verilog
+include $(BLARNEY_ROOT)/Examples/blarneyTest.mk

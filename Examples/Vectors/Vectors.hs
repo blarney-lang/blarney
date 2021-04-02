@@ -1,3 +1,4 @@
+import BlarneyTest
 import Blarney
 import Blarney.SourceSink
 import Blarney.Vector as V
@@ -42,4 +43,4 @@ main :: IO ()
 main = do
   writeVerilogModule testVecModule "testVecModule" "Vectors-Verilog/"
   writeVerilogModule testVecReg "testVecReg" "Vectors-Verilog/"
-  writeVerilogTop top "top" "Vectors-Verilog/"
+  blarneyTestMain "Vectors" top

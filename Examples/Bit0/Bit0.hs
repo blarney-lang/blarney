@@ -1,3 +1,4 @@
+import BlarneyTest
 import Blarney
 
 data MyIfc n = MyIfc { meh0 :: Bit n
@@ -32,5 +33,5 @@ top = do
 
 main :: IO ()
 main = do
-  writeVerilogTop top "top" "Bit0-Verilog/"
   writeVerilogModule testMyIfc "testMyIfc" "Bit0-Verilog/"
+  blarneyTestMain "Bit0" top

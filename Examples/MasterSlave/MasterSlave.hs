@@ -1,3 +1,4 @@
+import BlarneyTest
 import Blarney
 import Blarney.Stream
 import Blarney.Queue
@@ -45,6 +46,6 @@ top = mdo
 
 main :: IO ()
 main = do
-  writeVerilogTop top "top" "MasterSlave-Verilog/"
   writeVerilogModule slave "slave" "MasterSlave-Verilog/"
   writeVerilogModule master "master" "MasterSlave-Verilog/"
+  blarneyTestMain "MasterSlave" top

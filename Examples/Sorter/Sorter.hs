@@ -1,3 +1,4 @@
+import BlarneyTest
 import Blarney
 
 twoSort :: (Bit 8, Bit 8) -> (Bit 8, Bit 8)
@@ -29,4 +30,4 @@ top = always do
   finish
 
 main :: IO ()
-main = writeVerilogTop top "top" "Sorter-Verilog/"
+main = blarneyTestMain "Sorter" top

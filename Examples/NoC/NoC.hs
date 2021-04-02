@@ -1,3 +1,4 @@
+import BlarneyTest
 import Blarney
 import Blarney.Queue
 import Blarney.Stream
@@ -172,6 +173,4 @@ top = do
 
 -- Main
 main :: IO ()
-main = do
-  writeVerilogTop top "top" "NoC-Verilog/"
-  simulate top
+main = blarneyTestMain "NoC" top

@@ -1,8 +1,9 @@
--- Single-element FIFO
-
+import BlarneyTest
 import Blarney
 import Blarney.Queue
 import Blarney.Stream
+
+-- Single-element FIFO
 
 -- Module that increments each element in a stream
 inc :: Stream (Bit 8) -> Module (Stream (Bit 8))
@@ -49,6 +50,5 @@ top = do
 -- Main function
 main :: IO ()
 main = do
-  let dir = "Interface-Verilog/"
-  writeVerilogModule inc "inc" dir
-  writeVerilogTop top "top" dir
+  writeVerilogModule inc "inc" "Interface-Verilog/"
+  blarneyTestMain "Interface" top

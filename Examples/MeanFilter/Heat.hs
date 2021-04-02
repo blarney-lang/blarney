@@ -1,8 +1,9 @@
--- Heat diffusion on a 2D mesh
-
+import BlarneyTest
 import Blarney
 import Mesh
 import Data.List
+
+-- Heat diffusion on a 2D mesh
 
 -- Temperature type
 type Temp = Bit 32
@@ -44,4 +45,4 @@ top t w h = do
 
 -- Main function
 main :: IO ()
-main = writeVerilogTop (top 5000 16 16) "top" "Heat-Verilog/"
+main = blarneyTestMain "Heat" (top 5000 16 16)

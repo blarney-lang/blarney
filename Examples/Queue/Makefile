@@ -1,6 +1,3 @@
-.PHONY: all
-all:
-	blc $(BLC_FLAGS) Queue.hs -cpp
+SRCS = Queue.hs
 
-clean:
-	rm -rf *.o *.hi Queue Queue-Verilog
+include $(BLARNEY_ROOT)/Examples/blarneyTest.mk

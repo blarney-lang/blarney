@@ -1,3 +1,4 @@
+import BlarneyTest
 import Blarney
 import Blarney.BitScan
 
@@ -28,4 +29,4 @@ top = always do
 
 -- Main function
 main :: IO ()
-main = writeVerilogTop top "top" "BitScan-Verilog/"
+main = blarneyTestMain "BitScan" top

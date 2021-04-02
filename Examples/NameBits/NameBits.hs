@@ -1,3 +1,4 @@
+import BlarneyTest
 import Blarney
 
 top :: Module ()
@@ -22,4 +23,4 @@ top = do
       finish
 
 main :: IO ()
-main = writeVerilogTop top "top" "NameBits-Verilog/"
+main = blarneyTestMain "NameBits" top

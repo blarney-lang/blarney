@@ -1,6 +1,3 @@
-.PHONEY: all
-all:
-	blc $(BLC_FLAGS) OptionExample.hs
+SRCS = OptionExample.hs
 
-clean:
-	rm -rf *.o *.hi OptionExample OptionExample-Verilog
+include $(BLARNEY_ROOT)/Examples/blarneyTest.mk

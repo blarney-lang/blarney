@@ -1,3 +1,4 @@
+import BlarneyTest
 import Blarney
 import Blarney.Stmt
 
@@ -31,4 +32,4 @@ top = do
 
 -- Main function
 main :: IO ()
-main = writeVerilogTop top "top" "RAMBE-Verilog/"
+main = blarneyTestMain "RAMBE" top

@@ -1,6 +1,3 @@
-.PHONEY: all
-all:
-	blc $(BLC_FLAGS) FIFO.hs
+SRCS = FIFO.hs
 
-clean:
-	rm -rf *.o *.hi FIFO FIFO-Verilog
+include $(BLARNEY_ROOT)/Examples/blarneyTest.mk

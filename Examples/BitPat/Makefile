@@ -1,6 +1,3 @@
-.PHONEY: all
-all:
-	blc $(BLC_FLAGS) BitPat.hs
+SRCS = BitPat.hs
 
-clean:
-	rm -rf *.o *.hi BitPat BitPat-Verilog
+include $(BLARNEY_ROOT)/Examples/blarneyTest.mk

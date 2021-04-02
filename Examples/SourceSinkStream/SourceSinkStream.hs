@@ -1,3 +1,4 @@
+import BlarneyTest
 import Blarney
 import Blarney.Queue
 import Blarney.Stream
@@ -40,4 +41,4 @@ top = do
 
 -- Main function
 main :: IO ()
-main = writeVerilogTop top "top" "SourceSinkStream-Verilog"
+main = blarneyTestMain "SourceSinkStream" top

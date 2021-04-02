@@ -1,6 +1,7 @@
--- Single-element FIFO
-
+import BlarneyTest
 import Blarney
+
+-- Single-element FIFO
 
 -- FIFO interface
 data FIFO a =
@@ -64,4 +65,4 @@ top = do
 
 -- Main function
 main :: IO ()
-main = writeVerilogTop top "top" "FIFO-Verilog/"
+main = blarneyTestMain "FIFO" top

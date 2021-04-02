@@ -1,3 +1,4 @@
+import BlarneyTest
 import Blarney
 import Blarney.Queue
 
@@ -33,4 +34,4 @@ top = do
       finish
 
 main :: IO ()
-main = writeVerilogTop top "top" "Lookup-Verilog/"
+main = blarneyTestMain "Lookup" top

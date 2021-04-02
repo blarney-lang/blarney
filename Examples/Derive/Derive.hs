@@ -1,3 +1,4 @@
+import BlarneyTest
 import Blarney
 
 data MemReq =
@@ -17,4 +18,4 @@ top = always do
 
 -- Main function
 main :: IO ()
-main = writeVerilogTop top "top" "Derive-Verilog/"
+main = blarneyTestMain "Derive" top

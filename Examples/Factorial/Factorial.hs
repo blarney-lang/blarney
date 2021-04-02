@@ -1,3 +1,4 @@
+import BlarneyTest
 import Blarney
 import Blarney.Recipe
 
@@ -25,4 +26,4 @@ fact = do
   runRecipe recipe
 
 main :: IO ()
-main = writeVerilogTop fact "top" "Fact-Verilog/"
+main = blarneyTestMain "Factorial" fact

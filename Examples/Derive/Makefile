@@ -1,6 +1,3 @@
-.PHONEY: all
-all:
-	blc $(BLC_FLAGS) Derive.hs
+SRCS = Derive.hs
 
-clean:
-	rm -rf *.o *.hi Derive Derive-Verilog
+include $(BLARNEY_ROOT)/Examples/blarneyTest.mk

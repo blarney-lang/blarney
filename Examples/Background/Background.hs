@@ -1,3 +1,4 @@
+import BlarneyTest
 import Blarney
 import Blarney.Recipe
 
@@ -120,4 +121,4 @@ top = do
   return ()
 
 main :: IO ()
-main = writeVerilogTop top "top" "Background-Verilog"
+main = blarneyTestMain "Background" top

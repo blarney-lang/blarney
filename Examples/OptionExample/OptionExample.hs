@@ -1,3 +1,4 @@
+import BlarneyTest
 import Blarney
 import Blarney.Option
 
@@ -26,5 +27,5 @@ top = do
 
 main :: IO ()
 main = do
-  writeVerilogTop top "top" "OptionExample-Verilog/"
   writeVerilogModule testModule "testModule" "OptionExample-Verilog/"
+  blarneyTestMain "OptionExample" top
