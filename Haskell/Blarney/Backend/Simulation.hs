@@ -33,6 +33,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Array.IArray as IArray
 
 import Blarney.Netlist
+import Blarney.Core.Utils
 import Blarney.Misc.MonadLoops
 
 -- debugging facilities
@@ -253,6 +254,15 @@ compileNetInputSignal ctxt memo (InputTree prim ins) = do
 
 
 
+
+
+-- | merges a new sample of provided width into an old sample of same width
+--   according to the provided byte enable
+mergeWithBE :: Width -> Sample -> Sample -> Sample -> Sample
+mergeWithBE w be new old = (newMask .&. new) .|. (oldMask .&. old)
+  where newMask = foldl (\a x -> shiftL a 8 .|. if x then 0xff else 0x00) 0 beLst
+        oldMask = foldl (\a x -> shiftL a 8 .|. if x then 0x00 else 0xff) 0 beLst
+        beLst = reverse $ testBit be <$> [0..(log2ceil w - 1)]
 
 -- | Describe how a primitive, given some input 'Signal's produces its output
 --   'Signals' (most often only the one output 'Signal' returned as a singleton
