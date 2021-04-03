@@ -295,11 +295,14 @@ compilePrim CompCtxt{..} instId prim ins = case (prim, ins) of
                                  (transpose inpts)
           t prev (addr:di:we:re:m_be)
             | we /= 0 =
-              Map.insertWith (wrt m_be) (clamp ramAddrWidth addr) di prev
+              Map.alter (wrt m_be di) (clamp ramAddrWidth addr) prev
             | otherwise = prev
-          wrt m_be new old
-            | ramHasByteEn, [be] <- m_be = mergeWithBE ramDataWidth be new old
-            | otherwise = clamp ramDataWidth new
+          wrt m_be new m_old
+            | ramHasByteEn, [be] <- m_be =
+              Just $ mergeWithBE ramDataWidth be new old
+            | otherwise = Just $ clamp ramDataWidth new
+            where old = case m_old of Just x  -> x
+                                      Nothing -> simDontCare
   (BRAM{ ramKind = BRAMDualPort, .. }, inpts@(rdAddrS:wrAddrS:_:weS:reS:_) ) ->
     [zipWith4 doRead delayedRdAddrS delayedWrAddrS delayedWeS bramContentS]
     where delayedRdAddrS = scanl (\prv (a, re) -> if re /= 0 then a else prv)
@@ -316,11 +319,14 @@ compilePrim CompCtxt{..} instId prim ins = case (prim, ins) of
                                  (transpose inpts)
           t prev (_:wrAddr:di:we:_:m_be)
             | we /= 0 =
-              Map.insertWith (wrt m_be) (clamp ramAddrWidth wrAddr) di prev
+              Map.alter (wrt m_be di) (clamp ramAddrWidth wrAddr) prev
             | otherwise = prev
-          wrt m_be new old
-            | ramHasByteEn, [be] <- m_be = mergeWithBE ramDataWidth be new old
-            | otherwise = clamp ramDataWidth new
+          wrt m_be new m_old
+            | ramHasByteEn, [be] <- m_be =
+              Just $ mergeWithBE ramDataWidth be new old
+            | otherwise = Just $ clamp ramDataWidth new
+            where old = case m_old of Just x  -> x
+                                      Nothing -> simDontCare
   (BRAM{ ramKind = BRAMTrueDualPort, .. }, inpts@(addrAs:addrBs:_:_:weAs:weBs:reAs:reBs:_)) ->
     [ zipWith4 doRead delayedAddrAs delayedAddrBs delayedWeAs bramContentS
     , zipWith4 doRead delayedAddrBs delayedAddrAs delayedWeBs bramContentS ]
@@ -344,11 +350,11 @@ compilePrim CompCtxt{..} instId prim ins = case (prim, ins) of
                   [beA, beB] = if ramHasByteEn then m_bes else [ones, ones]
                   cnflct = err "BRAM value written by conflicting writes"
           go prev addr di we be
-            | we /= 0 = Map.insertWith (mergeWithBE ramDataWidth be)
-                                       (clamp ramAddrWidth addr)
-                                       di
-                                       prev
+            | we /= 0 =
+              Map.alter f (clamp ramAddrWidth addr) prev
             | otherwise = prev
+            where f (Just x) = Just $ mergeWithBE ramDataWidth be di x
+                  f  Nothing = Just $ mergeWithBE ramDataWidth be di simDontCare
   -- special cased primitives (handled by fall through case but explicitly
   -- pattern matched here for better performance)
   (Add _, [x, y]) -> evalBinOp x y
