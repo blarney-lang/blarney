@@ -361,7 +361,7 @@ genNetVerilog netlist net = case netPrim net of
   declRAM initFile 1 _ dw net =
     vcat $ map (\n -> declWire dw (netInstId net, n)) [Nothing]
   declRAM initFile 2 _ dw net =
-    vcat $ map (\n -> declWire dw (netInstId net, n)) [Just "dataA", Just "dataB"]
+    vcat $ map (\n -> declWire dw (netInstId net, n)) [Just "DO_A", Just "DO_B"]
   declRAM _ _ _ _ _ = error "cannot declare RAM with more than 2 ports"
   declRegFile RegFileInfo{ regFileId        = id
                          , regFileInitFile  = initFile
@@ -454,8 +454,8 @@ genNetVerilog netlist net = case netPrim net of
                    ++ [ text ('.':arg) <> parens (showNetInput inp)
                       | ((arg, _), inp) <-
                           zip (primInputs prim) (netInputs net) ]
-                   ++ [ text ".DO_A"   <> parens (showWire (nId, Just "dataA"))
-                      , text ".DO_B"   <> parens (showWire (nId, Just "dataB"))
+                   ++ [ text ".DO_A" <> parens (showWire (nId, Just "DO_A"))
+                      , text ".DO_B" <> parens (showWire (nId, Just "DO_B"))
                       ]
           nId = netInstId net
   instRegFileRead id net =

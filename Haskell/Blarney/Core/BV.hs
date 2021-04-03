@@ -337,7 +337,7 @@ trueDualRamBV dw initFile (addrA, dataInA, weInA, reInA, byteEnA)
   | otherwise =
       (bvOuts !! 0, bvOuts !! 1)
   where
-    outs = [Just "dataA", Just "dataB"]
+    outs = [Just "DO_A", Just "DO_B"]
     bvOuts = makePrim prim ([addrA, addrB, dataInA, dataInB] ++
                             [weInA, weInB, reInA, reInB] ++
                             [be | Just be <- [byteEnA, byteEnB]]) outs
