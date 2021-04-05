@@ -38,7 +38,8 @@ NC='\033[0m'
 # control variables. Default: simulation backend only
 ################################################################################
 
-doBackendSimulation=yup
+doBackendDefault=yup
+doBackendSimulation=
 doBackendVerilog=
 doPluginNamer=
 doPassNameProp=
@@ -59,7 +60,7 @@ do
     ############################################################################
     -h|--help)
       echo "Runs the blarney examples as a regression test suite"
-      echo "-s/--backend-simulation"
+      echo "--backend-simulation"
       echo "    runs the in haskell simulation backend (currently always on)"
       echo "--backend-verilog"
       echo "    runs the verilog backend and a verilator simulation"
@@ -75,10 +76,12 @@ do
       echo "    same as --plugin-namer and --pass-name-propagation"
       exit
       ;;
-    -s|--backend-simulation)
+    --backend-simulation)
+      doBackendDefault=
       doBackendSimulation=yup
       ;;
     --backend-verilog)
+      doBackendDefault=
       doBackendVerilog=yup
       ;;
     --plugin-namer)
@@ -91,6 +94,7 @@ do
       doPassSimplifier=yup
       ;;
     --backend-all)
+      doBackendDefault=
       doBackendSimulation=yup
       doBackendVerilog=yup
       ;;
@@ -114,6 +118,8 @@ do
   esac
   shift
 done
+# assign a default backend if necessary
+if [ $doBackendDefault ]; then doBackendVerilog=yup; fi
 
 # helper functions
 ################################################################################
@@ -189,9 +195,10 @@ done
 
 # reporting
 nbFailedTests=${#failedTests[@]}
-echo "ran $nbTests tests"
+nbPassedTests=$((nbTests-nbFailedTests))
+echo -e "passed ${GREEN}$nbPassedTests${NC} tests (ran $nbTests)"
 if [ $nbFailedTests -ne 0 ]; then
-  echo -e "${RED}Failed $nbFailedTests tests:${NC}"
+  echo -e "Failed ${RED}$nbFailedTests${NC} tests:"
   for t in ${failedTests[@]}; do echo -e "\t- $t"; done
   exit -1
 fi
