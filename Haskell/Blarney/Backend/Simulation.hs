@@ -1,4 +1,6 @@
+{-# LANGUAGE RecursiveDo        #-}
 {-# LANGUAGE BangPatterns       #-}
+{-# LANGUAGE BlockArguments     #-}
 {-# LANGUAGE RecordWildCards    #-}
 {-# LANGUAGE NoRebindableSyntax #-}
 

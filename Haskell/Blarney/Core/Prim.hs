@@ -1,3 +1,5 @@
+{-# LANGUAGE RankNTypes         #-}
+{-# LANGUAGE BlockArguments     #-}
 {-# LANGUAGE ConstraintKinds    #-}
 {-# LANGUAGE NoRebindableSyntax #-}
 
