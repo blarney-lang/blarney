@@ -2,9 +2,7 @@ ifndef BLARNEY_ROOT
 $(error "the BLARNEY_ROOT environment variable must be set")
 endif
 
-BUILD_DIR = $(BLARNEY_ROOT)/build
-O_DIR = $(BUILD_DIR)/odir
-HI_DIR = $(BUILD_DIR)/hidir
+include $(BLARNEY_ROOT)/blarneyDirs.mk
 
 GENS = $(basename $(SRCS))
 
@@ -18,7 +16,7 @@ all: $(GENS)
 	./$< --simulate
 
 %: %.hs
-	blc -hidir $(HI_DIR) -odir $(O_DIR) $(BLC_FLAGS) $<
+	blc --make -j -hidir $(HI_DIR) -odir $(O_DIR) $(BLC_FLAGS) $<
 
 .SECONDARY: $(addsuffix -Verilog, $(GEN))
 %-Verilog: %

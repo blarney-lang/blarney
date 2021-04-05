@@ -149,6 +149,22 @@ if [ $doPassSimplifier ]; then GEN_FLAGS+=("--enable-simplifier"); fi
 nbTests=0
 failedTests=()
 
+# start with building the blarney library itself
+pushd $BLARNEY_ROOT > /dev/null
+echo -n "initial blc Blarney build: "
+make clean > /dev/null
+tmpLog=$(mktemp -t blarney-initial-blc-build-XXXX.log)
+make blc-build &> $tmpLog
+if [ $? != 0 ]; then
+  echo -e "${RED}KO${NC}"
+  echo "content of $tmpLog:"
+  cat $tmpLog
+  exit -1
+else echo -e "${GREEN}OK${NC}"
+fi
+popd > /dev/null
+
+# go through each examples
 for E in ${BLARNEY_EXAMPLES[@]}; do
   # work in a temporary directory
   ###############################
@@ -164,9 +180,11 @@ for E in ${BLARNEY_EXAMPLES[@]}; do
     echo "- $testName"
     # build the blarney example
     ###########################
-    make -s BLC_FLAGS=$BLC_FLAGS $testName &> /dev/null
+    make -s BLC_FLAGS=$BLC_FLAGS $testName &> build.log
     if [ $? != 0 ]; then
-      echo "${RED}Failed to build $testName${NC}"
+      echo -e "${RED}Failed to build $testName${NC}"
+      echo "content of $tmpDir/build.log:"
+      cat $tmpDir/build.log
       exit -1
     fi
     # test verilog
@@ -174,19 +192,19 @@ for E in ${BLARNEY_EXAMPLES[@]}; do
     if [ $doBackendVerilog ]; then
       echo -n "  verilog: "
       ./$testName $GEN_FLAGS --verilog
-      make -s -C $testName-Verilog &> /dev/null
+      make -s -C $testName-Verilog &> $testName-test-verilog.log
       # Using 'sed \$d' to print all but the last line (works on Linux and OSX)
       # ('head -n -1' isn't available on OSX)
-      $testName-Verilog/$testName | sed \$d > $testName-test-verilog.out
-      compare_outputs $testName.out $testName-test-verilog.out || failedTests+=("$testName-verilog")
+      $testName-Verilog/$testName | sed \$d &> $testName-test-verilog.out
+      compare_outputs $testName.out $testName-test-verilog.out || failedTests+=("$testName-verilog ($tmpDir/$testName-test-verilog.{log, out})")
       nbTests=$((nbTests+1))
     fi
     # test simulation
     #################
     if [ $doBackendSimulation ]; then
       echo -n "  simulation: "
-      ./$testName $GEN_FLAGS --simulate > $testName-test-sim.out
-      compare_outputs $testName.out $testName-test-sim.out || failedTests+=("$testName-sim")
+      ./$testName $GEN_FLAGS --simulate &> $testName-test-sim.out
+      compare_outputs $testName.out $testName-test-sim.out || failedTests+=("$testName-sim ($tmpDir/$testName-test-sim.out)")
       nbTests=$((nbTests+1))
     fi
   done
@@ -194,11 +212,11 @@ for E in ${BLARNEY_EXAMPLES[@]}; do
 done
 
 # reporting
-nbFailedTests=${#failedTests[@]}
+nbFailedTests=${#failedTests[*]}
 nbPassedTests=$((nbTests-nbFailedTests))
 echo -e "passed ${GREEN}$nbPassedTests${NC} tests (ran $nbTests)"
 if [ $nbFailedTests -ne 0 ]; then
   echo -e "Failed ${RED}$nbFailedTests${NC} tests:"
-  for t in ${failedTests[@]}; do echo -e "\t- $t"; done
+  for i in ${!failedTests[*]}; do echo -e "  - ${failedTests[$i]}"; done
   exit -1
 fi
