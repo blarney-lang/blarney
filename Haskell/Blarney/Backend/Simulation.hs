@@ -134,6 +134,10 @@ compile :: CompCtxt -> Simulator
 compile ctxt inputStreams = runST do
   -- handle on the netlist
   let nl = compNl ctxt
+  -- XXX TODO implement in haskell simulation for modular designs XXX ---
+  sequence_ [ err $ "simulation of modular designs not yet supported: " ++
+                    show n
+            | n@Net{ netPrim = Custom{} } <- IArray.elems nl ]
   -- signal memoization table
   memo <- newListArray (IArray.bounds nl)
                        [ replicate (length $ primOutputs p) Nothing
