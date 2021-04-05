@@ -17,8 +17,6 @@ module Blarney.Backend.Simulation (
   simulateNetlist
 ) where
 
-import Debug.Trace
-
 import Prelude
 import Numeric
 import Data.List
@@ -37,11 +35,14 @@ import Blarney.Core.Utils
 import Blarney.Misc.MonadLoops
 
 -- debugging facilities
-debugEnabled = False
-dbg act = when debugEnabled act
+--import Debug.Trace
+--debugEnabled = False
+--dbg act = when debugEnabled act
+-- debugging facilities
+
+-- file-wide helpers
 err str = error $ "Blarney.Backend.Simulation: " ++ str
 simDontCare = 0
--- debugging facilities
 
 -- | Simulate a 'Netlist' until a 'Finish' 'Prim' is triggered. This is
 --   currently the "only" interface to the simulation module.
@@ -50,10 +51,8 @@ simDontCare = 0
 simulateNetlist :: Netlist -> IO ()
 simulateNetlist nl = do
   {- DBG -}
-  dbg do mapM_ print nl
-         putStrLn "============================"
-         --putStrLn $ "length simEffects = " ++ show (length simEffects)
-         --print simTerminate
+  --dbg do mapM_ print nl
+  --       putStrLn "============================"
   {- DBG -}
   -- prepare compilation context
   ctxt <- mkCompCtxt nl
@@ -209,13 +208,7 @@ compileWireIdSignal ctxt@CompCtxt{..} memo (instId, outNm) = do
           let thunks' = take idx thunks ++ Just signal : drop (idx+1) thunks
           writeArray memo instId thunks'
           -- then compile the signal
-          {- DBG -}
-          dbg $ traceM $ "compileWireIdSignal " ++ show (instId, outNm) ++ " >>>> (call) compileNetIndexedOuptutSignal " ++ show (net, idx)
-          {- DBG -}
           signal <- compileNetIndexedOuptutSignal ctxt memo (net, idx)
-          {- DBG -}
-          dbg $ traceM $ "compileNetIndexedOuptutSignal " ++ show (net, idx) ++ " >>>> (return) compileWireIdSignal " ++ show (instId, outNm)
-          {- DBG -}
           return signal
     Nothing -> err $ "unknown output " ++ show outNm ++ " for net " ++ show net
 
@@ -223,42 +216,19 @@ compileWireIdSignal ctxt@CompCtxt{..} memo (instId, outNm) = do
 --   (not memoized)
 compileNetIndexedOuptutSignal :: CompFun s (Net, Int) Signal
 compileNetIndexedOuptutSignal ctxt memo (Net{..}, idx) = do
-  {- DBG -}
-  dbg $ traceM $ "compileNetIndexedOuptutSignal " ++ show (netPrim, netInstId, idx) ++ " >>>> (call) map compileNetInputSignal " ++ show netInputs
-  {- DBG -}
   ins <- mapM (compileNetInputSignal ctxt memo) netInputs
-  {- DBG -}
-  dbg $ traceM $ "map compileNetInputSignal " ++ show netInputs ++ " >>>> (return) compileNetIndexedOuptutSignal " ++ show (netPrim, netInstId, idx)
-  {- DBG -}
   return $ (compilePrim ctxt netInstId netPrim ins) !! idx
 
 -- | compile the 'Signal' associated with a 'NetInput' (not memoized)
 compileNetInputSignal :: CompFun s NetInput Signal
 compileNetInputSignal ctxt memo (InputWire wId) = do
-  {- DBG -}
-  dbg $ traceM $ "compileNetInputSignal InputWire " ++ show wId ++ " >>>> (call) compileWireIdSignal " ++ show wId
-  {- DBG -}
   signal <- compileWireIdSignal ctxt memo wId
-  {- DBG -}
-  dbg $ traceM $ "compileWireIdSignal " ++ show wId ++ " >>>> (return) compileNetInputSignal InputWire " ++ show wId
-  {- DBG -}
   return signal
 compileNetInputSignal ctxt memo (InputTree prim ins) = do
-  {- DBG -}
-  dbg $ traceM $ "compileNetInputSignal InputTree " ++ show (prim, ins) ++ " >>>> (call) map compileNetInputSignal " ++ show ins
-  {- DBG -}
   ins' <- mapM (compileNetInputSignal ctxt memo) ins
-  {- DBG -}
-  dbg $ traceM $ "map compileNetInputSignal " ++ show ins ++ " >>>> (return) compileNetInputSignal InputTree " ++ show (prim, ins)
-  {- DBG -}
   let instID = err "no InstId for InputTree Prims"
   -- TODO check that we only eval single output primitives
   return $ (compilePrim ctxt instID prim ins') !! 0
-
-
-
-
-
 
 -- | merges a new sample of provided width into an old sample of same width
 --   according to the provided byte enable
