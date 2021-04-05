@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds         #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ConstraintKinds   #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 
 {-|
 Module      : Blarney.BitScan
