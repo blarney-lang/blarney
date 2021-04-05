@@ -101,7 +101,7 @@ verifyWith conf circuit = do
 -- Simulation backend
 --------------------------------------------------------------------------------
 
--- | TODO write doc
+-- | Simulation the provided Blarney circuit
 simulate :: Modular a
          => a      -- ^ Blarney circuit
          -> IO ()
