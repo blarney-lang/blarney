@@ -44,8 +44,9 @@ top = do
 
 main :: IO ()
 main = do
-  writeVerilogModule testVecModule "testVecModule" "Vectors-Verilog/"
-  writeVerilogModule testVecReg "testVecReg" "Vectors-Verilog/"
   args <- getArgs
   if | "--simulate" `elem` args -> simulate top
-     | otherwise -> writeVerilogTop top "Vectors" "Vectors-Verilog/"
+     | otherwise -> do
+       writeVerilogModule testVecModule "testVecModule" "Vectors-Verilog/"
+       writeVerilogModule testVecReg "testVecReg" "Vectors-Verilog/"
+       writeVerilogTop top "Vectors" "Vectors-Verilog/"

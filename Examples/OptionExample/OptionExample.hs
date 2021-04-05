@@ -30,7 +30,8 @@ top = do
 
 main :: IO ()
 main = do
-  writeVerilogModule testModule "testModule" "OptionExample-Verilog/"
   args <- getArgs
   if | "--simulate" `elem` args -> simulate top
-     | otherwise -> writeVerilogTop top "OptionExample" "OptionExample-Verilog/"
+     | otherwise -> do
+       writeVerilogModule testModule "testModule" "OptionExample-Verilog/"
+       writeVerilogTop top "OptionExample" "OptionExample-Verilog/"

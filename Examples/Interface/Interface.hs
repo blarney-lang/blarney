@@ -53,7 +53,7 @@ top = do
 -- Main function
 main :: IO ()
 main = do
-  writeVerilogModule inc "inc" "Interface-Verilog/"
   args <- getArgs
   if | "--simulate" `elem` args -> simulate top
-     | otherwise -> writeVerilogTop top "Interface" "Interface-Verilog/"
+     | otherwise -> do writeVerilogModule inc "inc" "Interface-Verilog/"
+                       writeVerilogTop top "Interface" "Interface-Verilog/"

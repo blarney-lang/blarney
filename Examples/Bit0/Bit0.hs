@@ -36,7 +36,7 @@ top = do
 
 main :: IO ()
 main = do
-  writeVerilogModule testMyIfc "testMyIfc" "Bit0-Verilog/"
   args <- getArgs
   if | "--simulate" `elem` args -> simulate top
-     | otherwise -> writeVerilogTop top "Bit0" "Bit0-Verilog/"
+     | otherwise -> do writeVerilogModule testMyIfc "testMyIfc" "Bit0-Verilog/"
+                       writeVerilogTop top "Bit0" "Bit0-Verilog/"
