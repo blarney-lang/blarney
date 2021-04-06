@@ -130,20 +130,6 @@ done
 # assign a default backend if necessary
 if [ $doBackendDefault ]; then doBackendVerilog=yup; fi
 
-# helper functions
-################################################################################
-
-compare_outputs () {
-  cmp -s $1 $2
-  if [ $? == 0 ]; then
-    echo -e "${GREEN}Passed${NC}"
-    return 0
-  else
-    echo -e "${RED}Failed${NC}"
-    return 1
-  fi
-}
-
 # Run regression tests
 ################################################################################
 
@@ -198,21 +184,33 @@ for E in ${BLARNEY_EXAMPLES[@]}; do
     # test verilog
     ##############
     if [ $doBackendVerilog ] && [[ ! " ${VERILOG_EXCLUDE[@]} " =~ " ${testName} " ]]; then
-      echo -n "$testName - verilog: "
+      printf "%-12s %12s" $testName "verilog"
       ./$testName $GEN_FLAGS --verilog
       make -s -C $testName-Verilog &> $testName-test-verilog.log
       # Using 'sed \$d' to print all but the last line (works on Linux and OSX)
       # ('head -n -1' isn't available on OSX)
       $testName-Verilog/$testName | sed \$d &> $testName-test-verilog.out
-      compare_outputs $testName.out $testName-test-verilog.out || failedTests+=("$testName-verilog ($tmpDir/$testName-test-verilog.{log, out})")
+      cmp -s $testName.out $testName-test-verilog.out
+      if [ $? == 0 ]; then
+        printf "${GREEN}%10s${NC}\n" "Passed"
+      else
+        printf "${RED}%10s${NC}\n" "Failed"
+        failedTests+=("$testName-verilog ($tmpDir/$testName-test-verilog.{log, out})")
+      fi
       nbTests=$((nbTests+1))
     fi
     # test simulation
     #################
     if [ $doBackendSimulation ] && [[ ! " ${SIMULATION_EXCLUDE[@]} " =~ " ${testName} " ]]; then
-      echo -n "$testName - simulation: "
+      printf "%-12s %12s" $testName "simulation"
       ./$testName $GEN_FLAGS --simulate &> $testName-test-sim.out
-      compare_outputs $testName.out $testName-test-sim.out || failedTests+=("$testName-sim ($tmpDir/$testName-test-sim.out)")
+      cmp -s $testName.out $testName-test-sim.out
+      if [ $? == 0 ]; then
+        printf "${GREEN}%10s${NC}\n" "Passed"
+      else
+        printf "${RED}%10s${NC}\n" "Failed"
+        failedTests+=("$testName-sim ($tmpDir/$testName-test-sim.out)")
+      fi
       nbTests=$((nbTests+1))
     fi
   done
