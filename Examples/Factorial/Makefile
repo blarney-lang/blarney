@@ -1,6 +1,3 @@
-.PHONY: all
-all: Fact.hs
-	blc $(BLC_FLAGS) Fact.hs
+SRCS = Factorial.hs
 
-clean:
-	rm -rf *.o *.hi Fact Fact-Verilog
+include $(BLARNEY_ROOT)/Examples/blarneyTest.mk

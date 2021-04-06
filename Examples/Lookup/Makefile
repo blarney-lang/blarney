@@ -1,6 +1,3 @@
-.PHONEY: all
-all:
-	blc $(BLC_FLAGS) Lookup.hs
+SRCS = Lookup.hs
 
-clean:
-	rm -rf *.o *.hi Lookup Lookup-Verilog
+include $(BLARNEY_ROOT)/Examples/blarneyTest.mk

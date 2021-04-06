@@ -1,6 +1,3 @@
-.PHONEY: all
-all:
-	blc $(BLC_FLAGS) Vectors.hs
+SRCS = Vectors.hs
 
-clean:
-	rm -rf *.o *.hi Vectors Vectors-Verilog
+include $(BLARNEY_ROOT)/Examples/blarneyTest.mk

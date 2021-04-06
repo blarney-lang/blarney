@@ -1,7 +1,8 @@
--- This module implements a full-throughput dual-port stack.
-
 import Blarney
 import Blarney.Recipe
+import System.Environment
+
+-- This module implements a full-throughput dual-port stack.
 
 -- Interface
 -- =========
@@ -166,4 +167,7 @@ top = do
 -- ===============
 
 main :: IO ()
-main = writeVerilogTop top "top" "Stack-Verilog/"
+main = do
+  args <- getArgs
+  if | "--simulate" `elem` args -> simulate top
+     | otherwise -> writeVerilogTop top "Stack" "Stack-Verilog/"

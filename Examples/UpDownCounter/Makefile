@@ -1,6 +1,3 @@
-.PHONY: all
-all:
-	blc $(BLC_FLAGS) Counter.hs
+SRCS = UpDownCounter.hs
 
-clean:
-	rm -rf *.o *.hi Counter Counter-Verilog
+include $(BLARNEY_ROOT)/Examples/blarneyTest.mk

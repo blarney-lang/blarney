@@ -1,6 +1,3 @@
-.PHONEY: all
-all:
-	blc $(BLC_FLAGS) NoC.hs
+SRCS = NoC.hs
 
-clean:
-	rm -rf *.o *.hi NoC NoC-Verilog
+include $(BLARNEY_ROOT)/Examples/blarneyTest.mk

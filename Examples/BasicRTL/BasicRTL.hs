@@ -1,4 +1,5 @@
 import Blarney
+import System.Environment
 
 top :: Module ()
 top = do
@@ -24,4 +25,7 @@ top = do
       display "running with +DEBUG"
 
 main :: IO ()
-main = writeVerilogTop top "top" "BasicRTL-Verilog/"
+main = do
+  args <- getArgs
+  if | "--simulate" `elem` args -> simulate top
+     | otherwise -> writeVerilogTop top "BasicRTL" "BasicRTL-Verilog/"

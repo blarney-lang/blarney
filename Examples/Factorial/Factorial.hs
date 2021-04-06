@@ -1,5 +1,6 @@
 import Blarney
 import Blarney.Recipe
+import System.Environment
 
 fact :: Module ()
 fact = do
@@ -25,4 +26,7 @@ fact = do
   runRecipe recipe
 
 main :: IO ()
-main = writeVerilogTop fact "top" "Fact-Verilog/"
+main = do
+  args <- getArgs
+  if | "--simulate" `elem` args -> simulate fact
+     | otherwise -> writeVerilogTop fact "Factorial" "Factorial-Verilog/"

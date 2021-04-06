@@ -1,3 +1,8 @@
+import Blarney
+import Blarney.BitPat
+import System.Process
+import System.Environment
+
 -- Tiny 8-bit CPU specification
 --
 -- Opcode    | Meaning
@@ -6,10 +11,6 @@
 -- 01ZZXXYY  | Add register XX to register YY and store in register ZZ
 -- 10NNNNYY  | Branch back by NNNN instructions if YY is non-zero
 -- 11NNNNNN  | Halt
-
-import Blarney
-import Blarney.BitPat
-import System.Process
 
 makeCPUSpec :: Module ()
 makeCPUSpec = do
@@ -66,6 +67,6 @@ makeCPUSpec = do
 
 main :: IO ()
 main = do
-  writeVerilogTop makeCPUSpec "top" "Spec-Verilog/"
-  system "cp instrs.hex Spec-Verilog/"
-  return ()
+  args <- getArgs
+  if | "--simulate" `elem` args -> simulate makeCPUSpec
+     | otherwise -> writeVerilogTop makeCPUSpec "Spec" "Spec-Verilog/"

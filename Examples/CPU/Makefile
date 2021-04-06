@@ -1,7 +1,3 @@
-.PHONY: all
-all:
-	blc $(BLC_FLAGS) CPU.hs
-	blc $(BLC_FLAGS) Spec.hs
+SRCS = CPU.hs Spec.hs
 
-clean:
-	rm -rf *.o *.hi CPU Spec CPU-Verilog Spec-Verilog
+include $(BLARNEY_ROOT)/Examples/blarneyTest.mk

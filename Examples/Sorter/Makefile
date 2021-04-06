@@ -1,6 +1,3 @@
-.PHONEY: all
-all:
-	blc $(BLC_FLAGS) Sorter.hs
+SRCS = Sorter.hs
 
-clean:
-	rm -rf *.o *.hi Sorter Sorter-Verilog
+include $(BLARNEY_ROOT)/Examples/blarneyTest.mk

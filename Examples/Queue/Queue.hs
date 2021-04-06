@@ -1,5 +1,6 @@
 import Blarney
 import Blarney.Queue
+import System.Environment
 
 -- Top-level module
 top :: Module ()
@@ -25,4 +26,7 @@ top = do
 
 -- Main function
 main :: IO ()
-main = writeVerilogTop top "top" "Queue-Verilog"
+main = do
+  args <- getArgs
+  if | "--simulate" `elem` args -> simulate top
+     | otherwise -> writeVerilogTop top "Queue" "Queue-Verilog/"

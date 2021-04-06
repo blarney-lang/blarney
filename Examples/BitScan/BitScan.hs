@@ -1,5 +1,6 @@
 import Blarney
 import Blarney.BitScan
+import System.Environment
 
 -- Semantics of add instruction
 add :: Bit 5 -> Bit 5 -> Bit 5 -> Action ()
@@ -28,4 +29,7 @@ top = always do
 
 -- Main function
 main :: IO ()
-main = writeVerilogTop top "top" "BitScan-Verilog/"
+main = do
+  args <- getArgs
+  if | "--simulate" `elem` args -> simulate top
+     | otherwise -> writeVerilogTop top "BitScan" "BitScan-Verilog/"

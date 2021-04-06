@@ -1,4 +1,5 @@
 import Blarney
+import System.Environment
 
 data MemReq =
   MemReq {
@@ -17,4 +18,7 @@ top = always do
 
 -- Main function
 main :: IO ()
-main = writeVerilogTop top "top" "Derive-Verilog/"
+main = do
+  args <- getArgs
+  if | "--simulate" `elem` args -> simulate top
+     | otherwise -> writeVerilogTop top "Derive" "Derive-Verilog/"

@@ -1,6 +1,3 @@
-.PHONY: all
-all:
-	blc $(BLC_FLAGS) Stack.hs -cpp
+SRCS = StackTesting.hs
 
-clean:
-	rm -rf *.o *.hi Stack Stack-Verilog
+include $(BLARNEY_ROOT)/Examples/blarneyTest.mk

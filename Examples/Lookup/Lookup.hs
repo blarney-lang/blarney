@@ -1,5 +1,6 @@
 import Blarney
 import Blarney.Queue
+import System.Environment
 
 top :: Module ()
 top = do
@@ -33,4 +34,7 @@ top = do
       finish
 
 main :: IO ()
-main = writeVerilogTop top "top" "Lookup-Verilog/"
+main = do
+  args <- getArgs
+  if | "--simulate" `elem` args -> simulate top
+     | otherwise -> writeVerilogTop top "Lookup" "Lookup-Verilog/"

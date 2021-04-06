@@ -1,5 +1,6 @@
 import Blarney
 import Blarney.Recipe
+import System.Environment
 
 data Counter n =
   Counter {
@@ -63,4 +64,7 @@ top = do
   return ()
 
 main :: IO ()
-main = writeVerilogTop top "top" "Counter-Verilog/"
+main = do
+  args <- getArgs
+  if | "--simulate" `elem` args -> simulate top
+     | otherwise -> writeVerilogTop top "UpDownCounter" "UpDownCounter-Verilog/"

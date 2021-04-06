@@ -1,4 +1,5 @@
 import Blarney
+import System.Environment
 
 data MyIfc n = MyIfc { meh0 :: Bit n
                      , meh8 :: Bit 8 } deriving (Generic, Interface)
@@ -32,5 +33,7 @@ top = do
 
 main :: IO ()
 main = do
-  writeVerilogTop top "top" "Bit0-Verilog/"
-  writeVerilogModule testMyIfc "testMyIfc" "Bit0-Verilog/"
+  args <- getArgs
+  if | "--simulate" `elem` args -> simulate top
+     | otherwise -> do writeVerilogModule testMyIfc "testMyIfc" "Bit0-Verilog/"
+                       writeVerilogTop top "Bit0" "Bit0-Verilog/"

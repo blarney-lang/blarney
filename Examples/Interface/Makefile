@@ -1,6 +1,3 @@
-.PHONEY: all
-all:
-	blc $(BLC_FLAGS) Interface.hs
+SRCS = Interface.hs
 
-clean:
-	rm -rf *.o *.hi *.v Interface Interface-Verilog
+include $(BLARNEY_ROOT)/Examples/blarneyTest.mk

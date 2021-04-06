@@ -1,6 +1,3 @@
-.PHONEY: all
-all:
-	blc $(BLC_FLAGS) Background.hs
+SRCS = Background.hs
 
-clean:
-	rm -rf *.o *.hi Background Background-Verilog
+include $(BLARNEY_ROOT)/Examples/blarneyTest.mk

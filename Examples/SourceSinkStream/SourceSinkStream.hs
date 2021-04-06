@@ -2,6 +2,7 @@ import Blarney
 import Blarney.Queue
 import Blarney.Stream
 import Blarney.SourceSink
+import System.Environment
 
 -- Top-level module
 top :: Module ()
@@ -40,4 +41,8 @@ top = do
 
 -- Main function
 main :: IO ()
-main = writeVerilogTop top "top" "SourceSinkStream-Verilog"
+main = do
+  args <- getArgs
+  if | "--simulate" `elem` args -> simulate top
+     | otherwise -> do
+       writeVerilogTop top "SourceSinkStream" "SourceSinkStream-Verilog/"

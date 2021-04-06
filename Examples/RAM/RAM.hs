@@ -1,5 +1,6 @@
 import Blarney
 import Blarney.Stmt
+import System.Environment
 
 -- Top-level module
 top :: Module ()
@@ -22,7 +23,7 @@ top = do
       action do
         load ram (i.val)
       action do
-        display "ram[" (i.val) "] = 0x" (formatHex 24 (ram.out))
+        display "ram[" (i.val) "] = 0x" (formatHex 32 (ram.out))
         i <== i.val + 1
     action do
       finish
@@ -31,4 +32,7 @@ top = do
 
 -- Main function
 main :: IO ()
-main = writeVerilogTop top "top" "RAM-Verilog/"
+main = do
+  args <- getArgs
+  if | "--simulate" `elem` args -> simulate top
+     | otherwise -> writeVerilogTop top "RAM" "RAM-Verilog/"

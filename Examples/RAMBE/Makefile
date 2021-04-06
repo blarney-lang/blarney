@@ -1,5 +1,3 @@
-ram:
-	blc $(BLC_FLAGS) RAMBE.hs
+SRCS = RAMBE.hs
 
-clean:
-	rm -rf *.o *.hi RAMBE RAMBE-Verilog
+include $(BLARNEY_ROOT)/Examples/blarneyTest.mk

@@ -1,6 +1,7 @@
 import Blarney
 import Blarney.SourceSink
-import Blarney.Vector as V
+import Blarney.Vector hiding (elem)
+import System.Environment
 
 makeElement :: KnownNat n => Integer -> Module (Source (Bit n))
 makeElement i = do
@@ -40,6 +41,9 @@ top = do
 
 main :: IO ()
 main = do
-  writeVerilogModule testVecModule "testVecModule" "Vectors-Verilog/"
-  writeVerilogModule testVecReg "testVecReg" "Vectors-Verilog/"
-  writeVerilogTop top "top" "Vectors-Verilog/"
+  args <- getArgs
+  if | "--simulate" `elem` args -> simulate top
+     | otherwise -> do
+       writeVerilogModule testVecModule "testVecModule" "Vectors-Verilog/"
+       writeVerilogModule testVecReg "testVecReg" "Vectors-Verilog/"
+       writeVerilogTop top "Vectors" "Vectors-Verilog/"

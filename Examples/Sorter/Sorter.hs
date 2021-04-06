@@ -1,4 +1,5 @@
 import Blarney
+import System.Environment
 
 twoSort :: (Bit 8, Bit 8) -> (Bit 8, Bit 8)
 twoSort (a, b) = if a .<. b then (a, b) else (b, a)
@@ -29,4 +30,7 @@ top = always do
   finish
 
 main :: IO ()
-main = writeVerilogTop top "top" "Sorter-Verilog/"
+main = do
+  args <- getArgs
+  if | "--simulate" `elem` args -> simulate top
+     | otherwise -> writeVerilogTop top "Sorter" "Sorter-Verilog/"

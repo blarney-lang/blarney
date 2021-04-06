@@ -1,5 +1,6 @@
 import Blarney
 import Blarney.Option
+import System.Environment
 
 testModule :: Module (Option (Bit 32), Bit 32)
 testModule = do
@@ -26,5 +27,8 @@ top = do
 
 main :: IO ()
 main = do
-  writeVerilogTop top "top" "OptionExample-Verilog/"
-  writeVerilogModule testModule "testModule" "OptionExample-Verilog/"
+  args <- getArgs
+  if | "--simulate" `elem` args -> simulate top
+     | otherwise -> do
+       writeVerilogModule testModule "testModule" "OptionExample-Verilog/"
+       writeVerilogTop top "OptionExample" "OptionExample-Verilog/"

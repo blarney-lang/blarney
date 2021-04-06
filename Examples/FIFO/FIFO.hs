@@ -1,6 +1,7 @@
--- Single-element FIFO
-
 import Blarney
+import System.Environment
+
+-- Single-element FIFO
 
 -- FIFO interface
 data FIFO a =
@@ -64,4 +65,7 @@ top = do
 
 -- Main function
 main :: IO ()
-main = writeVerilogTop top "top" "FIFO-Verilog/"
+main = do
+  args <- getArgs
+  if | "--simulate" `elem` args -> simulate top
+     | otherwise -> writeVerilogTop top "FIFO" "FIFO-Verilog/"

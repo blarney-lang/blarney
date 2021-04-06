@@ -1,5 +1,6 @@
 import Blarney
 import Blarney.Recipe
+import System.Environment
 
 block :: [Action ()] -> Recipe
 block acts = Seq (map Action acts)
@@ -120,4 +121,7 @@ top = do
   return ()
 
 main :: IO ()
-main = writeVerilogTop top "top" "Background-Verilog"
+main = do
+  args <- getArgs
+  if | "--simulate" `elem` args -> simulate top
+     | otherwise -> writeVerilogTop top "Background" "Background-Verilog/"

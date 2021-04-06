@@ -1,5 +1,6 @@
 import Blarney
 import Blarney.BitPat
+import System.Environment
 
 -- Opcode    | Meaning
 -- ----------+--------------------------------------------------------
@@ -38,4 +39,7 @@ top = always do
 
 -- Main function
 main :: IO ()
-main = writeVerilogTop top "top" "BitPat-Verilog/"
+main = do
+  args <- getArgs
+  if | "--simulate" `elem` args -> simulate top
+     | otherwise -> writeVerilogTop top "BitPat" "BitPat-Verilog/"

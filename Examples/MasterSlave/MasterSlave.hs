@@ -1,6 +1,7 @@
 import Blarney
 import Blarney.Stream
 import Blarney.Queue
+import System.Environment
 
 type MulReq  = (Bit 32, Bit 32)
 type MulResp = Bit 32
@@ -45,6 +46,8 @@ top = mdo
 
 main :: IO ()
 main = do
-  writeVerilogTop top "top" "MasterSlave-Verilog/"
-  writeVerilogModule slave "slave" "MasterSlave-Verilog/"
-  writeVerilogModule master "master" "MasterSlave-Verilog/"
+  args <- getArgs
+  if | "--simulate" `elem` args -> simulate top
+     | otherwise -> do writeVerilogModule slave "slave" "MasterSlave-Verilog/"
+                       writeVerilogModule master "master" "MasterSlave-Verilog/"
+                       writeVerilogTop top "MasterSlave" "MasterSlave-Verilog/"
