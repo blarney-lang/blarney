@@ -151,7 +151,7 @@ failedTests=()
 
 # start with building the blarney library itself
 pushd $BLARNEY_ROOT > /dev/null
-echo -n "initial blc Blarney build: "
+echo -n "Blarney build (blc): "
 make clean > /dev/null
 tmpLog=$(mktemp -t blarney-initial-blc-build-XXXX.log)
 make blc-build &> $tmpLog
