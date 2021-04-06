@@ -1,8 +1,5 @@
-{-# LANGUAGE MultiWayIf #-}
-
 import Blarney
 import Blarney.BitPat
-
 import System.Process
 import System.Environment
 

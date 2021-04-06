@@ -1,8 +1,5 @@
-{-# LANGUAGE MultiWayIf #-}
-
 import Blarney
 import Blarney.Recipe
-
 import System.Environment
 
 data Counter n =

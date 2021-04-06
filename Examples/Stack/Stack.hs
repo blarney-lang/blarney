@@ -1,8 +1,5 @@
-{-# LANGUAGE MultiWayIf #-}
-
 import Blarney
 import Blarney.Recipe
-
 import System.Environment
 
 -- This module implements a full-throughput dual-port stack.

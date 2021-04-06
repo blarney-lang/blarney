@@ -1,10 +1,7 @@
-{-# LANGUAGE MultiWayIf #-}
-
 -- Blarney imports
 import Blarney
 import Blarney.Queue
 import Blarney.Recipe
-
 -- Standard imports
 import Data.Proxy
 import System.Environment

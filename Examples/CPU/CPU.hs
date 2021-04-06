@@ -1,7 +1,4 @@
-{-# LANGUAGE MultiWayIf #-}
-
 import Blarney
-
 import System.Environment
 
 -- Tiny 8-bit CPU with a 4-stage pipeline

@@ -1,9 +1,5 @@
-{-# LANGUAGE MultiWayIf #-}
-
 import Mesh
-
 import Blarney
-
 import Data.List
 import System.Environment
 

@@ -1,9 +1,6 @@
-{-# LANGUAGE MultiWayIf #-}
-
 import Blarney
 import Blarney.Stream
 import Blarney.Queue
-
 import System.Environment
 
 type MulReq  = (Bit 32, Bit 32)

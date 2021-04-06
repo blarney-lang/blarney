@@ -1,8 +1,5 @@
-{-# LANGUAGE MultiWayIf #-}
-
 import Blarney
 import Blarney.BitScan
-
 import System.Environment
 
 -- Semantics of add instruction

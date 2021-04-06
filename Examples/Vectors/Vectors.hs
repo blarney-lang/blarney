@@ -1,9 +1,6 @@
-{-# LANGUAGE MultiWayIf #-}
-
 import Blarney
 import Blarney.SourceSink
 import Blarney.Vector hiding (elem)
-
 import System.Environment
 
 makeElement :: KnownNat n => Integer -> Module (Source (Bit n))

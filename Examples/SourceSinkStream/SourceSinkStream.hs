@@ -1,10 +1,7 @@
-{-# LANGUAGE MultiWayIf #-}
-
 import Blarney
 import Blarney.Queue
 import Blarney.Stream
 import Blarney.SourceSink
-
 import System.Environment
 
 -- Top-level module

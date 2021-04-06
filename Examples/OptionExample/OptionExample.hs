@@ -1,8 +1,5 @@
-{-# LANGUAGE MultiWayIf #-}
-
 import Blarney
 import Blarney.Option
-
 import System.Environment
 
 testModule :: Module (Option (Bit 32), Bit 32)

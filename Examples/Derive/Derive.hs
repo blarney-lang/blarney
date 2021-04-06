@@ -1,7 +1,4 @@
-{-# LANGUAGE MultiWayIf #-}
-
 import Blarney
-
 import System.Environment
 
 data MemReq =

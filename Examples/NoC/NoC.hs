@@ -1,9 +1,6 @@
-{-# LANGUAGE MultiWayIf #-}
-
 import Blarney
 import Blarney.Queue
 import Blarney.Stream
-
 import System.Environment
 import Data.List (transpose)
 import Control.Monad (forM_, zipWithM_, replicateM)

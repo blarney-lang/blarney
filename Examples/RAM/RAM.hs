@@ -1,8 +1,5 @@
-{-# LANGUAGE MultiWayIf #-}
-
 import Blarney
 import Blarney.Stmt
-
 import System.Environment
 
 -- Top-level module

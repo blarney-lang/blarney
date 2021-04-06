@@ -1,9 +1,6 @@
-{-# LANGUAGE MultiWayIf #-}
-
 import Blarney
 import Blarney.Queue
 import Blarney.Stream
-
 import System.Environment
 
 -- Single-element FIFO

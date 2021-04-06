@@ -1,7 +1,4 @@
-{-# LANGUAGE MultiWayIf #-}
-
 import Blarney
-
 import System.Environment
 
 twoSort :: (Bit 8, Bit 8) -> (Bit 8, Bit 8)

@@ -1,8 +1,5 @@
-{-# LANGUAGE MultiWayIf #-}
-
 import Blarney
 import Blarney.Queue
-
 import System.Environment
 
 top :: Module ()
