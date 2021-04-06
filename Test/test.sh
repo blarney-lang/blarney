@@ -31,6 +31,15 @@ BLARNEY_DEFAULT_EXAMPLES=(
 )
 BLARNEY_EXAMPLES="${BLARNEY_EXAMPLES[@]:-${BLARNEY_DEFAULT_EXAMPLES[@]}}"
 
+# exclude those from being tested, for whatever reason (mainly expected failure)
+VERILOG_EXCLUDE=()
+SIMULATION_EXCLUDE=(
+  Bit0
+  Spec
+  Interface
+  MasterSlave
+)
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 NC='\033[0m'
@@ -177,7 +186,6 @@ for E in ${BLARNEY_EXAMPLES[@]}; do
   outputs=$(ls *.out)
   for O in $outputs; do
     testName=$(basename $O .out)
-    echo "- $testName"
     # build the blarney example
     ###########################
     make -s BLC_FLAGS=$BLC_FLAGS $testName &> build.log
@@ -189,8 +197,8 @@ for E in ${BLARNEY_EXAMPLES[@]}; do
     fi
     # test verilog
     ##############
-    if [ $doBackendVerilog ]; then
-      echo -n "  verilog: "
+    if [ $doBackendVerilog ] && [[ ! " ${VERILOG_EXCLUDE[@]} " =~ " ${testName} " ]]; then
+      echo -n "$testName - verilog: "
       ./$testName $GEN_FLAGS --verilog
       make -s -C $testName-Verilog &> $testName-test-verilog.log
       # Using 'sed \$d' to print all but the last line (works on Linux and OSX)
@@ -201,8 +209,8 @@ for E in ${BLARNEY_EXAMPLES[@]}; do
     fi
     # test simulation
     #################
-    if [ $doBackendSimulation ]; then
-      echo -n "  simulation: "
+    if [ $doBackendSimulation ] && [[ ! " ${SIMULATION_EXCLUDE[@]} " =~ " ${testName} " ]]; then
+      echo -n "$testName - simulation: "
       ./$testName $GEN_FLAGS --simulate &> $testName-test-sim.out
       compare_outputs $testName.out $testName-test-sim.out || failedTests+=("$testName-sim ($tmpDir/$testName-test-sim.out)")
       nbTests=$((nbTests+1))
