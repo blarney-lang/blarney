@@ -61,7 +61,7 @@ do
     -h|--help)
       echo "Runs the blarney examples as a regression test suite"
       echo "--backend-simulation"
-      echo "    runs the in haskell simulation backend (currently always on)"
+      echo "    runs the in haskell simulation backend"
       echo "--backend-verilog"
       echo "    runs the verilog backend and a verilator simulation"
       echo "--plugin-namer"
