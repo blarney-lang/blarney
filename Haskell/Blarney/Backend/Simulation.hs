@@ -149,11 +149,12 @@ compile ctxt inputStreams = runST do
                             , case p of Display _ -> True
                                         _         -> False ]
   -- compile simulation termination stream
-  endStreams <- sequence [ compileTermination ctxt memo n
-                         | n@Net{ netPrim = p } <- IArray.elems nl
-                         , case p of Finish   -> True
-                                     Assert _ -> True
-                                     _        -> False ]
+  terminationStreams <- sequence [ compileTermination ctxt memo n
+                                 | n@Net{ netPrim = p } <- IArray.elems nl
+                                 , case p of Finish   -> True
+                                             Assert _ -> True
+                                             _        -> False ]
+  let endStreams = repeat False : terminationStreams
   -- compile simulation outputs streams
   let outputs = [ (nm, compileOutputSignal ctxt memo o)
                 | o@Net{ netPrim = Output _ nm } <- IArray.elems nl ]
