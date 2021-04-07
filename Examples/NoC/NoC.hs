@@ -166,10 +166,10 @@ top = do
   -- Flood a 4x4 mesh
   testMesh (4, 4)
 
-  -- Simulate for 1000 cycles
+  -- Simulate for 100 cycles
   always do
     timer <== timer.val + 1
-    when (timer.val .==. 10000) finish
+    when (timer.val .==. 100) finish
 
 -- Main
 main :: IO ()
