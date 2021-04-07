@@ -20,14 +20,14 @@ clean:
 	make -C MeanFilter clean
 	make -C NameBits clean
 	make -C NoC clean
-	make -C OptionExample clean
+	make -C Option clean
 	make -C Queue clean
 	make -C RAM clean
 	make -C Sklansky clean
 	make -C Sorter clean
-	make -C SourceSinkStream clean
+	make -C SourceSink clean
 	make -C Stack clean
 	make -C StackTesting clean
-	make -C UpDownCounter clean
+	make -C Counter clean
 	make -C Vectors clean
 	make -C RAMBE clean

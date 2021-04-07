@@ -19,14 +19,14 @@ BLARNEY_DEFAULT_EXAMPLES=(
   MeanFilter
   NameBits
   NoC
-  OptionExample
+  Option
   Queue
   RAM
   RAMBE
   Sorter
-  SourceSinkStream
+  SourceSink
   Stack
-  UpDownCounter
+  Counter
   Vectors
 )
 BLARNEY_EXAMPLES="${BLARNEY_EXAMPLES[@]:-${BLARNEY_DEFAULT_EXAMPLES[@]}}"

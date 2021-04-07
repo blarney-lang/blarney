@@ -1,3 +1,3 @@
-SRCS = OptionExample.hs
+SRCS = SourceSink.hs
 
 include $(BLARNEY_ROOT)/Examples/blarneyTest.mk

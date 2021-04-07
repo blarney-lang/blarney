@@ -67,4 +67,4 @@ main :: IO ()
 main = do
   args <- getArgs
   if | "--simulate" `elem` args -> simulate top
-     | otherwise -> writeVerilogTop top "UpDownCounter" "UpDownCounter-Verilog/"
+     | otherwise -> writeVerilogTop top "Counter" "Counter-Verilog/"

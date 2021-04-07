@@ -45,4 +45,4 @@ main = do
   args <- getArgs
   if | "--simulate" `elem` args -> simulate top
      | otherwise -> do
-       writeVerilogTop top "SourceSinkStream" "SourceSinkStream-Verilog/"
+       writeVerilogTop top "SourceSink" "SourceSink-Verilog/"

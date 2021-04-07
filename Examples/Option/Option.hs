@@ -7,7 +7,7 @@ testModule = do
   testReg :: Reg (Bit 32) <- makeReg 0
   always do testReg <== testReg.val + 1
   let optVal = if testReg.val .%. 5 === 0 then some (testReg.val) else none
-  return (optVal ,testReg.val)
+  return (optVal, testReg.val)
 
 top :: Module ()
 top = do
@@ -30,5 +30,5 @@ main = do
   args <- getArgs
   if | "--simulate" `elem` args -> simulate top
      | otherwise -> do
-       writeVerilogModule testModule "testModule" "OptionExample-Verilog/"
-       writeVerilogTop top "OptionExample" "OptionExample-Verilog/"
+       writeVerilogModule testModule "testModule" "Option-Verilog/"
+       writeVerilogTop top "Option" "Option-Verilog/"
