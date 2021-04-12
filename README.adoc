@@ -125,13 +125,38 @@ twoSort (2,1) = (1,2)
 
 Looks like `twoSort` is working!
 
+=== In-Haskell simulation
+
+Sometimes it can be convenient to skip Verilog generation, and use the in-Haskell simulator.
+
+[source, haskell]
+----
+main :: IO ()
+main = simulate top
+----
+
+Now after running `./Sorter` we see the test bench output directly.
+
+[source, shell]
+----
+$ ./Sorter
+twoSort (1,2) = (1,2)
+twoSort (2,1) = (1,2)
+----
+
+The in-Haskell simulator is much slower than Verilator, but can be
+more convenient for small designs.  However, it currently has fewer
+features (no
+http://blarney-lang.github.io/blarney/Blarney-Core-Module.html#t:RegFile[RegFile]
+or <<Modular compilation>>).
+
 === Bubble sort
 
 We can build a general _N_-element sorter by connecting together
 multiple two-sorters.  One of the simplest ways to do this is the
-_bubble sort_ network.  The key component of this network is a
-function `bubble` that takes a list of inputs and returns a new list
-in which the smallest element comes first.
+_bubble sort_ network.  The key component is a function `bubble` that
+takes a list of inputs and returns a new list in which the smallest
+element comes first.
 
 [source, haskell]
 ----
