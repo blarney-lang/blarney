@@ -28,8 +28,8 @@ import Blarney.Stream
 -- Generic imports
 import Control.Applicative
 
--- Stream mergers
--- ==============
+-- Stream mergers and switches
+-- ===========================
 
 -- | Unbuffered left-biased merge of two streams
 mergeTwo :: Bits a => Stream a -> Stream a -> Stream a
@@ -48,6 +48,12 @@ mergeChain = foldr mergeTwo nullStream
 -- where each merger is left biased
 mergeTree :: Bits a => [Stream a] -> Stream a
 mergeTree = tree mergeTwo nullStream
+
+-- | Shorthand for a two-way switch
+type TwoWaySwitch a =
+     (a -> Bit 1)                 -- ^ Routing function
+  -> (Stream a, Stream a)         -- ^ Input streams
+  -> Module (Stream a, Stream a)  -- ^ Output streams
 
 -- | Buffered fair merger of two streams
 makeGenericFairMergeTwo :: Bits a =>
@@ -94,6 +100,91 @@ makeFairExchange q route (inA, inB) = do
   outB <- makeGenericFairMergeTwo q route (inA, inB)
   return (outA, outB)
 
+-- | Optionally broadcast items from an input stream into two output
+-- streams.  If an item is to be broadcast, then *both* consumers must
+-- eventually consume it (perhaps at different times).
+makeTwoWayBroadcast :: Bits a =>
+     (a -> Bit 1)                 -- ^ Broadcast condition
+  -> Stream a                     -- ^ Input stream
+  -> Module (Stream a, Stream a)  -- ^ Output streams
+makeTwoWayBroadcast isBroadcast streamIn = do
+  -- Pulsed when data is consumed from an output stream
+  consume0 <- makeWire false
+  consume1 <- makeWire false
+
+  -- If the current item is to be broadcast, and one of the consumers
+  -- has already consumed it, then this register is true
+  waiting <- makeReg false
+
+  -- If we're waiting, then this register indicates the consumer that
+  -- has not yet consumed the current item
+  waitingFor :: Reg (Bit 1) <- makeReg dontCare
+
+  -- State machine
+  always do
+    when (streamIn.canPeek) do
+      if streamIn.peek.isBroadcast
+        then do
+          -- Broadcast
+          if waiting.val
+            then do
+              -- If we're waiting and a consumer consumes, we're done
+              when (consume0.val .||. consume1.val) do
+                streamIn.consume
+                waiting <== false
+            else do
+              -- If we're not waiting, and both consumers consume, we're done
+              when (consume0.val .&&. consume1.val) do
+                streamIn.consume
+              -- If we're not waiting, and 1 consumer consumes, we must wait
+              when (consume0.val .^. consume1.val) do
+                waiting <== true
+                waitingFor <== consume1.val
+        else do
+          -- No broadcast, just consume immediately
+          when (consume0.val .||. consume1.val) do
+            streamIn.consume
+
+  -- First output stream
+  let out0 =
+        Source {
+          peek = streamIn.peek
+        , canPeek = streamIn.canPeek .&&.
+                      (waiting.val .==>. waitingFor.val .==. 0)
+        , consume = consume0 <== true
+        }
+
+  -- Second output stream
+  let out1 =
+        Source {
+          peek = streamIn.peek
+        , canPeek = streamIn.canPeek .&&.
+                      (waiting.val .==>. waitingFor.val .==. 1)
+        , consume = consume1 <== true
+        }
+
+  return (out0, out1)
+
+-- | Buffered fair switch between two streams, based on routing
+-- function, with optional broadcast
+makeFairExchangeWithBroadcast :: Bits a =>
+     Module (Queue a)            -- ^ Queue kind to use for buffering
+  -> (a -> Bit 1)                -- ^ Broadcast condition
+  -> (a -> Bit 1)                -- ^ Routing function
+  -> (Stream a, Stream a)        -- ^ Input streams
+  -> Module (Stream a, Stream a) -- ^ Output streams
+makeFairExchangeWithBroadcast q bcast route (inA, inB) = do
+  -- Insert broadcasters
+  (inA0, inA1) <- makeTwoWayBroadcast bcast inA
+  (inB0, inB1) <- makeTwoWayBroadcast bcast inB
+  -- Determine first output
+  outA <- makeGenericFairMergeTwo q
+            (\x -> inv (route x) .||. bcast x) (inA0, inB0)
+  -- Determine second output
+  outB <- makeGenericFairMergeTwo q
+            (\x -> route x .||. bcast x) (inA1, inB1)
+  return (outA, outB)
+
 -- Shuffle Exchange network
 -- ========================
 
@@ -111,11 +202,11 @@ makeFairExchange q route (inA, inB) = do
 -- throughput is equivalent to that of a full crossbar.  Indeed, the
 -- network is similar to that found in a barrel shifter.
 makeShuffleExchange :: forall n a. (KnownNat n, Bits a) =>
-     Module (Queue a)  -- ^ Queue kind to use for buffering
+     TwoWaySwitch a    -- ^ Primitive two-way switch
   -> (a -> Bit n)      -- ^ Routing function
   -> [Stream a]        -- ^ Input streams
   -> Module [Stream a] -- ^ Output streams
-makeShuffleExchange makeQueue route ins
+makeShuffleExchange switch route ins
   | length ins == 2 ^ valueOf @n = shuffEx (valueOf @n) ins
   | otherwise = error $
       "Blarney.Interconnect.makeShuffleExchange: " ++
@@ -133,7 +224,6 @@ makeShuffleExchange makeQueue route ins
       bs <- shuffEx (i-1) bottom
 
       -- Combine using MSB of routing function
-      let merge = makeFairExchange makeQueue
-                    (\x -> unsafeAt (i-1) (route x))
+      let merge = switch (\x -> unsafeAt (i-1) (route x))
       (ts', bs') <- unzip <$> mapM merge (zip ts bs)
       return (ts' ++ bs')
