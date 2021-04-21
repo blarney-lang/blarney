@@ -139,7 +139,7 @@ makeTwoWayBroadcast isBroadcast streamIn = do
               -- If we're not waiting, and 1 consumer consumes, we must wait
               when (consume0.val .^. consume1.val) do
                 waiting <== true
-                waitingFor <== consume1.val
+                waitingFor <== consume0.val
         else do
           -- No broadcast, just consume immediately
           when (consume0.val .||. consume1.val) do
