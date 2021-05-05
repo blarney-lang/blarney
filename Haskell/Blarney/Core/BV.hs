@@ -359,7 +359,24 @@ regFileReadBV inf a = makePrim1 (RegFileRead inf) [a]
 getInitBV :: BV -> Maybe Integer
 getInitBV BV{..} = case bvPrim of
   Const _ i -> Just i
-  DontCare w -> Just 0  -- TODO: do better here
+  DontCare w -> Nothing
+  Concat wx wy ->
+    let x = getInitBV (bvInputs !! 0)
+        y = getInitBV (bvInputs !! 1)
+    in case (x, y) of
+         (Nothing, Nothing) -> Nothing
+         other -> Just $ getSemVal x `B.shiftL` wy + getSemVal y
+  SelectBits w hi lo ->
+    let x = getInitBV (bvInputs !! 0)
+        mask = (1 `B.shiftL` (hi+1)) - 1
+    in case x of
+         Nothing -> Nothing
+         Just x -> Just $ (x B..&. mask) `B.shiftR` lo
+  ReplicateBit w ->
+    let x = getInitBV (bvInputs !! 0)
+    in case x of
+         Nothing -> Nothing
+         Just x -> Just $ x * ((2^w) - 1)
   _ | Just f <- eval ->
     Just $ head $ f (map getInitBVSem bvInputs)
   _ -> error $ "Register initialiser must be a constant. Encountered: " ++
@@ -367,4 +384,5 @@ getInitBV BV{..} = case bvPrim of
   where
     eval = primSemEvalRaw bvPrim
     dontCareSemVal = 0
-    getInitBVSem bv = fromMaybe dontCareSemVal (getInitBV bv)
+    getSemVal = fromMaybe dontCareSemVal
+    getInitBVSem bv = getSemVal (getInitBV bv)
