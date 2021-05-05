@@ -378,11 +378,11 @@ getInitBV BV{..} = case bvPrim of
          Nothing -> Nothing
          Just x -> Just $ x * ((2^w) - 1)
   _ | Just f <- eval ->
-    Just $ head $ f (map getInitBVSem bvInputs)
+    Just $ head $ f (map getInitBVSemVal bvInputs)
   _ -> error $ "Register initialiser must be a constant. Encountered: " ++
                show bvPrim
   where
     eval = primSemEvalRaw bvPrim
     dontCareSemVal = 0
     getSemVal = fromMaybe dontCareSemVal
-    getInitBVSem bv = getSemVal (getInitBV bv)
+    getInitBVSemVal bv = getSemVal (getInitBV bv)
