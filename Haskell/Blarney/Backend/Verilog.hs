@@ -330,8 +330,11 @@ genNetVerilog netlist net = case netPrim net of
   declWireDontCare width wId  =     text "wire" <+> showWireWidth width wId
                                 <+> equals <+> showDontCare width <> semi
   declReg width reg = text "reg" <+> showWireWidth width reg <> semi
-  declRegInit width reg init =     text "reg" <+> showWireWidth width reg
-                               <+> equals <+> showIntLit width init <> semi
+  declRegInit width reg init =
+    text "reg" <+> showWireWidth width reg <+>
+      case init of
+        Nothing -> semi
+        Just i -> equals <+> showIntLit width i <> semi
   declMux w net | numIns == 2 =
       declWire w (netInstId net, Nothing)
     where numIns = length (netInputs net) - 1
@@ -380,7 +383,8 @@ genNetVerilog netlist net = case netPrim net of
   -- reset helpers
   --------------------------------------------------------------------------------
 
-  resetRegister width reg init =
+  resetRegister width reg Nothing = mempty
+  resetRegister width reg (Just init) =
         showWire reg <+> text "<="
     <+> int width <> text "'h" <> hexInt init <> semi
 

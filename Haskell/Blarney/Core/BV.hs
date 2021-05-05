@@ -65,7 +65,7 @@ module Blarney.Core.BV (
 , regBV          -- :: Width -> Integer -> BV -> BV
 , regEnBV        -- :: Width -> Integer -> BV -> BV -> BV
 , regFileReadBV  -- :: RegFileInfo -> BV -> BV
-, getInitBV      -- :: BV -> Integer
+, getInitBV      -- :: BV -> Maybe Integer
 , ramBV          -- Single port block RAM
 , dualRamBV      -- Simple dual port block RAM
 , trueDualRamBV  -- True dual port block RAM
@@ -356,12 +356,15 @@ regFileReadBV inf a = makePrim1 (RegFileRead inf) [a]
 -- |Get the value of a constant bit vector,
 -- which may involve bit manipulations.
 -- Used to determine the initial value of a register.
-getInitBV :: BV -> Integer
+getInitBV :: BV -> Maybe Integer
 getInitBV BV{..} = case bvPrim of
-  Const _ i -> i
-  DontCare w -> 0  -- TODO: do better here
+  Const _ i -> Just i
+  DontCare w -> Just 0  -- TODO: do better here
   _ | Just f <- eval ->
-    head $ f (map getInitBV bvInputs)
+    Just $ head $ f (map getInitBVSem bvInputs)
   _ -> error $ "Register initialiser must be a constant. Encountered: " ++
                show bvPrim
-  where eval = primSemEvalRaw bvPrim
+  where
+    eval = primSemEvalRaw bvPrim
+    dontCareSemVal = 0
+    getInitBVSem bv = fromMaybe dontCareSemVal (getInitBV bv)

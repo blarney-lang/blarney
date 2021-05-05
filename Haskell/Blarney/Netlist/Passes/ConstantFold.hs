@@ -89,9 +89,9 @@ evalConstNet n@Net{..} = case n of
   -- Mux
   NetP (Mux _ w) (Lit s:xs) -> modNet (Identity w) [xs !! fromInteger s]
   -- Registers
-  NetP (RegisterEn i w) [Lit 0, _] -> modNet (Const w i) []
+  NetP (RegisterEn (Just i) w) [Lit 0, _] -> modNet (Const w i) []
   NetP (RegisterEn i w) [Lit 1, a] -> modNet (Register i w) [a]
-  NetP (Register i w) [Lit x] | i == x -> modNet (Const w i) []
+  NetP (Register (Just i) w) [Lit x] | i == x -> modNet (Const w i) []
   -- general unary op on literal --
   NetP _ [Lit a0] | Just f <- eval ->
     modNet (Const (primOutWidth netPrim Nothing) (head $ f [a0])) []

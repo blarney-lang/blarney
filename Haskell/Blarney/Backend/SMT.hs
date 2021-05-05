@@ -167,6 +167,7 @@ mkContext nl n = Context { ctxtNetlist    = nl
                          , ctxtPropName   = nm
                          , ctxtAssertMsg  = msg }
   where topoSortIds = partialTopologicalSort nl $ netInstId n
+        dontCareVal = 0
         inputIds = [ i | x@Net{netInstId = i, netPrim = p} <- elems nl
                        , case p of Input _ _ -> True
                                    _         -> False
@@ -177,8 +178,10 @@ mkContext nl n = Context { ctxtNetlist    = nl
                                          Register   _ _ -> True
                                          _              -> False
                              , elem i topoSortIds ]
-        stateInit Net{netPrim=RegisterEn init w} = (init, w)
-        stateInit Net{netPrim=Register   init w} = (init, w)
+        stateInit Net{netPrim=RegisterEn init w} =
+          (fromMaybe dontCareVal init, w)
+        stateInit Net{netPrim=Register   init w} =
+          (fromMaybe dontCareVal init, w)
         stateInit x = error $ "Blarney.Backend.SMT: non state net " ++ show x ++
                               " encountered where state net was expected"
         (stateIds, stateInits) = unzip stateElems

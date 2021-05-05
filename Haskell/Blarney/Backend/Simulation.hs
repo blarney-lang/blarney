@@ -255,9 +255,9 @@ compilePrim CompCtxt{..} instId prim ins = case (prim, ins) of
   (Const w val, []) -> [repeat $ clamp w $ fromInteger val]
   (DontCare w, []) -> [repeat simDontCare]
   -- stateful primitives
-  (Register i _, [inpts]) -> [i:inpts]
+  (Register i _, [inpts]) -> [fromMaybe simDontCare i : inpts]
   (RegisterEn i _, [ens, inpts]) ->
-    [scanl f i (zip ens inpts)]
+    [scanl f (fromMaybe simDontCare i) (zip ens inpts)]
     where f prev (en, inpt) = if en /= 0 then inpt else prev
   (BRAM{ ramKind = BRAMSinglePort, .. }, inpts@(addrS:_:weS:reS:_) ) ->
     [zipWith3 doRead delayedAddrS delayedWeS bramContentS]

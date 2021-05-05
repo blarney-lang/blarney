@@ -300,21 +300,23 @@ data Prim =
     --   [__outputs__] a single output, the @w@-bit input value @x@
   | Identity OutputWidth
 
-    -- | @Register initial w@ represents a register with an initial value
+    -- | @Register initial w@ represents a register with an initial value.
+    --   An initial value of 'Nothing' denotes "dont care".
     --
     --   [__inputs__]  @[x]@, a single @w@-bit value
     --   [__outputs__] a single output, the @w@-bit value @initial@ or the last
     --                 written input value @x@
-  | Register Integer InputWidth
+  | Register (Maybe Integer) InputWidth
 
-    -- | @RegisterEn initial w@ represents a register with an initial value and
-    --   an enable signal
+    -- | @RegisterEn initial w@ represents a register with an initial value
+    --   and an enable signal. An initial value of 'Nothing' denotes
+    --   "dont care"
     --
     --   [__inputs__]  @[en, x]@, with @en@ a 1-bit value and @x@ a @w@-bit
     --                 value
     --   [__outputs__] a single output, the @w@-bit value @initial@ or the last
     --                 written input value @x@ when @en@ was asserted
-  | RegisterEn Integer InputWidth
+  | RegisterEn (Maybe Integer) InputWidth
 
     -- | @Input w name@ represents a named external input
     --
