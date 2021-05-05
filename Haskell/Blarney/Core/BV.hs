@@ -65,7 +65,7 @@ module Blarney.Core.BV (
 , regBV          -- :: Width -> Integer -> BV -> BV
 , regEnBV        -- :: Width -> Integer -> BV -> BV -> BV
 , regFileReadBV  -- :: RegFileInfo -> BV -> BV
-, getInitBV      -- :: BV -> Integer
+, getInitBV      -- :: BV -> Maybe Integer
 , ramBV          -- Single port block RAM
 , dualRamBV      -- Simple dual port block RAM
 , trueDualRamBV  -- True dual port block RAM
@@ -356,12 +356,34 @@ regFileReadBV inf a = makePrim1 (RegFileRead inf) [a]
 -- |Get the value of a constant bit vector,
 -- which may involve bit manipulations.
 -- Used to determine the initial value of a register.
-getInitBV :: BV -> Integer
+-- TODO: generalise semantic functions to understand "dont care" values.
+getInitBV :: BV -> Maybe Integer
 getInitBV BV{..} = case bvPrim of
-  Const _ i -> i
-  DontCare w -> 0  -- TODO: do better here
+  Const _ i -> Just i
+  DontCare w -> Nothing
+  Concat wx wy ->
+    let x = getInitBV (bvInputs !! 0)
+        y = getInitBV (bvInputs !! 1)
+    in case (x, y) of
+         (Nothing, Nothing) -> Nothing
+         other -> Just $ getSemVal x `B.shiftL` wy + getSemVal y
+  SelectBits w hi lo ->
+    let x = getInitBV (bvInputs !! 0)
+        mask = (1 `B.shiftL` (hi+1)) - 1
+    in case x of
+         Nothing -> Nothing
+         Just x -> Just $ (x B..&. mask) `B.shiftR` lo
+  ReplicateBit w ->
+    let x = getInitBV (bvInputs !! 0)
+    in case x of
+         Nothing -> Nothing
+         Just x -> Just $ x * ((2^w) - 1)
   _ | Just f <- eval ->
-    head $ f (map getInitBV bvInputs)
+    Just $ head $ f (map getInitBVSemVal bvInputs)
   _ -> error $ "Register initialiser must be a constant. Encountered: " ++
                show bvPrim
-  where eval = primSemEvalRaw bvPrim
+  where
+    eval = primSemEvalRaw bvPrim
+    dontCareSemVal = 0
+    getSemVal = fromMaybe dontCareSemVal
+    getInitBVSemVal bv = getSemVal (getInitBV bv)

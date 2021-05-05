@@ -30,6 +30,7 @@ import Blarney.Netlist.Passes.Utils
 
 -- pattern helper to identify constant InputTree NetInputs
 pattern Lit i <- InputTree (Const _ i) []
+pattern LitDontCare <- InputTree (DontCare _) []
 -- pattern helper to identify a 'Net' with specific 'Prim' and 'NetInput's
 pattern NetP p is <- Net{ netPrim = p, netInputs = is }
 -- | Helper to evaluate constant Net
@@ -89,9 +90,12 @@ evalConstNet n@Net{..} = case n of
   -- Mux
   NetP (Mux _ w) (Lit s:xs) -> modNet (Identity w) [xs !! fromInteger s]
   -- Registers
-  NetP (RegisterEn i w) [Lit 0, _] -> modNet (Const w i) []
+  NetP (RegisterEn Nothing w) [_, LitDontCare] -> modNet (DontCare w) []
+  NetP (RegisterEn Nothing w) [Lit 0, _] -> modNet (DontCare w) []
+  NetP (RegisterEn (Just i) w) [Lit 0, _] -> modNet (Const w i) []
   NetP (RegisterEn i w) [Lit 1, a] -> modNet (Register i w) [a]
-  NetP (Register i w) [Lit x] | i == x -> modNet (Const w i) []
+  NetP (Register Nothing w) [LitDontCare] -> modNet (DontCare w) []
+  NetP (Register (Just i) w) [Lit x] | i == x -> modNet (Const w i) []
   -- general unary op on literal --
   NetP _ [Lit a0] | Just f <- eval ->
     modNet (Const (primOutWidth netPrim Nothing) (head $ f [a0])) []
