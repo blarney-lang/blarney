@@ -356,6 +356,7 @@ regFileReadBV inf a = makePrim1 (RegFileRead inf) [a]
 -- |Get the value of a constant bit vector,
 -- which may involve bit manipulations.
 -- Used to determine the initial value of a register.
+-- TODO: generalise semantic functions to understand "dont care" values.
 getInitBV :: BV -> Maybe Integer
 getInitBV BV{..} = case bvPrim of
   Const _ i -> Just i
