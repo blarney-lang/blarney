@@ -24,6 +24,11 @@ module BlockRAM (
   generate
     if (INIT_FILE != "UNUSED") begin
       initial $readmemh(INIT_FILE, RAM);
+    end else begin
+      integer i;
+      initial
+        for (i = 0; i < 2**ADDR_WIDTH; i=i+1)
+          RAM[i] = 0;
     end
   endgenerate
 
