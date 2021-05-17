@@ -62,6 +62,9 @@ module Blarney.Core.Module
     -- * Register files
     RegFile(..), makeRegFileInit, makeRegFile,
 
+    -- * Elaboration time IO
+    addIO,
+
     -- * Other actions
     finish, RTL.display, RTL.display_, assert, dynamicAssert, staticAssert,
 
@@ -280,6 +283,10 @@ makeRegFileInit initFile = M (liftM toRegFile $ RTL.makeRegFileInit initFile)
 -- |Create uninitialised register file
 makeRegFile :: forall a d. (Bits a, Bits d) => Module (RegFile a d)
 makeRegFile = M (liftM toRegFile RTL.makeRegFile)
+
+-- | Add elaboration-time IO action
+addIO :: IO () -> Module ()
+addIO io = M (RTL.addIO io)
 
 -- | Terminate simulator
 finish :: Action ()

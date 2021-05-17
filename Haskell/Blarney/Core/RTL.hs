@@ -30,6 +30,7 @@ module Blarney.Core.RTL (
 , RTLAction(..)   -- RTLAction
 , R(..)           -- The RTL reader type
 , Assign(..)      -- Conditional variable assignment
+, addIO           -- Add elaboration-time IO action
   -- * Conditional statements
 , when            -- RTL conditional block
 , whenR           -- RTL conditional block (with return value)
@@ -102,6 +103,7 @@ type W = JL.JList RTLAction
 data RTLAction =
     RTLAssign Assign
   | RTLRoots [BV]
+  | RTL_IO (IO ())
 
 -- |Variable identifiers
 type VarId = Int
@@ -167,6 +169,10 @@ fresh = do
   v <- get
   set (v+1)
   return v
+
+-- |Add elaboration-time IO action
+addIO :: IO () -> RTL ()
+addIO io = write (RTL_IO io)
 
 -- | Set a name hint for an RTL block
 withNameHint :: NameHint -> RTL a -> RTL a

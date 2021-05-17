@@ -125,8 +125,11 @@ instance ToNetlist (RTL ()) IO where
       writeArray mnl idx net{ netNameHints = oldHints <> hints }
     -- run undo computations
     undo
-    -- return final netlist
-    freeze mnl
+    -- final netlist
+    finalNetlist <- freeze mnl
+    -- perform any IO gathered actions
+    sequence_ [m | RTL_IO m <- acts]
+    return finalNetlist
     ------------------------
     where
       (_, actsJL, _) = runRTL rtl (R { nameHints = mempty

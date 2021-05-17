@@ -24,7 +24,7 @@ module Blarney.Backend (
 import Prelude
 
 import Blarney.Core.Opts
-import Blarney.Core.Interface (Modular(..), makeModule)
+import Blarney.Core.Interface
 import Blarney.Core.Flatten (ToNetlist(..))
 import Blarney.Core.Module
 import Blarney.Netlist
@@ -66,6 +66,14 @@ writeVerilogTop mod modName dirName = do
   nl <- toNetlist mod
   let nl' = runDefaultNetlistPasses opts nl
   genVerilogTop nl' modName dirName
+
+-- | Generate verilog for given module and return a function that can
+-- be used to instantiate that module
+makeInstanceOf :: Modular a => a -> String -> Module a
+makeInstanceOf m s = do
+  addIO do
+    writeVerilogModule m s "./"
+  return (makeInstance s)
 
 -- SMT backend
 --------------------------------------------------------------------------------
