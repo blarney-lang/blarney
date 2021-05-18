@@ -150,7 +150,7 @@ instance (KnownNat n, Interface a) => Interface (Vec n a) where
       buildList (IfcTermProduct x0 x1) = fromIfcTerm x0 : buildList x1
   toIfcType _ =
     L.foldr IfcTypeProduct IfcTypeUnit (L.replicate (valueOf @n) t)
-    where t = toIfcType (undefined :: a)
+    where t = IfcTypeField "" (toIfcType (undefined :: a))
 
 -- | Generate a 'Vec' of size 'n' initialized with 'undefined' in each element
 newVec :: forall n a. KnownNat n => Vec n a

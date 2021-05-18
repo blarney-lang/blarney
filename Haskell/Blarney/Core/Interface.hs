@@ -72,8 +72,8 @@ data IfcType =
   | IfcTypeAction IfcType
   | IfcTypeProduct IfcType IfcType
   | IfcTypeFun IfcType IfcType
-    -- Marks new field selector with name
-  | IfcTypeMetaSel String IfcType
+    -- Marks each field / constructor argument (with name, which can be "")
+  | IfcTypeField String IfcType
 
 class Interface a where
   toIfcTerm   :: a -> IfcTerm
@@ -144,7 +144,7 @@ instance (GInterface a, GInterface b) => GInterface (a :*: b) where
 instance (GInterface a, Selector c) => GInterface (M1 S c a) where
   gtoIfcTerm ~(m@(M1 x)) = gtoIfcTerm x
   gfromIfcTerm x = M1 (gfromIfcTerm x)
-  gtoIfcType ~(m@(M1 x)) = IfcTypeMetaSel (selName m) (gtoIfcType x)
+  gtoIfcType ~(m@(M1 x)) = IfcTypeField (selName m) (gtoIfcType x)
 
 instance {-# OVERLAPPABLE #-} GInterface a => GInterface (M1 i c a)  where
   gtoIfcTerm ~(m@(M1 x)) = gtoIfcTerm x
@@ -258,7 +258,7 @@ declareInputBV suffix width = do
 
 -- Declare an output, generically over any interface type
 declareOut :: IfcTerm -> IfcType -> Declare ()
-declareOut x (IfcTypeMetaSel selName t) =
+declareOut x (IfcTypeField selName t) =
   newScope selName (declareOut x t)
 declareOut IfcTermUnit _ = return ()
 declareOut (IfcTermBV bv) _ =
@@ -286,7 +286,7 @@ declareOutput str out =
 
 -- Declare an input, generically over any interface type
 declareIn :: IfcType -> Declare IfcTerm
-declareIn (IfcTypeMetaSel selName t) =
+declareIn (IfcTypeField selName t) =
   newScope selName (declareIn t)
 declareIn IfcTypeUnit = return IfcTermUnit
 declareIn (IfcTypeBV w) = do
@@ -334,7 +334,7 @@ declareIn t@(IfcTypeFun _ _) = do
     -- Declare an output and return assignment
     -- function (driver) for that output
     driver :: IfcType -> Declare (IfcTerm -> Action ())
-    driver (IfcTypeMetaSel selName t) = newScope selName (driver t)
+    driver (IfcTypeField selName t) = newScope selName (driver t)
     driver IfcTypeUnit = return (\x -> return ())
     driver (IfcTypeBV w) =
       liftNat w $ \(_ :: Proxy n) -> do
