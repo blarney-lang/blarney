@@ -62,7 +62,7 @@ data IfcTerm =
     IfcTermUnit
   | IfcTermBV BV
   | IfcTermAction (Action IfcTerm)
-  | IfcTermProduct [IfcTerm]
+  | IfcTermProduct IfcTerm IfcTerm
   | IfcTermFun (IfcTerm -> IfcTerm)
 
 -- Interface type representation
@@ -70,7 +70,7 @@ data IfcType =
     IfcTypeUnit
   | IfcTypeBV Width
   | IfcTypeAction IfcType
-  | IfcTypeProduct [IfcType]
+  | IfcTypeProduct IfcType IfcType
   | IfcTypeFun IfcType IfcType
     -- Marks new field selector with name
   | IfcTypeMetaSel String IfcType
@@ -137,9 +137,9 @@ instance GInterface U1 where
   gtoIfcType _ = IfcTypeUnit
 
 instance (GInterface a, GInterface b) => GInterface (a :*: b) where
-  gtoIfcTerm ~(a :*: b) = IfcTermProduct [gtoIfcTerm a, gtoIfcTerm b]
-  gfromIfcTerm ~(IfcTermProduct [a, b]) = gfromIfcTerm a :*: gfromIfcTerm b
-  gtoIfcType ~(a :*: b) = IfcTypeProduct [gtoIfcType a, gtoIfcType b]
+  gtoIfcTerm ~(a :*: b) = IfcTermProduct (gtoIfcTerm a) (gtoIfcTerm b)
+  gfromIfcTerm ~(IfcTermProduct a b) = gfromIfcTerm a :*: gfromIfcTerm b
+  gtoIfcType ~(a :*: b) = IfcTypeProduct (gtoIfcType a) (gtoIfcType b)
 
 instance (GInterface a, Selector c) => GInterface (M1 S c a) where
   gtoIfcTerm ~(m@(M1 x)) = gtoIfcTerm x
@@ -232,7 +232,7 @@ liftModule m = Declare \c s e -> noName do
   a <- m
   return (c, [], a)
 
--- Get a meaningful name with given prefix
+-- Get a meaningful name
 getName :: Declare String
 getName = Declare \c s e ->
   return (c, [], concat (intersperse "_" (reverse s)))
@@ -270,8 +270,9 @@ declareOut (IfcTermAction act) (IfcTypeAction t) = do
   ret <- liftModule $ always $ whenR (FromBV en :: Bit 1) act
   -- Declare return value output
   newScope "ret" (declareOut ret t)
-declareOut (IfcTermProduct xs) (IfcTypeProduct txs) =
-  zipWithM_ declareOut xs txs
+declareOut (IfcTermProduct x0 x1) (IfcTypeProduct tx0 tx1) = do
+  declareOut x0 tx0
+  declareOut x1 tx1
 declareOut (IfcTermFun fun) (IfcTypeFun argType retType) = do
   -- Declare argument as input
   arg <- newScope "" (declareIn argType)
@@ -300,8 +301,8 @@ declareIn (IfcTypeAction t) = do
   declareOutputBV "en" (toBV (val enWire))
   -- When action block is called, trigger the enable line
   return (IfcTermAction $ do { enWire <== 1; return ret })
-declareIn (IfcTypeProduct ts) =
-  IfcTermProduct <$> mapM declareIn ts
+declareIn (IfcTypeProduct t0 t1) =
+  IfcTermProduct <$> declareIn t0 <*> declareIn t1
 declareIn t@(IfcTypeFun _ _) = do
   let (argTypes, retType) = flatten t
   -- The return type must be an action (the Method class captures
@@ -343,9 +344,10 @@ declareIn t@(IfcTypeFun _ _) = do
         declareOutputBV "" (toBV (val wire))
         -- Return assigner
         return (\(IfcTermBV bv) -> wire <== FromBV bv)
-    driver (IfcTypeProduct ts) = do
-      drivers <- mapM driver ts
-      return (\(IfcTermProduct xs) -> zipWithM_ ($) drivers xs)
+    driver (IfcTypeProduct t0 t1) = do
+      driver0 <- driver t0
+      driver1 <- driver t1
+      return (\(IfcTermProduct x0 x1) -> driver0 x0 >> driver1 x1)
     driver other =
       error "Blarney.Core.Interface: driver applied to non-Bits type"
 

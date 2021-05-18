@@ -93,7 +93,8 @@ lookupInterface ifcs i = fromIfcTerm (idx $ toIfcTerm <$> ifcs)
                        | (j, IfcTermAction act) <- zip [0..] terms ]
       return (idx rets)
     idx (terms@(IfcTermProduct{}:_)) =
-      IfcTermProduct $ map idx $ transpose [xs | IfcTermProduct xs <- terms]
+      IfcTermProduct (idx [x0 | IfcTermProduct x0 _ <- terms])
+                     (idx [x1 | IfcTermProduct _ x1 <- terms])
     idx (terms@(IfcTermFun{}:_)) =
       IfcTermFun $ \x -> idx [f x | IfcTermFun f <- terms]
 

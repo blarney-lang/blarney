@@ -142,9 +142,14 @@ instance (KnownNat n, Bits a) => Bits (Vec n a) where
                        | (i,b) <- L.zip [0..] (toList xs) ]
 
 instance (KnownNat n, Interface a) => Interface (Vec n a) where
-  toIfcTerm vec = IfcTermProduct (L.map toIfcTerm (toList vec))
-  fromIfcTerm (IfcTermProduct list) = Vec (L.map fromIfcTerm list)
-  toIfcType _ = IfcTypeProduct (L.replicate (valueOf @n) t)
+  toIfcTerm vec =
+    L.foldr IfcTermProduct IfcTermUnit (L.map toIfcTerm (toList vec))
+  fromIfcTerm term = Vec (buildList term)
+    where
+      buildList IfcTermUnit = []
+      buildList (IfcTermProduct x0 x1) = fromIfcTerm x0 : buildList x1
+  toIfcType _ =
+    L.foldr IfcTypeProduct IfcTypeUnit (L.replicate (valueOf @n) t)
     where t = toIfcType (undefined :: a)
 
 -- | Generate a 'Vec' of size 'n' initialized with 'undefined' in each element
@@ -178,7 +183,7 @@ genWith f = Vec (L.take (valueOf @n) $ L.map f [0..])
 
 genWithM :: forall n a m. (Monad m, KnownNat n) => (Integer -> m a) -> m (Vec n a)
 genWithM f = do
-  xs <- Blarney.mapM f [0..toInteger $ valueOf @n]
+  xs <- Blarney.mapM f [0 .. toInteger (valueOf @n - 1)]
   return $ Vec xs
 
 -- | TODO
