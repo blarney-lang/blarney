@@ -14,19 +14,17 @@ License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
 
-This module provides types and functions to represent circuits as 'Netlist's
-that can then be rendered as Verilog or in other formats...
+This module provides types and functions to represent circuits as
+'Netlist's that can then be rendered as Verilog or in other formats.
+See Blarney.Core.Prim for the definition of 'Net' and 'Netlist'.  (The
+definitions are there to break an import cycle.)
 
 -}
 
 module Blarney.Core.Net (
-  Net(..)         -- 'Net' type to represent 'Netlist' nodes
-, WireId          -- 'WireId' type to uniquely identify wires
-, NetInput(..)    -- 'NetInput' type to represent inputs to 'Net's
-, netInputWireIds -- Helper function to extract all 'NetInput''s 'WireId's
+  netInputWireIds -- Helper function to extract all 'NetInput''s 'WireId's
 , remapNetInputInstId -- Helper to remap a 'NetInput''s 'InstId's
 , remapNetInstId  -- Helper to remap a 'Net''s 'InstId's
-, Netlist         -- 'Netlist' type to represent a circuit
 , ToNetlist(..)   -- Class of types that can be turned into 'Netlist's
 , getNet          -- Extract the 'Net' from a 'Netlist' at the provided 'InstId'
 , topologicalSort -- Topologically sort a 'Netlist'
@@ -41,31 +39,6 @@ import Data.Array.ST
 import Control.Monad.ST
 
 import Blarney.Core.Prim
-
--- General type definitions and helpers
---------------------------------------------------------------------------------
-
--- | 'Net' type representing a 'Netlist' node
-data Net = Net { -- | The 'Net' 's 'Prim'itive
-                 netPrim         :: Prim
-                 -- | The 'Net' 's 'InstId' identifier
-               , netInstId       :: InstId
-                 -- | The 'Net' 's list of 'NetInput' inputs
-               , netInputs       :: [NetInput]
-                 -- | The 'Net' 's 'NameHints'
-               , netNameHints    :: NameHints
-               } deriving Show
-
--- | A 'WireId' uniquely identify a wire with a 'Net''s instance identifier
---   ('InstId') and an output name ('OutputName')
-type WireId = (InstId, OutputName)
-
--- | A 'Net''s input ('NetInput') can be:
---   - a wire, using the 'InputWire' constructor
---   - a complex expression, using the 'InputTree' constructor
-data NetInput = InputWire WireId
-              | InputTree Prim [NetInput]
-              deriving Show
 
 -- | Helper function to extract all 'NetInput''s 'WireId's
 netInputWireIds :: NetInput -> [WireId]
@@ -83,9 +56,6 @@ remapNetInstId :: (InstId -> InstId) -> Net -> Net
 remapNetInstId remap net@Net{ netInstId = instId, netInputs = inpts } =
   net { netInstId = remap instId
       , netInputs = remapNetInputInstId remap <$> inpts }
-
--- | A 'Netlist', represented as an 'Array InstId Net'
-type Netlist = Array InstId Net
 
 class Monad m => ToNetlist a m where
   toNetlist :: a -> m Netlist

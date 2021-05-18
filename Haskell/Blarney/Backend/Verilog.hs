@@ -221,7 +221,7 @@ genNetVerilog netlist net = case netPrim net of
               , inst = Just $ instRegFileRead vId net }
   RegFileWrite RegFileInfo{ regFileId = vId }
     -> dfltNV { alws = Just $ alwsRegFileWrite vId net }
-  Custom p is os ps clked
+  Custom p is os ps clked nlgen
     -> dfltNV { decl = Just $ sep [ declWire w (netInstId net, Just nm)
                                   | (nm, w) <- os ]
               , inst = Just $ instCustom net p is os ps clked }

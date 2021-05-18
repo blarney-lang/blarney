@@ -35,7 +35,7 @@ module Blarney.Core.Interface (
 , Modular(..)   -- Types that can be turned into external modules
 , makeModule    -- Convert a Blarney function to an external module
 , makeInstance  -- Instantiate an external module in a Blarney description
-, makeInstanceWithTypeOf -- Use type of argument rather than needing type sig
+, makeBoundary  -- Introduce synthesis boundary
 , makeInstanceWithParams  -- Allow static parameters
 ) where
 
@@ -55,6 +55,7 @@ import Blarney.Core.Bits
 import Blarney.Core.Prim
 import Blarney.Core.Module
 import Blarney.Core.Prelude
+import Blarney.Core.Flatten
 import qualified Blarney.Core.RTL as RTL
 
 -- Interface term representation
@@ -361,30 +362,31 @@ declareInput str =
 
 class Modular a where
   makeMod :: Int -> a -> Declare ()
-  makeInst :: String -> [Param] -> Int -> Declare () -> a
+  makeInst :: String -> [Param] -> Int ->
+    Declare () -> Maybe NetlistGenerator -> a
 
 -- Specific base case 
 instance {-# OVERLAPPING #-} Interface a => Modular (Module a) where
   makeMod count m =
     liftModule m >>= declareOutput "out"
-  makeInst s ps count m =
-    instantiate s ps True (m >> declareInput "out")
+  makeInst s ps count m nlg =
+    instantiate s ps True (m >> declareInput "out") nlg
 
 -- Specific recursive case
 instance {-# OVERLAPPING #-} (Interface a, Modular m) => Modular (a -> m) where
   makeMod count f = do
     a <- declareInput ("in" ++ show count)
     makeMod (count+1) (f a)
-  makeInst s ps count m = \a ->
-    makeInst s ps (count+1) (m >> declareOutput ("in" ++ show count) a)
+  makeInst s ps count m nlg = \a ->
+    makeInst s ps (count+1) (m >> declareOutput ("in" ++ show count) a) nlg
 
 -- General base case (pure function)
 instance {-# OVERLAPPABLE #-} Interface a => Modular a where
   makeMod count out = declareOutput "out" out
-  makeInst s ps count m = runPureModule mod
+  makeInst s ps count m nlg = runPureModule mod
       "Interface.makeInstance: function must be in the Module monad, or pure"
     where
-      mod = instantiate s ps False (m >> declareInput "out")
+      mod = instantiate s ps False (m >> declareInput "out") nlg
 
 -- Realise declarations to give standalone module
 modularise :: Declare a -> Module a
@@ -401,8 +403,9 @@ modularise ifc = noName mdo
       return $ zip (map fst inputs) tmps
 
 -- Realise declarations to give module instance
-instantiate :: String -> [Param] -> Bool -> Declare a -> Module a
-instantiate name params doAddRoots ifc = noName mdo
+instantiate :: String -> [Param] -> Bool -> Declare a ->
+  Maybe NetlistGenerator -> Module a
+instantiate name params doAddRoots ifc nlg = noName mdo
     (_, w, a) <- runDeclare ifc 0 [] (custom w)
     addRoots [x | DeclOutput s x <- w, doAddRoots]
     return a
@@ -412,18 +415,26 @@ instantiate name params doAddRoots ifc = noName mdo
           outputs  = [(s, n) | DeclInput s n <- w]
           outNames = map fst outputs
           prim     = Custom name [(s, bvPrimOutWidth x) | (s, x) <- inputs]
-                           outputs params True
+                           outputs params True nlg
       in  zip outNames (makePrim prim (map snd inputs) (map Just outNames))
 
 makeModule :: Modular a => a -> Module ()
 makeModule a = modularise (makeMod 0 a)
 
-makeInstanceWithParams :: Modular a => String -> [Param] -> a
-makeInstanceWithParams s ps = makeInst s ps 0 (return ())
+makeInstanceWithParams :: Modular a =>
+     String                 -- ^ Name of componenet being instantiated
+  -> [Param]                -- ^ Generic parameters to component
+  -> Maybe NetlistGenerator -- ^ Optional netlist generator for component
+  -> a
+makeInstanceWithParams s ps nlg =
+  makeInst s ps 0 (return ()) nlg
 
 makeInstance :: Modular a => String -> a
-makeInstance s = makeInstanceWithParams s []
+makeInstance s = makeInstanceWithParams s [] Nothing
 
--- | Use type of argument to specify type of result
-makeInstanceWithTypeOf :: Modular a => a -> String -> a
-makeInstanceWithTypeOf _ s = makeInstanceWithParams s []
+-- | Make synthesis boundary.  This first arugment to this function
+-- should not capture external runtime state (e.g. by partial
+-- application).
+makeBoundary :: Modular a => String -> a -> a
+makeBoundary name m = makeInstanceWithParams name [] nlg
+  where nlg = Just $ NetlistGenerator $ toNetlist $ makeModule m
