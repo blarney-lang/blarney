@@ -142,12 +142,14 @@ instance (KnownNat n, Bits a) => Bits (Vec n a) where
                        | (i,b) <- L.zip [0..] (toList xs) ]
 
 instance (KnownNat n, Interface a) => Interface (Vec n a) where
-  toIfcTerm vec =
-    L.foldr IfcTermProduct IfcTermUnit (L.map toIfcTerm (toList vec))
-  fromIfcTerm term = Vec (buildList term)
+  toIfcTerm vec = encode (valueOf @n) (toList vec)
     where
-      buildList IfcTermUnit = []
-      buildList (IfcTermProduct x0 x1) = fromIfcTerm x0 : buildList x1
+      encode 0 _ = IfcTermUnit
+      encode i ~(x:xs) = IfcTermProduct (toIfcTerm x) (encode (i-1) xs)
+  fromIfcTerm term = Vec $ decode (valueOf @n) term
+    where
+      decode 0 _ = []
+      decode i ~(IfcTermProduct x0 x1) = fromIfcTerm x0 : decode (i-1) x1
   toIfcType _ =
     L.foldr IfcTypeProduct IfcTypeUnit (L.replicate (valueOf @n) t)
     where t = IfcTypeField "" (toIfcType (undefined :: a))
