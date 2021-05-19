@@ -44,6 +44,12 @@ module Blarney.Core.Prim (
 , Param(..)       -- Compile-time parameters
 , NameHint(..)    -- A 'NameHint' type to represent name hints
 , NameHints       -- A 'NameHints' type to gather name hints
+  -- * Netlists
+, Net(..)         -- 'Net' type to represent 'Netlist' nodes
+, WireId          -- 'WireId' type to uniquely identify wires
+, NetInput(..)    -- 'NetInput' type to represent inputs to 'Net's
+, Netlist         -- 'Netlist' type to represent a circuit
+, NetlistGenerator(..) -- Action that can generate a netlist
 ) where
 
 import Prelude
@@ -51,6 +57,7 @@ import Data.Set (Set, union, empty)
 import Data.List (elemIndex)
 import Data.Bits
 import Data.Maybe
+import Data.Array
 
 import Blarney.Core.Utils
 
@@ -342,11 +349,14 @@ data Prim =
 
     -- TODO document
     -- | Custom component
-  | Custom { customName      :: String                  -- component name
-           , customInputs    :: [(String, InputWidth)]  -- input names
-           , customOutputs   :: [(String, OutputWidth)] -- output names/widths
-           , customParams    :: [Param]                 -- parameters
-           , customIsClocked :: Bool }                  -- pass clock (reset?)
+  | Custom { customName      :: String                  -- ^ Component name
+           , customInputs    :: [(String, InputWidth)]  -- ^ Input names
+           , customOutputs   :: [(String, OutputWidth)] -- ^ Output names/widths
+           , customParams    :: [Param]                 -- ^ Parameters
+           , customIsClocked :: Bool                    -- ^ Pass clock (reset?)
+           , customNetlist   :: Maybe (NetlistGenerator)
+             -- ^ Optional netlist generator for this component
+           }
 
     -- TODO document
     -- | Register file declaration
@@ -909,3 +919,39 @@ primInfo prim@(RegFileWrite RegFileInfo{ regFileAddrWidth = aw
            , isRoot = True
            , inputs = [("idx", aw), ("data", dw)]
            , outputs = [] }
+
+-- Nets and netlists
+-- =================
+
+-- | 'Net' type representing a 'Netlist' node
+data Net = Net { -- | The 'Net' 's 'Prim'itive
+                 netPrim         :: Prim
+                 -- | The 'Net' 's 'InstId' identifier
+               , netInstId       :: InstId
+                 -- | The 'Net' 's list of 'NetInput' inputs
+               , netInputs       :: [NetInput]
+                 -- | The 'Net' 's 'NameHints'
+               , netNameHints    :: NameHints
+               } deriving Show
+
+-- | A 'WireId' uniquely identify a wire with a 'Net''s instance identifier
+--   ('InstId') and an output name ('OutputName')
+type WireId = (InstId, OutputName)
+
+-- | A 'Net''s input ('NetInput') can be:
+--   - a wire, using the 'InputWire' constructor
+--   - a complex expression, using the 'InputTree' constructor
+data NetInput = InputWire WireId
+              | InputTree Prim [NetInput]
+              deriving Show
+
+-- | A 'Netlist', represented as an 'Array InstId Net'
+type Netlist = Array InstId Net
+
+-- | Netlist generator. We use a new type here so that we can keep
+-- automatic deriving of the 'Show' class for 'Prim'.
+data NetlistGenerator =
+  NetlistGenerator { getNetlistGenerator :: IO Netlist }
+
+instance Show NetlistGenerator where
+  show _ = "NetlistGenerator"

@@ -22,8 +22,8 @@ import Data.STRef
 import Data.Array.ST
 import Control.Monad.ST
 
-import Blarney.Core.Net
 import Blarney.Core.Prim
+import Blarney.Core.NetHelpers
 
 -- | A helper type for mutable 'Netlist'
 type MNetlist s = STArray s InstId (Maybe Net)

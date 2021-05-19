@@ -22,6 +22,8 @@ module Blarney.Backend (
 ) where
 
 import Prelude
+import Data.Map (Map, toList, fromList, member, notMember, insert, empty)
+import Data.Array (elems)
 
 import Blarney.Core.Opts
 import Blarney.Core.Interface (Modular(..), makeModule)
@@ -33,6 +35,29 @@ import Blarney.Backend.Simulation
 import Blarney.Backend.Verilog
 import Blarney.Backend.SMT
 
+-- | Elaborate module hierarchy
+elaborateHierarchy ::
+     Map String Netlist
+     -- ^ Accumlator of explored modules
+  -> [(String, IO Netlist)]
+     -- ^ List of currently unexplored modules
+  -> IO (Map String Netlist)
+elaborateHierarchy acc [] = return acc
+elaborateHierarchy acc ((name, nlg):rest)
+  | name `member` acc = elaborateHierarchy acc rest
+  | otherwise = do
+      -- Run netlist generator
+      nl <- nlg
+      -- Insert resulting netlist into accumulator
+      let newAcc = insert name nl acc
+      -- Look for new netlists
+      elaborateHierarchy newAcc $
+        [ (nm, getNetlistGenerator nlg')
+        | Custom { customName = nm
+                 , customNetlist = Just nlg' } <- map netPrim (elems nl)
+        , nm `notMember` newAcc
+        ] ++ rest
+        
 -- Verilog backend
 --------------------------------------------------------------------------------
 
@@ -46,9 +71,12 @@ writeVerilogModule :: Modular a
                    -> IO ()
 writeVerilogModule mod modName dirName = do
   (opts, _) <- getOpts
-  nl <- toNetlist (makeModule mod)
-  let nl' = runDefaultNetlistPasses opts nl
-  genVerilogModule nl' modName dirName
+  nl0 <- toNetlist (makeModule mod)
+  nls <- elaborateHierarchy empty [(modName, return nl0)]
+  sequence_
+    [ do let nl1' = runDefaultNetlistPasses opts nl1
+         genVerilogModule nl1' name dirName
+    | (name, nl1) <- toList nls ]
 
 -- | This function is similar to 'writeVerilogModule' but also generates
 -- a verilator wrapper and Makefile.
@@ -63,9 +91,14 @@ writeVerilogTop :: Module () -- ^ Blarney function
                 -> IO ()
 writeVerilogTop mod modName dirName = do
   (opts, _) <- getOpts
-  nl <- toNetlist mod
-  let nl' = runDefaultNetlistPasses opts nl
-  genVerilogTop nl' modName dirName
+  nl0 <- toNetlist mod
+  let nl0' = runDefaultNetlistPasses opts nl0
+  genVerilogTop nl0' modName dirName
+  nls <- elaborateHierarchy empty [(modName, return nl0')]
+  sequence_
+    [ do let nl1' = runDefaultNetlistPasses opts nl1
+         genVerilogModule nl1' name dirName
+    | (name, nl1) <- toList nls, name /= modName ]
 
 -- SMT backend
 --------------------------------------------------------------------------------
