@@ -948,7 +948,8 @@ data NetInput = InputWire WireId
 -- | A 'Netlist', represented as an 'Array InstId Net'
 type Netlist = Array InstId Net
 
--- | Netlist generator
+-- | Netlist generator. We use a new type here so that we can keep
+-- automatic deriving of the 'Show' class for 'Prim'.
 data NetlistGenerator =
   NetlistGenerator { getNetlistGenerator :: IO Netlist }
 

@@ -362,8 +362,8 @@ declareInput str =
 
 class Modular a where
   makeMod :: Int -> a -> Declare ()
-  makeInst :: String -> [Param] -> Int ->
-    Declare () -> Maybe NetlistGenerator -> a
+  makeInst :: String -> [Param] -> Int
+           -> Declare () -> Maybe NetlistGenerator -> a
 
 -- Specific base case 
 instance {-# OVERLAPPING #-} Interface a => Modular (Module a) where
@@ -432,9 +432,10 @@ makeInstanceWithParams s ps nlg =
 makeInstance :: Modular a => String -> a
 makeInstance s = makeInstanceWithParams s [] Nothing
 
--- | Make synthesis boundary.  This first arugment to this function
--- should not capture external runtime state (e.g. by partial
--- application).
+-- | Make a named synthesis boundary around the given module.
+-- Note that it is possible for the supplied module to capture data that
+-- is independent of the module's inputs; this may or may not be
+-- desirable, so take care.
 makeBoundary :: Modular a => String -> a -> a
 makeBoundary name m = makeInstanceWithParams name [] nlg
   where nlg = Just $ NetlistGenerator $ toNetlist $ makeModule m

@@ -30,7 +30,7 @@ import Data.Map (fromListWith)
 import Control.Monad
 
 import Blarney.Core.BV
-import Blarney.Core.Net
+import Blarney.Core.NetHelpers
 import Blarney.Core.Prim
 import Blarney.Core.RTL (RTL(..), RTLAction(..), R(..), Assign(..))
 import Blarney.Core.Module (Module(..))

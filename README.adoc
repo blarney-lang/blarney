@@ -814,10 +814,39 @@ main = do
   writeVerilogTop top "top" dir
 ----
 
-Using this approach, we can maintain the module hierarchy of a Blarney design
-whenever we generate Verilog, rather than having to flatten it to massive
-netlist.  This technique can also be used to instantaite any Verilog module
-within a Blarney design.
+Using this approach, we can maintain the module hierarchy of a Blarney
+design whenever we generate Verilog, rather than having to flatten it
+to big monolithic netlist.  This technique can also be used to
+instantiate any Verilog module within a Blarney design.
+
+When simply marking netlist boundaries within a Blarney design, the
+`makeInstance`/`writeVerilogModule` combination is rather low-level
+and error-prone.  In particular, there is no requirement for the type
+of the instance to match the type of the module, and it would be nice
+to specify a boundary in a backend-independent way.  To solve these
+problems, Blarney provides a `makeBoundary` function.  We can now
+define `makeInc` as:
+
+[source, haskell]
+----
+makeInc :: Stream (Bit 8) -> Module (Stream (Bit 8))
+makeInc = makeBoundary "inc" inc
+----
+
+Unlike `makeInstance`, `makeBoundary` takes the module to instantiate
+as an argument.  The type of the argument to `makeBoundary` must match
+the return type:
+
+[source, haskell]
+----
+makeBoundary :: Modular m => String -> m -> m
+----
+
+This means that it is unncessary to supply a type signature for
+`makeInc` now; it will be inferred.  Furthermore, the top-level of our
+design no longer needs to call `writeVerilogModule` for the `inc`
+module because Blarney now knows how to generate a module for any
+instance that it encounters.
 
 === Master-slave pattern
 

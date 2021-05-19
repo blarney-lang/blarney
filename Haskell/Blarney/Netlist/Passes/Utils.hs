@@ -20,8 +20,8 @@ module Blarney.Netlist.Passes.Utils (
 , NetCounts
 , countNetRef
 -- * Exported 'Blarney' modules
-, module Blarney.Core.Net
 , module Blarney.Core.Prim
+, module Blarney.Core.NetHelpers
 ) where
 
 import Prelude
@@ -31,8 +31,8 @@ import Control.Monad.ST
 import Data.STRef
 import Data.Array.ST
 
-import Blarney.Core.Net
 import Blarney.Core.Prim
+import Blarney.Core.NetHelpers
 import Blarney.Netlist.Passes.Types
 
 -- | A helper function to tell if a 'Net' is a netlist root

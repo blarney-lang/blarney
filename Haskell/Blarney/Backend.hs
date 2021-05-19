@@ -52,9 +52,9 @@ elaborateHierarchy acc ((name, nlg):rest)
       let newAcc = insert name nl acc
       -- Look for new netlists
       elaborateHierarchy newAcc $
-        [ (nm, getNetlistGenerator nlg)
+        [ (nm, getNetlistGenerator nlg')
         | Custom { customName = nm
-                 , customNetlist = Just nlg } <- map netPrim (elems nl)
+                 , customNetlist = Just nlg' } <- map netPrim (elems nl)
         , nm `notMember` newAcc
         ] ++ rest
         
@@ -71,12 +71,12 @@ writeVerilogModule :: Modular a
                    -> IO ()
 writeVerilogModule mod modName dirName = do
   (opts, _) <- getOpts
-  nl <- toNetlist (makeModule mod)
-  nls <- elaborateHierarchy empty [(modName, return nl)]
+  nl0 <- toNetlist (makeModule mod)
+  nls <- elaborateHierarchy empty [(modName, return nl0)]
   sequence_
-    [ do let nl' = runDefaultNetlistPasses opts nl
-         genVerilogModule nl' name dirName
-    | (name, nl) <- toList nls ]
+    [ do let nl1' = runDefaultNetlistPasses opts nl1
+         genVerilogModule nl1' name dirName
+    | (name, nl1) <- toList nls ]
 
 -- | This function is similar to 'writeVerilogModule' but also generates
 -- a verilator wrapper and Makefile.
@@ -91,14 +91,14 @@ writeVerilogTop :: Module () -- ^ Blarney function
                 -> IO ()
 writeVerilogTop mod modName dirName = do
   (opts, _) <- getOpts
-  nl <- toNetlist mod
-  let nl' = runDefaultNetlistPasses opts nl
-  genVerilogTop nl' modName dirName
-  nls <- elaborateHierarchy empty [(modName, return nl')]
+  nl0 <- toNetlist mod
+  let nl0' = runDefaultNetlistPasses opts nl0
+  genVerilogTop nl0' modName dirName
+  nls <- elaborateHierarchy empty [(modName, return nl0')]
   sequence_
-    [ do let nl' = runDefaultNetlistPasses opts nl
-         genVerilogModule nl' name dirName
-    | (name, nl) <- toList nls, name /= modName ]
+    [ do let nl1' = runDefaultNetlistPasses opts nl1
+         genVerilogModule nl1' name dirName
+    | (name, nl1) <- toList nls, name /= modName ]
 
 -- SMT backend
 --------------------------------------------------------------------------------

@@ -6,7 +6,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 {-|
-Module      : Blarney.Core.Net
+Module      : Blarney.Core.NetHelpers
 Description : Net primitive for Netlist construction
 Copyright   : (c) Matthew Naylor, 2019
               (c) Alexandre Joannou, 2019-2021
@@ -14,14 +14,13 @@ License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
 
-This module provides types and functions to represent circuits as
-'Netlist's that can then be rendered as Verilog or in other formats.
-See Blarney.Core.Prim for the definition of 'Net' and 'Netlist'.  (The
-definitions are there to break an import cycle.)
+This module provides various functions over 'Net's and 'Netlist's.
+See 'Blarney.Core.Prim' for the definition of 'Net' and 'Netlist'.  (The
+definitions were moved there to break an import cycle.)
 
 -}
 
-module Blarney.Core.Net (
+module Blarney.Core.NetHelpers (
   netInputWireIds -- Helper function to extract all 'NetInput''s 'WireId's
 , remapNetInputInstId -- Helper to remap a 'NetInput''s 'InstId's
 , remapNetInstId  -- Helper to remap a 'Net''s 'InstId's
