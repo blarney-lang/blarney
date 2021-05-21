@@ -52,6 +52,7 @@ mergeTree = tree mergeTwo nullStream
 -- | Shorthand for a two-way switch
 type TwoWaySwitch a =
      (a -> Bit 1)                 -- ^ Routing function
+  -> (a -> Bit 1)                 -- ^ Final flit of atomic transaction?
   -> (Stream a, Stream a)         -- ^ Input streams
   -> Module (Stream a, Stream a)  -- ^ Output streams
 
@@ -59,9 +60,10 @@ type TwoWaySwitch a =
 makeGenericFairMergeTwo :: Bits a =>
      Module (Queue a)     -- ^ Queue kind to use for buffering
   -> (a -> Bit 1)         -- ^ Guard on whether data is consumed by merger
+  -> (a -> Bit 1)         -- ^ Final flit of an atomic transaction?
   -> (Stream a, Stream a) -- ^ Input streams to be merged
   -> Module (Stream a)    -- ^ Output stream
-makeGenericFairMergeTwo makeQueue g (origInA, origInB) = do
+makeGenericFairMergeTwo makeQueue g isFinal (origInA, origInB) = do
   -- Output buffer
   buffer <- makeQueue
 
@@ -72,18 +74,32 @@ makeGenericFairMergeTwo makeQueue g (origInA, origInB) = do
   -- Was previous output taken from stream A?
   prevChoiceWasA :: Reg (Bit 1) <- makeReg false
 
+  -- Locks to preserve atomicty of multi-flit transactions
+  lockA :: Reg (Bit 1) <- makeReg false
+  lockB :: Reg (Bit 1) <- makeReg false
+
   always do
+    -- Only one lock can be true at any time
+    dynamicAssert (inv (lockA.val .&&. lockB.val))
+      "makeGenericFairMergeTwo: both locks acquired!"
     when (buffer.notFull) do
       -- Take next input from stream B?
-      let chooseB = inB.canPeek .&. (inA.canPeek.inv .|. prevChoiceWasA.val)
-      -- Consume input
-      if chooseB
-        then do inB.consume
-        else when (inA.canPeek) do inA.consume
-      -- Produce output
-      when (inA.canPeek .|. inB.canPeek) do
-        enq buffer (chooseB ? (inB.peek, inA.peek))
-        prevChoiceWasA <== inv chooseB
+      let chooseB = lockA.val.inv .&&. inB.canPeek .&&.
+            (inA.canPeek.inv .||. prevChoiceWasA.val)
+      -- Consume input and produce output
+      if lockB.val .||. chooseB
+        then
+          when (inB.canPeek) do
+            inB.consume
+            lockB <== inB.peek.isFinal.inv
+            enq buffer (inB.peek)
+            prevChoiceWasA <== false
+        else
+          when (inA.canPeek) do
+            inA.consume
+            lockA <== inA.peek.isFinal.inv
+            enq buffer (inA.peek)
+            prevChoiceWasA <== true
 
   return (buffer.toStream)
 
@@ -91,13 +107,14 @@ makeGenericFairMergeTwo makeQueue g (origInA, origInB) = do
 makeFairExchange :: Bits a =>
      Module (Queue a)            -- ^ Queue kind to use for buffering
   -> (a -> Bit 1)                -- ^ Routing function
+  -> (a -> Bit 1)                -- ^ Final flit of atomic transaction?
   -> (Stream a, Stream a)        -- ^ Input streams
   -> Module (Stream a, Stream a) -- ^ Output streams
-makeFairExchange q route (inA, inB) = do
+makeFairExchange q route isFinal (inA, inB) = do
   -- Determine first output
-  outA <- makeGenericFairMergeTwo q (\x -> inv (route x)) (inA, inB)
+  outA <- makeGenericFairMergeTwo q (\x -> inv (route x)) isFinal (inA, inB)
   -- Determine second output
-  outB <- makeGenericFairMergeTwo q route (inA, inB)
+  outB <- makeGenericFairMergeTwo q route isFinal (inA, inB)
   return (outA, outB)
 
 -- | Optionally broadcast items from an input stream into two output
@@ -171,18 +188,19 @@ makeFairExchangeWithBroadcast :: Bits a =>
      Module (Queue a)            -- ^ Queue kind to use for buffering
   -> (a -> Bit 1)                -- ^ Broadcast condition
   -> (a -> Bit 1)                -- ^ Routing function
+  -> (a -> Bit 1)                -- ^ Final flit of atomic transaction?
   -> (Stream a, Stream a)        -- ^ Input streams
   -> Module (Stream a, Stream a) -- ^ Output streams
-makeFairExchangeWithBroadcast q bcast route (inA, inB) = do
+makeFairExchangeWithBroadcast q bcast route isFinal (inA, inB) = do
   -- Insert broadcasters
   (inA0, inA1) <- makeTwoWayBroadcast bcast inA
   (inB0, inB1) <- makeTwoWayBroadcast bcast inB
   -- Determine first output
   outA <- makeGenericFairMergeTwo q
-            (\x -> inv (route x) .||. bcast x) (inA0, inB0)
+            (\x -> inv (route x) .||. bcast x) isFinal (inA0, inB0)
   -- Determine second output
   outB <- makeGenericFairMergeTwo q
-            (\x -> route x .||. bcast x) (inA1, inB1)
+            (\x -> route x .||. bcast x) isFinal (inA1, inB1)
   return (outA, outB)
 
 -- Shuffle Exchange network
@@ -197,16 +215,17 @@ makeFairExchangeWithBroadcast q bcast route (inA, inB) = do
 -- network switches thar are too large to be handled by a crossbar
 -- (which would require N*N 2-input muxes).  The throughput will not
 -- match that of a crossbar in general, but the network is capable of
--- handling a large number of simultaneous connections. When the
+-- routing a large number of packets simultaneously. When the
 -- routing pattern is a shift or rotation (by any amount), the
 -- throughput is equivalent to that of a full crossbar.  Indeed, the
 -- network is similar to that found in a barrel shifter.
 makeShuffleExchange :: forall n a. (KnownNat n, Bits a) =>
      TwoWaySwitch a    -- ^ Primitive two-way switch
   -> (a -> Bit n)      -- ^ Routing function
+  -> (a -> Bit 1)      -- ^ Final flit of atomic transaction?
   -> [Stream a]        -- ^ Input streams
   -> Module [Stream a] -- ^ Output streams
-makeShuffleExchange switch route ins
+makeShuffleExchange switch route isFinal ins
   | length ins == 2 ^ valueOf @n = shuffEx (valueOf @n) ins
   | otherwise = error $
       "Blarney.Interconnect.makeShuffleExchange: " ++
@@ -224,6 +243,6 @@ makeShuffleExchange switch route ins
       bs <- shuffEx (i-1) bottom
 
       -- Combine using MSB of routing function
-      let merge = switch (\x -> unsafeAt (i-1) (route x))
+      let merge = switch (\x -> unsafeAt (i-1) (route x)) isFinal
       (ts', bs') <- unzip <$> mapM merge (zip ts bs)
       return (ts' ++ bs')
