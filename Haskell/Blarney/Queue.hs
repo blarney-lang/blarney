@@ -22,6 +22,7 @@ module Blarney.Queue where
 -- Blarney imports
 import Blarney
 import Blarney.Stream
+import Blarney.Option
 import Blarney.SourceSink
 
 -- Standard imports
@@ -230,13 +231,23 @@ An N-element queue implemented using a shift register:
 This version optimised for Fmax.
 -}
 makeShiftQueue :: Bits a => Int -> Module (Queue a)
-makeShiftQueue = makeShiftQueueCore OptFmax
+makeShiftQueue n = do
+  (q, _) <- makeShiftQueueCore OptFmax n
+  return q
 
 -- |This version is optimised for throughput
 makePipelineQueue :: Bits a => Int -> Module (Queue a)
-makePipelineQueue = makeShiftQueueCore OptThroughput
+makePipelineQueue n = do
+  (q, _) <- makeShiftQueueCore OptThroughput n
+  return q
 
-makeShiftQueueCore :: Bits a => ShiftQueueMode -> Int -> Module (Queue a)
+makeShiftQueueCore :: Bits a =>
+     ShiftQueueMode
+     -- ^ Optimise for throughput or Fmax?
+  -> Int
+     -- ^ Size of queue
+  -> Module (Queue a, [Option a])
+     -- ^ Return a standard queue interface, but also the contents to be viewed
 makeShiftQueueCore mode n = do
   -- Elements of the queue, stored in registers
   elems :: [Reg a] <- replicateM n makeRegU
@@ -269,16 +280,17 @@ makeShiftQueueCore mode n = do
       valids.last <== 1
       elems.last <== doEnq.val
 
-  return $
-    Queue {
-      notEmpty = orList (map val valids)
-    , notFull  = inv (andList (map val valids)) .|.
-                   (if mode == OptFmax then 0 else doDeq.val)
-    , enq      = \a -> doEnq <== a
-    , deq      = doDeq <== 1
-    , canDeq   = valids.head.val
-    , first    = elems.head.val
-    }
+  return
+    ( Queue {
+        notEmpty = orList (map val valids)
+      , notFull  = inv (andList (map val valids)) .|.
+                     (if mode == OptFmax then 0 else doDeq.val)
+      , enq      = \a -> doEnq <== a
+      , deq      = doDeq <== 1
+      , canDeq   = valids.head.val
+      , first    = elems.head.val
+      }
+    , [Option (v.val) (e.val) | (v, e) <- zip valids elems] )
 
 -- |Single element bypass queue
 makeBypassQueue :: Bits a => Module (Queue a)
