@@ -50,38 +50,44 @@ module BlockRAMTrueDual (
 // synopsys translate_off
 `endif
   tri1 CLK, RE_A, RE_B;
-  tri0 WE_A;
-  tri0 WE_B;
+  tri0 WE_A, WE_B;
 `ifndef ALTERA_RESERVED_QIS
 // synopsys translate_on
 `endif
 
-  altsyncram altsyncram_component (
+  altera_syncram altsyncram_component (
         .address_a (ADDR_A),
         .address_b (ADDR_B),
+        .byteena_a (1'b1),
         .byteena_b (1'b1),
         .clock0 (CLK),
         .data_a (DI_A),
         .data_b (DI_B),
+        .rden_a (RE_A),
+        .rden_b (RE_B),
         .wren_a (WE_A),
         .wren_b (WE_B),
         .q_a (DO_A),
         .q_b (DO_B),
         .aclr0 (1'b0),
         .aclr1 (1'b0),
+        .address2_a (1'b1),
+        .address2_b (1'b1),
         .addressstall_a (1'b0),
         .addressstall_b (1'b0),
-        .byteena_a (1'b1),
-        .clock1 (CLK),
+        .clock1 (1'b1),
         .clocken0 (1'b1),
         .clocken1 (1'b1),
         .clocken2 (1'b1),
         .clocken3 (1'b1),
+        .eccencbypass (1'b0),
+        .eccencparity (8'b0),
         .eccstatus (),
-        .rden_a (RE_A),
-        .rden_b (RE_B));
+        .sclr (1'b0));
   defparam
     altsyncram_component.address_reg_b = "CLOCK0",
+    altsyncram_component.byteena_reg_b = "CLOCK0",
+    altsyncram_component.byte_size = 8,
     altsyncram_component.clock_enable_input_a = "BYPASS",
     altsyncram_component.clock_enable_input_b = "BYPASS",
     altsyncram_component.clock_enable_output_a = "BYPASS",
@@ -90,7 +96,7 @@ module BlockRAMTrueDual (
     altsyncram_component.init_file_layout = "PORT_A",
     altsyncram_component.indata_reg_b = "CLOCK0",
     altsyncram_component.intended_device_family = DEV_FAMILY,
-    altsyncram_component.lpm_type = "altsyncram",
+    altsyncram_component.lpm_type = "altera_syncram",
     altsyncram_component.numwords_a = 2**ADDR_WIDTH,
     altsyncram_component.numwords_b = 2**ADDR_WIDTH,
     altsyncram_component.operation_mode = "BIDIR_DUAL_PORT",
@@ -107,7 +113,6 @@ module BlockRAMTrueDual (
     altsyncram_component.width_a = DATA_WIDTH,
     altsyncram_component.width_b = DATA_WIDTH,
     altsyncram_component.width_byteena_a = 1,
-    altsyncram_component.width_byteena_b = 1,
-    altsyncram_component.wrcontrol_wraddress_reg_b = "CLOCK0";
+    altsyncram_component.width_byteena_b = 1;
 
 endmodule
