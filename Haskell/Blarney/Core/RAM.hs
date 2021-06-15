@@ -44,6 +44,7 @@ module Blarney.Core.RAM (
 , makeDualRAMCore     -- Optionally initialised dual-port block RAM
 , makeDualRAMForward  -- Forwarding dual-port block RAM
 , makeDualRAMForwardInit -- Initialised forwarding dual-port block RAM
+, nullRAM             -- Make a RAM interface with no RAM backing it
 
   -- * RTL block RAM interface with byte enables
 , RAMBE(..)              -- Block RAM interface
@@ -56,6 +57,7 @@ module Blarney.Core.RAM (
 , makeDualRAMBE          -- Dual-port block RAM
 , makeDualRAMInitBE      -- Initilaised dual-port block RAM
 , makeDualRAMBECore      -- Initilaised dual-port block RAM
+, nullRAMBE              -- Make a RAMBE interface with no RAM backing it
 ) where
 
 -- Standard imports
@@ -585,4 +587,26 @@ makeDualRAMBECore init = do
                               val writeEn, val readEn, val byteEn)
   , storeActiveBE = val writeEn
   , preserveOutBE = readEn <== 0
+  }
+
+-- | RAM interface with no backing functionality
+nullRAM :: Bits d => RAM a d
+nullRAM =
+  RAM {
+    load = \_ -> return ()
+  , store = \_ _ -> return ()
+  , out = dontCare
+  , storeActive = false
+  , preserveOut = return ()
+  }
+
+-- | RAMBE interface with no backing functionality
+nullRAMBE :: KnownNat (8*dw) => RAMBE aw dw
+nullRAMBE =
+  RAMBE {
+    loadBE = \_ -> return ()
+  , storeBE = \_ _ _ -> return ()
+  , outBE = dontCare
+  , storeActiveBE = false
+  , preserveOutBE = return ()
   }
