@@ -359,7 +359,10 @@ regFileReadBV inf a = makePrim1 (RegFileRead inf) [a]
 -- TODO: generalise semantic functions to understand "dont care" values.
 getInitBV :: BV -> Maybe Integer
 getInitBV BV{..} = case bvPrim of
-  Const _ i -> Just i
+  Const w i
+    | i >= 2^w || i < -(2^w) -> error "Initial register value out of range"
+    | i < 0 -> Just (2^w + i)
+    | otherwise -> Just i
   DontCare w -> Nothing
   Concat wx wy ->
     let x = getInitBV (bvInputs !! 0)
