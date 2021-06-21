@@ -520,7 +520,7 @@ clamp :: (Num a, Bits a) => Width -> a -> a
 clamp w x = (bit w - 1) .&. x
 
 toSigned :: (Ord a, Num a) => Width -> a -> a
-toSigned w x | x > 0 = if x >= 2^(w-1) then x - 2^w else x
+toSigned w x | x >= 0 = if x >= 2^(w-1) then x - 2^w else x
              | otherwise = err $ "cannot toSigned on negative number"
 
 fromSigned :: (Ord a, Num a) => Width -> a -> a
