@@ -293,13 +293,13 @@ data Prim =
     --                 @{x, y}@
   | Concat InputWidth InputWidth
 
-    -- | @Mux n w@ represents an @n@-inputs multiplexer
+    -- | @Mux n wsel w@ represents an @n@-input multiplexer
     --
     --   [__inputs__]  @sel:inpts@, with @sel@ a @(log2 n)@-bit value and
     --                 @inpts@ an @n@-sized list of @w@-bit values
     --   [__outputs__] a single output, the @w@-bit value at position @sel@ in
-    --                 @inpts@
-  | Mux Int OutputWidth
+    --                 @inpts@ (the width of @sel@ is @wsel@)
+  | Mux Int InputWidth OutputWidth
 
     -- | @Identity w@ represents an identity function
     --
@@ -753,14 +753,14 @@ primInfo (Concat w0 w1) =
            , isRoot = False
            , inputs = [("in0", w0), ("in1", w1)]
            , outputs = [("out", w0 + w1)] }
-primInfo (Mux n w) =
+primInfo (Mux n wsel w) =
   PrimInfo { isInlineable = False
            , inputsInlineable = True
            , strRep = "Mux"
            , semEval = Just \(s:is) -> [is !! fromIntegral s]
            , dontKill = False
            , isRoot = False
-           , inputs = ("sel", log2ceil n)
+           , inputs = ("sel", wsel)
                       : [("in" ++ show i, w) | i <- [0..n-1]]
            , outputs = [("out", w)] }
 primInfo (Identity w) =

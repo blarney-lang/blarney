@@ -41,6 +41,8 @@ zeroWidthNetTransform net@Net{ netPrim = SignExtend 0 w } =
   (net { netPrim = Const w 0, netInputs = [] }, True)
 zeroWidthNetTransform net@Net{ netPrim = SelectBits 0 hi lo } =
   (net { netPrim = Const (hi-lo) 0, netInputs = [] }, True)
+zeroWidthNetTransform net@Net{ netPrim = Mux n 0 w } =
+  (net { netPrim = Identity w, netInputs = [netInputs net !! 1] }, True)
 zeroWidthNetTransform net@Net{ netPrim = Concat w0 w1, netInputs = [i0, i1] }
   | w0 == 0 && w1 /= 0 = (net { netPrim = Identity w1, netInputs = [i1] }, True)
   | w0 /= 0 && w1 == 0 = (net { netPrim = Identity w0, netInputs = [i0] }, True)

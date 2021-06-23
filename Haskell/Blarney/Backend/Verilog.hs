@@ -187,7 +187,7 @@ genNetVerilog netlist net = case netPrim net of
   SelectBits w hi lo      -> primNV { decl = Just $ declWire (1+hi-lo) wId }
   Concat aw bw            -> primNV { decl = Just $ declWire (aw+bw) wId }
   Identity w              -> primNV { decl = Just $ declWire w wId }
-  Mux _ w                 -> dfltNV { decl = Just $ declMux w net
+  Mux _ wsel w            -> dfltNV { decl = Just $ declMux wsel w net
                                     , inst = Just $ instMux net }
   Const w i               -> dfltNV { decl = Just $ declWireInit w wId i }
   DontCare w              -> dfltNV { decl = Just $ declWireDontCare w wId }
@@ -335,16 +335,16 @@ genNetVerilog netlist net = case netPrim net of
       case init of
         Nothing -> semi
         Just i -> equals <+> showIntLit width i <> semi
-  declMux w net | numIns == 2 =
+  declMux wsel w net | numIns == 2 && wsel == 1 =
       declWire w (netInstId net, Nothing)
     where numIns = length (netInputs net) - 1
-  declMux w net = declWire w (netInstId net, Nothing)
+  declMux wsel w net = declWire w (netInstId net, Nothing)
     $+$ hang header 2 body
     $+$ text "endfunction"
     where thisMux = text "mux_" <> int (netInstId net)
           header = text "function" <+> brackets (int (w-1) <> text ":0")
                      <+> thisMux <> parens allArgs <> semi
-          selArg = text "input" <+> brackets (int (selw-1) <> text ":0")
+          selArg = text "input" <+> brackets (int (wsel-1) <> text ":0")
                      <+> text "sel"
           inArgs = [ text "input" <+> brackets (int (w-1) <> text ":0")
                        <+> text "in" <> int i
@@ -358,9 +358,8 @@ genNetVerilog netlist net = case netPrim net of
           defaultAlt =
             [ text "default:" <+> thisMux <+> equals <+>
                text (show w ++ "'b" ++ replicate w 'x') <> semi
-            | numIns < 2^selw ]
+            | numIns < 2^wsel ]
           numIns = length (netInputs net) - 1
-          selw = log2ceil numIns
   declRAM initFile 1 _ dw net =
     vcat $ map (\n -> declWire dw (netInstId net, n)) [Nothing]
   declRAM initFile 2 _ dw net =
