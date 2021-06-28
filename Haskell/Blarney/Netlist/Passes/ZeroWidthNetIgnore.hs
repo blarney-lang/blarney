@@ -68,6 +68,11 @@ zeroWidthNetTransform net@Net{ netPrim = prim@Custom{ customInputs = primIns
         ins' = [x | x@(_, (_, w)) <- ins, w /= 0]
         (netIns', primIns') = unzip ins'
         primOuts' = [x | x@(_, w) <- primOuts, w /= 0]
+-- Remove 0-width registers to break 0-width cycles
+zeroWidthNetTransform net@Net{ netPrim = Register _ 0 } =
+  (net { netPrim = Const 0 0, netInputs = [] }, True)
+zeroWidthNetTransform net@Net{ netPrim = RegisterEn _ 0 } =
+  (net { netPrim = Const 0 0, netInputs = [] }, True)
 -- TODO currently unsupported cases that could be transformed
 zeroWidthNetTransform net@Net{ netPrim = BRAM { ramAddrWidth = 0 } } =
   error "zeroWidthNetTransform unsupported on BRAM Prim"
