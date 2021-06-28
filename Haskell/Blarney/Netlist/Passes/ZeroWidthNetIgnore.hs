@@ -41,6 +41,8 @@ zeroWidthNetTransform net@Net{ netPrim = SignExtend 0 w } =
   (net { netPrim = Const w 0, netInputs = [] }, True)
 zeroWidthNetTransform net@Net{ netPrim = SelectBits 0 hi lo } =
   (net { netPrim = Const (hi-lo) 0, netInputs = [] }, True)
+zeroWidthNetTransform net@Net{ netPrim = Mux n 0 w } =
+  (net { netPrim = Identity w, netInputs = [netInputs net !! 1] }, True)
 zeroWidthNetTransform net@Net{ netPrim = Concat w0 w1, netInputs = [i0, i1] }
   | w0 == 0 && w1 /= 0 = (net { netPrim = Identity w1, netInputs = [i1] }, True)
   | w0 /= 0 && w1 == 0 = (net { netPrim = Identity w0, netInputs = [i0] }, True)
@@ -66,6 +68,11 @@ zeroWidthNetTransform net@Net{ netPrim = prim@Custom{ customInputs = primIns
         ins' = [x | x@(_, (_, w)) <- ins, w /= 0]
         (netIns', primIns') = unzip ins'
         primOuts' = [x | x@(_, w) <- primOuts, w /= 0]
+-- Remove 0-width registers to break 0-width cycles
+zeroWidthNetTransform net@Net{ netPrim = Register _ 0 } =
+  (net { netPrim = Const 0 0, netInputs = [] }, True)
+zeroWidthNetTransform net@Net{ netPrim = RegisterEn _ 0 } =
+  (net { netPrim = Const 0 0, netInputs = [] }, True)
 -- TODO currently unsupported cases that could be transformed
 zeroWidthNetTransform net@Net{ netPrim = BRAM { ramAddrWidth = 0 } } =
   error "zeroWidthNetTransform unsupported on BRAM Prim"

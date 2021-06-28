@@ -88,7 +88,7 @@ evalConstNet n@Net{..} = case n of
   NetP (ArithShiftRight _ w) [Lit 0, _] -> modNet (Const w 0) []
   NetP (ArithShiftRight _ w) [x, Lit 0] -> modNet (Identity w) [x]
   -- Mux
-  NetP (Mux _ w) (Lit s:xs) -> modNet (Identity w) [xs !! fromInteger s]
+  NetP (Mux _ _ w) (Lit s:xs) -> modNet (Identity w) [xs !! fromInteger s]
   -- Registers
   NetP (RegisterEn Nothing w) [_, LitDontCare] -> modNet (DontCare w) []
   NetP (RegisterEn Nothing w) [Lit 0, _] -> modNet (DontCare w) []

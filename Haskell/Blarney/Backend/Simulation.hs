@@ -356,7 +356,7 @@ compilePrim CompCtxt{..} instId prim ins = case (prim, ins) of
   (SelectBits _ _ _, [x]) -> evalUnOp x
   (Concat _ _, [x, y]) -> evalBinOp x y
   (Identity _, [x]) -> evalUnOp x
-  (Mux _ w, [ss, i0, i1]) ->
+  (Mux _ _ w, [ss, i0, i1]) ->
     [zipWith3 (\s x y -> if s == 0 then x else y) ss i0 i1]
   -- fall through case
   _ -> transpose $ eval <$> transpose ins
