@@ -1,6 +1,6 @@
 import Blarney
 import Blarney.Stmt
-import Blarney.Core.RAM.Quad
+import Blarney.QuadPortRAM
 
 -- Top-level module
 top :: Module ()
