@@ -1,4 +1,5 @@
-{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE RebindableSyntax      #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
