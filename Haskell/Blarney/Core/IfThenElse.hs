@@ -24,15 +24,8 @@ instance IfThenElse Bool a where
   ifThenElse False a b = b
   ifThenElse True a b = a
 
--- | If-then-else chain
-priorityIf :: IfThenElse cond ret => [(cond, ret)] -> ret
-priorityIf [] = error "Blarney.Core.IfThenElse: priorityIf applied to []"
-priorityIf ((a, b):rest) 
-  | null rest = b
-  | otherwise = if a then b else priorityIf rest
-
 -- | If-then-else chain, with fallthrough case
-priorityIfWithFallthrough :: IfThenElse cond ret => [(cond, ret)] -> ret -> ret
-priorityIfWithFallthrough [] def = def
-priorityIfWithFallthrough ((a, b):rest) def =
-  if a then b else priorityIfWithFallthrough rest def
+priorityIf :: IfThenElse cond ret => [(cond, ret)] -> ret -> ret
+priorityIf [] ft = ft
+priorityIf ((a, b):rest) ft =
+  if a then b else priorityIf rest ft
