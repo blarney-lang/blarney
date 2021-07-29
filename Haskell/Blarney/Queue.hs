@@ -323,3 +323,19 @@ makeBypassQueue = do
     , canDeq   = canDeqVal
     , first    = dataWire.val
     }
+
+-- | Insert a queue in front of a sink
+makeSinkBuffer :: Bits a => Module (Queue a) -> Sink a -> Module (Sink a)
+makeSinkBuffer makeQueue sink = do
+  q <- makeQueue
+
+  always do
+    when (q.notEmpty .&&. sink.canPut) do
+      q.deq
+      put sink (q.first)
+
+  return
+    Sink {
+      canPut = q.notFull
+    , put = enq q
+    }
