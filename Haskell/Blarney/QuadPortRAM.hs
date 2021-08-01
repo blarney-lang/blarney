@@ -66,7 +66,8 @@ ramQuadPrim dataWidth init
           [ ("ADDR_WIDTH" :-> show addrWidth)
           , ("DATA_WIDTH" :-> show dataWidth)
           ] ++
-          [ ("INIT_FILE" :-> filename) | Just filename <- [init] ]
+          [ ("INIT_FILE" :-> ("\"" ++ filename ++ "\""))
+          | Just filename <- [init] ]
       , customIsClocked = True
       , customNetlist = Nothing
       }
