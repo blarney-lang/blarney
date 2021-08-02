@@ -433,11 +433,11 @@ matchMap strict alts subj = (tagMap, mapWithKey combine fieldMap)
                      Just i  -> subj' !! i
                  | b <- bits ]
 
-        extend [] = error "BitScan.matchMap: extend"
         extend xs
           | strict && maxLen /= length xs =
               error ("BitScan.matchMap: different widths for field " ++ field)
-          | otherwise = take maxLen (xs ++ repeat (last xs))
+          | otherwise = take maxLen (xs ++ repeat y)
+          where y = if null xs then 0 else last xs
 
 -- |Pack the tag map into a bit vector
 packTagMap :: (KnownNat n, Tag tag) => TagMap tag -> Bit n
