@@ -221,10 +221,10 @@ genNetVerilog netlist net = case netPrim net of
               , inst = Just $ instRegFileRead vId net }
   RegFileWrite RegFileInfo{ regFileId = vId }
     -> dfltNV { alws = Just $ alwsRegFileWrite vId net }
-  Custom p is os ps clked nlgen
+  Custom p is os ps clked resetable nlgen
     -> dfltNV { decl = Just $ sep [ declWire w (netInstId net, Just nm)
                                   | (nm, w) <- os ]
-              , inst = Just $ instCustom net p is os ps clked }
+              , inst = Just $ instCustom net p is os ps clked resetable }
   --_ -> dfltNV
   where
   wId = (netInstId net, Nothing)
@@ -392,7 +392,7 @@ genNetVerilog netlist net = case netPrim net of
   instPrim net =
         text "assign" <+> showWire (netInstId net, Nothing) <+> equals
     <+> showPrim (netPrim net) (netInputs net) <> semi
-  instCustom net name ins outs params clked
+  instCustom net name ins outs params clked resetable
     | numParams == 0 = hang (text name) 2 showInst
     | otherwise = hang (hang (text (name ++ "#")) 2 (parens $ argStyle allParams))
                     2 showInst
@@ -404,7 +404,7 @@ genNetVerilog netlist net = case netPrim net of
                                                       | nm <- map fst outs ]
           numArgs  = length args
           showArgs = parens $ argStyle $ [ text ".clock(clock)" | clked ]
-                                      ++ [ text ".reset(reset)" | clked ]
+                                      ++ [ text ".reset(reset)" | resetable ]
                                       ++ allArgs
           allArgs  = [ dot <> text name <> parens (showNetInput netInput)
                      | ((name, netInput), i) <- zip args [1..] ]

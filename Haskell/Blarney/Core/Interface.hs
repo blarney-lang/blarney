@@ -415,7 +415,7 @@ instantiate name params doAddRoots ifc nlg = noName mdo
           outputs  = [(s, n) | DeclInput s n <- w]
           outNames = map fst outputs
           prim     = Custom name [(s, bvPrimOutWidth x) | (s, x) <- inputs]
-                           outputs params True nlg
+                           outputs params True True nlg
       in  zip outNames (makePrim prim (map snd inputs) (map Just outNames))
 
 makeModule :: Modular a => a -> Module ()

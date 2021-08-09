@@ -353,7 +353,8 @@ data Prim =
            , customInputs    :: [(String, InputWidth)]  -- ^ Input names
            , customOutputs   :: [(String, OutputWidth)] -- ^ Output names/widths
            , customParams    :: [Param]                 -- ^ Parameters
-           , customIsClocked :: Bool                    -- ^ Pass clock (reset?)
+           , customIsClocked :: Bool                    -- ^ Pass clock?
+           , customResetable :: Bool                    -- ^ Pass reset?
            , customNetlist   :: Maybe (NetlistGenerator)
              -- ^ Optional netlist generator for this component
            }
