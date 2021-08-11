@@ -1,3 +1,9 @@
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE DeriveAnyClass        #-}
+{-# LANGUAGE BlockArguments        #-}
+{-# LANGUAGE RebindableSyntax      #-}
+
 module Blarney.Avalon.Stream where
 
 import Blarney

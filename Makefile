@@ -17,6 +17,7 @@ BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/SourceSink.hs
 BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/Stmt.hs
 BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/Stream.hs
 BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/Vector.hs
+BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/Avalon/Stream.hs
 
 all: ghc-build blc-build
 
