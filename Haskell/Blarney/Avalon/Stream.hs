@@ -3,30 +3,31 @@ module Blarney.Avalon.Stream where
 import Blarney
 import Blarney.Stream
 
+type AvlStream a = AvlStreamIfc (SizeOf a)
+
 -- | Avalon stream interface
-data AvlStream a =
-  AvlStream {
-    avlStreamReady :: Bit 1 -> Action ()
+data AvlStreamIfc w =
+  AvlStreamIfc {
+    avlStreamReady :: Action ()
   , avlStreamValid :: Bit 1
-  , avlStreamData :: a
+  , avlStreamData :: Bit w
   }
   deriving (Generic, Interface)
 
 -- | Convert Blarney stream to Avalon stream
-toAvlStream :: Stream a -> AvlStream a
+toAvlStream :: Bits a => Stream a -> AvlStream a
 toAvlStream s =
-  AvlStream {
-    avlStreamReady = \ready ->
-      when (ready .&&. s.canPeek) do s.consume
+  AvlStreamIfc {
+    avlStreamReady = when (s.canPeek) do s.consume
   , avlStreamValid = s.canPeek
-  , avlStreamData = s.peek
+  , avlStreamData = s.peek.pack
   }
 
 -- | Convert Avalon stream to Blarney stream
-fromAvlStream :: AvlStream a -> Stream a
+fromAvlStream :: Bits a => AvlStream a -> Stream a
 fromAvlStream s =
   Source {
-    peek = s.avlStreamData
+    peek = s.avlStreamData.unpack
   , canPeek = s.avlStreamValid
-  , consume = avlStreamReady s true
+  , consume = s.avlStreamReady
   }
