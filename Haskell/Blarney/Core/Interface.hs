@@ -28,30 +28,30 @@ want to maintain the modular structure when generating external modules.
 modules, and external modules to be instantiated in a Blarney description.
 -}
 module Blarney.Core.Interface (
+  -- Class of types that can be converted to external module I/O ports
   Interface(..)
-  -- ^ Class of types that can be converted to external module I/O ports
+  -- Generic term representation
 , IfcTerm(..)
-  -- ^ Generic term representation
+  -- Generic type representation
 , IfcType(..)
-  -- ^ Generic type representation
+  -- Function types convertible to external module I/O ports
 , Method(..)
-  -- ^ Function types convertible to external module I/O ports
+  -- Types that can be turned into external modules
 , Modular(..)
-  -- ^ Types that can be turned into external modules
+  -- Information about an instance
 , InstanceInfo(..)
-  -- ^ Information about an instance
+  -- Convert a Blarney function to an external module
 , makeModule
-  -- ^ Convert a Blarney function to an external module
+  -- Instantiate an external module in a Blarney description
 , makeInstanceWithInfo
-  -- ^ Instantiate an external module in a Blarney description
+  -- Instantiate module with default info
 , makeInstance
-  -- ^ Instantiate module with default info
+  -- Introduce synthesis boundary
 , makeBoundaryWithInfo
-  -- ^ Introduce synthesis boundary
+  -- Introduce synthesis boundary with default info
 , makeBoundary
-  -- ^ Introduce synthesis boundary with default info
+  -- Introduce synthesis boundary, with instance taking given clock and reset
 , makeBoundaryWithClockAndReset
-  -- ^ Introduce synthesis boundary, with instance taking given clock and reset
 ) where
 
 -- Standard imports
