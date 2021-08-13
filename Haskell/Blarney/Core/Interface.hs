@@ -465,7 +465,7 @@ makeModule :: Modular a => a -> Module ()
 makeModule a = modularise (makeMod 0 a)
 
 makeInstanceWithInfo :: Modular a =>
-     String                 -- ^ Name of componenet being instantiated
+     String                 -- ^ Name of component being instantiated
   -> InstanceInfo           -- ^ Instance information
   -> Maybe NetlistGenerator -- ^ Optional netlist generator for component
   -> a
