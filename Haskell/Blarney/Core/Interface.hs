@@ -28,15 +28,30 @@ want to maintain the modular structure when generating external modules.
 modules, and external modules to be instantiated in a Blarney description.
 -}
 module Blarney.Core.Interface (
-  Interface(..) -- Types that can be converted to external module I/O ports
-, IfcTerm(..)   -- Generic term representation
-, IfcType(..)   -- Generic type representation
-, Method(..)    -- Function types convertible to external module I/O ports
-, Modular(..)   -- Types that can be turned into external modules
-, makeModule    -- Convert a Blarney function to an external module
-, makeInstance  -- Instantiate an external module in a Blarney description
-, makeBoundary  -- Introduce synthesis boundary
-, makeInstanceWithParams  -- Allow static parameters
+  Interface(..)
+  -- ^ Class of types that can be converted to external module I/O ports
+, IfcTerm(..)
+  -- ^ Generic term representation
+, IfcType(..)
+  -- ^ Generic type representation
+, Method(..)
+  -- ^ Function types convertible to external module I/O ports
+, Modular(..)
+  -- ^ Types that can be turned into external modules
+, InstanceInfo(..)
+  -- ^ Information about an instance
+, makeModule
+  -- ^ Convert a Blarney function to an external module
+, makeInstanceWithInfo
+  -- ^ Instantiate an external module in a Blarney description
+, makeInstance
+  -- ^ Instantiate module with default info
+, makeBoundaryWithInfo
+  -- ^ Introduce synthesis boundary
+, makeBoundary
+  -- ^ Introduce synthesis boundary with default info
+, makeBoundaryWithClockAndReset
+  -- ^ Introduce synthesis boundary, with instance taking given clock and reset
 ) where
 
 -- Standard imports
@@ -47,6 +62,7 @@ import Control.Monad.Fix
 import Control.Monad hiding (when)
 import Data.List (intersperse)
 import Data.Proxy
+import Data.Maybe
 
 -- Blarney imports
 import Blarney.Core.BV
@@ -56,6 +72,7 @@ import Blarney.Core.Prim
 import Blarney.Core.Module
 import Blarney.Core.Prelude
 import Blarney.Core.Flatten
+import Blarney.Core.ClockReset
 import qualified Blarney.Core.RTL as RTL
 
 -- Interface term representation
@@ -175,6 +192,8 @@ instance (Interface a, Bits a) => Interface (Reg a)
 instance (Interface a, Bits a) => Interface (Wire a)
 instance (Interface a, Bits a) => Interface (ReadWrite a)
 instance (Interface a, Bits a) => Interface (WriteOnly a)
+instance Interface Clock
+instance Interface Reset
 
 -- |Declaration reader/writer monad for declaring named inputs and outputs.
 -- The writer part of the monad collects declarations.  Any names
@@ -360,33 +379,50 @@ declareInput str =
     x <- declareIn t
     return (fromIfcTerm x)
 
+-- Information about an instance
+data InstanceInfo =
+  InstanceInfo {
+    instanceParams :: [Param]
+  , instanceClock :: Maybe Clock
+  , instanceReset :: Maybe Reset
+  }
+
+-- Default instance information
+defaultInstanceInfo :: InstanceInfo
+defaultInstanceInfo =
+  InstanceInfo {
+    instanceParams = []
+  , instanceClock = Nothing
+  , instanceReset = Nothing
+  }
+
 class Modular a where
   makeMod :: Int -> a -> Declare ()
-  makeInst :: String -> [Param] -> Int
+  makeInst :: String -> InstanceInfo -> Int
            -> Declare () -> Maybe NetlistGenerator -> a
 
 -- Specific base case 
 instance {-# OVERLAPPING #-} Interface a => Modular (Module a) where
   makeMod count m =
     liftModule m >>= declareOutput "out"
-  makeInst s ps count m nlg =
-    instantiate s ps True (m >> declareInput "out") nlg
+  makeInst s info count m nlg =
+    instantiate s info True (m >> declareInput "out") nlg
 
 -- Specific recursive case
 instance {-# OVERLAPPING #-} (Interface a, Modular m) => Modular (a -> m) where
   makeMod count f = do
     a <- declareInput ("in" ++ show count)
     makeMod (count+1) (f a)
-  makeInst s ps count m nlg = \a ->
-    makeInst s ps (count+1) (m >> declareOutput ("in" ++ show count) a) nlg
+  makeInst s info count m nlg = \a ->
+    makeInst s info (count+1) (m >> declareOutput ("in" ++ show count) a) nlg
 
 -- General base case (pure function)
 instance {-# OVERLAPPABLE #-} Interface a => Modular a where
   makeMod count out = declareOutput "out" out
-  makeInst s ps count m nlg = runPureModule mod
+  makeInst s info count m nlg = runPureModule mod
       "Interface.makeInstance: function must be in the Module monad, or pure"
     where
-      mod = instantiate s ps False (m >> declareInput "out") nlg
+      mod = instantiate s info False (m >> declareInput "out") nlg
 
 -- Realise declarations to give standalone module
 modularise :: Declare a -> Module a
@@ -403,39 +439,57 @@ modularise ifc = noName mdo
       return $ zip (map fst inputs) tmps
 
 -- Realise declarations to give module instance
-instantiate :: String -> [Param] -> Bool -> Declare a ->
+instantiate :: String -> InstanceInfo -> Bool -> Declare a ->
   Maybe NetlistGenerator -> Module a
-instantiate name params doAddRoots ifc nlg = noName mdo
+instantiate name info doAddRoots ifc nlg = noName mdo
     (_, w, a) <- runDeclare ifc 0 [] (custom w)
     addRoots [x | DeclOutput s x <- w, doAddRoots]
     return a
   where
     custom w =
-      let inputs   = [(s, x) | (DeclOutput s x) <- w]
+      let inputs   = [ ("clock", toBV clk)
+                     | Just (Clock clk) <- [instanceClock info] ]
+                  ++ [ ("reset", toBV rst)
+                     | Just (Reset rst) <- [instanceReset info] ]
+                  ++ [(s, x) | (DeclOutput s x) <- w]
           outputs  = [(s, n) | DeclInput s n <- w]
           outNames = map fst outputs
+          addClock = isNothing (instanceClock info)
+          addReset = isNothing (instanceReset info)
           prim     = Custom name [(s, bvPrimOutWidth x) | (s, x) <- inputs]
-                           outputs params True True nlg
+                           outputs (instanceParams info)
+                             addClock addReset nlg
       in  zip outNames (makePrim prim (map snd inputs) (map Just outNames))
 
 makeModule :: Modular a => a -> Module ()
 makeModule a = modularise (makeMod 0 a)
 
-makeInstanceWithParams :: Modular a =>
+makeInstanceWithInfo :: Modular a =>
      String                 -- ^ Name of componenet being instantiated
-  -> [Param]                -- ^ Generic parameters to component
+  -> InstanceInfo           -- ^ Instance information
   -> Maybe NetlistGenerator -- ^ Optional netlist generator for component
   -> a
-makeInstanceWithParams s ps nlg =
-  makeInst s ps 0 (return ()) nlg
+makeInstanceWithInfo s info nlg =
+  makeInst s info 0 (return ()) nlg
 
 makeInstance :: Modular a => String -> a
-makeInstance s = makeInstanceWithParams s [] Nothing
+makeInstance s = makeInstanceWithInfo s defaultInstanceInfo Nothing
 
 -- | Make a named synthesis boundary around the given module.
 -- Note that it is possible for the supplied module to capture data that
 -- is independent of the module's inputs; this may or may not be
 -- desirable, so take care.
-makeBoundary :: Modular a => String -> a -> a
-makeBoundary name m = makeInstanceWithParams name [] nlg
+makeBoundaryWithInfo :: Modular a => InstanceInfo -> String -> a -> a
+makeBoundaryWithInfo info name m = makeInstanceWithInfo name info nlg
   where nlg = Just $ NetlistGenerator $ toNetlist $ makeModule m
+
+makeBoundary :: Modular a => String -> a -> a
+makeBoundary = makeBoundaryWithInfo defaultInstanceInfo
+
+makeBoundaryWithClockAndReset :: Modular a => (Clock, Reset) -> String -> a -> a
+makeBoundaryWithClockAndReset (clk, rst) =
+  makeBoundaryWithInfo
+    defaultInstanceInfo {
+      instanceClock = Just clk
+    , instanceReset = Just rst
+    }
