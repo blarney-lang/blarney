@@ -19,6 +19,6 @@ import GHC.Generics
 -- Blarney imports
 import Blarney.Core.Bit
 
-data Clock = Clock (Bit 1) deriving Generic
+newtype Clock = Clock (Bit 1) deriving Generic
 
-data Reset = Reset (Bit 1) deriving Generic
+newtype Reset = Reset (Bit 1) deriving Generic

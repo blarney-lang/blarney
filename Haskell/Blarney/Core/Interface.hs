@@ -50,7 +50,7 @@ module Blarney.Core.Interface (
   -- ^ Introduce synthesis boundary
 , makeBoundary
   -- ^ Introduce synthesis boundary with default info
-, makeBoundaryClockedBy
+, makeBoundaryWithClockAndReset
   -- ^ Introduce synthesis boundary, with instance taking given clock and reset
 ) where
 
@@ -454,11 +454,11 @@ instantiate name info doAddRoots ifc nlg = noName mdo
                   ++ [(s, x) | (DeclOutput s x) <- w]
           outputs  = [(s, n) | DeclInput s n <- w]
           outNames = map fst outputs
-          hasReset = isNothing $ instanceReset info
-          hasClock = isNothing $ instanceReset info
+          addClock = isNothing (instanceClock info)
+          addReset = isNothing (instanceReset info)
           prim     = Custom name [(s, bvPrimOutWidth x) | (s, x) <- inputs]
                            outputs (instanceParams info)
-                             hasClock hasReset nlg
+                             addClock addReset nlg
       in  zip outNames (makePrim prim (map snd inputs) (map Just outNames))
 
 makeModule :: Modular a => a -> Module ()
@@ -486,8 +486,8 @@ makeBoundaryWithInfo info name m = makeInstanceWithInfo name info nlg
 makeBoundary :: Modular a => String -> a -> a
 makeBoundary = makeBoundaryWithInfo defaultInstanceInfo
 
-makeBoundaryClockedBy :: Modular a => (Clock, Reset) -> String -> a -> a
-makeBoundaryClockedBy (clk, rst) =
+makeBoundaryWithClockAndReset :: Modular a => (Clock, Reset) -> String -> a -> a
+makeBoundaryWithClockAndReset (clk, rst) =
   makeBoundaryWithInfo
     defaultInstanceInfo {
       instanceClock = Just clk
