@@ -20,6 +20,7 @@ module Blarney.Netlist.Passes (
 , module Blarney.Netlist.Passes.ConstantPropagate
 , module Blarney.Netlist.Passes.ConstantEliminate
 , module Blarney.Netlist.Passes.ZeroWidthNetIgnore
+, module Blarney.Netlist.Passes.DontCareDeInline
 ) where
 
 import Blarney.Netlist.Passes.Types
@@ -32,3 +33,4 @@ import Blarney.Netlist.Passes.DeadNetEliminate
 import Blarney.Netlist.Passes.ConstantPropagate
 import Blarney.Netlist.Passes.ConstantEliminate
 import Blarney.Netlist.Passes.ZeroWidthNetIgnore
+import Blarney.Netlist.Passes.DontCareDeInline

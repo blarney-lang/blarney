@@ -26,6 +26,7 @@ data Opts =
   Opts {
     optEnableSimplifier :: Bool
   , optEnableNamePropagation :: Bool
+  , optEnableDontCareDeInline :: Bool
   }
   deriving (Show)
 
@@ -33,6 +34,7 @@ defaultOpts :: Opts
 defaultOpts = Opts
   { optEnableSimplifier = False
   , optEnableNamePropagation = False
+  , optEnableDontCareDeInline = False
   }
 
 options :: [OptDescr (Opts -> Opts)]
@@ -43,6 +45,9 @@ options =
   , Option [] ["enable-name-prop"]
       (NoArg \opts -> opts { optEnableNamePropagation = True })
       "Name propagation pass"
+  , Option [] ["enable-dont-care-de-inline"]
+      (NoArg \opts -> opts { optEnableDontCareDeInline = True })
+      "DontCare de-inline pass (avoid if possible)"
   ]
 
 -- Parse command line options
