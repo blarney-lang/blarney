@@ -43,7 +43,6 @@ dontCareDeInline mnlRef = do
         modifySTRef' newDontCares
                      (\xs -> Just (Net (DontCare w) newId [] mempty) : xs)
         return $ InputWire (newId, Nothing)
-  --updateInputTree :: NetInput -> ST s NetInput
   let updateInputTree inpt = case inpt of
         InputWire _ -> return inpt
         InputTree (DontCare w) _ -> genNewDontCare w
@@ -58,7 +57,7 @@ dontCareDeInline mnlRef = do
   newNets <- readSTRef newDontCares
   case newNets of
     [] -> return False
-    Just Net { netInstId = newHi } : _ -> do
+    Just (Net { netInstId = newHi }) : _ -> do
       newNets' <- newListArray (0, newHi) (updatedOldNets ++ reverse newNets)
       writeSTRef mnlRef newNets'
       return True
