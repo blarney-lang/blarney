@@ -73,6 +73,9 @@ optionalNetlistPasses opts mnlRef = do
                                      return ()
   -- propagates existing names through the netlist
   when (optEnableNamePropagation opts) $ namePropagate mnlRef
+  -- XXX De-inline don't cares (Workaround issue in verilator.
+  -- XXX Avoid if possible)
+  when (optEnableDontCareDeInline opts) $ dontCareDeInline mnlRef >> return ()
 
 -- | Run an 'MNetlistPass' on a 'Netlist' and return the resulting 'Netlist'
 runNetlistPass :: (forall s. MNetlistPass s a) -> Netlist -> Netlist
