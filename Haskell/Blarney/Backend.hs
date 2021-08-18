@@ -1,3 +1,5 @@
+{-# LANGUAGE NoRebindableSyntax #-}
+
 {-|
 Module      : Blarney.Backend
 Description : Backend module for the blarney hardware description library
@@ -7,6 +9,7 @@ License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
 -}
+
 module Blarney.Backend (
   -- * Verilog backend
   module Blarney.Backend.Verilog
@@ -22,10 +25,8 @@ module Blarney.Backend (
 ) where
 
 import Prelude
-import Data.Map (Map, toList, fromList, member, notMember, insert, empty)
-import Data.Array (elems)
+import Data.Map ((!), toList, fromList)
 
-import Blarney.Core.Opts
 import Blarney.Core.Interface (Modular(..), makeModule)
 import Blarney.Core.Flatten (ToNetlist(..))
 import Blarney.Core.Module
@@ -34,30 +35,8 @@ import Blarney.Netlist
 import Blarney.Backend.Simulation
 import Blarney.Backend.Verilog
 import Blarney.Backend.SMT
+import Blarney.Backend.Utils
 
--- | Elaborate module hierarchy
-elaborateHierarchy ::
-     Map String Netlist
-     -- ^ Accumlator of explored modules
-  -> [(String, IO Netlist)]
-     -- ^ List of currently unexplored modules
-  -> IO (Map String Netlist)
-elaborateHierarchy acc [] = return acc
-elaborateHierarchy acc ((name, nlg):rest)
-  | name `member` acc = elaborateHierarchy acc rest
-  | otherwise = do
-      -- Run netlist generator
-      nl <- nlg
-      -- Insert resulting netlist into accumulator
-      let newAcc = insert name nl acc
-      -- Look for new netlists
-      elaborateHierarchy newAcc $
-        [ (nm, getNetlistGenerator nlg')
-        | Custom { customName = nm
-                 , customNetlist = Just nlg' } <- map netPrim (elems nl)
-        , nm `notMember` newAcc
-        ] ++ rest
-        
 -- Verilog backend
 --------------------------------------------------------------------------------
 
@@ -69,14 +48,9 @@ writeVerilogModule :: Modular a
                    -> String -- ^ Module name
                    -> String -- ^ Output directory
                    -> IO ()
-writeVerilogModule mod modName dirName = do
-  (opts, _) <- getOpts
-  nl0 <- toNetlist (makeModule mod)
-  nls <- elaborateHierarchy empty [(modName, return nl0)]
-  sequence_
-    [ do let nl1' = runDefaultNetlistPasses opts nl1
-         genVerilogModule nl1' name dirName
-    | (name, nl1) <- toList nls ]
+writeVerilogModule mod modName dirName =
+  runWithElaboratedHierarchy mod modName \nls ->
+    sequence_ [ genVerilogModule nl name dirName | (name, nl) <- toList nls ]
 
 -- | This function is similar to 'writeVerilogModule' but also generates
 -- a verilator wrapper and Makefile.
@@ -89,16 +63,11 @@ writeVerilogTop :: Module () -- ^ Blarney function
                 -> String    -- ^ Module name
                 -> String    -- ^ Output directory
                 -> IO ()
-writeVerilogTop mod modName dirName = do
-  (opts, _) <- getOpts
-  nl0 <- toNetlist mod
-  let nl0' = runDefaultNetlistPasses opts nl0
-  genVerilogTop nl0' modName dirName
-  nls <- elaborateHierarchy empty [(modName, return nl0')]
-  sequence_
-    [ do let nl1' = runDefaultNetlistPasses opts nl1
-         genVerilogModule nl1' name dirName
-    | (name, nl1) <- toList nls, name /= modName ]
+writeVerilogTop mod modName dirName =
+  runWithElaboratedHierarchy mod modName \nls ->
+    sequence_ [ if name /= modName then genVerilogModule nl name dirName
+                                   else genVerilogTop    nl name dirName
+              | (name, nl) <- toList nls ]
 
 -- SMT backend
 --------------------------------------------------------------------------------
@@ -108,38 +77,38 @@ writeVerilogTop mod modName dirName = do
 --   The name of the generated SMT script is specified with 'scriptName' and
 --   the generated file is `'dirName'/'scriptName'.smt2`.
 writeSMTScript :: Modular a
-                => VerifyConf
-                -> a      -- ^ Blarney circuit
-                -> String -- ^ Script name
-                -> String -- ^ Output directory
+                => VerifyConf -- ^ Verification configuration setup
+                -> a          -- ^ Blarney circuit
+                -> String     -- ^ Script name
+                -> String     -- ^ Output directory
                 -> IO ()
-writeSMTScript conf circuit scriptName dirName = do
-  (opts, _) <- getOpts
-  nl <- toNetlist $ makeModule circuit
-  let nl' = runDefaultNetlistPasses opts nl
-  genSMTScript conf nl' scriptName dirName
+writeSMTScript conf circuit scriptName dirName =
+  runWithElaboratedHierarchy circuit scriptName \nls ->
+    -- XXX maybe do not consider all nested Netlists?
+    sequence_ [ genSMTScript conf nl name dirName | (name, nl) <- toList nls ]
 
 -- | This function interacts with an SMT solver to verify each assertion present
 --   in 'circuit', introduced by calls to the 'assert' function.
 verifyWith :: Modular a
-           => VerifyConf
-           -> a      -- ^ Blarney circuit
+           => VerifyConf -- ^ Verification configuration setup
+           -> a          -- ^ Blarney circuit
            -> IO ()
-verifyWith conf circuit = do
-  (opts, _) <- getOpts
-  nl <- toNetlist . makeModule $ circuit
-  let nl' = runDefaultNetlistPasses opts nl
-  verifyWithSMT conf nl'
+verifyWith conf circuit =
+  runWithElaboratedHierarchy circuit "circuit under verification" \nls ->
+    -- XXX maybe do not consider all nested Netlists?
+    sequence_ [ verifyWithSMT conf nl | (name, nl) <- toList nls ]
 
 -- Simulation backend
 --------------------------------------------------------------------------------
 
--- | Simulation the provided Blarney circuit
+-- | Simulate the provided Blarney circuit
 simulate :: Modular a
-         => a      -- ^ Blarney circuit
+         => a     -- ^ Blarney circuit
          -> IO ()
 simulate circuit = do
-  (opts, _) <- getOpts
-  nl <- toNetlist $ makeModule circuit
-  let nl' = runDefaultNetlistPasses opts nl
-  simulateNetlist nl'
+  topSim <- runWithElaboratedHierarchy circuit topSimName \nls -> mdo
+    sims <- fromList <$> sequence [ compileSim sims nl >>= return . (,) name
+                                  | (name, nl) <- toList nls ]
+    return $ sims ! topSimName
+  runSim topSim mempty
+  where topSimName = "circuit under simulation"
