@@ -1,0 +1,3 @@
+[submodule "blarney-vendor-ip"]
+	path = blarney-vendor-ip
+	url = https://github.com/blarney-lang/blarney-vendor-ip
