@@ -147,8 +147,7 @@ twoSort (2,1) = (1,2)
 The in-Haskell simulator is much slower than Verilator, but can be
 more convenient for small designs.  However, it currently has fewer
 features (no
-http://blarney-lang.github.io/blarney/Blarney-Core-Module.html#t:RegFile[RegFile]
-or <<Modular compilation>>).
+http://blarney-lang.github.io/blarney/Blarney-Core-Module.html#t:RegFile[RegFile]).
 
 === Bubble sort
 
