@@ -43,6 +43,9 @@ instance  Valid (Option t) where
 instance Val (Option t) t where
   val = optValue
 
+instance Functor Option where
+  fmap f (Option valid value) = Option valid (f value)
+
 -- | Builds an 'Option' with a valid value
 some :: Bits t => t -> Option t
 some val = Option true val
