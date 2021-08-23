@@ -116,7 +116,10 @@ onNetlists circuit name f = do
   nl0 <- toNetlist $ makeModule circuit
   nls <- elab mempty [(name, return nl0)]
   f nls
-  where elab acc [] = return acc
+  where elab :: Map String Netlist     -- ^ Accumlator of explored modules
+             -> [(String, IO Netlist)] -- ^ List of currently unexplored modules
+             -> IO (Map String Netlist)
+        elab acc [] = return acc
         elab acc ((name, nlg):rest)
           | name `member` acc = elab acc rest
           | otherwise = do
