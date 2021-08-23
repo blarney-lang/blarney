@@ -35,7 +35,6 @@ import Blarney.Netlist
 import Blarney.Backend.Simulation
 import Blarney.Backend.Verilog
 import Blarney.Backend.SMT
-import Blarney.Backend.Utils
 
 -- Verilog backend
 --------------------------------------------------------------------------------
@@ -49,7 +48,7 @@ writeVerilogModule :: Modular a
                    -> String -- ^ Output directory
                    -> IO ()
 writeVerilogModule mod modName dirName =
-  runWithElaboratedHierarchy mod modName \nls ->
+  onNetlists mod modName \nls ->
     sequence_ [ genVerilogModule nl name dirName | (name, nl) <- toList nls ]
 
 -- | This function is similar to 'writeVerilogModule' but also generates
@@ -64,7 +63,7 @@ writeVerilogTop :: Module () -- ^ Blarney function
                 -> String    -- ^ Output directory
                 -> IO ()
 writeVerilogTop mod modName dirName =
-  runWithElaboratedHierarchy mod modName \nls ->
+  onNetlists mod modName \nls ->
     sequence_ [ if name /= modName then genVerilogModule nl name dirName
                                    else genVerilogTop    nl name dirName
               | (name, nl) <- toList nls ]
@@ -83,7 +82,7 @@ writeSMTScript :: Modular a
                 -> String     -- ^ Output directory
                 -> IO ()
 writeSMTScript conf circuit scriptName dirName =
-  runWithElaboratedHierarchy circuit scriptName \nls ->
+  onNetlists circuit scriptName \nls ->
     -- XXX maybe do not consider all nested Netlists?
     sequence_ [ genSMTScript conf nl name dirName | (name, nl) <- toList nls ]
 
@@ -94,7 +93,7 @@ verifyWith :: Modular a
            -> a          -- ^ Blarney circuit
            -> IO ()
 verifyWith conf circuit =
-  runWithElaboratedHierarchy circuit "circuit under verification" \nls ->
+  onNetlists circuit "circuit under verification" \nls ->
     -- XXX maybe do not consider all nested Netlists?
     sequence_ [ verifyWithSMT conf nl | (name, nl) <- toList nls ]
 
@@ -106,7 +105,7 @@ simulate :: Modular a
          => a     -- ^ Blarney circuit
          -> IO ()
 simulate circuit = do
-  topSim <- runWithElaboratedHierarchy circuit topSimName \nls -> mdo
+  topSim <- onNetlists circuit topSimName \nls -> mdo
     sims <- fromList <$> sequence [ (,) name <$> compileSim sims nl
                                   | (name, nl) <- toList nls ]
     return $ sims ! topSimName
