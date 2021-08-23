@@ -107,7 +107,7 @@ simulate :: Modular a
          -> IO ()
 simulate circuit = do
   topSim <- runWithElaboratedHierarchy circuit topSimName \nls -> mdo
-    sims <- fromList <$> sequence [ compileSim sims nl >>= return . (,) name
+    sims <- fromList <$> sequence [ (,) name <$> compileSim sims nl
                                   | (name, nl) <- toList nls ]
     return $ sims ! topSimName
   runSim topSim mempty
