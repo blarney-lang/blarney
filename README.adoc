@@ -41,7 +41,7 @@ variable to point to it, and add the `Scripts` directory to our
 
 [source, shell]
 ----
-$ git clone https://github.com/blarney-lang/blarney
+$ git clone --recursive https://github.com/blarney-lang/blarney
 $ export BLARNEY_ROOT=$(pwd)/blarney
 $ export PATH=$PATH:$BLARNEY_ROOT/Scripts
 ----
@@ -144,8 +144,9 @@ twoSort (1,2) = (1,2)
 twoSort (2,1) = (1,2)
 ----
 
-The experomental in-Haskell simulator is much slower than Verilator, but can be
-more convenient for small designs.
+The in-Haskell simulator is much slower than Verilator, but can be
+more convenient for small designs.  It is currently an experimental
+feature.
 
 === Bubble sort
 
