@@ -16,7 +16,8 @@ Simulate a Blarney 'Netlist'.
 -}
 
 module Blarney.Backend.Simulation (
-  simulateNetlist
+  compileSim
+, runSim
 ) where
 
 import Prelude
@@ -29,45 +30,99 @@ import Control.Monad
 import Data.Array.ST
 import Control.Monad.ST
 import System.Environment
-import qualified Data.Map.Strict as Map
+import qualified Data.Map as Map
+import qualified Data.IntMap as IntMap
 import qualified Data.Array.IArray as IArray
 
 import Blarney.Netlist
 import Blarney.Core.Utils
 import Blarney.Misc.MonadLoops
+import Blarney.Core.Opts
 
 -- debugging facilities
 --import Debug.Trace
---debugEnabled = False
+--debugEnabled = True
 --dbg act = when debugEnabled act
 -- debugging facilities
 
 -- file-wide helpers
 err str = error $ "Blarney.Backend.Simulation: " ++ str
 simDontCare = 0
+--lstIdx lst idx msg | idx >= length lst = err msg
+--lstIdx lst idx _ = lst !! idx
 
--- | Simulate a 'Netlist' until a 'Finish' 'Prim' is triggered. This is
---   currently the "only" interface to the simulation module.
---   TODO: export the current SimulatorIfc after sanitizing it, and a bunch of
---         related helpers probably
-simulateNetlist :: Netlist -> IO ()
-simulateNetlist nl = do
+-- | Simulate a 'Simulator' until a 'Finish' 'Prim' is triggered.
+runSim :: Simulator -- ^ the 'Simulator' to simulate, compiled with 'compileSim'
+       -> SignalMap -- ^ the input signals to the 'Simulator'
+       -> IO ()
+runSim sim ins = do
+  -- simply bind names
+  let SimulatorIfc{..} = sim ins
+  -- here, while the termination stream does not indicate the end of the
+  -- simulation, we apply all effects from the current simulation cycle and
+  -- also print TICK
+  mapM_ (\(effect, end) -> effect {->> print ("TICK: " ++ show end)-})
+        (zip simEffect (takeWhileInclusive not simTerminate))
+  where takeWhileInclusive _ [] = []
+        takeWhileInclusive p (x:xs) = x : if p x then takeWhileInclusive p xs
+                                                 else []
+
+-- | A function to turn a 'Netlist' into a 'Simulator'
+compileSim :: Map.Map String Simulator
+           -- ^ existing 'Simulator's (for nested 'Custom')
+           -> Netlist
+           -- ^ 'Netlist' for the circuit to compile a 'Simulator' for
+           -> IO Simulator
+compileSim allSims originalNl = do
+  -- prepare compilation context
+  ctxt <- mkCompCtxt originalNl
+  -- handle on the netlist
+  let nl = compNl ctxt
   {- DBG -}
   --dbg do mapM_ print nl
   --       putStrLn "============================"
   {- DBG -}
-  -- prepare compilation context
-  ctxt <- mkCompCtxt nl
-  -- simulator compiled from the input netlist
-  let SimulatorIfc{..} = compile ctxt Map.empty
-  -- here, while the termination stream does not indicate the end of the
-  -- simulation, we apply all effects from the current simulation cycle and
-  -- also print TICK
-  mapM_ (\(effects, end) -> sequence_ effects {->> print ("TICK: " ++ show end)-})
-        (zip (transpose simEffects) (takeWhileInclusive not simTerminate))
-  where takeWhileInclusive _ [] = []
-        takeWhileInclusive p (x:xs) = x : if p x then takeWhileInclusive p xs
-                                                 else []
+  -- For this layer of Netlist
+  return \currentIns -> runST mdo
+    -- signal memoization table
+    memo <- newListArray (IArray.bounds nl)
+                         [ replicate (length $ primOutputs p) Nothing
+                         | Net { netPrim = p } <- IArray.elems nl ]
+    -- compile internal Custom related signals
+    (childrenIds, childrenInputs, childrenOutIfcs) <- unzip3 <$> sequence
+      [ do ins <- compileCustomInputs ctxt memo currentIns childrenOutputs n
+           return (netInstId, ins, (allSims Map.! customName) ins)
+      | n@Net{ netPrim = Custom{..}, ..} <- IArray.elems nl ]
+    let childrenEffects = map sequence_ $ transpose $
+                            repeat (return ()) : map simEffect childrenOutIfcs
+    let childrenTerminates = map simTerminate childrenOutIfcs
+    let childrenOutputs =
+          IntMap.fromList $ zipWith (\i ifc -> (i, simOutputs ifc))
+                                    childrenIds childrenOutIfcs
+    -- compile simulation effects streams
+    allEffectStreams <- sequence
+      [ compileSimEffect ctxt memo currentIns childrenOutputs n
+      | n@Net{ netPrim = p } <- IArray.elems nl, case p of Display _ -> True
+                                                           _         -> False ]
+    let effectStreams = map sequence_ $ transpose $
+                          repeat (return ()) : allEffectStreams
+    -- compile simulation termination stream
+    terminationStreams <- sequence
+      [ compileTermination ctxt memo currentIns childrenOutputs n
+      | n@Net{ netPrim = p } <- IArray.elems nl, case p of Finish   -> True
+                                                           Assert _ -> True
+                                                           _        -> False ]
+    let endStreams = repeat False : (terminationStreams ++ childrenTerminates)
+    -- compile simulation outputs streams
+    outputStreams <- sequence
+      [ do outs <- compileOutputSignal ctxt memo currentIns childrenOutputs o
+           return (nm, outs)
+      | o@Net{ netPrim = Output _ nm } <- IArray.elems nl ]
+    -- wrap compilation result into a SimulatorIfc
+    return SimulatorIfc { simEffect    = zipWith (>>) effectStreams
+                                                      childrenEffects
+                        , simTerminate = map or (transpose endStreams)
+                        , simOutputs   = Map.fromList outputStreams }
 
 --------------------------------------------------------------------------------
 -- helper types
@@ -102,17 +157,13 @@ mkCompCtxt nl = do
           return $ Map.fromList (zip [0..] $  a2i <$> initContent)
         prepBRAMContent Nothing = return Map.empty
 
--- | A type representing s stream of simulation 'IO's to supplement output
---   'Signal's
-type SimEffect = [IO ()]
-
 -- | a dictionary of named 'Signal's
 type SignalMap = Map.Map String Signal
 
 -- | A 'Simulator''s interface
 data SimulatorIfc = SimulatorIfc {
     -- | set of streams of effects
-    simEffects   :: [SimEffect]
+    simEffect    :: [IO ()]
     -- | stream of booleans indicating termination
   , simTerminate :: [Bool]
     -- | dictionary of output signals
@@ -128,51 +179,29 @@ type Simulator = SignalMap -> SimulatorIfc
 type MemoSignals s = STArray s InstId [Maybe Signal]
 
 -- | compile helper functions
-type CompFun s a b = CompCtxt -> MemoSignals s -> a -> ST s b
+type CompFun s a b = CompCtxt -> MemoSignals s
+                     -> SignalMap -> IntMap.IntMap SignalMap
+                     -> a
+                     -> ST s b
 
--- | A function to turn a 'Netlist' into a 'Simulator'
-compile :: CompCtxt -> Simulator
-compile ctxt inputStreams = runST do
-  -- handle on the netlist
-  let nl = compNl ctxt
-  -- XXX TODO implement in haskell simulation for modular designs XXX ---
-  sequence_ [ err $ "simulation of modular designs not yet supported: " ++
-                    show n
-            | n@Net{ netPrim = Custom{} } <- IArray.elems nl ]
-  -- signal memoization table
-  memo <- newListArray (IArray.bounds nl)
-                       [ replicate (length $ primOutputs p) Nothing
-                       | Net { netPrim = p } <- IArray.elems nl ]
-  -- compile simulation effects streams
-  effectStreams <- sequence [ compileSimEffect ctxt memo n
-                            | n@Net{ netPrim = p } <- IArray.elems nl
-                            , case p of Display _ -> True
-                                        _         -> False ]
-  -- compile simulation termination stream
-  terminationStreams <- sequence [ compileTermination ctxt memo n
-                                 | n@Net{ netPrim = p } <- IArray.elems nl
-                                 , case p of Finish   -> True
-                                             Assert _ -> True
-                                             _        -> False ]
-  let endStreams = repeat False : terminationStreams
-  -- compile simulation outputs streams
-  let outputs = [ (nm, compileOutputSignal ctxt memo o)
-                | o@Net{ netPrim = Output _ nm } <- IArray.elems nl ]
-  let (nms, sigsST) = unzip outputs
-  sigs <- sequence sigsST
-  let outputStreams = zip nms sigs
-  -- wrap compilation result into a SimulatorIfc
-  return $ SimulatorIfc { simEffects   = effectStreams
-                        , simTerminate = map or (transpose endStreams)
-                        , simOutputs   = Map.fromList outputStreams }
+-- | compile the 'SignalMap' of inputs to the given 'Custom' 'Net'
+compileCustomInputs :: CompFun s Net SignalMap
+compileCustomInputs ctxt memo currentIns childrenOutputs
+                    Net{ netPrim = Custom{..}, ..} = do
+  ins <- mapM (compileNetInputSignal ctxt memo currentIns childrenOutputs)
+              netInputs
+  return $ Map.fromList $ zip (map fst customInputs) ins
 
--- | compile the 'SimEffect' stream of simulation effects for a given simulation
+-- | compile the '[IO ()]' stream of simulation effects for a given simulation
 --   effect capable 'Net' (currently, only 'Display' nets)
-compileSimEffect :: CompFun s Net SimEffect
-compileSimEffect ctxt memo Net{ netPrim = Display args, .. } = do
-  netInputs' <- mapM (compileNetInputSignal ctxt memo) netInputs
-  return $ map (\(en:inpts) -> when (en /= 0) do putStr . concat $ fmt args inpts)
-               (transpose netInputs')
+compileSimEffect :: CompFun s Net [IO ()]
+compileSimEffect ctxt memo currentIns childrenOutputs
+                 Net{ netPrim = Display args, .. } = do
+  ins <- mapM (compileNetInputSignal ctxt memo currentIns childrenOutputs)
+              netInputs
+  return $ map (\(en:inpts) ->
+                 when (en /= 0) do putStr . concat $ fmt args inpts)
+               (transpose ins)
   where fmt [] _ = []
         fmt (DisplayArgString s : rest) ins = escape s : fmt rest ins
         fmt (DisplayArgBit _ r p z : rest) (x:ins) =
@@ -187,19 +216,22 @@ compileSimEffect ctxt memo Net{ netPrim = Display args, .. } = do
 -- | compile the termination stream as a '[Bool]' for a given termination
 --   capable 'Net' (currently only 'Finish' nets)
 compileTermination :: CompFun s Net [Bool]
-compileTermination ctxt memo Net{ netPrim = Finish, netInputs = [en] } = do
-  en' <- compileNetInputSignal ctxt memo en
-  return $ (/= 0) <$> en'
+compileTermination ctxt memo currentIns childrenOutputs
+                   Net{ netPrim = Finish, netInputs = [en] } = do
+  en' <- compileNetInputSignal ctxt memo currentIns childrenOutputs en
+  return $ map (/= 0) en'
 
 -- | compile the output 'Signal' for a given output 'Net'
 --   (currently not supported)
 compileOutputSignal :: CompFun s Net Signal
-compileOutputSignal ctxt memo n = do
-  return $ repeat simDontCare -- TODO
+compileOutputSignal ctxt memo currentIns childrenOutputs
+                    Net{ netPrim = Output _ _, ..} = do
+  compileNetInputSignal ctxt memo currentIns childrenOutputs (head netInputs)
 
 -- | compile the 'Signal' associated with a 'WireId' (memoized)
 compileWireIdSignal :: CompFun s WireId Signal
-compileWireIdSignal ctxt@CompCtxt{..} memo (instId, outNm) = do
+compileWireIdSignal ctxt@CompCtxt{..} memo currentIns childrenOutputs
+                    (instId, outNm) = do
   thunks <- readArray memo instId
   let net = getNet compNl instId
   case primOutIndex (netPrim net) outNm of
@@ -211,27 +243,30 @@ compileWireIdSignal ctxt@CompCtxt{..} memo (instId, outNm) = do
           let thunks' = take idx thunks ++ Just signal : drop (idx+1) thunks
           writeArray memo instId thunks'
           -- then compile the signal
-          signal <- compileNetIndexedOuptutSignal ctxt memo (net, idx)
+          signal <- compileNetIndexedOuptutSignal ctxt memo currentIns
+                                                  childrenOutputs (net, idx)
           return signal
     Nothing -> err $ "unknown output " ++ show outNm ++ " for net " ++ show net
 
 -- | compile the 'Signal' associated with an indexed output of a given 'Net'
 --   (not memoized)
 compileNetIndexedOuptutSignal :: CompFun s (Net, Int) Signal
-compileNetIndexedOuptutSignal ctxt memo (Net{..}, idx) = do
-  ins <- mapM (compileNetInputSignal ctxt memo) netInputs
-  return $ (compilePrim ctxt netInstId netPrim ins) !! idx
+compileNetIndexedOuptutSignal ctxt memo currentIns childrenOutputs
+                              (Net{..}, idx) = do
+  ins <- mapM (compileNetInputSignal ctxt memo currentIns childrenOutputs)
+              netInputs
+  return $ compilePrim ctxt currentIns childrenOutputs netInstId netPrim ins idx
 
 -- | compile the 'Signal' associated with a 'NetInput' (not memoized)
 compileNetInputSignal :: CompFun s NetInput Signal
-compileNetInputSignal ctxt memo (InputWire wId) = do
-  signal <- compileWireIdSignal ctxt memo wId
-  return signal
-compileNetInputSignal ctxt memo (InputTree prim ins) = do
-  ins' <- mapM (compileNetInputSignal ctxt memo) ins
+compileNetInputSignal ctxt memo currentIns childrenOutputs (InputWire wId) = do
+  compileWireIdSignal ctxt memo currentIns childrenOutputs wId
+compileNetInputSignal ctxt memo currentIns childrenOutputs
+                      (InputTree prim ins) = do
+  ins' <- mapM (compileNetInputSignal ctxt memo currentIns childrenOutputs) ins
   let instID = err "no InstId for InputTree Prims"
   -- TODO check that we only eval single output primitives
-  return $ (compilePrim ctxt instID prim ins') !! 0
+  return $ compilePrim ctxt currentIns childrenOutputs instID prim ins' 0
 
 -- | merges a new sample of provided width into an old sample of same width
 --   according to the provided byte enable
@@ -247,20 +282,27 @@ mergeWithBE w be new old = (newMask .&. new) .|. (oldMask .&. old)
 --   Note:
 --     * the CompCtxt argument is needed for primitives such as TestPlusArgs
 --     * the InstId argument is needed to identify 'Net' initialization data
-compilePrim :: CompCtxt -> InstId -> Prim -> [Signal] -> [Signal]
-compilePrim CompCtxt{..} instId prim ins = case (prim, ins) of
+compilePrim :: CompCtxt -> SignalMap -> IntMap.IntMap SignalMap
+            -> InstId -> Prim -> [Signal] -> Int
+            -> Signal
+compilePrim CompCtxt{..} currentIns childrenOutputs
+            instId prim ins idx = case (prim, ins) of
   -- no input primitives
   (TestPlusArgs plsArg, []) ->
-    [repeat $ if '+' : plsArg `elem` compArgs then 1 else 0]
-  (Const w val, []) -> [repeat $ clamp w $ fromInteger val]
-  (DontCare w, []) -> [repeat simDontCare]
+    repeat $ if '+' : plsArg `elem` compArgs then 1 else 0
+  (Const w val, []) -> repeat $ clamp w $ fromInteger val
+  (DontCare w, []) -> repeat simDontCare
   -- stateful primitives
-  (Register i _, [inpts]) -> [fromMaybe simDontCare i : inpts]
+  (Register i _, [inpts]) -> fromMaybe simDontCare i : inpts
   (RegisterEn i _, [ens, inpts]) ->
-    [scanl f (fromMaybe simDontCare i) (zip ens inpts)]
+    scanl f (fromMaybe simDontCare i) (zip ens inpts)
     where f prev (en, inpt) = if en /= 0 then inpt else prev
+  (Input _ nm, _) -> currentIns Map.! nm
+  (Custom{..}, _) -> childOuts Map.! nm
+    where childOuts = childrenOutputs IntMap.! instId
+          nm = fst $ (primOutputs prim) !! idx
   (BRAM{ ramKind = BRAMSinglePort, .. }, inpts@(addrS:_:weS:reS:_) ) ->
-    [zipWith3 doRead delayedAddrS delayedWeS bramContentS]
+    zipWith3 doRead delayedAddrS delayedWeS bramContentS
     where delayedAddrS = scanl (\prv (a, re) -> if re /= 0 then a else prv)
                                simDontCare
                                (zip (clamp ramAddrWidth <$> addrS) reS)
@@ -281,7 +323,7 @@ compilePrim CompCtxt{..} instId prim ins = case (prim, ins) of
             where old = case m_old of Just x  -> x
                                       Nothing -> simDontCare
   (BRAM{ ramKind = BRAMDualPort, .. }, inpts@(rdAddrS:wrAddrS:_:weS:reS:_) ) ->
-    [zipWith4 doRead delayedRdAddrS delayedWrAddrS delayedWeS bramContentS]
+    zipWith4 doRead delayedRdAddrS delayedWrAddrS delayedWeS bramContentS
     where delayedRdAddrS = scanl (\prv (a, re) -> if re /= 0 then a else prv)
                                  simDontCare
                                  (zip (clamp ramAddrWidth <$> rdAddrS) reS)
@@ -306,7 +348,7 @@ compilePrim CompCtxt{..} instId prim ins = case (prim, ins) of
                                       Nothing -> simDontCare
   (BRAM{ ramKind = BRAMTrueDualPort, .. }, inpts@(addrAs:addrBs:_:_:weAs:weBs:reAs:reBs:_)) ->
     [ zipWith4 doRead delayedAddrAs delayedAddrBs delayedWeAs bramContentS
-    , zipWith4 doRead delayedAddrBs delayedAddrAs delayedWeBs bramContentS ]
+    , zipWith4 doRead delayedAddrBs delayedAddrAs delayedWeBs bramContentS ] !! idx
     where delayedAddrAs = scanl (\prv (a, re) -> if re /= 0 then a else prv)
                                 simDontCare
                                 (zip (clamp ramAddrWidth <$> addrAs) reAs)
@@ -357,9 +399,9 @@ compilePrim CompCtxt{..} instId prim ins = case (prim, ins) of
   (Concat _ _, [x, y]) -> evalBinOp x y
   (Identity _, [x]) -> evalUnOp x
   (Mux _ _ w, [ss, i0, i1]) ->
-    [zipWith3 (\s x y -> if s == 0 then x else y) ss i0 i1]
+    zipWith3 (\s x y -> if s == 0 then x else y) ss i0 i1
   -- fall through case
-  _ -> transpose $ eval <$> transpose ins
+  _ -> (transpose $ eval <$> transpose ins) !! idx
   where eval = primSemEval prim
-        evalUnOp i0 = [concatMap eval ((:[]) <$> i0)]
-        evalBinOp i0 i1 = [zipWith (\x y -> head $ eval [x, y]) i0 i1]
+        evalUnOp i0 = concatMap eval ((:[]) <$> i0)
+        evalBinOp i0 i1 = zipWith (\x y -> head $ eval [x, y]) i0 i1

@@ -33,10 +33,10 @@ master resps = do
   return (buffer.toStream)
 
 makeSlave :: Stream MulReq -> Module (Stream MulResp)
-makeSlave = makeInstance "slave"
+makeSlave = makeBoundary "slave" slave
 
 makeMaster :: Stream MulResp -> Module (Stream MulReq)
-makeMaster = makeInstance "master"
+makeMaster = makeBoundary "master" master
 
 top :: Module ()
 top = mdo

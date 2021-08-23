@@ -8,6 +8,7 @@
 Module      : Blarney.Netlist
 Description : Netlist module for the blarney hardware description library
 Copyright   : (c) Alexandre Joannou, 2020-2021
+              (c) Matthew Naylor, 2021
 License     : MIT
 Stability   : experimental
 
@@ -25,19 +26,22 @@ module Blarney.Netlist (
 , wrapWithMandatoryNetlistPasses
 -- * Exports of individual 'MNetlistPass'es and other utils
 , module Blarney.Netlist.Passes
+-- * others
+, onNetlists
 ) where
 
 import Prelude
 import Data.Maybe
+import Data.STRef
 import Control.Monad
 import Control.Monad.ST
 import Data.Array.IArray
 import Data.Array.MArray
-
-import Data.STRef
+import Data.Map (Map, member, notMember, insert)
 
 import Blarney.Misc.MonadLoops
 import Blarney.Core.Opts
+import Blarney.Core.Interface
 import Blarney.Netlist.Passes
 
 -- | 'ToNetlist' instance for 'MNetlistRef's in the 'ST' monad
@@ -96,3 +100,38 @@ runDefaultNetlistPasses :: Opts -> Netlist -> Netlist
 runDefaultNetlistPasses opts netlist = runNetlistPass pass netlist
   where pass :: MNetlistPass s ()
         pass = wrapWithMandatoryNetlistPasses $ optionalNetlistPasses opts
+
+-- | Run an 'IO' function with the elaborated 'Netlist's hierarchy for the
+--   given circuit (effectively one 'Netlist' per eligible 'Custom' 'Net'). The
+--   'Netlist's are passed to the provided function as a 'Map String Netlist',
+--   with the toplevel 'Netlist''s key being the provided 'String' argument, and
+--   the other 'Netlist's using the 'customName' field of the elaborated
+--   'Custom' as a key.
+onNetlists :: Modular a
+           => a                            -- ^ Blarney circuit
+           -> String                       -- ^ circuit name
+           -> (Map String Netlist -> IO b) -- ^ function to run
+           -> IO b
+onNetlists circuit name f = do
+  nl0 <- toNetlist $ makeModule circuit
+  nls <- elab mempty [(name, return nl0)]
+  f nls
+  where elab :: Map String Netlist     -- ^ Accumlator of explored modules
+             -> [(String, IO Netlist)] -- ^ List of currently unexplored modules
+             -> IO (Map String Netlist)
+        elab acc [] = return acc
+        elab acc ((name, nlg):rest)
+          | name `member` acc = elab acc rest
+          | otherwise = do
+              (opts, _) <- getOpts
+              -- Run netlist generator
+              nl <- runDefaultNetlistPasses opts <$> nlg
+              -- Insert resulting netlist into accumulator
+              let newAcc = insert name nl acc
+              -- Look for new netlists
+              elab newAcc $
+                [ (nm, getNetlistGenerator nlg')
+                | Custom { customName = nm
+                         , customNetlist = Just nlg' } <- map netPrim (elems nl)
+                , nm `notMember` newAcc
+                ] ++ rest
