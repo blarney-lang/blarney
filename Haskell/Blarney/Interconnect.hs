@@ -244,5 +244,5 @@ makeShuffleExchange switch route isFinal ins
 
       -- Combine using MSB of routing function
       let merge = switch (\x -> unsafeAt (i-1) (route x)) isFinal
-      (ts', bs') <- unzip <$> mapM merge (zip ts bs)
-      return (ts' ++ bs')
+      (ts_new, bs_new) <- unzip <$> mapM merge (zip ts bs)
+      return (ts_new ++ bs_new)
