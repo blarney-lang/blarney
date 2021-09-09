@@ -54,18 +54,17 @@ simDontCare = 0
 -- | Simulate a 'Simulator' until a 'Finish' 'Prim' is triggered.
 runSim :: Simulator -- ^ the 'Simulator' to simulate, compiled with 'compileSim'
        -> SignalMap -- ^ the input signals to the 'Simulator'
-       -> IO ()
+       -> IO SignalMap
 runSim sim ins = do
   -- simply bind names
   let SimulatorIfc{..} = sim ins
   -- here, while the termination stream does not indicate the end of the
   -- simulation, we apply all effects from the current simulation cycle and
   -- also print TICK
-  mapM_ (\(effect, end) -> effect {->> print ("TICK: " ++ show end)-})
-        (zip simEffect (takeWhileInclusive not simTerminate))
-  where takeWhileInclusive _ [] = []
-        takeWhileInclusive p (x:xs) = x : if p x then takeWhileInclusive p xs
-                                                 else []
+  --mapM_ (\(effect, end) -> effect {->> print ("TICK: " ++ show end)-})
+  --      (zip simEffect simTerminate)
+  sequence simEffect
+  return simOutputs
 
 -- | A function to turn a 'Netlist' into a 'Simulator'
 compileSim :: Map.Map String Simulator
@@ -119,10 +118,17 @@ compileSim allSims originalNl = do
            return (nm, outs)
       | o@Net{ netPrim = Output _ nm } <- IArray.elems nl ]
     -- wrap compilation result into a SimulatorIfc
-    return SimulatorIfc { simEffect    = zipWith (>>) effectStreams
-                                                      childrenEffects
-                        , simTerminate = map or (transpose endStreams)
-                        , simOutputs   = Map.fromList outputStreams }
+    let endStream = takeWhileInclusive not (map or $ transpose endStreams)
+    let effectStream = map snd $
+                           zip endStream
+                               (zipWith (>>) effectStreams childrenEffects)
+    let outputStream = map snd $ zip endStream outputStreams
+    return SimulatorIfc { simEffect    = effectStream
+                        , simTerminate = endStream
+                        , simOutputs   = Map.fromList outputStream }
+  where takeWhileInclusive _ [] = []
+        takeWhileInclusive p (x:xs) = x : if p x then takeWhileInclusive p xs
+                                                 else []
 
 --------------------------------------------------------------------------------
 -- helper types
