@@ -98,13 +98,6 @@ compileSim allSims originalNl = do
     let childrenOutputs =
           IntMap.fromList $ zipWith (\i ifc -> (i, simOutputs ifc))
                                     childrenIds childrenOutIfcs
-    -- compile simulation effects streams
-    allEffectStreams <- sequence
-      [ compileSimEffect ctxt memo currentIns childrenOutputs n
-      | n@Net{ netPrim = p } <- IArray.elems nl, case p of Display _ -> True
-                                                           _         -> False ]
-    let effectStreams = map sequence_ $ transpose $
-                          repeat (return ()) : allEffectStreams
     -- compile simulation termination stream
     terminationStreams <- sequence
       [ compileTermination ctxt memo currentIns childrenOutputs n
@@ -112,20 +105,26 @@ compileSim allSims originalNl = do
                                                            Assert _ -> True
                                                            _        -> False ]
     let endStreams = repeat False : (terminationStreams ++ childrenTerminates)
+    let endStreams' = takeWhileInclusive not (map or $ transpose endStreams)
+    let truncate :: [a] -> [a]
+        truncate = map snd . zip endStreams'
+    -- compile simulation effects streams
+    allEffectStreams <- sequence
+      [ compileSimEffect ctxt memo currentIns childrenOutputs n
+      | n@Net{ netPrim = p } <- IArray.elems nl, case p of Display _ -> True
+                                                           _         -> False ]
+    let effectStreams = map sequence_ $ transpose $
+                          repeat (return ()) : allEffectStreams
+    let effectStreams' = truncate $ zipWith (>>) effectStreams childrenEffects
     -- compile simulation outputs streams
     outputStreams <- sequence
       [ do outs <- compileOutputSignal ctxt memo currentIns childrenOutputs o
-           return (nm, outs)
+           return (nm, truncate outs)
       | o@Net{ netPrim = Output _ nm } <- IArray.elems nl ]
     -- wrap compilation result into a SimulatorIfc
-    let endStream = takeWhileInclusive not (map or $ transpose endStreams)
-    let effectStream = map snd $
-                           zip endStream
-                               (zipWith (>>) effectStreams childrenEffects)
-    let outputStream = map snd $ zip endStream outputStreams
-    return SimulatorIfc { simEffect    = effectStream
-                        , simTerminate = endStream
-                        , simOutputs   = Map.fromList outputStream }
+    return SimulatorIfc { simEffect    = effectStreams'
+                        , simTerminate = endStreams'
+                        , simOutputs   = Map.fromList outputStreams }
   where takeWhileInclusive _ [] = []
         takeWhileInclusive p (x:xs) = x : if p x then takeWhileInclusive p xs
                                                  else []
