@@ -94,7 +94,6 @@ compileSim allSims originalNl = do
       | n@Net{ netPrim = Custom{..}, ..} <- IArray.elems nl ]
     let childrenEffects = map sequence_ $ transpose $
                             repeat (return ()) : map simEffect childrenOutIfcs
-    let childrenTerminates = map simTerminate childrenOutIfcs
     let childrenOutputs =
           IntMap.fromList $ zipWith (\i ifc -> (i, simOutputs ifc))
                                     childrenIds childrenOutIfcs
@@ -104,7 +103,7 @@ compileSim allSims originalNl = do
       | n@Net{ netPrim = p } <- IArray.elems nl, case p of Finish   -> True
                                                            Assert _ -> True
                                                            _        -> False ]
-    let endStreams = repeat False : (terminationStreams ++ childrenTerminates)
+    let endStreams = repeat False : terminationStreams
     let endStreams' = takeWhileInclusive not (map or $ transpose endStreams)
     let truncate :: [a] -> [a]
         truncate = map snd . zip endStreams'
@@ -123,7 +122,6 @@ compileSim allSims originalNl = do
       | o@Net{ netPrim = Output _ nm } <- IArray.elems nl ]
     -- wrap compilation result into a SimulatorIfc
     return SimulatorIfc { simEffect    = effectStreams'
-                        , simTerminate = endStreams'
                         , simOutputs   = Map.fromList outputStreams }
   where takeWhileInclusive _ [] = []
         takeWhileInclusive p (x:xs) = x : if p x then takeWhileInclusive p xs
@@ -169,8 +167,6 @@ type SignalMap = Map.Map String Signal
 data SimulatorIfc = SimulatorIfc {
     -- | set of streams of effects
     simEffect    :: [IO ()]
-    -- | stream of booleans indicating termination
-  , simTerminate :: [Bool]
     -- | dictionary of output signals
   , simOutputs   :: SignalMap }
 
