@@ -52,20 +52,15 @@ simDontCare = 0
 --lstIdx lst idx _ = lst !! idx
 
 -- | Simulate a 'Simulator' until a 'Finish' 'Prim' is triggered.
+--   This is strict in that the effects are evaluated before returning the
+--   outputs
 runSim :: Simulator -- ^ the 'Simulator' to simulate, compiled with 'compileSim'
        -> SignalMap -- ^ the input signals to the 'Simulator'
-       -> IO ()
+       -> IO SignalMap
 runSim sim ins = do
-  -- simply bind names
   let SimulatorIfc{..} = sim ins
-  -- here, while the termination stream does not indicate the end of the
-  -- simulation, we apply all effects from the current simulation cycle and
-  -- also print TICK
-  mapM_ (\(effect, end) -> effect {->> print ("TICK: " ++ show end)-})
-        (zip simEffect (takeWhileInclusive not simTerminate))
-  where takeWhileInclusive _ [] = []
-        takeWhileInclusive p (x:xs) = x : if p x then takeWhileInclusive p xs
-                                                 else []
+  sequence simEffect
+  return simOutputs
 
 -- | A function to turn a 'Netlist' into a 'Simulator'
 compileSim :: Map.Map String Simulator
@@ -95,10 +90,19 @@ compileSim allSims originalNl = do
       | n@Net{ netPrim = Custom{..}, ..} <- IArray.elems nl ]
     let childrenEffects = map sequence_ $ transpose $
                             repeat (return ()) : map simEffect childrenOutIfcs
-    let childrenTerminates = map simTerminate childrenOutIfcs
     let childrenOutputs =
           IntMap.fromList $ zipWith (\i ifc -> (i, simOutputs ifc))
                                     childrenIds childrenOutIfcs
+    -- compile simulation termination stream
+    terminationStreams <- sequence
+      [ compileTermination ctxt memo currentIns childrenOutputs n
+      | n@Net{ netPrim = p } <- IArray.elems nl, case p of Finish   -> True
+                                                           Assert _ -> True
+                                                           _        -> False ]
+    let endStreams = repeat False : terminationStreams
+    let endStreams' = takeWhileInclusive not (map or $ transpose endStreams)
+    let truncate :: [a] -> [a]
+        truncate = map snd . zip endStreams'
     -- compile simulation effects streams
     allEffectStreams <- sequence
       [ compileSimEffect ctxt memo currentIns childrenOutputs n
@@ -106,23 +110,18 @@ compileSim allSims originalNl = do
                                                            _         -> False ]
     let effectStreams = map sequence_ $ transpose $
                           repeat (return ()) : allEffectStreams
-    -- compile simulation termination stream
-    terminationStreams <- sequence
-      [ compileTermination ctxt memo currentIns childrenOutputs n
-      | n@Net{ netPrim = p } <- IArray.elems nl, case p of Finish   -> True
-                                                           Assert _ -> True
-                                                           _        -> False ]
-    let endStreams = repeat False : (terminationStreams ++ childrenTerminates)
+    let effectStreams' = truncate $ zipWith (>>) effectStreams childrenEffects
     -- compile simulation outputs streams
     outputStreams <- sequence
       [ do outs <- compileOutputSignal ctxt memo currentIns childrenOutputs o
-           return (nm, outs)
+           return (nm, truncate outs)
       | o@Net{ netPrim = Output _ nm } <- IArray.elems nl ]
     -- wrap compilation result into a SimulatorIfc
-    return SimulatorIfc { simEffect    = zipWith (>>) effectStreams
-                                                      childrenEffects
-                        , simTerminate = map or (transpose endStreams)
+    return SimulatorIfc { simEffect    = effectStreams'
                         , simOutputs   = Map.fromList outputStreams }
+  where takeWhileInclusive _ [] = []
+        takeWhileInclusive p (x:xs) = x : if p x then takeWhileInclusive p xs
+                                                 else []
 
 --------------------------------------------------------------------------------
 -- helper types
@@ -164,8 +163,6 @@ type SignalMap = Map.Map String Signal
 data SimulatorIfc = SimulatorIfc {
     -- | set of streams of effects
     simEffect    :: [IO ()]
-    -- | stream of booleans indicating termination
-  , simTerminate :: [Bool]
     -- | dictionary of output signals
   , simOutputs   :: SignalMap }
 

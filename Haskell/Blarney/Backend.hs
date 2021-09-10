@@ -112,4 +112,5 @@ simulate circuit = do
                                   | (name, nl) <- toList nls ]
     return $ sims ! topSimName
   runSim topSim mempty
+  return ()
   where topSimName = "circuit under simulation"
