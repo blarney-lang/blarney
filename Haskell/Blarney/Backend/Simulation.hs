@@ -52,17 +52,13 @@ simDontCare = 0
 --lstIdx lst idx _ = lst !! idx
 
 -- | Simulate a 'Simulator' until a 'Finish' 'Prim' is triggered.
+--   This is strict in that the effects are evaluated before returning the
+--   outputs
 runSim :: Simulator -- ^ the 'Simulator' to simulate, compiled with 'compileSim'
        -> SignalMap -- ^ the input signals to the 'Simulator'
        -> IO SignalMap
 runSim sim ins = do
-  -- simply bind names
   let SimulatorIfc{..} = sim ins
-  -- here, while the termination stream does not indicate the end of the
-  -- simulation, we apply all effects from the current simulation cycle and
-  -- also print TICK
-  --mapM_ (\(effect, end) -> effect {->> print ("TICK: " ++ show end)-})
-  --      (zip simEffect simTerminate)
   sequence simEffect
   return simOutputs
 
