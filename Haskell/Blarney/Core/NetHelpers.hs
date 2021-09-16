@@ -56,8 +56,8 @@ remapNetInstId remap net@Net{ netInstId = instId, netInputs = inpts } =
   net { netInstId = remap instId
       , netInputs = remapNetInputInstId remap <$> inpts }
 
-class Monad m => ToNetlist a m where
-  toNetlist :: a -> m Netlist
+class ToNetlist a where
+  toNetlist :: a -> Netlist
 
 -- | Extract the 'Net' from a 'Netlist' at the provided 'InstId'. Raise an error
 --   if no 'Net' with this 'InstId' is present.

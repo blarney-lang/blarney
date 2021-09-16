@@ -39,23 +39,22 @@ import Data.Array.IArray
 import Data.Array.MArray
 import Data.Map (Map, member, notMember, insert)
 
-import Blarney.Misc.MonadLoops
 import Blarney.Core.Opts
 import Blarney.Core.Interface
 import Blarney.Netlist.Passes
+import Blarney.Misc.MonadLoops
 
--- | 'ToNetlist' instance for 'MNetlistRef's in the 'ST' monad
-instance ToNetlist (MNetlistRef s) (ST s) where
-  toNetlist mnlRef = do
-    -- prune the netlist of all 'Nothing' entries
-    prune mnlRef
-    -- extract the mutable netlist and freeze it, dropping the Maybe wrapping
-    mnl <- readSTRef mnlRef
-    x <- mapArray (fromMaybe $ error "Blarney.Netlist.Passes.Utils:\
-                                     \toNetlist encountered non Just entry\
+freezeMNetlist :: MNetlistRef s -> ST s Netlist
+freezeMNetlist mnlRef = do
+  -- prune the netlist of all 'Nothing' entries
+  prune mnlRef
+  -- extract the mutable netlist and freeze it, dropping the Maybe wrapping
+  mnl <- readSTRef mnlRef
+  x <- mapArray (fromMaybe $ error "Blarney.Netlist.Passes.Utils:\
+                                     \freezeMNetlist encountered non Just entry\
                                      \after a netlist pruning")
                   mnl
-    freeze x
+  freeze x
 
 -- | Wrap a custom pass with the mandatory netlist transformation passes
 wrapWithMandatoryNetlistPasses :: MNetlistPass s a -> MNetlistPass s ()
@@ -93,7 +92,7 @@ runNetlistPass pass netlist = runST wrappedPass
           -- apply netlist transformations
           pass mnlRef
           -- return transformed netlist as immutable
-          toNetlist mnlRef
+          freezeMNetlist mnlRef
 
 -- | Run the default set of netlist passes
 runDefaultNetlistPasses :: Opts -> Netlist -> Netlist
@@ -113,25 +112,26 @@ onNetlists :: Modular a
            -> (Map String Netlist -> IO b) -- ^ function to run
            -> IO b
 onNetlists circuit name f = do
-  nl0 <- toNetlist $ makeModule circuit
-  nls <- elab mempty [(name, return nl0)]
+  let nl0 = toNetlist $ makeModule circuit
+  nls <- elab mempty [(name, nl0)]
   f nls
-  where elab :: Map String Netlist     -- ^ Accumlator of explored modules
-             -> [(String, IO Netlist)] -- ^ List of currently unexplored modules
+  where elab :: Map String Netlist  -- ^ Accumlator of explored modules
+             -> [(String, Netlist)] -- ^ List of unexplored modules
              -> IO (Map String Netlist)
         elab acc [] = return acc
-        elab acc ((name, nlg):rest)
+        elab acc ((name, nl0):rest)
           | name `member` acc = elab acc rest
           | otherwise = do
               (opts, _) <- getOpts
               -- Run netlist generator
-              nl <- runDefaultNetlistPasses opts <$> nlg
+              let nl = runDefaultNetlistPasses opts nl0
               -- Insert resulting netlist into accumulator
               let newAcc = insert name nl acc
               -- Look for new netlists
               elab newAcc $
-                [ (nm, getNetlistGenerator nlg')
+                [ (nm, nl')
                 | Custom { customName = nm
-                         , customNetlist = Just nlg' } <- map netPrim (elems nl)
+                         , customNetlist = Just (CustomNetlist nl') } <-
+                    map netPrim (elems nl)
                 , nm `notMember` newAcc
                 ] ++ rest

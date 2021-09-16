@@ -49,7 +49,7 @@ module Blarney.Core.Prim (
 , WireId          -- 'WireId' type to uniquely identify wires
 , NetInput(..)    -- 'NetInput' type to represent inputs to 'Net's
 , Netlist         -- 'Netlist' type to represent a circuit
-, NetlistGenerator(..) -- Action that can generate a netlist
+, CustomNetlist(..) -- Wrapper type to represent the Netlist for a Custom Prim
 ) where
 
 import Prelude
@@ -355,8 +355,8 @@ data Prim =
            , customParams    :: [Param]                 -- ^ Parameters
            , customIsClocked :: Bool                    -- ^ Pass clock?
            , customResetable :: Bool                    -- ^ Pass reset?
-           , customNetlist   :: Maybe (NetlistGenerator)
-             -- ^ Optional netlist generator for this component
+           , customNetlist   :: Maybe CustomNetlist
+             -- ^ Optional netlist for this component
            }
 
     -- TODO document
@@ -949,10 +949,9 @@ data NetInput = InputWire WireId
 -- | A 'Netlist', represented as an 'Array InstId Net'
 type Netlist = Array InstId Net
 
--- | Netlist generator. We use a new type here so that we can keep
--- automatic deriving of the 'Show' class for 'Prim'.
-data NetlistGenerator =
-  NetlistGenerator { getNetlistGenerator :: IO Netlist }
+-- | Netlist for a Custom Prim. We use a new type here so that we can keep
+--   automatic deriving of the 'Show' class for 'Prim'.
+newtype CustomNetlist = CustomNetlist Netlist
 
-instance Show NetlistGenerator where
-  show _ = "NetlistGenerator"
+instance Show CustomNetlist where
+  show _ = "CustomNetlist"
