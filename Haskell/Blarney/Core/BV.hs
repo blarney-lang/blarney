@@ -1,3 +1,4 @@
+{-# LANGUAGE BlockArguments  #-}
 {-# LANGUAGE RecordWildCards #-}
 
 -- For Observable Sharing
@@ -109,8 +110,8 @@ data BV = BV {
              , bvOutput    :: OutputName
                -- | Name (hints) characterising the 'BV'
              , bvNameHints :: NameHints
-               -- | Unique id of primitive instance
-             , bvInstRef   :: IORef (Maybe InstId)
+               -- | Unique 'BV' identifier
+             , bvInstId    :: InstId
              }
 
 -- | Add a name hint to the 'BV'
@@ -123,6 +124,11 @@ addBVNameHints :: BV -> NameHints -> BV
 addBVNameHints bv@BV{ bvNameHints = hints } newHints =
   bv { bvNameHints = hints <> newHints }
 
+{-# NOINLINE instIdCnt #-}
+-- | Global 'InstId' counter
+instIdCnt :: IORef InstId
+instIdCnt = unsafePerformIO $ newIORef 0
+
 {-# NOINLINE makePrim #-}
 -- | Helper function for creating an instance of a primitive component
 makePrim :: Prim -> [BV] -> [OutputName] -> [BV]
@@ -133,10 +139,10 @@ makePrim prim ins outs
                 , bvInputs    = ins
                 , bvOutput    = Nothing
                 , bvNameHints = empty
-                , bvInstRef   = instIdRef
+                , bvInstId    = instId
                 }
         -- | For Observable Sharing.
-        instIdRef = unsafePerformIO (newIORef Nothing)
+        instId = unsafePerformIO $ atomicModifyIORef' instIdCnt \x -> (x + 1, x)
 
 -- | helper to get the 'OutputWidth' of the 'Prim' of a 'BV'
 bvPrimOutWidth :: BV -> OutputWidth

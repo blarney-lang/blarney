@@ -1,3 +1,5 @@
+{-# LANGUAGE BlockArguments        #-}
+{-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE PatternSynonyms       #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
@@ -14,44 +16,38 @@ Stability   : experimental
 -}
 
 module Blarney.Core.Flatten (
-  Flatten(..)   -- Monad for flattening a circuit (BV) to a netlist
-, doIO          -- Lift an IO computation to a Flatten computation
-, freshInstId   -- Obtain a fresh instance id
-, addNet        -- Add a net to the netlist
-, flatten       -- Flatten a bit vector to a netlist
-, ToNetlist(..) -- re-export the class
+  ToNetlist(..) -- re-export the ToNetlist class
 ) where
 
 import Prelude
-import Data.IORef
-import Data.Array
-import Data.Array.IO
-import Data.Map (fromListWith)
+import Data.IntSet
+import Data.Array.ST
 import Control.Monad
+import Data.Array.Unboxed
+import qualified Data.Set
+import Data.Map (fromListWith)
 
 import Blarney.Core.BV
-import Blarney.Core.NetHelpers
 import Blarney.Core.Prim
-import Blarney.Core.RTL (RTL(..), RTLAction(..), R(..), Assign(..))
+import Blarney.Core.NetHelpers
 import Blarney.Core.Module (Module(..))
 import qualified Blarney.Core.JList as JL
+import Blarney.Core.RTL (RTL(..), RTLAction(..), R(..), Assign(..))
 
--- |A reader/writer monad for accumulating the netlist
-newtype Flatten a = Flatten { runFlatten :: FlattenR -> IO (FlattenW, a) }
+-- | A state/writer monad for accumulating the netlist
+newtype Flatten a = Flatten { runFlatten :: S -> (S, W, a) }
 
--- |The reader component contains an IORef containing the next unique net id
-type FlattenR = IORef Int
+-- | The state component contains the set of visited nodes
+type S = IntSet
 
--- |The writer component contains the netlist and
--- an "undo" computation, which unperforms all IORef assignments.
-type FlattenW = (JL.JList Net, JL.JList (InstId, NameHints), IO ())
+-- | The writer component contains the accumulated netlist and name hints
+type W = (JL.JList Net, JL.JList (InstId, NameHints))
 
 instance Monad Flatten where
-  return a = Flatten $ \r -> return (mempty, a)
-  m >>= f  = Flatten $ \r ->
-    do (w0, a) <- runFlatten m r
-       (w1, b) <- runFlatten (f a) r
-       return (w0 <> w1, b)
+  return a = Flatten $ \st -> (st, mempty, a)
+  m >>= f  = Flatten $ \st -> let (s0, w0, a) = runFlatten m st
+                                  (s1, w1, b) = runFlatten (f a) s0
+                              in (s1, w0 <> w1, b)
 
 instance Applicative Flatten where
   pure = return
@@ -60,82 +56,80 @@ instance Applicative Flatten where
 instance Functor Flatten where
   fmap = liftM
 
--- |Obtain a fresh 'InstId' with the next available id
-freshInstId :: Flatten InstId
-freshInstId = Flatten $ \r -> do
-  id <- readIORef r
-  writeIORef r (id+1)
-  return (mempty, id)
+-- | Retrieve the state component of the Flatten monad
+getS :: Flatten S
+getS = Flatten \st -> (st, (mempty, mempty), st)
 
--- |Add a net to the netlist
+-- | Set the state component of the Flatten monad
+setS :: S -> Flatten ()
+setS st = Flatten \_ -> (st, (mempty, mempty), ())
+
+-- | Add a net to the netlist
 addNet :: Net -> Flatten ()
-addNet net = Flatten $ \r -> return ((JL.One net, mempty, mempty), ())
+addNet net = Flatten \st -> (st, (JL.One net, mempty), ())
 
--- |Add name hints to the list
+-- | Add name hints to the list
 addNameHints :: (InstId, NameHints) -> Flatten ()
-addNameHints hints = Flatten $ \r -> return ((mempty, JL.One hints, mempty), ())
-
--- |Add an "undo" computation
-addUndo :: IO () -> Flatten ()
-addUndo undo = Flatten $ \r -> return ((mempty, mempty, undo), ())
-
--- |Lift an IO computation to a Flatten computation
-doIO :: IO a -> Flatten a
-doIO m = Flatten $ \r -> do
-  a <- m
-  return (mempty, a)
+addNameHints hints = Flatten \st -> (st, (mempty, JL.One hints), ())
 
 -- | Flatten a root 'BV' to a netlist
 flatten :: BV -> Flatten NetInput
 flatten BV{bvPrim=p@(Const w v)} = return $ InputTree p []
 flatten BV{bvPrim=p@(DontCare w)} = return $ InputTree p []
-flatten bv@BV{bvNameHints=hints,bvInstRef=instRef} = do
-  -- handle instId traversal
-  instIdVal <- doIO (readIORef instRef)
-  let hasNameHints = not $ null hints
-  case instIdVal of
-    Nothing -> do
-      instId <- freshInstId
-      when hasNameHints $ addNameHints (instId, hints)
-      doIO (writeIORef instRef (Just instId))
-      addUndo (writeIORef instRef Nothing)
-      ins <- mapM flatten (bvInputs bv)
-      let net = Net { netPrim         = bvPrim bv
-                    , netInstId       = instId
-                    , netInputs       = ins
-                    , netNameHints    = mempty
-                    }
-      addNet net
-      return $ InputWire (instId, bvOutput bv)
-    Just instId -> do when hasNameHints $ addNameHints (instId, hints)
-                      return $ InputWire (instId, bvOutput bv)
+flatten BV{..} = do
+
+  -- handle potential new name hints. TODO can we do this on first visit only?
+  when (not $ Data.Set.null bvNameHints) $ addNameHints (bvInstId, bvNameHints)
+
+  -- retrieve the set of visited nodes from the state
+  visited <- getS
+
+  -- Upon first visit of the current 'BV'
+  when (not $ bvInstId `member` visited) do
+    -- add current 'BV' to the set of visited nodes
+    setS $ insert bvInstId visited
+    -- recursively explore curent 'BV' 's inputs and generate and add a new
+    -- 'Net' to the accumulation netlist
+    ins <- mapM flatten bvInputs
+    addNet Net { netPrim      = bvPrim
+               , netInstId    = bvInstId
+               , netInputs    = ins
+               , netNameHints = mempty }
+
+  -- return a handle to the visited 'Net'
+  return $ InputWire (bvInstId, bvOutput)
 
 -- | Convert RTL monad to a netlist
-instance ToNetlist (RTL ()) IO where
-  toNetlist rtl = do
-    -- flatten BVs into a Netlist
-    i <- newIORef (0 :: InstId)
-    ((nl, nms, undo), _) <- runFlatten flattenRoots i
-    maxId <- readIORef i -- by construction, maxId == length (JL.toList nl)
-    mnl :: IOArray InstId Net <-
-      thaw $ array (0, maxId - 1) [(netInstId n, n) | n <- JL.toList nl]
+instance ToNetlist (RTL ()) where
+  toNetlist rtl = runSTArray do
+    mnl <- newListArray (0, length nl - 1)
+                        [remapNetInstId (mapping !) n | n <- nl]
     -- update netlist with gathered names
     forM_ (JL.toList nms) $ \(idx, hints) -> do
-      net@Net{ netNameHints = oldHints } <- readArray mnl idx
-      writeArray mnl idx net{ netNameHints = oldHints <> hints }
-    -- run undo computations
-    undo
+      let idx' = mapping ! idx
+      net@Net{ netNameHints = oldHints } <- readArray mnl (idx')
+      writeArray mnl idx' net{ netNameHints = oldHints <> hints }
     -- return final netlist
-    freeze mnl
+    return mnl
     ------------------------
     where
+      -- flatten BVs into a Netlist
+      (visited, (jlnl, nms), _) = runFlatten flattenRoots empty
+      nl = JL.toList jlnl
+      -- for remapping instance ids to a compact range starting from 0
+      minInstId = findMin visited
+      maxInstId = findMax visited
+      mapping :: UArray InstId InstId = array (minInstId, maxInstId)
+                                                (zip (fmap netInstId nl) [0..])
+      -- get all actions from the RTL description
       (_, actsJL, _) = runRTL rtl (R { nameHints = mempty
                                      , cond = 1
                                      , assigns = assignMap }) 0
       acts = JL.toList actsJL
       assignMap = fromListWith (++) [(lhs a, [a]) | RTLAssign a <- acts]
+      -- flatten the roots of the circuit
       flattenRoots = mapM flatten (concat [rts | RTLRoots rts <- acts])
 
 -- | Convert Module monad to a netlist
-instance ToNetlist (Module ()) IO where
+instance ToNetlist (Module ()) where
   toNetlist = toNetlist . runModule

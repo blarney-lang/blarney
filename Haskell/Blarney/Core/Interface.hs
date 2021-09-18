@@ -17,7 +17,7 @@
 Module      : Blarney.Core.Interface
 Description : Support for separate compilation
 Copyright   : (c) Matthew Naylor, 2019
-              (c) Alexandre Joannou, 2019-2020
+              (c) Alexandre Joannou, 2019-2021
 License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
@@ -399,30 +399,30 @@ defaultInstanceInfo =
 class Modular a where
   makeMod :: Int -> a -> Declare ()
   makeInst :: String -> InstanceInfo -> Int
-           -> Declare () -> Maybe NetlistGenerator -> a
+           -> Declare () -> Maybe CustomNetlist -> a
 
--- Specific base case 
+-- Specific base case
 instance {-# OVERLAPPING #-} Interface a => Modular (Module a) where
   makeMod count m =
     liftModule m >>= declareOutput "out"
-  makeInst s info count m nlg =
-    instantiate s info True (m >> declareInput "out") nlg
+  makeInst s info count m mcnl =
+    instantiate s info True (m >> declareInput "out") mcnl
 
 -- Specific recursive case
 instance {-# OVERLAPPING #-} (Interface a, Modular m) => Modular (a -> m) where
   makeMod count f = do
     a <- declareInput ("in" ++ show count)
     makeMod (count+1) (f a)
-  makeInst s info count m nlg = \a ->
-    makeInst s info (count+1) (m >> declareOutput ("in" ++ show count) a) nlg
+  makeInst s info count m mcnl = \a ->
+    makeInst s info (count+1) (m >> declareOutput ("in" ++ show count) a) mcnl
 
 -- General base case (pure function)
 instance {-# OVERLAPPABLE #-} Interface a => Modular a where
   makeMod count out = declareOutput "out" out
-  makeInst s info count m nlg = runPureModule mod
+  makeInst s info count m mcnl = runPureModule mod
       "Interface.makeInstance: function must be in the Module monad, or pure"
     where
-      mod = instantiate s info False (m >> declareInput "out") nlg
+      mod = instantiate s info False (m >> declareInput "out") mcnl
 
 -- Realise declarations to give standalone module
 modularise :: Declare a -> Module a
@@ -439,9 +439,10 @@ modularise ifc = noName mdo
       return $ zip (map fst inputs) tmps
 
 -- Realise declarations to give module instance
-instantiate :: String -> InstanceInfo -> Bool -> Declare a ->
-  Maybe NetlistGenerator -> Module a
-instantiate name info doAddRoots ifc nlg = noName mdo
+instantiate :: String -> InstanceInfo -> Bool -> Declare a
+            -> Maybe CustomNetlist
+            -> Module a
+instantiate name info doAddRoots ifc mcnl = noName mdo
     (_, w, a) <- runDeclare ifc 0 [] (custom w)
     addRoots [x | DeclOutput s x <- w, doAddRoots]
     return a
@@ -458,19 +459,19 @@ instantiate name info doAddRoots ifc nlg = noName mdo
           addReset = isNothing (instanceReset info)
           prim     = Custom name [(s, bvPrimOutWidth x) | (s, x) <- inputs]
                            outputs (instanceParams info)
-                             addClock addReset nlg
+                             addClock addReset mcnl
       in  zip outNames (makePrim prim (map snd inputs) (map Just outNames))
 
 makeModule :: Modular a => a -> Module ()
 makeModule a = modularise (makeMod 0 a)
 
 makeInstanceWithInfo :: Modular a =>
-     String                 -- ^ Name of component being instantiated
-  -> InstanceInfo           -- ^ Instance information
-  -> Maybe NetlistGenerator -- ^ Optional netlist generator for component
+     String              -- ^ Name of component being instantiated
+  -> InstanceInfo        -- ^ Instance information
+  -> Maybe CustomNetlist -- ^ Optional netlist for component
   -> a
-makeInstanceWithInfo s info nlg =
-  makeInst s info 0 (return ()) nlg
+makeInstanceWithInfo s info mcnl =
+  makeInst s info 0 (return ()) mcnl
 
 makeInstance :: Modular a => String -> a
 makeInstance s = makeInstanceWithInfo s defaultInstanceInfo Nothing
@@ -480,8 +481,8 @@ makeInstance s = makeInstanceWithInfo s defaultInstanceInfo Nothing
 -- is independent of the module's inputs; this may or may not be
 -- desirable, so take care.
 makeBoundaryWithInfo :: Modular a => InstanceInfo -> String -> a -> a
-makeBoundaryWithInfo info name m = makeInstanceWithInfo name info nlg
-  where nlg = Just $ NetlistGenerator $ toNetlist $ makeModule m
+makeBoundaryWithInfo info name m = makeInstanceWithInfo name info mcnl
+  where mcnl = Just $ CustomNetlist $ toNetlist $ makeModule m
 
 makeBoundary :: Modular a => String -> a -> a
 makeBoundary = makeBoundaryWithInfo defaultInstanceInfo
