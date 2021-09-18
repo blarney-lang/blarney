@@ -116,10 +116,10 @@ instance ToNetlist (RTL ()) where
       -- flatten BVs into a Netlist
       (visited, (jlnl, nms), _) = runFlatten flattenRoots empty
       nl = JL.toList jlnl
-      -- guarantee consistent fresh mapping instead of relying on largest InstId
-      -- being the size of the netlist... Likely unnecessary...
+      -- for remapping instance ids to a compact range starting from 0
+      minInstId = findMin visited
       maxInstId = findMax visited
-      mapping :: UArray InstId InstId = array (0, maxInstId)
+      mapping :: UArray InstId InstId = array (minInstId, maxInstId)
                                                 (zip (fmap netInstId nl) [0..])
       -- get all actions from the RTL description
       (_, actsJL, _) = runRTL rtl (R { nameHints = mempty
