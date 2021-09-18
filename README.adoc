@@ -723,6 +723,7 @@ interface:
 ----
 module inc(
   input  wire clock
+, input  wire reset
 , output wire [0:0] in0_consume_en
 , input  wire [0:0] in0_canPeek
 , input  wire [7:0] in0_peek
