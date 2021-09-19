@@ -88,8 +88,9 @@ compileSim allSims originalNl = do
       [ do ins <- compileCustomInputs ctxt memo currentIns childrenOutputs n
            return (netInstId, ins, (allSims Map.! customName) ins)
       | n@Net{ netPrim = Custom{..}, ..} <- IArray.elems nl ]
-    let childrenEffects = map sequence_ $ transpose $
-                            repeat (return ()) : map simEffect childrenOutIfcs
+    let childrenEffects =
+          foldl1 (zipWith (>>))
+                 (repeat (return ()) : map simEffect childrenOutIfcs)
     let childrenOutputs =
           IntMap.fromList $ zipWith (\i ifc -> (i, simOutputs ifc))
                                     childrenIds childrenOutIfcs

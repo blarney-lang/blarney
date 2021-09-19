@@ -38,7 +38,6 @@ SIMULATION_EXCLUDE=(
   Bit0
   Spec
   Interface
-  MasterSlave
   RAMQuad
 )
 
