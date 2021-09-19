@@ -54,13 +54,13 @@ execFlatten m s0 = (s, w, x)
   where f = runIdentity . runWriterT . (flip runStateT) s0
         ((x, s), w) = f m
 
--- | Get the state of the 'Flatten' monad
-getS :: Flatten S
-getS = get
+-- | Get the set of visited nodes
+getVisited :: Flatten S
+getVisited = get
 
--- | Put a new state in the 'Flatten' monad
-putS :: S -> Flatten ()
-putS = put
+-- | set the set of visited nodes
+putVisited :: S -> Flatten ()
+putVisited = put
 
 -- | Add a net to the netlist
 addNet :: Net -> Flatten ()
@@ -80,12 +80,12 @@ flatten BV{..} = do
   when (not $ Data.Set.null bvNameHints) $ addNameHints (bvInstId, bvNameHints)
 
   -- retrieve the set of visited nodes from the state
-  visited <- getS
+  visited <- getVisited
 
   -- Upon first visit of the current 'BV'
   when (not $ bvInstId `member` visited) do
     -- add current 'BV' to the set of visited nodes
-    putS $ insert bvInstId visited
+    putVisited $ insert bvInstId visited
     -- recursively explore curent 'BV' 's inputs and generate and add a new
     -- 'Net' to the accumulation netlist
     ins <- mapM flatten bvInputs
