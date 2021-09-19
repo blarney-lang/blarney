@@ -39,27 +39,27 @@ import qualified Blarney.Core.JList as JL
 import Blarney.Core.RTL (RTL(..), RTLAction(..), R(..), Assign(..))
 
 -- | A state/writer monad for accumulating the netlist
-type Flatten = StateT S (WriterT W Identity)
+type Flatten = StateT FlattenS (WriterT FlattenW Identity)
 
 -- | The state component contains the set of visited nodes
-type S = IntSet
+type FlattenS = IntSet
 
 -- | The writer component contains the accumulated netlist and name hints
-type W = (JL.JList Net, JL.JList (InstId, NameHints))
+type FlattenW = (JL.JList Net, JL.JList (InstId, NameHints))
 
 -- | run the 'Flatten' monad and return a tuple with the final state, the final
 --   writer accumulator and a return value
-execFlatten :: Flatten a -> S -> (S, W, a)
+execFlatten :: Flatten a -> FlattenS -> (FlattenS, FlattenW, a)
 execFlatten m s0 = (s, w, x)
   where f = runIdentity . runWriterT . (flip runStateT) s0
         ((x, s), w) = f m
 
 -- | Get the set of visited nodes
-getVisited :: Flatten S
+getVisited :: Flatten FlattenS
 getVisited = get
 
 -- | set the set of visited nodes
-putVisited :: S -> Flatten ()
+putVisited :: FlattenS -> Flatten ()
 putVisited = put
 
 -- | Add a net to the netlist
