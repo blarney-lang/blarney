@@ -1,7 +1,9 @@
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE RecursiveDo           #-}
 {-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE BlockArguments        #-}
 {-# LANGUAGE KindSignatures        #-}
+{-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE RebindableSyntax      #-}
 {-# LANGUAGE FlexibleInstances     #-}
@@ -12,7 +14,7 @@
 Module      : Blarney.Core.RTL
 Description : Register-transfer-level descriptions
 Copyright   : (c) Matthew Naylor, 2019
-              (c) Alexandre Joannou, 2019-2020
+              (c) Alexandre Joannou, 2019-2021
 License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
@@ -26,10 +28,9 @@ The module defines the RTL monad, supporting:
 -}
 module Blarney.Core.RTL (
   -- * RTL monad
-  RTL(..)         -- RTL monad (abstract)
-, RTLAction(..)   -- RTLAction
-, R(..)           -- The RTL reader type
-, Assign(..)      -- Conditional variable assignment
+  RTL             -- RTL monad (abstract)
+, evalPureRTL
+, evalRTLRoots
   -- * Conditional statements
 , when            -- RTL conditional block
 , whenR           -- RTL conditional block (with return value)
@@ -45,9 +46,9 @@ module Blarney.Core.RTL (
 , writeWire       -- Write to wire
 , makeReg         -- Create register
 , makeRegU        -- Create uninitialised regiseter
+, makeDReg        -- Like makeReg, but holds value one cycle only
 , makeWire        -- Create wire
 , makeWireU       -- Create uninitialised wire
-, makeDReg        -- Like makeReg, but holds value one cycle only
   -- * Simulation-time statements
 , Displayable(..) -- To support N-ary display statement
 , display         -- Display statement
@@ -86,335 +87,325 @@ import GHC.TypeLits
 --import Data.Array.IO
 import Data.Set (Set, empty, insert, singleton, toList)
 import Control.Monad.Fix
+import Control.Monad.Trans
+import Data.Functor.Identity
+import Control.Monad.Trans.State
+import Control.Monad.Trans.Writer
+import Control.Monad.Trans.Reader
 import Data.List (intercalate)
 import Control.Monad hiding (when)
-import Data.Map (Map, findWithDefault)
+import Data.Map (Map, findWithDefault, fromListWith)
 
--- |The RTL monad, for register-transfer-level descriptions,
--- is a fairly standard reader-writer-state monad.
-newtype RTL a =
-  RTL { runRTL :: R -> S -> (S, W, a) }
-
--- |The writer component maintains a list of all RTL actions to be performed
-type W = JL.JList RTLAction
-
--- |RTL actions
-data RTLAction =
-    RTLAssign Assign
-  | RTLRoots [BV]
-
--- |Variable identifiers
+-- helper types and functions
+--------------------------------------------------------------------------------
+-- | Variable identifiers
 type VarId = Int
 
--- |Conditional variable assignment
+-- | RTL actions
+data RTLAction = RTLAssign Assign
+               | RTLRoot BV
+
+-- | Conditional variable assignment
 data Assign = Assign { enable :: Bit 1, lhs :: VarId, rhs :: BV }
 
--- |The right-hand-side of an assignment is untyped,
--- but we can give it type with the following function
+-- | The right-hand-side of an assignment is untyped, but we can give it type
+--   with the following function
 rhsTyped :: Bits a => Assign -> a
 rhsTyped = unpack . FromBV . rhs
 
--- |The reader component contains name hints, the current condition on any
--- RTL actions, and a list of all assigments in the computation
--- (obtained circularly from the writer output of the monad).
-data R = R { nameHints :: NameHints
-           , cond      :: Bit 1
-           , assigns   :: Map VarId [Assign]
-           }
+-- | Add name hints to underlying BV for a value in Bits
+bvHintsUpdt b hints = unpack (FromBV $ addBVNameHints (toBV $ pack b) hints)
 
--- |The state component contains the next free variable identifier
-type S = VarId
+-- The RTL Monad and primitive interaction functions
+--------------------------------------------------------------------------------
+-- | The RTL monad, for register-transfer-level descriptions
+type RTL = ReaderT RTL_R (StateT RTL_S (WriterT RTL_W Identity))
 
-instance Monad RTL where
-  return a = RTL (\r s -> (s, mempty, a))
-  m >>= f = RTL (\r s -> let (s0, w0, a) = runRTL m r s
-                             (s1, w1, b) = runRTL (f a) r s0
-                         in  (s1, w0 <> w1, b))
+-- | run the 'RTL' monad with the given environment and initial state, and
+--   return a tuple of the final state, accumulated RTLActions and return value
+execRTL :: RTL a -> RTL_R -> RTL_S -> (RTL_S, RTL_W, a)
+execRTL rtlAct env s0 = (s, w, x)
+  where f = runIdentity . runWriterT
+                        . (flip runStateT) s0
+                        . (flip runReaderT) env
+        ((x, s), w) = f rtlAct
 
-instance Applicative RTL where
-  pure = return
-  (<*>) = ap
+evalPureRTL :: RTL a -> String -> a
+evalPureRTL rtlAct errStr
+  | null (JL.toList w) && s == 0 = x
+  | otherwise = error errStr
+  where (s, w, x) = execRTL rtlAct dfltRTLEnv 0
 
-instance Functor RTL where
-  fmap = liftM
+evalRTLRoots :: RTL a -> [BV]
+evalRTLRoots rtl = [root | RTLRoot root <- acts]
+  where acts = JL.toList actsJL
+        (_, actsJL, _) = execRTL rtl (RTLEnv { rtlEnvNameHints = mempty
+                                             , rtlEnvCondition = 1
+                                             , rtlEnvAssigns   = assignMap }) 0
+        assignMap = fromListWith (++) [(lhs a, [a]) | RTLAssign a <- acts]
 
-instance MonadFix RTL where
-  mfix f = RTL (\r s -> let (s', w, a) = runRTL (f a) r s in (s', w, a))
+-- | The reader component contains name hints, the current condition on any
+--   RTL actions, and a list of all assigments in the computation (obtained
+--   circularly from the writer output of the monad).
+data RTLEnv = RTLEnv { rtlEnvNameHints :: NameHints
+                     , rtlEnvCondition :: Bit 1
+                     , rtlEnvAssigns   :: Map VarId [Assign] }
 
--- |Get state component
-get :: RTL S
-get = RTL (\r s -> (s, mempty, s))
+-- | A default RTL environment
+dfltRTLEnv :: RTLEnv
+dfltRTLEnv = RTLEnv { rtlEnvNameHints = mempty
+                    , rtlEnvCondition = 0
+                    , rtlEnvAssigns   = mempty }
 
--- |Set state component
-set :: S -> RTL ()
-set s' = RTL (\r s -> (s', mempty, ()))
+-- | The reader component's local type
+type RTL_R = RTLEnv
 
--- |Get reader component
-ask :: RTL R
-ask = RTL (\r s -> (s, mempty, r))
+-- | The state component contains the next free variable identifier
+type RTL_S = VarId
 
--- |Execute computation in given environment
-local :: R -> RTL a -> RTL a
-local r m = RTL (\_ s -> runRTL m r s)
+-- | The writer component accumulater the 'RTLAction's
+type RTL_W = JL.JList RTLAction
 
--- |Add action to writer component
-write :: RTLAction -> RTL ()
-write rtl = RTL (\r s -> (s, JL.One rtl, ()))
+-- | Get reader name hints
+askNameHints :: RTL NameHints
+askNameHints = asks rtlEnvNameHints
 
--- |Get fresh variable id
-fresh :: RTL VarId
-fresh = do
-  v <- get
-  set (v+1)
-  return v
+-- | Get reader condition
+askCondition :: RTL (Bit 1)
+askCondition = asks rtlEnvCondition
+
+-- | Get reader assignments
+askAssigns :: RTL (Map VarId [Assign])
+askAssigns = asks rtlEnvAssigns
+
+-- | Get the entire environment
+askEnv :: RTL RTLEnv
+askEnv = ask
+
+-- | Execute computation in given environment
+localEnv :: RTLEnv -> RTL a -> RTL a
+localEnv env act = local (const env) act
+
+-- | Get fresh variable id
+freshVarId :: RTL VarId
+freshVarId = do v <- lift get
+                lift $ put (v + 1)
+                return v
+
+-- | Add action to writer component
+addRTLAction :: RTLAction -> RTL ()
+addRTLAction rtlAct = lift . lift $ tell (JL.One rtlAct)
+
+-- | Add netlist roots
+addRoots :: [BV] -> RTL ()
+addRoots roots = mapM_ addRTLAction (map RTLRoot roots)
+
+--------------------------------------------------------------------------------
 
 -- | Set a name hint for an RTL block
 withNameHint :: NameHint -> RTL a -> RTL a
 withNameHint hint m = do
-  r@R{ nameHints = hints } <- ask
-  local (r { nameHints = insert hint hints }) m
+  r@RTLEnv{..} <- askEnv
+  localEnv (r { rtlEnvNameHints  = insert hint rtlEnvNameHints }) m
 
--- |RTL conditional block
-when :: Bit 1 -> RTL () -> RTL ()
-when c a = do
-  r <- ask
-  local (r { cond = c .&. cond r }) a
-
--- |RTL conditional block with return value
+-- | RTL conditional block with return value
 whenR :: Bit 1 -> RTL a -> RTL a
 whenR c a = do
-  r <- ask
-  local (r { cond = c .&. cond r }) a
+  r@RTLEnv{..} <- askEnv
+  localEnv (r { rtlEnvCondition = c .&. rtlEnvCondition }) a
 
--- |If-then-else statement for RTL
+-- | RTL conditional block
+when :: Bit 1 -> RTL () -> RTL ()
+when = whenR
+
+-- | If-then-else statement for RTL
 ifThenElseRTL :: Bits a => Bit 1 -> RTL a -> RTL a -> RTL a
-ifThenElseRTL c a b =
-  do r <- ask
-     ra <- local (r { cond = cond r .&. c }) a
-     rb <- local (r { cond = cond r .&. inv c }) b
-     return $ cond r ? (ra, rb)
+ifThenElseRTL c a b = do
+  r@RTLEnv{..} <- askEnv
+  ra <- localEnv (r { rtlEnvCondition = rtlEnvCondition .&. c }) a
+  rb <- localEnv (r { rtlEnvCondition = rtlEnvCondition .&. inv c }) b
+  return $ rtlEnvCondition ? (ra, rb)
 
--- |RTL switch statement
+-- | RTL switch statement
 switch :: Bits a => a -> [(a, RTL ())] -> RTL ()
-switch subject alts =
-  forM_ alts $ \(lhs, rhs) ->
-    when (pack subject .==. pack lhs) rhs
+switch subject alts = forM_ alts \(lhs, rhs) ->
+  when (pack subject .==. pack lhs) rhs
 
--- |Operator for switch statement alternatives
+-- | Operator for switch statement alternatives
 infixl 0 -->
 (-->) :: a -> RTL () -> (a, RTL ())
 lhs --> rhs = (lhs, rhs)
 
--- |Register variables
-data Reg a =
-  Reg {
-    -- |Unique identifier
-    regId  :: VarId
-    -- |Current register value
-  , regVal :: a
-  }
+-- | Terminate simulator
+finish :: RTL ()
+finish = do
+  cond <- askCondition
+  addRTLAction . RTLRoot $ makePrim0 Finish [toBV cond]
 
--- |Register assignment
+-- | Assert that a predicate holds
+assert :: Bit 1 -> String -> RTL ()
+assert pred msg = do
+  cond <- askCondition
+  addRTLAction . RTLRoot $ makePrim0 (Assert msg)
+                                     [toBV cond, toBV $ pack pred]
+
+-- | To support a display statement with variable number of arguments
+class Displayable a where
+  disp :: Format -> Format -> a
+
+-- | Base case
+instance Displayable (RTL a) where
+  disp x suffix = do
+    cond <- askCondition
+    let Format items = x <> suffix
+    let prim = Display (map fst items)
+    let inps = toBV cond : [bv | (DisplayArgBit {}, bv) <- items]
+    addRTLAction . RTLRoot $ makePrim0 prim inps
+    return $ error "Return value of 'display' should be ignored"
+
+-- | Recursive case
+instance (FShow b, Displayable a) => Displayable (b -> a) where
+  disp x suffix b = disp (x <> fshow b) suffix
+
+-- | Display statement
+display :: Displayable a => a
+display = disp (Format []) (fshow "\n")
+
+-- | Display statement (without new line)
+display_ :: Displayable a => a
+display_ = disp (Format []) (Format [])
+
+-- | RTL external input declaration
+input :: KnownNat n => String -> RTL (Bit n)
+input str = mdo x <- FromBV <$> inputBV str (widthOf x)
+                return x
+
+-- | RTL external input declaration (untyped)
+inputBV :: String -> Width -> RTL BV
+inputBV str w = do let bv = inputPinBV w str
+                   addRTLAction $ RTLRoot bv
+                   return bv
+
+-- | RTL external output declaration
+output :: String -> Bit n -> RTL ()
+output str out = outputBV str (toBV out)
+
+-- | RTL external output declaration (untyped)
+outputBV :: String -> BV -> RTL ()
+outputBV str bv =
+  addRTLAction . RTLRoot $ makePrim0 (Output (bvPrimOutWidth bv) str) [bv]
+
+--------------------------------------------------------------------------------
+
+-- | Register variables
+data Reg a = Reg { regId  :: VarId -- ^ Unique identifier
+                 , regVal :: a     -- ^ Current register value
+                 }
+
+-- | Register assignment
 writeReg :: Bits a => Reg a -> a -> RTL ()
 writeReg v x = do
-  r <- ask
-  write $ RTLAssign $
-    Assign {
-      enable = cond r
-    , lhs = regId v
-    , rhs = toBV (pack x)
-    }
+  cond <- askCondition
+  addRTLAction . RTLAssign $ Assign { enable = cond
+                                    , lhs = regId v
+                                    , rhs = toBV (pack x) }
 
--- |Wire variables
-data Wire a =
-  Wire {
-    -- |Unique identifier
-    wireId  :: VarId
-    -- |Current wire value
-  , wireVal :: a
-    -- |Is wire being assigned on this cycle?
-  , active  :: Bit 1
-  }
+-- | Create register with initial value
+makeReg :: Bits a => a -> RTL (Reg a)
+makeReg init = do
+  v <- freshVarId
+  assigns <- findWithDefault [] v <$> askAssigns
+  nameHints <- askNameHints
+  let en = orList (map enable assigns)
+  let inp = case assigns of
+              [a] -> rhsTyped a
+              other -> select [(enable a, rhsTyped a) | a <- assigns]
+  let out = delayEn init en inp
+  return $ Reg { regId = v, regVal = bvHintsUpdt out nameHints }
 
--- |Wire assignment
+-- | Wire variables
+data Wire a = Wire { wireId  :: VarId -- ^ Unique identifier
+                   , wireVal :: a     -- ^ Current wire value
+                   , active  :: Bit 1 -- ^ Is wire being assigned on this cycle?
+                   }
+
+-- | Wire assignment
 writeWire :: Bits a => Wire a -> a -> RTL ()
 writeWire v x = do
-  r <- ask
-  write $ RTLAssign $
-    Assign {
-      enable = cond r
-    , lhs = wireId v
-    , rhs = toBV (pack x)
-    }
+  cond <- askCondition
+  addRTLAction . RTLAssign $ Assign { enable = cond
+                                    , lhs = wireId v
+                                    , rhs = toBV (pack x) }
 
--- |Create wire with don't care initial value
+-- | Create wire with default value
+makeWire :: Bits a => a -> RTL (Wire a)
+makeWire defaultVal = do
+  v <- freshVarId
+  assigns <- findWithDefault [] v <$> askAssigns
+  nameHints <- askNameHints
+  let any = orList (map enable assigns)
+  let none = inv any
+  let out = select $    [(enable a, rhsTyped a) | a <- assigns]
+                     ++ [(none, defaultVal)]
+  return $ Wire { wireId  = v
+                , wireVal = bvHintsUpdt out nameHints
+                , active  = bvHintsUpdt any $ insert (NmSuffix 0 "act")
+                                                     nameHints }
+
+--------------------------------------------------------------------------------
+
+-- | Create wire with don't care initial value
 makeRegU :: Bits a => RTL (Reg a)
 makeRegU = makeReg dontCare
 
--- | local helper to add name hints to underlying BV for a value in Bits
-bvHintsUpdt b hints = unpack (FromBV $ addBVNameHints (toBV $ pack b) hints)
-
--- |Create register with initial value
-makeReg :: Bits a => a -> RTL (Reg a)
-makeReg init =
-  do v <- fresh
-     r <- ask
-     let as = findWithDefault [] v (assigns r)
-     let en = orList (map enable as)
-     let inp = case as of
-                 [a] -> rhsTyped a
-                 other -> select [(enable a, rhsTyped a) | a <- as]
-     let out = delayEn init en inp
-     return (Reg { regId = v, regVal = bvHintsUpdt out (nameHints r) })
-
--- |Create wire with default value
-makeWire :: Bits a => a -> RTL (Wire a)
-makeWire defaultVal =
-  do v <- fresh
-     r <- ask
-     let as = findWithDefault [] v (assigns r)
-     let any = orList (map enable as)
-     let none = inv any
-     let out = select ([(enable a, rhsTyped a) | a <- as]
-                         ++ [(none, defaultVal)])
-     return $
-       Wire {
-         wireId  = v
-       , wireVal = bvHintsUpdt out (nameHints r)
-       , active  = bvHintsUpdt any $ insert (NmSuffix 0 "act") (nameHints r)
-       }
+-- | A DReg holds the assigned value only for one cycle. At all other times, it
+--   has the given default value.
+makeDReg :: Bits a => a -> RTL (Reg a)
+makeDReg defaultVal = do
+  -- Create wire with default value
+  w :: Wire a <- makeWire defaultVal
+  -- Register the output of the wire
+  r :: Reg a <- makeReg defaultVal
+  -- Always assign to the register
+  writeReg r (wireVal w)
+  -- Write to wire and read from reg
+  return $ Reg { regId = wireId w, regVal = regVal r }
 
 -- |Create wire with don't care default value
 makeWireU :: Bits a => RTL (Wire a)
 makeWireU = makeWire dontCare
 
--- |A DReg holds the assigned value only for one cycle.
--- At all other times, it has the given default value.
-makeDReg :: Bits a => a -> RTL (Reg a)
-makeDReg defaultVal = do
-  -- Create wire with default value
-  w :: Wire a <- makeWire defaultVal
+--------------------------------------------------------------------------------
 
-  -- Register the output of the wire
-  r :: Reg a <- makeReg defaultVal
-
-  -- Always assign to the register
-  writeReg r (wireVal w)
-
-  -- Write to wire and read from reg
-  return (Reg { regId = wireId w, regVal = regVal r })
-
--- |Terminate simulator
-finish :: RTL ()
-finish = do
-  r <- ask
-  let root = makePrim0 Finish [toBV (cond r)]
-  write (RTLRoots [root])
-
--- | Assert that a predicate holds
-assert :: Bit 1 -> String -> RTL ()
-assert pred msg = do
-  r <- ask
-  let root = makePrim0 (Assert msg) [toBV (cond r), toBV $ pack pred]
-  write $ RTLRoots [root]
-
--- |To support a display statement with variable number of arguments
-class Displayable a where
-  disp :: Format -> Format -> a
-
--- |Base case
-instance Displayable (RTL a) where
-  disp x suffix = do
-      r <- ask
-      let Format items = x <> suffix
-      let prim = Display (map fst items)
-      let inps = toBV (cond r) : [bv | (DisplayArgBit {}, bv) <- items]
-      write (RTLRoots [makePrim0 prim inps])
-      return (error "Return value of 'display' should be ignored")
-
--- |Recursive case
-instance (FShow b, Displayable a) => Displayable (b -> a) where
-  disp x suffix b = disp (x <> fshow b) suffix
-
--- |Display statement
-display :: Displayable a => a
-display = disp (Format []) (fshow "\n")
-
--- |Display statement (without new line)
-display_ :: Displayable a => a
-display_ = disp (Format []) (Format [])
-
--- |RTL external input declaration
-input :: KnownNat n => String -> RTL (Bit n)
-input str = mdo
-  x <- FromBV <$> inputBV str (widthOf x)
-  return x
-
--- |RTL external input declaration (untyped)
-inputBV :: String -> Width -> RTL BV
-inputBV str w = do
-  let bv = inputPinBV w str
-  write (RTLRoots [bv])
-  return bv
-
--- |RTL external output declaration
-output :: String -> Bit n -> RTL ()
-output str out = outputBV str (toBV out)
-
--- |RTL external output declaration (untyped)
-outputBV :: String -> BV -> RTL ()
-outputBV str bv = do
-  let root = makePrim0 (Output (bvPrimOutWidth bv) str) [bv]
-  write (RTLRoots [root])
-
--- Register files
--- ==============
-
--- |Register file interface
-data RegFileRTL a d =
-  RegFileRTL {
-    lookupRTL :: a -> d
-  , updateRTL :: a -> d -> RTL ()
-  }
+-- | Register file interface
+data RegFileRTL a d = RegFileRTL { lookupRTL :: a -> d
+                                 , updateRTL :: a -> d -> RTL () }
 
 -- | Create register file with initial contents
 makeRegFileInit :: forall a d. (Bits a, Bits d) =>
-                     String -> RTL (RegFileRTL a d)
+                   String -> RTL (RegFileRTL a d)
 makeRegFileInit initFile = do
   -- Create regsiter file identifier
-  id <- fresh
-
+  v <- freshVarId
   -- Determine widths of address/data bus
   let aw = sizeOf (error "_|_" :: a)
   let dw = sizeOf (error "_|_" :: d)
-
   -- Record register file for netlist generation
-  let rfinfo = RegFileInfo{ regFileId = id
+  let rfinfo = RegFileInfo{ regFileId = v
                           , regFileInitFile = initFile
                           , regFileAddrWidth = aw
                           , regFileDataWidth = dw }
-  let root = makePrim0 (RegFileMake rfinfo) []
-  write (RTLRoots [root])
-
+  addRTLAction . RTLRoot $ makePrim0 (RegFileMake rfinfo) []
   return $
     RegFileRTL {
       lookupRTL = \a ->
         unpack $ FromBV $ regFileReadBV rfinfo $ toBV (pack a)
     , updateRTL = \a d -> do
-        r <- ask
-        let rootInps = [toBV (cond r), toBV (pack a), toBV (pack d)]
-        let root = makePrim0 (RegFileWrite rfinfo) rootInps
-        write (RTLRoots [root])
+        cond <- askCondition
+        let rootInps = [toBV cond, toBV (pack a), toBV (pack d)]
+        addRTLAction . RTLRoot $ makePrim0 (RegFileWrite rfinfo) rootInps
     }
 
--- |Create uninitialised register file
+-- | Create uninitialised register file
 makeRegFile :: forall a d. (Bits a, Bits d) => RTL (RegFileRTL a d)
 makeRegFile = makeRegFileInit ""
-
--- Netlist generation
--- ==================
-
--- |Add netlist roots
-addRoots :: [BV] -> RTL ()
-addRoots [] = return ()
-addRoots roots = write (RTLRoots roots)

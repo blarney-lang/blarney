@@ -27,7 +27,6 @@ import qualified Data.Set
 import Data.Array.Unboxed
 import Control.Monad.Trans
 import Data.Functor.Identity
-import Data.Map (fromListWith)
 import Control.Monad.Trans.State
 import Control.Monad.Trans.Writer
 
@@ -35,8 +34,8 @@ import Blarney.Core.BV
 import Blarney.Core.Prim
 import Blarney.Core.NetHelpers
 import Blarney.Core.Module (Module(..))
+import qualified Blarney.Core.RTL as RTL
 import qualified Blarney.Core.JList as JL
-import Blarney.Core.RTL (RTL(..), RTLAction(..), R(..), Assign(..))
 
 -- | A state/writer monad for accumulating the netlist
 type Flatten = StateT FlattenS (WriterT FlattenW Identity)
@@ -98,7 +97,7 @@ flatten BV{..} = do
   return $ InputWire (bvInstId, bvOutput)
 
 -- | Convert RTL monad to a netlist
-instance ToNetlist (RTL ()) where
+instance ToNetlist (RTL.RTL ()) where
   toNetlist rtl = runSTArray do
     mnl <- newListArray (0, length nl - 1)
                         [remapNetInstId (mapping !) n | n <- nl]
@@ -119,14 +118,7 @@ instance ToNetlist (RTL ()) where
       maxInstId = findMax visited
       mapping :: UArray InstId InstId = array (minInstId, maxInstId)
                                                 (zip (fmap netInstId nl) [0..])
-      -- get all actions from the RTL description
-      (_, actsJL, _) = runRTL rtl (R { nameHints = mempty
-                                     , cond = 1
-                                     , assigns = assignMap }) 0
-      acts = JL.toList actsJL
-      assignMap = fromListWith (++) [(lhs a, [a]) | RTLAssign a <- acts]
-      -- flatten the roots of the circuit
-      flattenRoots = mapM flatten (concat [rts | RTLRoots rts <- acts])
+      flattenRoots = mapM flatten $ RTL.evalRTLRoots rtl
 
 -- | Convert Module monad to a netlist
 instance ToNetlist (Module ()) where
