@@ -23,9 +23,13 @@ import Prelude
 import Data.IntSet
 import Data.Array.ST
 import Control.Monad
-import Data.Array.Unboxed
 import qualified Data.Set
+import Data.Array.Unboxed
+import Control.Monad.Trans
+import Data.Functor.Identity
 import Data.Map (fromListWith)
+import Control.Monad.Trans.State
+import Control.Monad.Trans.Writer
 
 import Blarney.Core.BV
 import Blarney.Core.Prim
@@ -35,42 +39,36 @@ import qualified Blarney.Core.JList as JL
 import Blarney.Core.RTL (RTL(..), RTLAction(..), R(..), Assign(..))
 
 -- | A state/writer monad for accumulating the netlist
-newtype Flatten a = Flatten { runFlatten :: S -> (S, W, a) }
+type Flatten = StateT FlattenS (WriterT FlattenW Identity)
 
 -- | The state component contains the set of visited nodes
-type S = IntSet
+type FlattenS = IntSet
 
 -- | The writer component contains the accumulated netlist and name hints
-type W = (JL.JList Net, JL.JList (InstId, NameHints))
+type FlattenW = (JL.JList Net, JL.JList (InstId, NameHints))
 
-instance Monad Flatten where
-  return a = Flatten $ \st -> (st, mempty, a)
-  m >>= f  = Flatten $ \st -> let (s0, w0, a) = runFlatten m st
-                                  (s1, w1, b) = runFlatten (f a) s0
-                              in (s1, w0 <> w1, b)
+-- | run the 'Flatten' monad and return a tuple with the final state, the final
+--   writer accumulator and a return value
+execFlatten :: Flatten a -> FlattenS -> (FlattenS, FlattenW, a)
+execFlatten m s0 = (s, w, x)
+  where f = runIdentity . runWriterT . (flip runStateT) s0
+        ((x, s), w) = f m
 
-instance Applicative Flatten where
-  pure = return
-  (<*>) = ap
+-- | Get the set of visited nodes
+getVisited :: Flatten FlattenS
+getVisited = get
 
-instance Functor Flatten where
-  fmap = liftM
-
--- | Retrieve the state component of the Flatten monad
-getS :: Flatten S
-getS = Flatten \st -> (st, (mempty, mempty), st)
-
--- | Set the state component of the Flatten monad
-setS :: S -> Flatten ()
-setS st = Flatten \_ -> (st, (mempty, mempty), ())
+-- | set the set of visited nodes
+putVisited :: FlattenS -> Flatten ()
+putVisited = put
 
 -- | Add a net to the netlist
 addNet :: Net -> Flatten ()
-addNet net = Flatten \st -> (st, (JL.One net, mempty), ())
+addNet net = lift $ tell (JL.One net, mempty)
 
 -- | Add name hints to the list
 addNameHints :: (InstId, NameHints) -> Flatten ()
-addNameHints hints = Flatten \st -> (st, (mempty, JL.One hints), ())
+addNameHints hints = lift $ tell (mempty, JL.One hints)
 
 -- | Flatten a root 'BV' to a netlist
 flatten :: BV -> Flatten NetInput
@@ -82,12 +80,12 @@ flatten BV{..} = do
   when (not $ Data.Set.null bvNameHints) $ addNameHints (bvInstId, bvNameHints)
 
   -- retrieve the set of visited nodes from the state
-  visited <- getS
+  visited <- getVisited
 
   -- Upon first visit of the current 'BV'
   when (not $ bvInstId `member` visited) do
     -- add current 'BV' to the set of visited nodes
-    setS $ insert bvInstId visited
+    putVisited $ insert bvInstId visited
     -- recursively explore curent 'BV' 's inputs and generate and add a new
     -- 'Net' to the accumulation netlist
     ins <- mapM flatten bvInputs
@@ -114,7 +112,7 @@ instance ToNetlist (RTL ()) where
     ------------------------
     where
       -- flatten BVs into a Netlist
-      (visited, (jlnl, nms), _) = runFlatten flattenRoots empty
+      (visited, (jlnl, nms), _) = execFlatten flattenRoots empty
       nl = JL.toList jlnl
       -- for remapping instance ids to a compact range starting from 0
       minInstId = findMin visited
