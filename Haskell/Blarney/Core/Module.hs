@@ -310,11 +310,6 @@ addRoots :: [BV] -> Module ()
 addRoots roots = M (RTL.addRoots roots)
 
 -- | Run a pure module, i.e. a module that has no side effects.
--- If the module has side effects, raise an error.
+--   If the module has side effects, raise an error.
 runPureModule :: Module a -> String -> a
-runPureModule mod errStr
-  | null (JL.toList w) && s == 0 = a
-  | otherwise = error errStr
-  where
-    r = RTL.R { RTL.nameHints = mempty, RTL.cond = 0, RTL.assigns = mempty}
-    (s, w, a) = RTL.runRTL (runModule mod) r 0
+runPureModule mod errStr = RTL.evalPureRTL (runModule mod) errStr
