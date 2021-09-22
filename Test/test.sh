@@ -165,12 +165,23 @@ showTime()
 {
   local t1=$(echo $1 | cut -d '.' -f1)
   local t2=$(echo $1 | cut -d '.' -f2)
-  date -u +%H:%M:%S.$t2 -d @$t1
+  if [ "$t1" -lt "3600" ]; then date -u +%M:%S.$t2 -d @$t1
+  elif [ "$t1" -lt "86400" ]; then date -u +%H:%M:%S.$t2 -d @$t1
+  else echo "$t1.$t2 seconds, more than a day..."
+  fi
 }
 # displays the content of $tmpTime
 showLastTime()
 {
   showTime $(tail -n 1 $tmpTime)
+}
+
+# add helper function
+add()
+{
+  # echo "$1 + $2" | bc
+  # Note: bc cannot display leading 0 for 0.xxx values... Use awk instead
+  awk -v a=$1 -v b=$2 'BEGIN {print a + b}'
 }
 
 # start with building the blarney library itself
@@ -192,7 +203,7 @@ popd > /dev/null
 
 # prepare time accumulators
 totalHaskellBuildTime=0
-totalHaskellGenTime=0
+totalVerilogGenTime=0
 totalVerilogBuildTime=0
 totalVerilogSimRunTime=0
 totalHaskellSimRunTime=0
@@ -220,25 +231,22 @@ for E in ${BLARNEY_EXAMPLES[@]}; do
       exit -1
     fi
     haskellBuildTime=$(tail -n 1 $tmpTime)
-    totalHaskellBuildTime=$(echo "$totalHaskellBuildTime + $haskellBuildTime" | bc)
+    totalHaskellBuildTime=$(add $totalHaskellBuildTime $haskellBuildTime)
     # test verilog
     ##############
     if [ $doBackendVerilog ] && [[ ! " ${VERILOG_EXCLUDE[@]} " =~ " ${testName} " ]]; then
       printf "%-12s %12s" $testName "verilog"
       timeCmd ./$testName $GEN_FLAGS --verilog
-      haskellGenTime=$(tail -n 1 $tmpTime)
-      totalHaskellGenTime=$(echo "$totalHaskellGenTime + $haskellGenTime" | bc)
+      verilogGenTime=$(tail -n 1 $tmpTime)
+      totalVerilogGenTime=$(add $totalVerilogGenTime $verilogGenTime)
       timeCmd make -s -C $testName-Verilog &> $testName-test-verilog.log
       verilogBuildTime=$(tail -n 1 $tmpTime)
-      totalVerilogBuildTime=$(echo "$totalVerilogBuildTime + $verilogBuildTime" | bc)
+      totalVerilogBuildTime=$(add $totalVerilogBuildTime $verilogBuildTime)
       # Using 'sed \$d' to print all but the last line (works on Linux and OSX)
       # ('head -n -1' isn't available on OSX)
       timeCmd $testName-Verilog/$testName | sed \$d &> $testName-test-verilog.out
       verilogSimRunTime=$(tail -n 1 $tmpTime)
-      totalVerilogSimRunTime=$(echo "$totalVerilogSimRunTime + $verilogSimRunTime" | bc)
-      # compute runtimes
-      buildTime=$(echo "$haskellBuildTime + $haskellGenTime + $verilogBuildTime" | bc)
-      runTime=$verilogSimRunTime
+      totalVerilogSimRunTime=$(add $totalVerilogSimRunTime $verilogSimRunTime)
       # compare for result
       cmp -s $testName.out $testName-test-verilog.out
       if [ $? == 0 ]; then
@@ -247,7 +255,10 @@ for E in ${BLARNEY_EXAMPLES[@]}; do
         printf "${RED}%10s${NC}" "Failed"
         failedTests+=("$testName-verilog ($exmplDir/$testName-test-verilog.{log, out})")
       fi
-      printf " (build: %s, run: %s)\n" $(showTime $buildTime) $(showTime $runTime)
+      printf " (haskell build: %s" $(showTime $haskellBuildTime)
+      printf ", verilog gen: %s" $(showTime $verilogGenTime)
+      printf ", verilog build: %s" $(showTime $verilogBuildTime)
+      printf ", verilog sim: %s)\n" $(showTime $verilogSimRunTime)
       nbTests=$((nbTests+1))
     fi
     # test simulation
@@ -256,10 +267,7 @@ for E in ${BLARNEY_EXAMPLES[@]}; do
       printf "%-12s %12s" $testName "simulation"
       timeCmd ./$testName $GEN_FLAGS --simulate &> $testName-test-sim.out
       haskellSimRunTime=$(tail -n 1 $tmpTime)
-      totalHaskellSimRunTime=$(echo "$totalHaskellSimRunTime + $haskellSimRunTime" | bc)
-      # compute runtimes
-      buildTime=$haskellBuildTime
-      runTime=$haskellSimRunTime
+      totalHaskellSimRunTime=$(add $totalHaskellSimRunTime $haskellSimRunTime)
       # compare for result
       cmp -s $testName.out $testName-test-sim.out
       if [ $? == 0 ]; then
@@ -268,7 +276,8 @@ for E in ${BLARNEY_EXAMPLES[@]}; do
         printf "${RED}%10s${NC}" "Failed"
         failedTests+=("$testName-sim ($exmplDir/$testName-test-sim.out)")
       fi
-      printf " (build: %s, run: %s)\n" $(showTime $buildTime) $(showTime $runTime)
+      printf " (haskell build: %s" $(showTime $haskellBuildTime)
+      printf ", haskell sim: %s)\n" $(showTime $haskellSimRunTime)
       nbTests=$((nbTests+1))
     fi
   done
@@ -276,13 +285,26 @@ for E in ${BLARNEY_EXAMPLES[@]}; do
 done
 
 # reporting
-printf '%.0s-' {1..80}
-printf '\n'
-totalBuildTime=$(echo "$totalHaskellBuildTime + $totalHaskellGenTime + $totalVerilogBuildTime" | bc)
-totalRunTime=$(echo "$totalHaskellSimRunTime + $totalVerilogSimRunTime" | bc)
-printf "build time: %s, run time: %s\n" $(showTime $totalBuildTime) $(showTime $totalRunTime)
+if [ $doBackendVerilog ]; then
+  printf '%.0s-' {1..80}
+  printf '\n'
+  printf "Verilog backend cumulated times:\n"
+  printf "haskell build: %s" $(showTime $totalHaskellBuildTime)
+  printf ", verilog gen: %s" $(showTime $totalVerilogGenTime)
+  printf ", verilog build: %s" $(showTime $totalVerilogBuildTime)
+  printf ", verilog sim: %s\n" $(showTime $totalVerilogSimRunTime)
+fi
+if [ $doBackendSimulation ]; then
+  printf '%.0s-' {1..80}
+  printf '\n'
+  printf "Haskell Simulation backend cumulated times:\n"
+  printf "haskell build: %s" $(showTime $totalHaskellBuildTime)
+  printf ", haskell sim: %s\n" $(showTime $totalHaskellSimRunTime)
+fi
 nbFailedTests=${#failedTests[*]}
 nbPassedTests=$((nbTests-nbFailedTests))
+printf '%.0s-' {1..80}
+printf '\n'
 echo -e "passed ${GREEN}$nbPassedTests${NC} tests (ran $nbTests)"
 if [ $nbFailedTests -ne 0 ]; then
   echo -e "Failed ${RED}$nbFailedTests${NC} tests:"
