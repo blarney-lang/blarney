@@ -255,10 +255,14 @@ for E in ${BLARNEY_EXAMPLES[@]}; do
         printf "${RED}%10s${NC}" "Failed"
         failedTests+=("$testName-verilog ($exmplDir/$testName-test-verilog.{log, out})")
       fi
-      printf " (haskell build: %s" $(showTime $haskellBuildTime)
-      printf ", verilog gen: %s" $(showTime $verilogGenTime)
-      printf ", verilog build: %s" $(showTime $verilogBuildTime)
-      printf ", verilog sim: %s)\n" $(showTime $verilogSimRunTime)
+      # Counts available:
+      #   $haskellBuildTime
+      #   $verilogGenTime
+      #   $verilogBuildTime
+      #   $verilogSimRunTime
+      # Display the most useful counts
+      printf " (sim: %s" $(showTime $verilogSimRunTime)
+      printf ", gen: %s)\n" $(showTime $verilogGenTime)
       nbTests=$((nbTests+1))
     fi
     # test simulation
@@ -276,8 +280,11 @@ for E in ${BLARNEY_EXAMPLES[@]}; do
         printf "${RED}%10s${NC}" "Failed"
         failedTests+=("$testName-sim ($exmplDir/$testName-test-sim.out)")
       fi
-      printf " (haskell build: %s" $(showTime $haskellBuildTime)
-      printf ", haskell sim: %s)\n" $(showTime $haskellSimRunTime)
+      # Counts available:
+      #   $haskellBuildTime
+      #   $haskellSimRunTime
+      # Display the most useful counts
+      printf " (sim: %s)\n" $(showTime $haskellSimRunTime)
       nbTests=$((nbTests+1))
     fi
   done
@@ -289,17 +296,17 @@ if [ $doBackendVerilog ]; then
   printf '%.0s-' {1..80}
   printf '\n'
   printf "Verilog backend cumulated times:\n"
-  printf "haskell build: %s" $(showTime $totalHaskellBuildTime)
-  printf ", verilog gen: %s" $(showTime $totalVerilogGenTime)
-  printf ", verilog build: %s" $(showTime $totalVerilogBuildTime)
-  printf ", verilog sim: %s\n" $(showTime $totalVerilogSimRunTime)
+  printf "ghc: %s" $(showTime $totalHaskellBuildTime)
+  printf ", gen: %s" $(showTime $totalVerilogGenTime)
+  printf ", verilation: %s" $(showTime $totalVerilogBuildTime)
+  printf ", sim: %s\n" $(showTime $totalVerilogSimRunTime)
 fi
 if [ $doBackendSimulation ]; then
   printf '%.0s-' {1..80}
   printf '\n'
   printf "Haskell Simulation backend cumulated times:\n"
-  printf "haskell build: %s" $(showTime $totalHaskellBuildTime)
-  printf ", haskell sim: %s\n" $(showTime $totalHaskellSimRunTime)
+  printf "ghc: %s" $(showTime $totalHaskellBuildTime)
+  printf ", sim: %s\n" $(showTime $totalHaskellSimRunTime)
 fi
 nbFailedTests=${#failedTests[*]}
 nbPassedTests=$((nbTests-nbFailedTests))
