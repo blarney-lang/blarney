@@ -52,6 +52,7 @@ NC='\033[0m'
 ################################################################################
 
 doRunDefault=yup
+doGenVerilog=
 doRunCircuitGen=
 doRunHaskellSim=
 doRunVerilator=
@@ -119,7 +120,7 @@ do
     -h|--help)
       echo "Runs the blarney examples as a regression test suite"
       echo "--run-circuit-generation"
-      echo "    runs the blarney circuit generator"
+      echo "    runs blarney verilog circuit generator"
       echo "--run-haskell-simulation"
       echo "    runs the in haskell simulation backend"
       echo "--run-verilator"
@@ -139,6 +140,7 @@ do
     --run-circuit-generation)
       doRunDefault=
       doRunCircuitGen=yup
+      doGenVerilog=yup
       ;;
     --run-haskell-simulation)
       doRunDefault=
@@ -147,6 +149,7 @@ do
     --run-verilator)
       doRunDefault=
       doRunVerilator=yup
+      doGenVerilog=yup
       ;;
     --plugin-namer)
       doPluginNamer=yup
@@ -162,6 +165,7 @@ do
       doRunCircuitGen=yup
       doRunHaskellSim=yup
       doRunVerilator=yup
+      doGenVerilog=yup
       ;;
     --preserve-names)
       doPluginNamer=yup
@@ -184,7 +188,10 @@ do
   shift
 done
 # assign a default backend if necessary
-if [ $doRunDefault ]; then doRunVerilator=yup; fi
+if [ $doRunDefault ]; then
+  doRunVerilator=yup
+  doGenVerilog=yup
+fi
 
 # Build the blarney library and run regression tests
 ################################################################################
@@ -255,13 +262,28 @@ for E in ${BLARNEY_EXAMPLES[@]}; do
     fi
     haskellBuildTime=$(tail -n 1 $tmpTime)
     totalHaskellBuildTime=$(add $totalHaskellBuildTime $haskellBuildTime)
-    # test verilator
-    ################
-    if [ $doRunVerilator ] && [[ ! " ${VERILATOR_EXCLUDE[@]} " =~ " ${testName} " ]]; then
-      printf "%-12s %12s" $testName "verilator"
+    # verilog circuit generation
+    ############################
+    if [ $doGenVerilog ]; then
       timeCmd ./$testName $GEN_FLAGS --verilog
       verilogGenTime=$(tail -n 1 $tmpTime)
       totalVerilogGenTime=$(add $totalVerilogGenTime $verilogGenTime)
+    fi
+    # test circuit generation
+    #########################
+    if [ $doRunCircuitGen ] && [[ ! " ${CIRCUIT_GEN_EXCLUDE[@]} " =~ " ${testName} " ]]; then
+      printf "%-14s %20s" $testName "verilog generation"
+      printf "%10s" ""
+      printf "%5s" "("
+      if [ "$verbose" -gt "0" ]; then
+        printf "ghc: %s, " $(showTime $haskellBuildTime)
+      fi
+      printf "gen: %s)\n" $(showTime $verilogGenTime)
+    fi
+    # test verilator
+    ################
+    if [ $doRunVerilator ] && [[ ! " ${VERILATOR_EXCLUDE[@]} " =~ " ${testName} " ]]; then
+      printf "%-14s %20s" $testName "verilator simulation"
       timeCmd make -s -C $testName-Verilog &> $testName-test-verilator.log
       verilogBuildTime=$(tail -n 1 $tmpTime)
       totalVerilogBuildTime=$(add $totalVerilogBuildTime $verilogBuildTime)
@@ -284,7 +306,7 @@ for E in ${BLARNEY_EXAMPLES[@]}; do
       #   $verilogBuildTime
       #   $verilogSimRunTime
       # Display the most useful counts
-      printf " ("
+      printf "%5s" "("
       if [ "$verbose" -gt "0" ]; then
         printf "ghc: %s, " $(showTime $haskellBuildTime)
       fi
@@ -298,7 +320,7 @@ for E in ${BLARNEY_EXAMPLES[@]}; do
     # test simulation
     #################
     if [ $doRunHaskellSim ] && [[ ! " ${HASKELL_SIM_EXCLUDE[@]} " =~ " ${testName} " ]]; then
-      printf "%-12s %12s" $testName "simulation"
+      printf "%-14s %20s" $testName "haskell simulation"
       timeCmd ./$testName $GEN_FLAGS --simulate &> $testName-test-sim.out
       haskellSimRunTime=$(tail -n 1 $tmpTime)
       totalHaskellSimRunTime=$(add $totalHaskellSimRunTime $haskellSimRunTime)
@@ -314,7 +336,7 @@ for E in ${BLARNEY_EXAMPLES[@]}; do
       #   $haskellBuildTime
       #   $haskellSimRunTime
       # Display the most useful counts
-      printf " ("
+      printf "%5s" "("
       if [ "$verbose" -gt "0" ]; then
         printf "ghc: %s, " $(showTime $haskellBuildTime)
       fi
@@ -326,6 +348,13 @@ for E in ${BLARNEY_EXAMPLES[@]}; do
 done
 
 # reporting
+if [ $doRunCircuitGen ]; then
+  printf '%.0s-' {1..80}
+  printf '\n'
+  printf "Verilog circuit generation cumulated times:\n"
+  printf "ghc: %s" $(showTime $totalHaskellBuildTime)
+  printf ", gen: %s\n" $(showTime $totalVerilogGenTime)
+fi
 if [ $doRunVerilator ]; then
   printf '%.0s-' {1..80}
   printf '\n'
