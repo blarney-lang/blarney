@@ -48,4 +48,4 @@ main :: IO ()
 main = do
   args <- getArgs
   if | "--simulate" `elem` args -> simulate (top 5000 16 16)
-     | otherwise -> writeVerilogTop (top 5000 16 16) "Heat" "Heat-Verilog/"
+     | otherwise -> writeVerilogTop (top 5 80 80) "Heat" "Heat-Verilog/"

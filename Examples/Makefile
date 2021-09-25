@@ -17,7 +17,7 @@ clean:
 	make -C Interface clean
 	make -C Lookup clean
 	make -C MasterSlave clean
-	make -C MeanFilter clean
+	make -C Heat clean
 	make -C NameBits clean
 	make -C NoC clean
 	make -C Option clean
