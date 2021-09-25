@@ -17,7 +17,7 @@ ALL_BLARNEY_EXAMPLES=(
   Interface
   Lookup
   MasterSlave
-  MeanFilter
+  Heat
   NameBits
   NoC
   Option
@@ -35,7 +35,7 @@ BLARNEY_EXAMPLES="${BLARNEY_EXAMPLES[@]:-${ALL_BLARNEY_EXAMPLES[@]}}"
 
 # per test set example exclusion lists
 CIRCUIT_GEN_EXCLUDE=()
-VERILATOR_EXCLUDE=()
+VERILATOR_EXCLUDE=(Heat)
 HASKELL_SIM_EXCLUDE=(
   Bit0
   Spec
