@@ -38,14 +38,15 @@ top t w h = do
     -- Termination
     when (timer.val .==. fromInteger t) $ do
       forM_ (zip [0..] grid) $ \(i, row) ->
-        forM_ (zip [0..] row) $ \(j, cell) ->
-          display (show i) "," (show j) ":0x"
-            (formatHex 8 (cell.val .>>. (16 :: Bit 5)))
+        forM_ (zip [0..] row) $ \(j, cell) -> do
+          let out = cell.val .>>. (16 :: Bit 5)
+          when (out .!=. 0) do
+            display (show i) "," (show j) ":" out
       finish
 
 -- Main function
 main :: IO ()
 main = do
   args <- getArgs
-  if | "--simulate" `elem` args -> simulate (top 5000 16 16)
-     | otherwise -> writeVerilogTop (top 5 80 80) "Heat" "Heat-Verilog/"
+  if | "--simulate" `elem` args -> simulate (top 10 128 128)
+     | otherwise -> writeVerilogTop (top 10 128 128) "Heat" "Heat-Verilog/"
