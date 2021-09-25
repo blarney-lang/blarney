@@ -3,7 +3,8 @@
 # script's static configuration
 ################################################################################
 
-BLARNEY_DEFAULT_EXAMPLES=(
+# blarney's existing examples
+ALL_BLARNEY_EXAMPLES=(
   Background
   BasicRTL
   Bit0
@@ -30,17 +31,19 @@ BLARNEY_DEFAULT_EXAMPLES=(
   Counter
   Vectors
 )
-BLARNEY_EXAMPLES="${BLARNEY_EXAMPLES[@]:-${BLARNEY_DEFAULT_EXAMPLES[@]}}"
+BLARNEY_EXAMPLES="${BLARNEY_EXAMPLES[@]:-${ALL_BLARNEY_EXAMPLES[@]}}"
 
-# exclude those from being tested, for whatever reason (mainly expected failure)
-VERILOG_EXCLUDE=()
-SIMULATION_EXCLUDE=(
+# per test set example exclusion lists
+CIRCUIT_GEN_EXCLUDE=()
+VERILATOR_EXCLUDE=()
+HASKELL_SIM_EXCLUDE=(
   Bit0
   Spec
   Interface
   RAMQuad
 )
 
+# colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 NC='\033[0m'
@@ -48,106 +51,18 @@ NC='\033[0m'
 # control variables
 ################################################################################
 
-doBackendDefault=yup
-doBackendSimulation=
-doBackendVerilog=
+doRunDefault=yup
+doGenVerilog=
+doRunCircuitGen=
+doRunHaskellSim=
+doRunVerilator=
 doPluginNamer=
 doPassNameProp=
 doPassSimplifier=
 verbose=0
 
-# preliminary checks and script arguments processing
+# helper functions
 ################################################################################
-
-if [ -z "$BLARNEY_ROOT" ]; then
-  echo Please set the BLARNEY_ROOT environment variable
-fi
-BLARNEY_TESTING_ROOT="${BLARNEY_TESTING_ROOT:-$BLARNEY_ROOT}"
-
-while :
-do
-  case $1 in
-    ############################################################################
-    -h|--help)
-      echo "Runs the blarney examples as a regression test suite"
-      echo "--backend-simulation"
-      echo "    runs the in haskell simulation backend"
-      echo "--backend-verilog"
-      echo "    runs the verilog backend and a verilator simulation"
-      echo "--plugin-namer"
-      echo "    runs blc with the namer plugin enabled"
-      echo "--pass-name-propagation"
-      echo "    runs the circuit generator with the name propagation netlist pass enabled"
-      echo "--pass-simplifier"
-      echo "    runs the circuit generator with the netlist optimisation passes enabled"
-      echo "--backend-all"
-      echo "    same as --backend-simulation and --backend-verilog"
-      echo "--preserve-names"
-      echo "    same as --plugin-namer and --pass-name-propagation"
-      exit
-      ;;
-    --backend-simulation)
-      doBackendDefault=
-      doBackendSimulation=yup
-      ;;
-    --backend-verilog)
-      doBackendDefault=
-      doBackendVerilog=yup
-      ;;
-    --plugin-namer)
-      doPluginNamer=yup
-      ;;
-    --pass-name-propagation)
-      doPassNameProp=yup
-      ;;
-    --pass-simplifier)
-      doPassSimplifier=yup
-      ;;
-    --backend-all)
-      doBackendDefault=
-      doBackendSimulation=yup
-      doBackendVerilog=yup
-      ;;
-    --preserve-names)
-      doPluginNamer=yup
-      doPassNameProp=yup
-      ;;
-    -v|--verbose)
-      verbose=$((verbose + 1))
-      ;;
-    ############################################################################
-    -?*)
-      printf 'Ignoring unknown flag: %s\n' "$1" >&2
-      ;;
-    --)
-      shift
-      break
-      ;;
-    *)
-      break
-  esac
-  shift
-done
-# assign a default backend if necessary
-if [ $doBackendDefault ]; then doBackendVerilog=yup; fi
-
-# Run regression tests
-################################################################################
-
-# prepare flags
-BLC_FLAGS=()
-if [ $doPluginNamer ]; then BLC_FLAGS+=("--enable-namer-plugin"); fi
-GEN_FLAGS=()
-if [ $doPassNameProp ]; then GEN_FLAGS+=("--enable-name-prop"); fi
-if [ $doPassSimplifier ]; then GEN_FLAGS+=("--enable-simplifier"); fi
-
-# reporting variables
-nbTests=0
-failedTests=()
-
-# tmp folder
-now=$(date +%d.%m.%y-%H:%M)
-tmpDir=$(mktemp -d -t blarney-test-$now-XXXX)
 
 # timing helpers:
 # need to explicitly avoid shell built-in time command to use the -o/--output
@@ -184,7 +99,126 @@ add()
   awk -v a=$1 -v b=$2 'BEGIN {print a + b}'
 }
 
-# start with building the blarney library itself
+# sub helper function
+sub()
+{
+  awk -v a=$1 -v b=$2 'BEGIN {print a - b}'
+}
+
+# preliminary checks and script arguments processing
+################################################################################
+
+if [ -z "$BLARNEY_ROOT" ]; then
+  echo Please set the BLARNEY_ROOT environment variable
+fi
+BLARNEY_TESTING_ROOT="${BLARNEY_TESTING_ROOT:-$BLARNEY_ROOT}"
+
+while :
+do
+  case $1 in
+    ############################################################################
+    -h|--help)
+      echo "Runs the blarney examples as a regression test suite"
+      echo "--run-circuit-generation"
+      echo "    runs blarney verilog circuit generator"
+      echo "--run-haskell-simulation"
+      echo "    runs the in haskell simulation backend"
+      echo "--run-verilator"
+      echo "    runs the verilog backend and a verilator simulation"
+      echo "--plugin-namer"
+      echo "    runs blc with the namer plugin enabled"
+      echo "--pass-name-propagation"
+      echo "    runs the circuit generator with the name propagation netlist pass enabled"
+      echo "--pass-simplifier"
+      echo "    runs the circuit generator with the netlist optimisation passes enabled"
+      echo "--run-all"
+      echo "    same as --run-circuit-generation, --run-haskell-simulation and --run-verilator"
+      echo "--preserve-names"
+      echo "    same as --plugin-namer and --pass-name-propagation"
+      exit
+      ;;
+    --run-circuit-generation)
+      doRunDefault=
+      doRunCircuitGen=yup
+      doGenVerilog=yup
+      ;;
+    --run-haskell-simulation)
+      doRunDefault=
+      doRunHaskellSim=yup
+      ;;
+    --run-verilator)
+      doRunDefault=
+      doRunVerilator=yup
+      doGenVerilog=yup
+      ;;
+    --plugin-namer)
+      doPluginNamer=yup
+      ;;
+    --pass-name-propagation)
+      doPassNameProp=yup
+      ;;
+    --pass-simplifier)
+      doPassSimplifier=yup
+      ;;
+    --run-all)
+      doRunDefault=
+      doRunCircuitGen=yup
+      doRunHaskellSim=yup
+      doRunVerilator=yup
+      doGenVerilog=yup
+      ;;
+    --preserve-names)
+      doPluginNamer=yup
+      doPassNameProp=yup
+      ;;
+    -v|--verbose)
+      verbose=$(add verbose  1)
+      ;;
+    ############################################################################
+    -?*)
+      printf 'Ignoring unknown flag: %s\n' "$1" >&2
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      break
+  esac
+  shift
+done
+# assign a default backend if necessary
+if [ $doRunDefault ]; then
+  doRunVerilator=yup
+  doGenVerilog=yup
+fi
+
+# Build the blarney library and run regression tests
+################################################################################
+
+# prepare flags
+BLC_FLAGS=()
+if [ $doPluginNamer ]; then BLC_FLAGS+=("--enable-namer-plugin"); fi
+GEN_FLAGS=()
+if [ $doPassNameProp ]; then GEN_FLAGS+=("--enable-name-prop"); fi
+if [ $doPassSimplifier ]; then GEN_FLAGS+=("--enable-simplifier"); fi
+
+# tmp folder and reporting variables
+now=$(date +%d.%m.%y-%H:%M)
+tmpDir=$(mktemp -d -t blarney-test-$now-XXXX)
+
+nbTests=0
+failedTests=()
+
+# prepare time accumulators
+totalHaskellBuildTime=0
+totalVerilogGenTime=0
+totalVerilogBuildTime=0
+totalVerilogSimRunTime=0
+totalHaskellSimRunTime=0
+
+# Build blarney
+###############
 pushd $BLARNEY_ROOT > /dev/null
 echo -n "Blarney build (blc): "
 make clean > /dev/null
@@ -201,12 +235,8 @@ printf '%.0s=' {1..80}
 printf '\n'
 popd > /dev/null
 
-# prepare time accumulators
-totalHaskellBuildTime=0
-totalVerilogGenTime=0
-totalVerilogBuildTime=0
-totalVerilogSimRunTime=0
-totalHaskellSimRunTime=0
+# Run regression tests
+######################
 # go through each examples
 for E in ${BLARNEY_EXAMPLES[@]}; do
   # work in a temporary directory
@@ -232,28 +262,43 @@ for E in ${BLARNEY_EXAMPLES[@]}; do
     fi
     haskellBuildTime=$(tail -n 1 $tmpTime)
     totalHaskellBuildTime=$(add $totalHaskellBuildTime $haskellBuildTime)
-    # test verilog
-    ##############
-    if [ $doBackendVerilog ] && [[ ! " ${VERILOG_EXCLUDE[@]} " =~ " ${testName} " ]]; then
-      printf "%-12s %12s" $testName "verilog"
+    # verilog circuit generation
+    ############################
+    if [ $doGenVerilog ]; then
       timeCmd ./$testName $GEN_FLAGS --verilog
       verilogGenTime=$(tail -n 1 $tmpTime)
       totalVerilogGenTime=$(add $totalVerilogGenTime $verilogGenTime)
-      timeCmd make -s -C $testName-Verilog &> $testName-test-verilog.log
+    fi
+    # test circuit generation
+    #########################
+    if [ $doRunCircuitGen ] && [[ ! " ${CIRCUIT_GEN_EXCLUDE[@]} " =~ " ${testName} " ]]; then
+      printf "%-14s %16s" $testName "verilog-gen"
+      printf "%10s" ""
+      printf "%5s" "("
+      if [ "$verbose" -gt "0" ]; then
+        printf "ghc: %s, " $(showTime $haskellBuildTime)
+      fi
+      printf "gen: %s)\n" $(showTime $verilogGenTime)
+    fi
+    # test verilator
+    ################
+    if [ $doRunVerilator ] && [[ ! " ${VERILATOR_EXCLUDE[@]} " =~ " ${testName} " ]]; then
+      printf "%-14s %16s" $testName "verilator-sim"
+      timeCmd make -s -C $testName-Verilog &> $testName-test-verilator.log
       verilogBuildTime=$(tail -n 1 $tmpTime)
       totalVerilogBuildTime=$(add $totalVerilogBuildTime $verilogBuildTime)
       # Using 'sed \$d' to print all but the last line (works on Linux and OSX)
       # ('head -n -1' isn't available on OSX)
-      timeCmd $testName-Verilog/$testName | sed \$d &> $testName-test-verilog.out
+      timeCmd $testName-Verilog/$testName | sed \$d &> $testName-test-verilator.out
       verilogSimRunTime=$(tail -n 1 $tmpTime)
       totalVerilogSimRunTime=$(add $totalVerilogSimRunTime $verilogSimRunTime)
       # compare for result
-      cmp -s $testName.out $testName-test-verilog.out
+      cmp -s $testName.out $testName-test-verilator.out
       if [ $? == 0 ]; then
         printf "${GREEN}%10s${NC}" "Passed"
       else
         printf "${RED}%10s${NC}" "Failed"
-        failedTests+=("$testName-verilog ($exmplDir/$testName-test-verilog.{log, out})")
+        failedTests+=("$testName-verilator ($exmplDir/$testName-test-verilator.{log, out})")
       fi
       # Counts available:
       #   $haskellBuildTime
@@ -261,14 +306,21 @@ for E in ${BLARNEY_EXAMPLES[@]}; do
       #   $verilogBuildTime
       #   $verilogSimRunTime
       # Display the most useful counts
-      printf " (sim: %s" $(showTime $verilogSimRunTime)
-      printf ", gen: %s)\n" $(showTime $verilogGenTime)
-      nbTests=$((nbTests+1))
+      printf "%5s" "("
+      if [ "$verbose" -gt "0" ]; then
+        printf "ghc: %s, " $(showTime $haskellBuildTime)
+      fi
+      printf "gen: %s, " $(showTime $verilogGenTime)
+      if [ "$verbose" -gt "0" ]; then
+        printf "build: %s, " $(showTime $verilogBuildTime)
+      fi
+      printf "sim: %s)\n" $(showTime $verilogSimRunTime)
+      nbTests=$(add $nbTests 1)
     fi
     # test simulation
     #################
-    if [ $doBackendSimulation ] && [[ ! " ${SIMULATION_EXCLUDE[@]} " =~ " ${testName} " ]]; then
-      printf "%-12s %12s" $testName "simulation"
+    if [ $doRunHaskellSim ] && [[ ! " ${HASKELL_SIM_EXCLUDE[@]} " =~ " ${testName} " ]]; then
+      printf "%-14s %16s" $testName "haskell-sim"
       timeCmd ./$testName $GEN_FLAGS --simulate &> $testName-test-sim.out
       haskellSimRunTime=$(tail -n 1 $tmpTime)
       totalHaskellSimRunTime=$(add $totalHaskellSimRunTime $haskellSimRunTime)
@@ -284,15 +336,26 @@ for E in ${BLARNEY_EXAMPLES[@]}; do
       #   $haskellBuildTime
       #   $haskellSimRunTime
       # Display the most useful counts
-      printf " (sim: %s)\n" $(showTime $haskellSimRunTime)
-      nbTests=$((nbTests+1))
+      printf "%5s" "("
+      if [ "$verbose" -gt "0" ]; then
+        printf "ghc: %s, " $(showTime $haskellBuildTime)
+      fi
+      printf "sim: %s)\n" $(showTime $haskellSimRunTime)
+      nbTests=$(add $nbTests 1)
     fi
   done
   popd > /dev/null
 done
 
 # reporting
-if [ $doBackendVerilog ]; then
+if [ $doRunCircuitGen ]; then
+  printf '%.0s-' {1..80}
+  printf '\n'
+  printf "Verilog circuit generation cumulated times:\n"
+  printf "ghc: %s" $(showTime $totalHaskellBuildTime)
+  printf ", gen: %s\n" $(showTime $totalVerilogGenTime)
+fi
+if [ $doRunVerilator ]; then
   printf '%.0s-' {1..80}
   printf '\n'
   printf "Verilog backend cumulated times:\n"
@@ -301,7 +364,7 @@ if [ $doBackendVerilog ]; then
   printf ", verilation: %s" $(showTime $totalVerilogBuildTime)
   printf ", sim: %s\n" $(showTime $totalVerilogSimRunTime)
 fi
-if [ $doBackendSimulation ]; then
+if [ $doRunHaskellSim ]; then
   printf '%.0s-' {1..80}
   printf '\n'
   printf "Haskell Simulation backend cumulated times:\n"
@@ -309,7 +372,7 @@ if [ $doBackendSimulation ]; then
   printf ", sim: %s\n" $(showTime $totalHaskellSimRunTime)
 fi
 nbFailedTests=${#failedTests[*]}
-nbPassedTests=$((nbTests-nbFailedTests))
+nbPassedTests=$(sub $nbTests $nbFailedTests)
 printf '%.0s-' {1..80}
 printf '\n'
 echo -e "passed ${GREEN}$nbPassedTests${NC} tests (ran $nbTests)"
