@@ -272,7 +272,7 @@ for E in ${BLARNEY_EXAMPLES[@]}; do
     # test circuit generation
     #########################
     if [ $doRunCircuitGen ] && [[ ! " ${CIRCUIT_GEN_EXCLUDE[@]} " =~ " ${testName} " ]]; then
-      printf "%-14s %20s" $testName "verilog generation"
+      printf "%-14s %16s" $testName "verilog-gen"
       printf "%10s" ""
       printf "%5s" "("
       if [ "$verbose" -gt "0" ]; then
@@ -283,7 +283,7 @@ for E in ${BLARNEY_EXAMPLES[@]}; do
     # test verilator
     ################
     if [ $doRunVerilator ] && [[ ! " ${VERILATOR_EXCLUDE[@]} " =~ " ${testName} " ]]; then
-      printf "%-14s %20s" $testName "verilator simulation"
+      printf "%-14s %16s" $testName "verilator-sim"
       timeCmd make -s -C $testName-Verilog &> $testName-test-verilator.log
       verilogBuildTime=$(tail -n 1 $tmpTime)
       totalVerilogBuildTime=$(add $totalVerilogBuildTime $verilogBuildTime)
@@ -320,7 +320,7 @@ for E in ${BLARNEY_EXAMPLES[@]}; do
     # test simulation
     #################
     if [ $doRunHaskellSim ] && [[ ! " ${HASKELL_SIM_EXCLUDE[@]} " =~ " ${testName} " ]]; then
-      printf "%-14s %20s" $testName "haskell simulation"
+      printf "%-14s %16s" $testName "haskell-sim"
       timeCmd ./$testName $GEN_FLAGS --simulate &> $testName-test-sim.out
       haskellSimRunTime=$(tail -n 1 $tmpTime)
       totalHaskellSimRunTime=$(add $totalHaskellSimRunTime $haskellSimRunTime)
