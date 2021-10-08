@@ -187,6 +187,7 @@ genNetVerilog netlist net = case netPrim net of
   SelectBits w hi lo      -> primNV { decl = Just $ declWire (1+hi-lo) wId }
   Concat aw bw            -> primNV { decl = Just $ declWire (aw+bw) wId }
   Identity w              -> primNV { decl = Just $ declWire w wId }
+  MergeWrites s n w       -> primNV { decl = Just $ declWire w wId }
   Mux _ wsel w            -> dfltNV { decl = Just $ declMux wsel w net
                                     , inst = Just $ instMux net }
   Const w i               -> dfltNV { decl = Just $ declWireInit w wId i }
@@ -307,19 +308,18 @@ genNetVerilog netlist net = case netPrim net of
   showPrim (Concat w0 w1) [e0, e1] =
     braces $ showNetInput e0 <> comma <+> showNetInput e1
   showPrim (Identity w) [e0] = showNetInput e0
+  showPrim (MergeWrites MStratOr n w) ins =
+    sep $ intersperse (char '|') (f [] ins)
+    where f acc [] = acc
+          f acc (en:x:rest) = f (parens (f' en x):acc) rest
+          f _ _ = error "malformed input list for MergeWrites primitive"
+          f' en x = showNetInput en <+> text "== 1 ?" <+> showNetInput x
+                                    <+> colon <+> showIntLit w 0
   showPrim p _ = error $
     "unsupported Prim '" ++ show p ++ "' encountered in Verilog generation"
 
   showNetInput :: NetInput -> Doc
   showNetInput (InputWire wId) = showWire wId
-  showNetInput (InputTree p@(Const _ _) ins) = showPrim p ins
-  showNetInput (InputTree p@(DontCare _) ins) = showPrim p ins
-  showNetInput (InputTree p@(ReplicateBit _) ins) = showPrim p ins
-  showNetInput (InputTree p@(ZeroExtend _ _) ins) = showPrim p ins
-  showNetInput (InputTree p@(SignExtend _ _) ins) = showPrim p ins
-  showNetInput (InputTree p@(SelectBits _ _ _) ins) = showPrim p ins
-  showNetInput (InputTree p@(Concat _ _) ins) = showPrim p ins
-  showNetInput (InputTree p@(Identity _) ins) = showPrim p ins
   showNetInput (InputTree p ins) = parens $ showPrim p ins
 
   -- declaration helpers

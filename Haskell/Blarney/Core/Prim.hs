@@ -17,39 +17,40 @@ This module provides a set of circuit primitives.
 
 module Blarney.Core.Prim (
   -- * 'Prim' primitive type and helpers
-  Prim(..)        -- Primitive components
-, canInline       -- Tell if a 'Prim' can be inlined
-, canInlineInput  -- Tell if a 'Prim' inputs can be inlined
+  Prim(..)            -- Primitive components
+, canInline           -- Tell if a 'Prim' can be inlined
+, canInlineInput      -- Tell if a 'Prim' inputs can be inlined
 , clamp
-, primStr         -- get useful name strings out of a 'Prim'
+, primStr             -- get useful name strings out of a 'Prim'
 , primSemEvalRaw
 , primSemEval
-, primDontKill    -- tell if a 'Prim' can be optimised away
-, primIsRoot      -- tell if a 'Prim' is a netlist root
-, primInputs      -- get the inputs of a 'Prim'
-, primOutputs     -- get the outputs of a 'Prim'
-, primOutIndex    -- get output index from name
-, primOutWidth    -- get 'OutputWidth' for a given named output of a 'Prim'
-, BRAMKind(..)    -- Block RAM kind
+, primDontKill        -- tell if a 'Prim' can be optimised away
+, primIsRoot          -- tell if a 'Prim' is a netlist root
+, primInputs          -- get the inputs of a 'Prim'
+, primOutputs         -- get the outputs of a 'Prim'
+, primOutIndex        -- get output index from name
+, primOutWidth        -- get 'OutputWidth' for a given named output of a 'Prim'
+, BRAMKind(..)        -- Block RAM kind
   -- * Other primitive types
-, InstId          -- Every component instance has a unique id
-, Width           -- Bit vector width
-, InputWidth      -- Width of an input to a component
-, OutputWidth     -- Width of an output from a component
-, OutputName      -- Reference to a named output of a 'Prim'
-, BitIndex        -- For indexing a bit vector
-, RegFileInfo(..) -- Register file primitive parameters
-, DisplayArg(..)  -- Arguments to display primitive
+, InstId              -- Every component instance has a unique id
+, Width               -- Bit vector width
+, InputWidth          -- Width of an input to a component
+, OutputWidth         -- Width of an output from a component
+, OutputName          -- Reference to a named output of a 'Prim'
+, BitIndex            -- For indexing a bit vector
+, MergeStrategy(..)   -- Merging strategy for a 'Merge' 'Prim'
+, RegFileInfo(..)     -- Register file primitive parameters
+, DisplayArg(..)      -- Arguments to display primitive
 , DisplayArgRadix(..) -- Radix of argument to display
-, Param(..)       -- Compile-time parameters
-, NameHint(..)    -- A 'NameHint' type to represent name hints
-, NameHints       -- A 'NameHints' type to gather name hints
+, Param(..)           -- Compile-time parameters
+, NameHint(..)        -- A 'NameHint' type to represent name hints
+, NameHints           -- A 'NameHints' type to gather name hints
   -- * Netlists
-, Net(..)         -- 'Net' type to represent 'Netlist' nodes
-, WireId          -- 'WireId' type to uniquely identify wires
-, NetInput(..)    -- 'NetInput' type to represent inputs to 'Net's
-, Netlist         -- 'Netlist' type to represent a circuit
-, CustomNetlist(..) -- Wrapper type to represent the Netlist for a Custom Prim
+, Net(..)             -- 'Net' type to represent 'Netlist' nodes
+, WireId              -- 'WireId' type to uniquely identify wires
+, NetInput(..)        -- 'NetInput' type to represent inputs to 'Net's
+, Netlist             -- 'Netlist' type to represent a circuit
+, CustomNetlist(..)   -- Wrapper type to represent the Netlist for a Custom Prim
 ) where
 
 import Prelude
@@ -91,6 +92,9 @@ type OutputName = Maybe String
 
 -- | Index into a bit vector
 type BitIndex = Int
+
+-- | Merging Strategy
+data MergeStrategy = MStratOr deriving (Eq, Show)
 
 -- | Register file primitive parameters
 data RegFileInfo = RegFileInfo {
@@ -325,6 +329,16 @@ data Prim =
     --   [__outputs__] a single output, the @w@-bit value @initial@ or the last
     --                 written input value @x@ when @en@ was asserted
   | RegisterEn (Maybe Integer) InputWidth
+
+    -- | @MergeWrites mStrat n w@ represents a merging primitive with the
+    --   @mStrat@ merging strategy, @n@ pairs of 1-bit enables and associated
+    --   @w@-wide inputs, and one @w@-wide output
+    --
+    --   [__inputs__]  @[en0, in0, en1, in1, ...]@, @n@ pairs of @enN@ 1-bit
+    --                 enables and @inN@ @w@-bit values
+    --   [__outputs__] a single output, a @w@-bit value result of the merging of
+    --                 the @n@ inputs according to @mStrat@
+  | MergeWrites MergeStrategy Int Width
 
     -- | @Input w name@ represents a named external input
     --
@@ -791,6 +805,21 @@ primInfo prim@(RegisterEn _ w) =
            , dontKill = False
            , isRoot = False
            , inputs = [("en", 1), ("in", w)]
+           , outputs = [("out", w)] }
+primInfo prim@(MergeWrites mStrat n w) =
+  PrimInfo { isInlineable = True
+           , inputsInlineable = True
+           , strRep = "MergeWrites{" ++ show mStrat ++ "}"
+           , semEval = Just \ins ->
+               let stratOr acc [] = acc
+                   stratOr acc (en:x:rest) =
+                     stratOr (if en == 1 then acc .|. x else acc) rest
+                   stratOr _ _ = err "malformed MergeWrites inputs"
+               in [clamp w $ case mStrat of _ -> stratOr 0 ins]
+           , dontKill = False
+           , isRoot = False
+           , inputs = concat [ [("en" ++ show i, 1), ("in" ++ show i, w)]
+                             | i <- [0..n-1] ]
            , outputs = [("out", w)] }
 primInfo prim@BRAM{ ramAddrWidth = aw
                   , ramDataWidth = dw
