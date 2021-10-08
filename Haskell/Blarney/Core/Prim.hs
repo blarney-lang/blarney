@@ -38,6 +38,7 @@ module Blarney.Core.Prim (
 , OutputWidth     -- Width of an output from a component
 , OutputName      -- Reference to a named output of a 'Prim'
 , BitIndex        -- For indexing a bit vector
+, MergeStrat(..)  -- Merging strategy for a 'Merge' 'Prim'
 , RegFileInfo(..) -- Register file primitive parameters
 , DisplayArg(..)  -- Arguments to display primitive
 , DisplayArgRadix(..) -- Radix of argument to display
@@ -90,6 +91,9 @@ type OutputName = Maybe String
 
 -- | Index into a bit vector
 type BitIndex = Int
+
+-- | Merging Strategy
+data MergeStrat = MStratOr deriving (Eq, Show)
 
 -- | Register file primitive parameters
 data RegFileInfo = RegFileInfo {
@@ -324,6 +328,15 @@ data Prim =
     --   [__outputs__] a single output, the @w@-bit value @initial@ or the last
     --                 written input value @x@ when @en@ was asserted
   | RegisterEn (Maybe Integer) InputWidth
+
+    -- | @Merge mStrat n w@ represents a merging primitive with the @mStrat@
+    --   merging strategy, @n@ @w@-wide inputs and one @w@-wide output
+    --
+    --   [__inputs__]  @[en0, in0, en1, in1, ...]@, @n@ pairs of @enN@ 1-bit
+    --                 enables and @inN@ @w@-bit values
+    --   [__outputs__] a single output, a @w@-bit value result of the merging of
+    --                 the @n@ inputs according to @mStrat@
+  | Merge MergeStrat Int Width
 
     -- | @Input w name@ represents a named external input
     --
@@ -790,6 +803,21 @@ primInfo prim@(RegisterEn _ w) =
            , dontKill = False
            , isRoot = False
            , inputs = [("en", 1), ("in", w)]
+           , outputs = [("out", w)] }
+primInfo prim@(Merge MStratOr n w) =
+  PrimInfo { isInlineable = True
+           , inputsInlineable = True
+           , strRep = "Merge{" ++ show MStratOr ++ "}"
+           , semEval = Just \ins ->
+               let f acc [] = acc
+                   f acc (en:x:rest) = f (if en == 1 then acc .|. x
+                                                     else acc) rest
+                   f _ _ = err "malformed Merge inputs"
+               in [clamp w $ f 0 ins]
+           , dontKill = False
+           , isRoot = False
+           , inputs = concat [ [("en" ++ show i, 1), ("in" ++ show i, w)]
+                             | i <- [0..n-1]]
            , outputs = [("out", w)] }
 primInfo prim@BRAM{ ramAddrWidth = aw
                   , ramDataWidth = dw

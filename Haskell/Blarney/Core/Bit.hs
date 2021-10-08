@@ -365,6 +365,11 @@ regEn init en a =
     FromBV $ regEnBV w (toBV init) (toBV en) (toBV a)
   where w = unsafeWidthOf init
 
+-- | Merge inputs together according to a merging strategy
+mergeBit :: forall n. KnownNat n => MergeStrat -> [(Bit 1, Bit n)] -> Bit n
+mergeBit strat ins = FromBV $ mergeBV strat (valueOf @n) ins'
+  where ins' = map (\(en, x) -> (toBV en, toBV x)) ins
+
 -- * Misc. bit-vector operations
 
 -- | Multiplexer using a selector signal to index a list of input signals.

@@ -197,6 +197,8 @@ genNetVerilog netlist net = case netPrim net of
   RegisterEn i w          -> dfltNV { decl = Just $ declRegInit w wId i
                                     , alws = Just $ alwsRegisterEn net
                                     , rst  = Just $ resetRegister w wId i }
+  Merge strat n w         -> dfltNV { decl = Just $ declWire w wId
+                                    , inst = Just $ instMerge net strat n w }
   BRAM BRAMSinglePort i aw dw be ->
     dfltNV { decl = Just $ declRAM i 1 aw dw net
            , inst = Just $ instRAM net i aw dw be }
@@ -429,6 +431,16 @@ genNetVerilog netlist net = case netPrim net of
       ins = netInputs net
       args = hcat $ intersperse comma $ map showNetInput $ netInputs net
       numIns = length ins - 1
+  instMerge net MStratOr n w =
+        text "assign" <+> showWire (netInstId net, Nothing)
+    <+> equals <+> args <> semi
+    where args = sep $ intersperse (char '|') ins
+          ins = f [] $ netInputs net
+          f acc [] = acc
+          f acc (en:x:rest) = f (parens (f' en x):acc) rest
+          f _ _ = error "malformed input list for Merge primitive"
+          f' en x = showNetInput en <+> text "== 1 ?" <+> showNetInput x
+                                    <+> colon <+> showIntLit w 0
   instRAM net i aw dw be =
         hang (hang (text modName) 2 (parens $ argStyle ramParams)) 2
           (hang (text "ram" <> int nId) 2 ((parens $ argStyle ramArgs) <> semi))

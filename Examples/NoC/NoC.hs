@@ -1,4 +1,4 @@
-import Blarney
+import Blarney hiding (merge)
 import Blarney.Queue
 import Blarney.Stream
 import System.Environment

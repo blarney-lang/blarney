@@ -39,11 +39,13 @@ module Blarney.Core.Prelude
   , delayEn         -- Generic register with enable
   , binaryEncode    -- One-hot to binary encoder
   , firstHot        -- Isolate first hot bit in vector
+  , merge           -- Merge input values according to a given merging strategy
   ) where
 
 import Prelude
 import GHC.TypeLits
 import Data.List (transpose)
+import Blarney.Core.Prim
 import Blarney.Core.BV
 import Blarney.Core.Bit
 import Blarney.Core.Bits
@@ -174,3 +176,7 @@ binaryEncode xs = unsafeFromBitList $ encode $ unsafeToBitList xs
 -- | Isolate first hot bit in a bit vector
 firstHot :: KnownNat n => Bit n -> Bit n
 firstHot x = x .&. (inv x + 1)
+
+merge :: (KnownNat (SizeOf a), Bits a) => MergeStrat -> [(Bit 1, a)] -> a
+merge strat ins = unpack $ mergeBit strat ins'
+  where ins' = map (\(en, x) -> (en, pack x)) ins

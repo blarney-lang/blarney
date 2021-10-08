@@ -114,7 +114,7 @@ rhsTyped :: Bits a => Assign -> a
 rhsTyped = unpack . FromBV . rhs
 
 -- | Add name hints to underlying BV for a value in Bits
-bvHintsUpdt b hints = unpack (FromBV $ addBVNameHints (toBV $ pack b) hints)
+bvHintsUpdt b hints = unpack . FromBV $ addBVNameHints b hints
 
 -- The RTL Monad and primitive interaction functions
 --------------------------------------------------------------------------------
@@ -316,11 +316,15 @@ makeReg init = do
   v <- freshVarId
   assigns <- findWithDefault [] v <$> askAssigns
   nameHints <- askNameHints
-  let en = orList (map enable assigns)
-  let inp = case assigns of
-              [a] -> rhsTyped a
-              other -> select [(enable a, rhsTyped a) | a <- assigns]
-  let out = delayEn init en inp
+  let w = sizeOf init
+      initBV = toBV $ pack init
+      en = toBV $ orList (map enable assigns)
+      inp = case assigns of
+              []    -> initBV
+              [a]   -> rhs a
+              other -> mergeBV MStratOr w
+                               [ (toBV $ enable a, rhs a) | a <- assigns ]
+      out = regEnBV w initBV en inp
   return $ Reg { regId = v, regVal = bvHintsUpdt out nameHints }
 
 -- | Wire variables
@@ -343,10 +347,15 @@ makeWire defaultVal = do
   v <- freshVarId
   assigns <- findWithDefault [] v <$> askAssigns
   nameHints <- askNameHints
-  let any = orList (map enable assigns)
-  let none = inv any
-  let out = select $    [(enable a, rhsTyped a) | a <- assigns]
-                     ++ [(none, defaultVal)]
+  let w = sizeOf defaultVal
+      dfltBV = toBV $ pack defaultVal
+      any = toBV $ orList (map enable assigns)
+      none = invBV any
+      out = case assigns of
+              []    -> dfltBV
+              other -> mergeBV MStratOr w
+                               ([(toBV $ enable a, rhs a) | a <- assigns] ++
+                                [(none, dfltBV)])
   return $ Wire { wireId  = v
                 , wireVal = bvHintsUpdt out nameHints
                 , active  = bvHintsUpdt any $ insert (NmSuffix 0 "act")
