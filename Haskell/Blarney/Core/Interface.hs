@@ -198,6 +198,7 @@ instance (Interface a, Bits a) => Interface (Reg a)
 instance (Interface a, Bits a) => Interface (Wire a)
 instance (Interface a, Bits a) => Interface (ReadWrite a)
 instance (Interface a, Bits a) => Interface (WriteOnly a)
+instance (Interface a, Bits a) => Interface (TriStateWire a)
 instance Interface Clock
 instance Interface Reset
 

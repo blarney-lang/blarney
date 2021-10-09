@@ -55,6 +55,7 @@ module Blarney.Core.Module
 
     -- * Wires
     Wire(..), makeWire, makeWireU,
+    TriStateWire(..), makeTriStateWire, makeTriStateWireU,
 
     -- * Read-Write and Write-Only interfaces
     ReadWrite(..), WriteOnly(..),
@@ -213,13 +214,30 @@ fromRTLWire w = Wire { readWire  = val w
                      , active    = RTL.active w
                      }
 
--- |Create wire with default value
+-- | Create a wire with a default value
 makeWire :: Bits a => a -> Module (Wire a)
-makeWire init = M (fromRTLWire <$> RTL.makeWire init)
+makeWire dflt = M (fromRTLWire <$> RTL.makeWire dflt)
 
--- |Create wire with don't care default value
+-- | Create a wire with a don't care default value
 makeWireU :: Bits a => Module (Wire a)
 makeWireU = M (fromRTLWire <$> RTL.makeWireU)
+
+-- | A newtype to discriminate tristate wires from standard wires
+newtype TriStateWire t = TriStateWire (Wire t) deriving (Generic)
+instance Val (TriStateWire t) t where
+  val (TriStateWire wire) = readWire wire
+instance Assign TriStateWire where
+  (TriStateWire wire) <== x = writeWire wire x
+
+-- | Create a tristate wire with a default value
+makeTriStateWire :: Bits a => a -> Module (TriStateWire a)
+makeTriStateWire dflt =
+  M (TriStateWire . fromRTLWire <$> RTL.makeTriStateWire dflt)
+
+-- | Create a tristate wire with a don't care default value
+makeTriStateWireU :: Bits a => Module (TriStateWire a)
+makeTriStateWireU =
+  M (TriStateWire . fromRTLWire <$> RTL.makeTriStateWireU)
 
 -- |Read-Write interface
 data ReadWrite a =

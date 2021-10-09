@@ -28,45 +28,47 @@ The module defines the RTL monad, supporting:
 -}
 module Blarney.Core.RTL (
   -- * RTL monad
-  RTL             -- RTL monad (abstract)
+  RTL               -- RTL monad (abstract)
 , evalPureRTL
 , evalRTLRoots
   -- * Conditional statements
-, when            -- RTL conditional block
-, whenR           -- RTL conditional block (with return value)
-, ifThenElseRTL   -- RTL if-then-else statement
-, switch          -- RTL switch statement
-, (-->)           -- Operator for switch statement alternatives
+, when              -- RTL conditional block
+, whenR             -- RTL conditional block (with return value)
+, ifThenElseRTL     -- RTL if-then-else statement
+, switch            -- RTL switch statement
+, (-->)             -- Operator for switch statement alternatives
   -- * Block naming statements
-, withNameHint    -- Set a name hint for an RTL block
+, withNameHint      -- Set a name hint for an RTL block
   -- * Mutable variables: registers and wires
-, Reg(..)         -- Registers
-, writeReg        -- Write to register
-, Wire(..)        -- Wires
-, writeWire       -- Write to wire
-, makeReg         -- Create register
-, makeRegU        -- Create uninitialised regiseter
-, makeDReg        -- Like makeReg, but holds value one cycle only
-, makeWire        -- Create wire
-, makeWireU       -- Create uninitialised wire
+, Reg(..)           -- Registers
+, writeReg          -- Write to register
+, Wire(..)          -- Wires
+, writeWire         -- Write to wire
+, makeReg           -- Create register
+, makeRegU          -- Create uninitialised regiseter
+, makeDReg          -- Like makeReg, but holds value one cycle only
+, makeWire          -- Create wire with a default value
+, makeWireU         -- Create uninitialised wire
+, makeTriStateWire  -- Create tristate wire
+, makeTriStateWireU -- Create tristate wire
   -- * Simulation-time statements
-, Displayable(..) -- To support N-ary display statement
-, display         -- Display statement
-, display_        -- Display statement (without newline)
-, finish          -- Terminate simulator
+, Displayable(..)   -- To support N-ary display statement
+, display           -- Display statement
+, display_          -- Display statement (without newline)
+, finish            -- Terminate simulator
   -- * Assertions
-, assert          -- assertion of a predicate
+, assert            -- assertion of a predicate
   -- * External inputs and outputs
-, input           -- Declare module input
-, output          -- Declare module output
-, inputBV         -- Declare module input (untyped)
-, outputBV        -- Declare module output (untyped)
+, input             -- Declare module input
+, output            -- Declare module output
+, inputBV           -- Declare module input (untyped)
+, outputBV          -- Declare module output (untyped)
   -- * Register files
-, RegFileRTL(..)  -- Register file interface
-, makeRegFileInit -- Create initialised register file
-, makeRegFile     -- Create uninitialised register file
+, RegFileRTL(..)    -- Register file interface
+, makeRegFileInit   -- Create initialised register file
+, makeRegFile       -- Create uninitialised register file
   -- * Add netlist roots
-, addRoots        -- Add netlist roots
+, addRoots          -- Add netlist roots
 ) where
 
 -- Blarney imports
@@ -341,9 +343,9 @@ writeWire v x = do
                                     , lhs = wireId v
                                     , rhs = toBV (pack x) }
 
--- | Create wire with default value
-makeWire :: Bits a => a -> RTL (Wire a)
-makeWire defaultVal = do
+-- | Create a wire with an explicit merging strategy and default value
+makeWireCore :: Bits a => MergeStrat -> a -> RTL (Wire a)
+makeWireCore mergeStrat defaultVal = do
   v <- freshVarId
   assigns <- findWithDefault [] v <$> askAssigns
   nameHints <- askNameHints
@@ -353,13 +355,21 @@ makeWire defaultVal = do
       none = invBV any
       out = case assigns of
               []    -> dfltBV
-              other -> mergeBV MStratOr w
+              other -> mergeBV mergeStrat w
                                ([(toBV $ enable a, rhs a) | a <- assigns] ++
                                 [(none, dfltBV)])
   return $ Wire { wireId  = v
                 , wireVal = bvHintsUpdt out nameHints
                 , active  = bvHintsUpdt any $ insert (NmSuffix 0 "act")
                                                      nameHints }
+
+-- | Create a wire with an explicit default value
+makeWire :: Bits a => a -> RTL (Wire a)
+makeWire = makeWireCore MStratOr
+
+-- | Create a tristate wire with an explicit default value
+makeTriStateWire :: Bits a => a -> RTL (Wire a)
+makeTriStateWire = makeWireCore MStratHiZ
 
 --------------------------------------------------------------------------------
 
@@ -380,9 +390,13 @@ makeDReg defaultVal = do
   -- Write to wire and read from reg
   return $ Reg { regId = wireId w, regVal = regVal r }
 
--- |Create wire with don't care default value
+-- | Create a wire with a don't care default value
 makeWireU :: Bits a => RTL (Wire a)
 makeWireU = makeWire dontCare
+
+-- | Create a tristate wire with a don't care default value
+makeTriStateWireU :: Bits a => RTL (Wire a)
+makeTriStateWireU = makeTriStateWire dontCare
 
 --------------------------------------------------------------------------------
 

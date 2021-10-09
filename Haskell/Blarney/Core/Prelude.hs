@@ -1,10 +1,11 @@
 {-# LANGUAGE DataKinds             #-}
-{-# LANGUAGE KindSignatures        #-}
-{-# LANGUAGE TypeOperators         #-}
-{-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE RankNTypes            #-}
-{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE TypeOperators         #-}
+{-# LANGUAGE KindSignatures        #-}
+{-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 {-|

@@ -103,7 +103,7 @@ type OutputName = Maybe String
 type BitIndex = Int
 
 -- | Merging Strategy
-data MergeStrat = MStratOr deriving (Eq, Show)
+data MergeStrat = MStratOr | MStratHiZ deriving (Eq, Show)
 
 -- | Register file primitive parameters
 data RegFileInfo = RegFileInfo {
@@ -821,11 +821,27 @@ primInfo prim@(Merge MStratOr n w) =
            , inputsInlineable = True
            , strRep = "Merge{" ++ show MStratOr ++ "}"
            , semEval = Just \ins ->
+               -- start with a 0 accumulator and or-in each enabled driver
                let f acc [] = acc
                    f acc (en:x:rest) = f (if en == 1 then acc .|. x
                                                      else acc) rest
                    f _ _ = err "malformed Merge inputs"
                in [clamp w $ f 0 ins]
+           , dontKill = False
+           , isRoot = False
+           , inputs = concat [ [("en" ++ show i, 1), ("in" ++ show i, w)]
+                             | i <- [0..n-1]]
+           , outputs = [("out", w)] }
+primInfo prim@(Merge MStratHiZ n w) =
+  PrimInfo { isInlineable = False
+           , inputsInlineable = True
+           , strRep = "Merge{" ++ show MStratHiZ ++ "}"
+           , semEval = Just \ins ->
+               -- pick the first enabled driver or 0 if none is enabled
+               let f (en:x:rest) = if en == 1 then x
+                                              else f rest
+                   f _ = 0
+               in [clamp w $ f ins]
            , dontKill = False
            , isRoot = False
            , inputs = concat [ [("en" ++ show i, 1), ("in" ++ show i, w)]

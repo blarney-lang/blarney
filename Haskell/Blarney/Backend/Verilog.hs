@@ -251,6 +251,8 @@ genNetVerilog netlist net = case netPrim net of
   showIntLit w v = int w <> text "'h" <> hexInt v
   showDontCare :: Int -> Doc
   showDontCare w = int w <> text "'b" <> text (replicate w 'x')
+  showHiZ :: Int -> Doc
+  showHiZ w = int w <> text "'b" <> text (replicate w 'z')
   showWire :: (InstId, OutputName) -> Doc
   showWire (iId, m_nm) = text name <> case m_nm of Just nm -> text nm
                                                    _       -> mempty
@@ -308,6 +310,12 @@ genNetVerilog netlist net = case netPrim net of
     where width = hi+1-lo
   showPrim (Concat w0 w1) [e0, e1] =
     braces $ showNetInput e0 <> comma <+> showNetInput e1
+  showPrim (Merge MStratOr n w) ins = sep $ intersperse (char '|') (go [] ins)
+    where go acc [] = acc
+          go acc (en:x:rest) = go (parens (go' en x):acc) rest
+          go _ _ = error "malformed input list for Merge{MStratOr} primitive"
+          go' en x = showNetInput en <+> text "== 1 ?" <+> showNetInput x
+                                     <+> colon <+> showIntLit w 0
   showPrim (Identity w) [e0] = showNetInput e0
   showPrim p _ = error $
     "unsupported Prim '" ++ show p ++ "' encountered in Verilog generation"
@@ -435,12 +443,21 @@ genNetVerilog netlist net = case netPrim net of
         text "assign" <+> showWire (netInstId net, Nothing)
     <+> equals <+> args <> semi
     where args = sep $ intersperse (char '|') ins
-          ins = f [] $ netInputs net
-          f acc [] = acc
-          f acc (en:x:rest) = f (parens (f' en x):acc) rest
-          f _ _ = error "malformed input list for Merge primitive"
-          f' en x = showNetInput en <+> text "== 1 ?" <+> showNetInput x
-                                    <+> colon <+> showIntLit w 0
+          ins = go [] $ netInputs net
+          go acc [] = acc
+          go acc (en:x:rest) = go (parens (go' en x):acc) rest
+          go _ _ = error "malformed input list for Merge{MStratOr} primitive"
+          go' en x = showNetInput en <+> text "== 1 ?" <+> showNetInput x
+                                     <+> colon <+> showIntLit w 0
+  instMerge net MStratHiZ n w = vcat assigns
+    where assigns = go [] $ netInputs net
+          go acc [] = acc
+          go acc (en:x:rest) = go (drive en x : acc) rest
+          go _ _ = error "malformed input list for Merge{MStratHiZ} primitive"
+          drive en x =
+                text "assign" <+> showWire (netInstId net, Nothing)
+            <+> equals <+> showNetInput en <+> text "== 1 ?" <+> showNetInput x
+                       <+> colon <+> showHiZ w <> semi
   instRAM net i aw dw be =
         hang (hang (text modName) 2 (parens $ argStyle ramParams)) 2
           (hang (text "ram" <> int nId) 2 ((parens $ argStyle ramArgs) <> semi))
