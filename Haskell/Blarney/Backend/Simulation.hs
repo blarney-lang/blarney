@@ -399,6 +399,7 @@ compilePrim CompCtxt{..} currentIns childrenOutputs
   (Mux _ _ w, [ss, i0, i1]) ->
     zipWith3 (\s x y -> if s == 0 then x else y) ss i0 i1
   -- fall through case
+  (_, []) -> repeat (eval [] !! idx)
   _ -> (transpose $ eval <$> transpose ins) !! idx
   where eval = primSemEval prim
         evalUnOp i0 = concatMap eval ((:[]) <$> i0)
