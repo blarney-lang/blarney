@@ -9,6 +9,7 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE DefaultSignatures     #-}
+{-# LANGUAGE NoRebindableSyntax    #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE UndecidableInstances  #-}
 {-# LANGUAGE PartialTypeSignatures #-}
@@ -230,6 +231,9 @@ instance Applicative Declare where
 instance Functor Declare where
   fmap = liftM
 
+getEnv :: Declare Env
+getEnv = Declare $ \c s e -> return (c, [], e)
+
 -- Lookup name in environment
 lookupInputBV :: String -> Declare BV
 lookupInputBV name = Declare $ \c s e ->
@@ -443,10 +447,13 @@ instantiate :: String -> InstanceInfo -> Bool -> Declare a
             -> Maybe CustomNetlist
             -> Module a
 instantiate name info doAddRoots ifc mcnl = noName mdo
-    (_, w, a) <- runDeclare ifc 0 [] (custom w)
-    addRoots [x | DeclOutput s x <- w, doAddRoots]
+    (_, w, (e, a)) <- runDeclare ifc' 0 [] (custom w)
+    addRoots [x | (_, x) <- e, doAddRoots]
     return a
   where
+    ifc' = do x <- ifc
+              e <- getEnv
+              return (e, x)
     custom w =
       let inputs   = [ ("clock", toBV clk)
                      | Just (Clock clk) <- [instanceClock info] ]
@@ -460,7 +467,10 @@ instantiate name info doAddRoots ifc mcnl = noName mdo
           prim     = Custom name [(s, bvPrimOutWidth x) | (s, x) <- inputs]
                            outputs (instanceParams info)
                              addClock addReset mcnl
-      in  zip outNames (makePrim prim (map snd inputs) (map Just outNames))
+      in if null outputs
+           then [(undefined, makePrim0 prim (map snd inputs))]
+           else zip outNames
+                    (makePrim prim (map snd inputs) (map Just outNames))
 
 makeModule :: Modular a => a -> Module ()
 makeModule a = modularise (makeMod 0 a)
