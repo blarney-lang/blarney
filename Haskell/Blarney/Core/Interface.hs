@@ -231,9 +231,6 @@ instance Applicative Declare where
 instance Functor Declare where
   fmap = liftM
 
-getEnv :: Declare Env
-getEnv = Declare $ \c s e -> return (c, [], e)
-
 -- Lookup name in environment
 lookupInputBV :: String -> Declare BV
 lookupInputBV name = Declare $ \c s e ->
@@ -447,13 +444,12 @@ instantiate :: String -> InstanceInfo -> Bool -> Declare a
             -> Maybe CustomNetlist
             -> Module a
 instantiate name info doAddRoots ifc mcnl = noName mdo
-    (_, w, (e, a)) <- runDeclare ifc' 0 [] (custom w)
-    addRoots [x | (_, x) <- e, doAddRoots]
+    let (bvs, env) = case custom w of Left bv -> ([bv], [])
+                                      Right e -> (snd <$> e, e)
+    (_, w, a) <- runDeclare ifc 0 [] env
+    addRoots [x | x <- bvs, doAddRoots]
     return a
   where
-    ifc' = do x <- ifc
-              e <- getEnv
-              return (e, x)
     custom w =
       let inputs   = [ ("clock", toBV clk)
                      | Just (Clock clk) <- [instanceClock info] ]
@@ -468,9 +464,9 @@ instantiate name info doAddRoots ifc mcnl = noName mdo
                            outputs (instanceParams info)
                              addClock addReset mcnl
       in if null outputs
-           then [(undefined, makePrim0 prim (map snd inputs))]
-           else zip outNames
-                    (makePrim prim (map snd inputs) (map Just outNames))
+           then Left $ makePrim0 prim (map snd inputs)
+           else Right . zip outNames $ makePrim prim (map snd inputs)
+                                                     (map Just outNames)
 
 makeModule :: Modular a => a -> Module ()
 makeModule a = modularise (makeMod 0 a)
