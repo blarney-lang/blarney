@@ -9,6 +9,7 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE DefaultSignatures     #-}
+{-# LANGUAGE NoRebindableSyntax    #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE UndecidableInstances  #-}
 {-# LANGUAGE PartialTypeSignatures #-}
@@ -443,8 +444,10 @@ instantiate :: String -> InstanceInfo -> Bool -> Declare a
             -> Maybe CustomNetlist
             -> Module a
 instantiate name info doAddRoots ifc mcnl = noName mdo
-    (_, w, a) <- runDeclare ifc 0 [] (custom w)
-    addRoots [x | DeclOutput s x <- w, doAddRoots]
+    let (bvs, env) = case custom w of Left bv -> ([bv], [])
+                                      Right e -> (snd <$> e, e)
+    (_, w, a) <- runDeclare ifc 0 [] env
+    addRoots [x | x <- bvs, doAddRoots]
     return a
   where
     custom w =
@@ -460,7 +463,10 @@ instantiate name info doAddRoots ifc mcnl = noName mdo
           prim     = Custom name [(s, bvPrimOutWidth x) | (s, x) <- inputs]
                            outputs (instanceParams info)
                              addClock addReset mcnl
-      in  zip outNames (makePrim prim (map snd inputs) (map Just outNames))
+      in if null outputs
+           then Left $ makePrim0 prim (map snd inputs)
+           else Right . zip outNames $ makePrim prim (map snd inputs)
+                                                     (map Just outNames)
 
 makeModule :: Modular a => a -> Module ()
 makeModule a = modularise (makeMod 0 a)
