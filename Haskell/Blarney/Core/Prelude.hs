@@ -37,6 +37,8 @@ module Blarney.Core.Prelude
   , buffer          -- Generic register with don't care initialiser
   , old             -- Generic register with don't care initialiser
   , delayEn         -- Generic register with enable
+  , binaryEncode    -- One-hot to binary encoder
+  , firstHot        -- Isolate first hot bit in vector
   ) where
 
 import Prelude
@@ -160,3 +162,15 @@ old = delay dontCare
 delayEn :: Bits a => a -> Bit 1 -> a -> a
 delayEn init en a =
   unpack (regEn (pack init) en (pack a))
+
+-- | One-hot to binary encoder
+binaryEncode :: Bit (2^n) -> Bit n
+binaryEncode xs = unsafeFromBitList $ encode $ unsafeToBitList xs
+  where
+    encode [_] = []
+    encode as  = zipWith (.|.) (encode ls) (encode rs) ++ [orList rs]
+      where (ls, rs) = splitAt (length as `div` 2) as
+
+-- | Isolate first hot bit in a bit vector
+firstHot :: KnownNat n => Bit n -> Bit n
+firstHot x = x .&. (inv x + 1)
