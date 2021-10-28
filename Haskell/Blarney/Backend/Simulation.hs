@@ -116,7 +116,7 @@ compileSim allSims originalNl = do
     outputStreams <- sequence
       [ do outs <- compileOutputSignal ctxt memo currentIns childrenOutputs o
            return (nm, truncate outs)
-      | o@Net{ netPrim = Output _ nm } <- IArray.elems nl ]
+      | o@Net{ netPrim = Output (nm, _, _) } <- IArray.elems nl ]
     -- wrap compilation result into a SimulatorIfc
     return SimulatorIfc { simEffect    = effectStreams'
                         , simOutputs   = Map.fromList outputStreams }
@@ -188,7 +188,7 @@ compileCustomInputs ctxt memo currentIns childrenOutputs
                     Net{ netPrim = Custom{..}, ..} = do
   ins <- mapM (compileNetInputSignal ctxt memo currentIns childrenOutputs)
               netInputs
-  return $ Map.fromList $ zip (map fst customInputs) ins
+  return $ Map.fromList $ zip (map (\(x, _, _) -> x) customInputs) ins
 
 -- | compile the '[IO ()]' stream of simulation effects for a given simulation
 --   effect capable 'Net' (currently, only 'Display' nets)
@@ -223,7 +223,7 @@ compileTermination ctxt memo currentIns childrenOutputs
 --   (currently not supported)
 compileOutputSignal :: CompFun s Net Signal
 compileOutputSignal ctxt memo currentIns childrenOutputs
-                    Net{ netPrim = Output _ _, ..} = do
+                    Net{ netPrim = Output _, ..} = do
   compileNetInputSignal ctxt memo currentIns childrenOutputs (head netInputs)
 
 -- | compile the 'Signal' associated with a 'WireId' (memoized)
@@ -295,7 +295,7 @@ compilePrim CompCtxt{..} currentIns childrenOutputs
   (RegisterEn i _, [ens, inpts]) ->
     scanl f (fromMaybe simDontCare i) (zip ens inpts)
     where f prev (en, inpt) = if en /= 0 then inpt else prev
-  (Input _ nm, _) -> currentIns Map.! nm
+  (Input (nm, _, _), _) -> currentIns Map.! nm
   (Custom{..}, _) -> childOuts Map.! nm
     where childOuts = childrenOutputs IntMap.! instId
           nm = fst $ (primOutputs prim) !! idx

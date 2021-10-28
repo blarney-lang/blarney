@@ -276,24 +276,24 @@ display_ :: Displayable a => a
 display_ = disp (Format []) (Format [])
 
 -- | RTL external input declaration
-input :: KnownNat n => String -> RTL (Bit n)
-input str = mdo x <- FromBV <$> inputBV str (widthOf x)
-                return x
+input :: KnownNat n => String -> PortId -> RTL (Bit n)
+input nm pid = mdo x <- FromBV <$> inputBV nm (widthOf x) pid
+                   return x
 
 -- | RTL external input declaration (untyped)
-inputBV :: String -> Width -> RTL BV
-inputBV str w = do let bv = inputPinBV w str
-                   addRTLAction $ RTLRoot bv
-                   return bv
+inputBV :: String -> Width -> PortId -> RTL BV
+inputBV nm w pid = do let bv = inputPinBV nm w pid
+                      addRTLAction $ RTLRoot bv
+                      return bv
 
 -- | RTL external output declaration
-output :: String -> Bit n -> RTL ()
-output str out = outputBV str (toBV out)
+output :: String -> PortId -> Bit n -> RTL ()
+output nm pid out = outputBV nm pid (toBV out)
 
 -- | RTL external output declaration (untyped)
-outputBV :: String -> BV -> RTL ()
-outputBV str bv =
-  addRTLAction . RTLRoot $ makePrim0 (Output (bvPrimOutWidth bv) str) [bv]
+outputBV :: String -> PortId -> BV -> RTL ()
+outputBV nm pid bv =
+  addRTLAction . RTLRoot $ makePrim0 (Output (nm, bvPrimOutWidth bv, pid)) [bv]
 
 --------------------------------------------------------------------------------
 

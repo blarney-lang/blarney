@@ -102,7 +102,7 @@ topoSort nl rootIds = runST do
                                            else return ()
     -- identify leaf net
     isLeaf :: Net -> Bool
-    isLeaf Net{ netPrim = Input      _ _ } = True
+    isLeaf Net{ netPrim = Input        _ } = True
     isLeaf Net{ netPrim = RegisterEn _ _ } = True
     isLeaf Net{ netPrim = Register   _ _ } = True
     isLeaf _                               = False

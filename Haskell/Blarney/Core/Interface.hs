@@ -216,7 +216,7 @@ type Env = [(String, BV)]
 
 -- Declarations being collected
 -- (A named input with a width, or a named output bit-vector)
-data Decl = DeclInput String Width | DeclOutput String BV
+data Decl = DeclInput Width String PortId | DeclOutput String PortId BV
 
 -- A scope is a stack of names, used to generate sensible names
 type Scope = [String]
@@ -272,14 +272,14 @@ declareOutputBV :: String -> BV -> Declare ()
 declareOutputBV suffix bv = do
   nm <- getName
   let name = case suffix of { "" -> nm; other -> nm ++ "_" ++ suffix }
-  addDecl (DeclOutput name bv)
+  addDecl (DeclOutput name Nothing bv)
 
 -- Declare a new input bit-vector of given width
 declareInputBV :: String -> Width -> Declare BV
 declareInputBV suffix width = do
   nm <- getName
   let name = case suffix of { "" -> nm; other -> nm ++ "_" ++ suffix }
-  addDecl (DeclInput name width)
+  addDecl (DeclInput width name Nothing)
   lookupInputBV name
 
 -- Declare an output, generically over any interface type
@@ -438,11 +438,11 @@ modularise ifc = noName mdo
     return a
   where
     mod w = noName do
-      let outputs = [(s, x) | (DeclOutput s x) <- w]
-      let inputs  = [(s, n) | DeclInput s n <- w]
-      mapM (\(s,x) -> outputBV s x) outputs
-      tmps <- mapM (\(s,n) -> inputBV s n) inputs
-      return $ zip (map fst inputs) tmps
+      let outputs = [(nm, pid, bv) | DeclOutput nm pid bv <- w]
+      let inputs  = [(nm, w, pid)  | DeclInput w nm pid <- w]
+      mapM (\(nm, pid, bv) -> outputBV nm pid bv) outputs
+      tmps <- mapM (\(nm, w, pid) -> inputBV nm w pid) inputs
+      return $ zip (map (\(x, _, _) -> x) inputs) tmps
 
 -- Realise declarations to give module instance
 instantiate :: String -> InstanceInfo -> Bool -> Declare a
@@ -456,22 +456,28 @@ instantiate name info doAddRoots ifc mcnl = noName mdo
     return a
   where
     custom w =
-      let inputs   = [ ("clock", toBV clk)
+      let inputs   = [ ("clock", Nothing, toBV clk)
                      | Just (Clock clk) <- [instanceClock info] ]
-                  ++ [ ("reset", toBV rst)
+                  ++ [ ("reset", Nothing, toBV rst)
                      | Just (Reset rst) <- [instanceReset info] ]
-                  ++ [(s, x) | (DeclOutput s x) <- w]
-          outputs  = [(s, n) | DeclInput s n <- w]
-          outNames = map fst outputs
+                  ++ [(nm, pid, bv) | DeclOutput nm pid bv <- w]
+          outputs  = [(nm, w, pid)  | DeclInput w nm pid <- w]
+          outNames = map (\(x, _, _) -> x) outputs
           addClock = isNothing (instanceClock info)
           addReset = isNothing (instanceReset info)
-          prim     = Custom name [(s, bvPrimOutWidth x) | (s, x) <- inputs]
-                           outputs (instanceParams info)
-                             addClock addReset mcnl
+          prim     = Custom { customName = name
+                            , customInputs = [ (nm, bvPrimOutWidth bv, pid)
+                                             | (nm, pid, bv) <- inputs ]
+                            , customOutputs = outputs
+                            , customParams = instanceParams info
+                            , customIsClocked = addClock
+                            , customResetable = addReset
+                            , customNetlist = mcnl }
       in if null outputs
-           then Left $ makePrim0 prim (map snd inputs)
-           else Right . zip outNames $ makePrim prim (map snd inputs)
-                                                     (map Just outNames)
+           then Left $ makePrim0 prim (map (\(_, _, x) -> x) inputs)
+           else Right . zip outNames $
+                  makePrim prim (map (\(_, _, x) -> x) inputs)
+                                (map Just outNames)
 
 makeModule :: Modular a => a -> Module ()
 makeModule a = modularise (makeMod 0 a)

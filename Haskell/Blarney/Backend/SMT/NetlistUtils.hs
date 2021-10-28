@@ -56,9 +56,9 @@ defineNLTransition :: Netlist
                    -> Doc
 defineNLTransition nl n@Net { netPrim = p, netInputs = ins }
                    (inptType, stType) sortedNl state name
-  | case p of Output _ _ -> True
-              Assert _   -> True
-              _          -> False =
+  | case p of Output _ -> True
+              Assert _ -> True
+              _        -> False =
     defineFun (text name) fArgs fRet fBody
   | otherwise = error $ "Blarney.Backend.SMT.NetlistUtils: " ++
                         "cannot defineNLTransition on " ++ show n
@@ -70,15 +70,15 @@ defineNLTransition nl n@Net { netPrim = p, netInputs = ins }
         fRet  = text $ "(Tuple2 Bool " ++ stType ++ ")"
         fBody = withBoundNets ctx filteredNl $ newTuple2 assertE stateUpdtE
         newTuple2 a b = applyOp (text "mkTuple2") [a, b]
-        dontPrune i = case netPrim (getNet nl i) of Input      _ _ -> False
+        dontPrune i = case netPrim (getNet nl i) of Input        _ -> False
                                                     RegisterEn _ _ -> False
                                                     Register   _ _ -> False
-                                                    Output     _ _ -> False
-                                                    Assert     _   -> False
+                                                    Output       _ -> False
+                                                    Assert       _ -> False
                                                     _              -> True
         filteredNl = [i | i <- sortedNl, dontPrune i]
         assertE = case p of
-          Output _ _ -> bvIsTrue $ showNetInput ctx (head ins)
+          Output _ -> bvIsTrue $ showNetInput ctx (head ins)
           Assert _ ->
             applyOp (text "=>") $ map (bvIsTrue . showNetInput ctx) ins
         stateUpdtE = mkNLDatatype stType $ regsInpts state
@@ -153,10 +153,10 @@ wireName nl (iId, m_outnm) = name ++ richNm ++ outnm ++ "_" ++ show iId
   where outnm = case m_outnm of Just nm -> nm
                                 _       -> ""
         net = getNet nl iId
-        richNm = case netPrim net of Input      _ nm -> "inpt_" ++ nm
-                                     RegisterEn _ _  -> "reg"
-                                     Register   _ _  -> "reg"
-                                     _               -> ""
+        richNm = case netPrim net of Input (nm, _, _) -> "inpt_" ++ nm
+                                     RegisterEn   _ _ -> "reg"
+                                     Register     _ _ -> "reg"
+                                     _                -> ""
         name = genName $ netNameHints net
 
 -- internal helpers
@@ -226,7 +226,7 @@ showWire nl wId = text $ wireName nl wId
 showNetInput :: (Netlist, String, String) -> NetInput -> Doc
 showNetInput (nl, inpts, state) (InputWire (nId, m_nm)) =
   case netPrim $ getNet nl nId of
-    Input      _ _ -> parens $ showWire nl (nId, m_nm) <+> text inpts
+    Input        _ -> parens $ showWire nl (nId, m_nm) <+> text inpts
     RegisterEn _ _ -> parens $ showWire nl (nId, m_nm) <+> text state
     Register   _ _ -> parens $ showWire nl (nId, m_nm) <+> text state
     _              -> showWire nl (nId, m_nm)

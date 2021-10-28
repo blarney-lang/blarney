@@ -33,6 +33,8 @@ module Blarney.Core.Prim (
 , BRAMKind(..)    -- Block RAM kind
   -- * Other primitive types
 , InstId          -- Every component instance has a unique id
+, PortId          -- Module port identifier
+, PortParams      -- Module port parameters
 , Width           -- Bit vector width
 , InputWidth      -- Width of an input to a component
 , OutputWidth     -- Width of an output from a component
@@ -68,6 +70,14 @@ err str = error $ "Blarney.Core.prim: " ++ str
 -- | Unique identifier used to identify every instance of a component in a
 --   circuit
 type InstId = Int
+
+-- | Port indentifier to tag primitives notionally part of the same module port
+--   (for 'Input' and 'Output' primitives, useful for a backend to detect
+--   potential "inout" ports for example)
+type PortId = Maybe Int
+
+-- | Port parameters (name, width, port identifier)
+type PortParams = (String, Width, PortId)
 
 -- | Hint to generate useful names when working with 'Net's
 data NameHint = NmPrefix Int String -- ^ Suggested name prefix
@@ -338,19 +348,21 @@ data Prim =
     --                 the @n@ inputs according to @mStrat@
   | Merge MergeStrat Int Width
 
-    -- | @Input w name@ represents a named external input
+    -- | @Input (nm, w, mPortId)@ represents a named external input with a
+    --   potential port id
     --
     --   [__inputs__]  no input, i.e. @[]@
     --   [__outputs__] a single output, the @w@-bit value received as an input
     --                 from outside the circuit
-  | Input OutputWidth String
+  | Input PortParams
 
-    -- | @Output w name@ represents a named external output
+    -- | @Output (nm, w, mPortId)@ represents a named external output with a
+    --   potential port id
     --
     --   [__inputs__]  @[x]@, a single @w@-bit value
     --   [__outputs__] no output, as this primitive stands for the node that
     --                 exports @x@ outside of the circuit
-  | Output InputWidth String
+  | Output PortParams
 
     -- TODO document
     -- | Block RAM
@@ -362,12 +374,12 @@ data Prim =
 
     -- TODO document
     -- | Custom component
-  | Custom { customName      :: String                  -- ^ Component name
-           , customInputs    :: [(String, InputWidth)]  -- ^ Input names
-           , customOutputs   :: [(String, OutputWidth)] -- ^ Output names/widths
-           , customParams    :: [Param]                 -- ^ Parameters
-           , customIsClocked :: Bool                    -- ^ Pass clock?
-           , customResetable :: Bool                    -- ^ Pass reset?
+  | Custom { customName      :: String       -- ^ Component name
+           , customInputs    :: [PortParams] -- ^ Input ports parameters
+           , customOutputs   :: [PortParams] -- ^ Output ports parameters
+           , customParams    :: [Param]      -- ^ Parameters
+           , customIsClocked :: Bool         -- ^ Pass clock?
+           , customResetable :: Bool         -- ^ Pass reset?
            , customNetlist   :: Maybe CustomNetlist
              -- ^ Optional netlist for this component
            }
@@ -861,9 +873,9 @@ primInfo prim@Custom{ customName = custNm
            , semEval = Nothing
            , dontKill = False
            , isRoot = False
-           , inputs = ins
-           , outputs = outs }
-primInfo prim@(Input w nm) =
+           , inputs = map (\(nm, w, _) -> (nm, w)) ins
+           , outputs = map (\(nm, w, _) -> (nm, w)) outs }
+primInfo prim@(Input (nm, w, _)) =
   PrimInfo { isInlineable = False
            , inputsInlineable = True
            , strRep = nm
@@ -872,7 +884,7 @@ primInfo prim@(Input w nm) =
            , isRoot = True
            , inputs = []
            , outputs = [("out", w)] }
-primInfo prim@(Output w nm) =
+primInfo prim@(Output (nm, w, _)) =
   PrimInfo { isInlineable = False
            , inputsInlineable = True
            , strRep = nm

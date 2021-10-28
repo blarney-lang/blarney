@@ -169,8 +169,8 @@ mkContext nl n = Context { ctxtNetlist    = nl
   where topoSortIds = partialTopologicalSort nl $ netInstId n
         dontCareVal = 0
         inputIds = [ i | x@Net{netInstId = i, netPrim = p} <- elems nl
-                       , case p of Input _ _ -> True
-                                   _         -> False
+                       , case p of Input _ -> True
+                                   _       -> False
                        , elem i topoSortIds ]
         stateElems =
           [ (i, stateInit x) | x@Net{netInstId=i, netPrim=p} <- elems nl
@@ -190,7 +190,7 @@ mkContext nl n = Context { ctxtNetlist    = nl
         tFun = "tFun_" ++ nm
         cFun = "chain_" ++ tFun
         (nm, msg) = case netPrim n of
-          Output _      outnm   -> ("output_"++outnm,  Nothing)
+          Output (outnm, _, _) -> ("output_"++outnm,  Nothing)
           Assert propmsg -> ("assert_"++propnm, Just propmsg)
             where propnm = wireName nl propWire
                   propWire = head . netInputWireIds $ (netInputs n !! 1)

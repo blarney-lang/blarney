@@ -248,20 +248,20 @@ makeDReg :: Bits a => a -> Module (Reg a)
 makeDReg defaultVal = M (fromRTLReg <$> RTL.makeDReg defaultVal)
 
 -- |External input declaration
-input :: KnownNat n => String -> Module (Bit n)
-input str = M (RTL.input str)
+input :: KnownNat n => String -> PortId -> Module (Bit n)
+input nm pid = M (RTL.input nm pid)
 
 -- |External input declaration (untyped)
-inputBV :: String -> Width -> Module BV
-inputBV str w = M (RTL.inputBV str w)
+inputBV :: String -> Width -> PortId -> Module BV
+inputBV nm w pid = M (RTL.inputBV nm w pid)
 
 -- |External output declaration
-output :: String -> Bit n -> Module ()
-output str out = M (RTL.output str out)
+output :: String -> PortId -> Bit n -> Module ()
+output nm pid out = M (RTL.output nm pid out)
 
 -- |External output declaration (untyped)
-outputBV :: String -> BV -> Module ()
-outputBV str bv = M (RTL.outputBV str bv)
+outputBV :: String -> PortId -> BV -> Module ()
+outputBV nm pid bv = M (RTL.outputBV nm pid bv)
 
 data RegFile a d =
   RegFile {

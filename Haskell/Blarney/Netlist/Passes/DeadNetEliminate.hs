@@ -39,7 +39,7 @@ deadNetEliminate mnlRef = do
   -- DEBUG HELP -- x <- readSTRef changed
   -- DEBUG HELP -- putStrLn $ "deadNetEliminate pass changed? " ++ show x
   readSTRef changed
-  where alsoDontKill Net{netPrim=Output _ _} = True
+  where alsoDontKill Net{netPrim=Output _} = True
         alsoDontKill Net{netPrim=RegFileWrite _} = True
         alsoDontKill _ = False
 

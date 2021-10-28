@@ -297,8 +297,8 @@ testPlusArgsBV :: String -> BV
 testPlusArgsBV str = makePrim1 (TestPlusArgs str) []
 
 -- |Input pin (named Verilog pin)
-inputPinBV :: Width -> String -> BV
-inputPinBV w s = makePrim1 (Input w s) []
+inputPinBV :: String -> Width -> PortId -> BV
+inputPinBV nm w pid = makePrim1 (Input (nm, w, pid)) []
 
 -- |Register of given width with initial value
 regBV :: Width -> BV -> BV -> BV

@@ -57,17 +57,17 @@ zeroWidthNetTransform net@Net{ netPrim = Display args, netInputs = inpts } =
 zeroWidthNetTransform net@Net{ netPrim = prim@Custom{ customInputs = primIns
                                                     , customOutputs = primOuts }
                              , netInputs = netIns }
-  | any (\(_, x) -> x == 0) primIns ||
-    any (\(_, y) -> y == 0) primOuts =
+  | any (\(_, x, _) -> x == 0) primIns ||
+    any (\(_, y, _) -> y == 0) primOuts =
     ( net { netPrim = prim { customInputs = primIns'
                            , customOutputs = primOuts' }
           , netInputs = netIns' }
     , True )
   | otherwise = (net, False)
   where ins = zip netIns primIns
-        ins' = [x | x@(_, (_, w)) <- ins, w /= 0]
+        ins' = [x | x@(_, (_, w, _)) <- ins, w /= 0]
         (netIns', primIns') = unzip ins'
-        primOuts' = [x | x@(_, w) <- primOuts, w /= 0]
+        primOuts' = [x | x@(_, w, _) <- primOuts, w /= 0]
 -- Remove 0-width registers to break 0-width cycles
 zeroWidthNetTransform net@Net{ netPrim = Register _ 0 } =
   (net { netPrim = Const 0 0, netInputs = [] }, True)

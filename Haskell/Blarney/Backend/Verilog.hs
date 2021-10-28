@@ -143,17 +143,17 @@ showVerilogModule modName netlst =
         nets = elems netlst
         netVs = map (genNetVerilog netlst) nets
         netPrims = map netPrim nets
-        ins = [Input w s | (w, s) <- nub [(w, s) | Input w s <- netPrims]]
-        outs = [Output w s | Output w s <- netPrims]
+        ins = [ Input pp | pp <- nub [ pp | Input pp <- netPrims ] ]
+        outs = [Output pp | Output pp <- netPrims]
         showIOs = argStyle $ text "input wire clock"
                            : text "input wire reset"
                            : map showIO (ins ++ outs)
-        showIO (Input w s) =     text "input wire"
-                             <+> brackets (int (w-1) <> text ":0")
-                             <+> text s
-        showIO (Output w s) = text "output wire"
-                              <+> brackets (int (w-1) <> text ":0")
-                              <+> text s
+        showIO (Input (nm, w, _)) =     text "input wire"
+                                    <+> brackets (int (w-1) <> text ":0")
+                                    <+> text nm
+        showIO (Output (nm, w, _)) =     text "output wire"
+                                     <+> brackets (int (w-1) <> text ":0")
+                                     <+> text nm
         showIO _ = text ""
         showComment cmt = text "//" <+> text cmt
         --showCommentLine = remainCols (\r -> p "//" <> p (replicate (r-2) '/'))
@@ -212,9 +212,9 @@ genNetVerilog netlist net = case netPrim net of
   Finish                  -> dfltNV { alws = Just $ alwsFinish net }
   TestPlusArgs s          -> dfltNV { decl = Just $ declWire 1 wId
                                     , inst = Just $ instTestPlusArgs wId s }
-  Input w s               -> dfltNV { decl = Just $ declWire w wId
-                                    , inst = Just $ instInput net s }
-  Output w s              -> dfltNV { inst = Just $ instOutput net s }
+  Input (nm, w, _)        -> dfltNV { decl = Just $ declWire w wId
+                                    , inst = Just $ instInput net nm }
+  Output (nm, w, _)       -> dfltNV { inst = Just $ instOutput net nm }
   Assert msg              -> dfltNV { alws = Just $ alwsAssert net msg }
   RegFileMake rfinfo
     -> dfltNV { decl = Just $ declRegFile rfinfo }
@@ -225,7 +225,7 @@ genNetVerilog netlist net = case netPrim net of
     -> dfltNV { alws = Just $ alwsRegFileWrite vId net }
   Custom p is os ps clked resetable nlgen
     -> dfltNV { decl = Just $ sep [ declWire w (netInstId net, Just nm)
-                                  | (nm, w) <- os ]
+                                  | (nm, w, _) <- os ]
               , inst = Just $ instCustom net p is os ps clked resetable }
   --_ -> dfltNV
   where
@@ -402,8 +402,8 @@ genNetVerilog netlist net = case netPrim net of
           showInst = hang (text (name ++ "_") <> int nId) 2 (showArgs <> semi)
           allParams = [ dot <> text key <> parens (text val)
                       | (key :-> val, i) <- zip params [1..] ]
-          args = zip (map fst ins) (netInputs net) ++ [ (nm, InputWire (nId, Just nm))
-                                                      | nm <- map fst outs ]
+          args =    zip (map (\(x, _, _) -> x) ins) (netInputs net)
+                 ++ [ (nm, InputWire (nId, Just nm)) | (nm, _, _) <- outs ]
           numArgs  = length args
           showArgs = parens $ argStyle $ [ text ".clock(clock)" | clked ]
                                       ++ [ text ".reset(reset)" | resetable ]
