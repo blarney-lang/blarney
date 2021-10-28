@@ -48,8 +48,8 @@ makeCPU = do
 
   -- Two block RAMs allows two operands to be read,
   -- and one result to be written, on every cycle
-  regFileA :: RAM RegId (Bit 8) <- makeDualRAMForward 0
-  regFileB :: RAM RegId (Bit 8) <- makeDualRAMForward 0
+  regFileA :: RAM RegId (Bit 8) <- makeDualRAMForward
+  regFileB :: RAM RegId (Bit 8) <- makeDualRAMForward
 
   -- Instruction register
   instr :: Reg (Bit 8) <- makeReg dontCare

@@ -56,7 +56,10 @@ module Blarney.Core.RAM (
 , makeTrueDualRAMBECore  -- Optionally initialised true dual-port block RAM
 , makeDualRAMBE          -- Dual-port block RAM
 , makeDualRAMInitBE      -- Initilaised dual-port block RAM
-, makeDualRAMBECore      -- Initilaised dual-port block RAM
+, makeDualRAMBECore      -- Optionally initilaised dual-port block RAM
+, makeDualRAMForwardBE   -- Forwarding dual-port block RAM with byte enable
+, makeDualRAMForwardInitBE
+, makeDualRAMForwardBECore
 , nullRAMBE              -- Make a RAMBE interface with no RAM backing it
 ) where
 
@@ -376,66 +379,53 @@ makeDualRAMCore init = do
 
 -- | Dual-port forwarding block RAM with initial contents from hex file.
 -- Read and write to same address yields new data.
-makeDualRAMForwardInit :: (Bits a, Bits d) => Int -> String -> Module (RAM a d)
-makeDualRAMForwardInit n init = makeDualRAMForwardCore n (Just init)
+makeDualRAMForwardInit :: (Bits a, Bits d) => String -> Module (RAM a d)
+makeDualRAMForwardInit init = makeDualRAMForwardCore (Just init)
 
 -- | Uninitialised dual-port forwarding block RAM.
 -- Read and write to same address yields new data.
-makeDualRAMForward :: (Bits a, Bits d) => Int -> Module (RAM a d)
-makeDualRAMForward n = makeDualRAMForwardCore n Nothing
+makeDualRAMForward :: (Bits a, Bits d) => Module (RAM a d)
+makeDualRAMForward = makeDualRAMForwardCore Nothing
 
 -- Dual port RAM module with forwarding.
 -- Read and write to same address yields new data.
-makeDualRAMForwardCore :: (Bits a, Bits d) =>
-                                 Int -> Maybe String -> Module (RAM a d)
-makeDualRAMForwardCore n init
-  | n < 0 = error "makeDualRAMForwardCore: n must be greater or equal to 0"
-  | otherwise = do
+makeDualRAMForwardCore :: (Bits a, Bits d) => Maybe String -> Module (RAM a d)
+makeDualRAMForwardCore init = do
   -- Create dual port RAM
   ram :: RAM a d <- makeDualRAMCore init
 
   -- Details of lastest load and store
-  la :: Wire a <- makeWireU
-  sa :: Wire a <- makeWireU
-  sd :: Wire d <- makeWireU
+  loadAddr  :: Wire a <- makeWire dontCare
+  storeAddr :: Wire a <- makeWire dontCare
+  storeData :: Wire d <- makeWire dontCare
 
-  let get_rdata (_,_,x,_,_,_) = x
-  let cmpStep (ractive, raddr, rdata, wactive, waddr, wdata) =
-       ( ractive
-       , raddr
-       , (ractive .&. wactive .&. (raddr === waddr)) ? (wdata, rdata)
-       , wactive
-       , waddr
-       , wdata)
-  let latchStep (ractive, raddr, rdata, wactive, waddr, wdata) =
-       ( delay 0 ractive
-       , buffer raddr
-       , rdata
-       , wactive
-       , waddr
-       , wdata)
-  let firstStage = cmpStep ( delay 0 (active la)
-                           , buffer (val la)
-                           , out ram
-                           , delay 0 (active sa)
-                           , buffer (val sa)
-                           , buffer (val sd))
-  let allStages = iterate (cmpStep `o` latchStep) ( active la
-                                                  , val la
-                                                  , get_rdata firstStage
-                                                  , active sa
-                                                  , val sa
-                                                  , val sd)
+  -- Preserve current output on the next cycle?
+  preserveWire :: Wire (Bit 1) <- makeWire false
 
   return RAM {
-    load    = \a -> do load ram a
-                       la <== a
-  , store   = \a d -> do store ram a d
-                         sa <== a
-                         sd <== d
-  , out     = get_rdata $ allStages !! n
+    load = \a -> do
+      load ram a
+      loadAddr <== a
+  , store = \a d -> do
+      store ram a d
+      storeAddr <== a
+      storeData <== d
+  , out =
+      let en = inv $ val $ preserveWire
+          forwardCond =
+            delayEn false en $
+              andList [
+                active loadAddr
+              , active storeAddr
+              , val loadAddr === val storeAddr
+              ]
+          forwardData =
+            delayEn dontCare en (val storeData)
+      in forwardCond ? (forwardData, out ram)
   , storeActive = storeActive ram
-  , preserveOut = preserveOut ram
+  , preserveOut = do
+      preserveWire <== true
+      preserveOut ram
   }
 
 -- |RAM (with byte enables) interface (data width is in bytes)
@@ -587,6 +577,72 @@ makeDualRAMBECore init = do
                               val writeEn, val readEn, val byteEn)
   , storeActiveBE = val writeEn
   , preserveOutBE = readEn <== 0
+  }
+
+-- |Create uninitialised forwarding dual-port RAM with byte enables.
+-- One port used for reading and the other for writing.
+-- Read-during-write yields new data.
+makeDualRAMForwardBE :: _ => Module (RAMBE aw dw)
+makeDualRAMForwardBE = makeDualRAMForwardBECore Nothing
+
+-- |Create forwarding dual-port RAM with byte enables and
+-- initial contents from hex file.
+-- One port used for reading and the other for writing.
+-- Read-during-write yields new data.
+makeDualRAMForwardInitBE :: _ => String -> Module (RAMBE aw dw)
+makeDualRAMForwardInitBE init = makeDualRAMForwardBECore (Just init)
+
+-- Forwarding dual port RAM module with byte enable.
+-- One port used for reading and the other for writing.
+-- Read-during-write yields new data.
+makeDualRAMForwardBECore :: _ => Maybe String -> Module (RAMBE aw dw)
+makeDualRAMForwardBECore init = do
+  -- Create dual port RAM
+  ram :: RAMBE aw dw <- makeDualRAMBECore init
+
+  -- Details of lastest load and store
+  loadAddr  :: Wire (Bit aw) <- makeWire dontCare
+  storeAddr :: Wire (Bit aw) <- makeWire dontCare
+  storeData :: Wire (Bit (8*dw)) <- makeWire dontCare
+  storeByteEn :: Wire (Bit dw) <- makeWire dontCare
+
+  -- Preserve current output on the next cycle?
+  preserveWire :: Wire (Bit 1) <- makeWire false
+
+  return RAMBE {
+    loadBE = \a -> do
+      loadBE ram a
+      loadAddr <== a
+  , storeBE = \a be d -> do
+      storeBE ram a be d
+      storeAddr <== a
+      storeData <== d
+      storeByteEn <== be
+  , outBE =
+      let en = inv $ val $ preserveWire
+          forwardCond =
+            delayEn false en $
+              andList [
+                active loadAddr
+              , active storeAddr
+              , val loadAddr === val storeAddr
+              ]
+          forwardData =
+            delayEn dontCare en (val storeData)
+          forwardByteEn =
+            delayEn 0 en (val storeByteEn)
+          outData = fromBitList
+            [ (forwardCond .&&. be) ? (new, old)
+            | (be, new, old) <-
+                zip3 (concatMap (replicate 8) (toBitList forwardByteEn))
+                     (toBitList forwardData)
+                     (toBitList (outBE ram))
+            ]
+      in outData
+  , storeActiveBE = storeActiveBE ram
+  , preserveOutBE = do
+      preserveWire <== true
+      preserveOutBE ram
   }
 
 -- | RAM interface with no backing functionality
