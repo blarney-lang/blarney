@@ -1,9 +1,5 @@
 import Blarney
 
--- | Isolate first hot bit in a bit vector
-firstHot :: KnownNat n => Bit n -> Bit n
-firstHot x = x .&. (inv x + 1)
-
 -- | Check that 'firstHot' isolates a bit that is indeed hot
 prop_hotCommon :: KnownNat n => Bit n -> Bit 1
 prop_hotCommon x = (x .&. firstHot x) .==. firstHot x
