@@ -6,8 +6,8 @@ import Data.List (transpose)
 import Control.Monad (forM_, zipWithM_, replicateM)
 
 -- |Isolate first hot bit
-firstHot :: [Bit 1] -> [Bit 1]
-firstHot = first 1
+firstHotList :: [Bit 1] -> [Bit 1]
+firstHotList = first 1
   where
     first ok [] = []
     first ok (x:xs) = (x .&. ok) : first (inv x .&. ok) xs
@@ -20,7 +20,7 @@ condMerge readys inputs = do
 
   -- Which input streams are available for consumption?
   let avail = [s.canPeek .&. r | (s, r) <- zip inputs readys]
-  let choice = firstHot avail
+  let choice = firstHotList avail
 
   -- Consume
   always do
@@ -45,7 +45,7 @@ fork n inp = do
 
   -- Which output streams are available to fill?
   let avail = [b.notFull | b <- buffers]
-  let choice = firstHot avail
+  let choice = firstHotList avail
 
   -- Fill
   always do
