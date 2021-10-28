@@ -1,6 +1,7 @@
 {-# LANGUAGE RankNTypes            #-}
 {-# LANGUAGE BlockArguments        #-}
 {-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeSynonymInstances  #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
@@ -95,23 +96,29 @@ runNetlistPass pass netlist = runST wrappedPass
           freezeMNetlist mnlRef
 
 -- | Run the default set of netlist passes
-runDefaultNetlistPasses :: Opts -> Netlist -> Netlist
-runDefaultNetlistPasses opts netlist = runNetlistPass pass netlist
+runDefaultNetlistPasses :: Opts -> (forall s. [MNetlistPass s t]) -> Netlist
+                        -> Netlist
+runDefaultNetlistPasses opts passes netlist = runNetlistPass pass netlist
   where pass :: MNetlistPass s ()
-        pass = wrapWithMandatoryNetlistPasses $ optionalNetlistPasses opts
+        pass = wrapWithMandatoryNetlistPasses \mnlRef -> do
+          optionalNetlistPasses opts mnlRef
+          sequence_ $ map ($ mnlRef) passes
 
 -- | Run an 'IO' function with the elaborated 'Netlist's hierarchy for the
 --   given circuit (effectively one 'Netlist' per eligible 'Custom' 'Net'). The
---   'Netlist's are passed to the provided function as a 'Map String Netlist',
---   with the toplevel 'Netlist''s key being the provided 'String' argument, and
---   the other 'Netlist's using the 'customName' field of the elaborated
---   'Custom' as a key.
+--   'Netlist's elaboration will be done using the default netlist passes as
+--   well as the extra optional passes that can be provided in an argument list.
+--   The generated 'Netlist's are passed to the provided function as a
+--   'Map String Netlist', with the toplevel 'Netlist''s key being the provided
+--   'String' argument, and the other 'Netlist's using the 'customName' field
+--   of the elaborated 'Custom' as a key.
 onNetlists :: Modular a
-           => a                            -- ^ Blarney circuit
-           -> String                       -- ^ circuit name
-           -> (Map String Netlist -> IO b) -- ^ function to run
+           => a                              -- ^ Blarney circuit
+           -> String                         -- ^ circuit name
+           -> (forall s. [MNetlistPass s t]) -- ^ additional passes to run
+           -> (Map String Netlist -> IO b)   -- ^ function to run
            -> IO b
-onNetlists circuit name f = do
+onNetlists circuit name passes f = do
   let nl0 = toNetlist $ makeModule circuit
   nls <- elab mempty [(name, nl0)]
   f nls
@@ -124,7 +131,7 @@ onNetlists circuit name f = do
           | otherwise = do
               (opts, _) <- getOpts
               -- Run netlist generator
-              let nl = runDefaultNetlistPasses opts nl0
+              let nl = runDefaultNetlistPasses opts passes nl0
               -- Insert resulting netlist into accumulator
               let newAcc = insert name nl acc
               -- Look for new netlists
