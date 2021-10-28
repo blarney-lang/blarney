@@ -112,6 +112,11 @@ instance KnownNat n => Interface (Bit n) where
   fromIfcTerm ~(IfcTermBV x) = FromBV x
   toIfcType x = IfcTypeBV (fromIntegral (widthOf x))
 
+instance KnownNat n => Interface (Signed n) where
+  toIfcTerm x = toIfcTerm (fromSigned x)
+  fromIfcTerm x = toSigned (fromIfcTerm x)
+  toIfcType x = toIfcType (fromSigned x)
+
 instance Interface a => Interface (Action a) where
   toIfcTerm act = IfcTermAction (toIfcTerm <$> act)
   fromIfcTerm ~(IfcTermAction act) = fromIfcTerm <$> act

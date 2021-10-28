@@ -119,6 +119,13 @@ instance KnownNat n => Bits (Bit n) where
   unpack = id
   nameBits = nameBit
 
+instance KnownNat n => Bits (Signed n) where
+  type SizeOf (Signed n) = n
+  sizeOf x = widthOf (fromSigned x)
+  pack x = fromSigned x
+  unpack x = toSigned x
+  nameBits s x = toSigned $ nameBit s $ fromSigned x
+
 instance Bits ()
 
 instance (Bits a, Bits b) => Bits (a, b)

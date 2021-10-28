@@ -483,3 +483,22 @@ instance (Cmp a, Cmp b, Cmp c, Cmp d, Cmp e, Cmp f) =>
          Cmp (a, b, c, d, e, f)
 instance (Cmp a, Cmp b, Cmp c, Cmp d, Cmp e, Cmp f, Cmp g) =>
          Cmp (a, b, c, d, e, f, g)
+
+-- * Signed typed bit-vectors
+
+-- | Signed bit vectors
+newtype Signed (n :: Nat) = Signed (Bit n)
+
+-- | Convert to signed bit-vector
+toSigned :: Bit n -> Signed n
+toSigned = Signed
+
+-- | Convert from signed bit-vector
+fromSigned :: Signed n -> Bit n
+fromSigned (Signed bv) = bv
+
+instance Cmp (Signed n) where
+  Signed a .<.  Signed b = a `sLT` b
+  Signed a .<=. Signed b = a `sLTE` b
+  Signed a .==. Signed b = a .==. b
+  Signed a .!=. Signed b = a .!=. b
