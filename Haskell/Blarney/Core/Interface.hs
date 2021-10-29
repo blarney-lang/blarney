@@ -35,6 +35,8 @@ module Blarney.Core.Interface (
 , IfcTerm(..)
   -- Generic type representation
 , IfcType(..)
+  -- Generic type representation meta information
+, IfcMetaInfo(..)
   -- Function types convertible to external module I/O ports
 , Method(..)
   -- Types that can be turned into external modules
@@ -91,8 +93,11 @@ data IfcType =
   | IfcTypeAction IfcType
   | IfcTypeProduct IfcType IfcType
   | IfcTypeFun IfcType IfcType
-    -- Marks each field / constructor argument (with name, which can be "")
-  | IfcTypeField String IfcType
+    -- Marks a type with some meta-information
+  | IfcTypeMeta IfcMetaInfo IfcType
+
+data IfcMetaInfo = MetaField String
+                 | MetaTriStateWire
 
 class Interface a where
   toIfcTerm   :: a -> IfcTerm
@@ -126,6 +131,9 @@ instance (Interface a, Bits a, Method b) => Interface (a -> b) where
   toIfcTerm = toMethodTerm
   fromIfcTerm = fromMethodTerm
   toIfcType = toMethodType
+
+instance (Interface a, Bits a) => Interface (TriStateWire a) where
+  toIfcType = IfcTypeMeta MetaTriStateWire . gtoIfcType . from
 
 -- |This class defines which functions make a valid 'Interface'.
 -- Specifially, a 'Method' is any function returning an 'Action'
@@ -168,7 +176,7 @@ instance (GInterface a, GInterface b) => GInterface (a :*: b) where
 instance (GInterface a, Selector c) => GInterface (M1 S c a) where
   gtoIfcTerm ~(m@(M1 x)) = gtoIfcTerm x
   gfromIfcTerm x = M1 (gfromIfcTerm x)
-  gtoIfcType ~(m@(M1 x)) = IfcTypeField (selName m) (gtoIfcType x)
+  gtoIfcType ~(m@(M1 x)) = IfcTypeMeta (MetaField (selName m)) (gtoIfcType x)
 
 instance {-# OVERLAPPABLE #-} GInterface a => GInterface (M1 i c a)  where
   gtoIfcTerm ~(m@(M1 x)) = gtoIfcTerm x
@@ -198,7 +206,6 @@ instance (Interface a, Bits a) => Interface (Reg a)
 instance (Interface a, Bits a) => Interface (Wire a)
 instance (Interface a, Bits a) => Interface (ReadWrite a)
 instance (Interface a, Bits a) => Interface (WriteOnly a)
-instance (Interface a, Bits a) => Interface (TriStateWire a)
 instance Interface Clock
 instance Interface Reset
 
@@ -219,8 +226,10 @@ type Env = [(String, BV)]
 -- (A named input with a width, or a named output bit-vector)
 data Decl = DeclInput Width String PortId | DeclOutput String PortId BV
 
--- A scope is a stack of names, used to generate sensible names
-type Scope = [String]
+-- A scope is composed of
+-- * a stack of names, used to generate sensible names
+-- * a stack of port identifiers
+type Scope = ([String], [Int])
 
 -- Instances of Monad, Applicable, Functor
 instance Monad Declare where
@@ -246,23 +255,35 @@ lookupInputBV name = Declare $ \c s e ->
              Just bv -> bv
   in  return (c, [], bv)
 
--- Start a new scope
-newScope :: String -> Declare a -> Declare a
-newScope name m = Declare \c s e -> noName do
-  let name' = case name of { "" -> show c; other -> name }
-  (_, ds, a) <- runDeclare m 0 (name':s) e
+-- Start a new name scope
+newNameScope :: String -> Declare a -> Declare a
+newNameScope name m = Declare \c (nms, pids) e -> noName do
+  let nm = case name of { "" -> show c; other -> name }
+  (_, ds, a) <- runDeclare m 0 (nm:nms, pids) e
   return (c+1, ds, a)
+
+-- Get a meaningful name
+getName :: Declare String
+getName = Declare \c (nms, _) e ->
+  return (c, [], concat (intersperse "_" (reverse nms)))
+
+-- Start a new port identifier scope
+newPortIdScope :: Declare a -> Declare a
+newPortIdScope m = Declare \c (nms, pids) e -> noName do
+  let pid = if null pids then 0 else head pids + 1
+  (_, ds, a) <- runDeclare m 0 (nms, pid:pids) e
+  return (c+1, ds, a)
+
+-- Get a portIdentifier
+getPortId :: Declare PortId
+getPortId = Declare \c (_, pids) e ->
+  return (c, [], if null pids then Nothing else Just (head pids))
 
 -- Lift module monad to declare monad
 liftModule :: Module a -> Declare a
 liftModule m = Declare \c s e -> noName do
   a <- m
   return (c, [], a)
-
--- Get a meaningful name
-getName :: Declare String
-getName = Declare \c s e ->
-  return (c, [], concat (intersperse "_" (reverse s)))
 
 -- Add a declaration to the collection
 addDecl :: Decl -> Declare ()
@@ -272,6 +293,7 @@ addDecl d = Declare \c s e -> return (c, [d], ())
 declareOutputBV :: String -> BV -> Declare ()
 declareOutputBV suffix bv = do
   nm <- getName
+  pid <- getPortId
   let name = case suffix of { "" -> nm; other -> nm ++ "_" ++ suffix }
   addDecl (DeclOutput name Nothing bv)
 
@@ -279,14 +301,17 @@ declareOutputBV suffix bv = do
 declareInputBV :: String -> Width -> Declare BV
 declareInputBV suffix width = do
   nm <- getName
+  pid <- getPortId
   let name = case suffix of { "" -> nm; other -> nm ++ "_" ++ suffix }
   addDecl (DeclInput width name Nothing)
   lookupInputBV name
 
 -- Declare an output, generically over any interface type
 declareOut :: IfcTerm -> IfcType -> Declare ()
-declareOut x (IfcTypeField selName t) =
-  newScope selName (declareOut x t)
+declareOut x (IfcTypeMeta (MetaField selName) t) =
+  newNameScope selName (declareOut x t)
+declareOut x (IfcTypeMeta MetaTriStateWire t) =
+  newPortIdScope (declareOut x t)
 declareOut IfcTermUnit _ = return ()
 declareOut (IfcTermBV bv) _ =
   declareOutputBV "" bv
@@ -296,32 +321,34 @@ declareOut (IfcTermAction act) (IfcTypeAction t) = do
   -- Trigger action
   ret <- liftModule $ always $ whenR (FromBV en :: Bit 1) act
   -- Declare return value output
-  newScope "ret" (declareOut ret t)
+  newNameScope "ret" (declareOut ret t)
 declareOut (IfcTermProduct x0 x1) (IfcTypeProduct tx0 tx1) = do
   declareOut x0 tx0
   declareOut x1 tx1
 declareOut (IfcTermFun fun) (IfcTypeFun argType retType) = do
   -- Declare argument as input
-  arg <- newScope "" (declareIn argType)
+  arg <- newNameScope "" (declareIn argType)
   -- Apply argument and declare return value as output
   declareOut (fun arg) retType
 
 -- Typed version of 'declareOut'
 declareOutput :: Interface a => String -> a -> Declare ()
 declareOutput str out =
-  newScope str (declareOut (toIfcTerm out) (toIfcType out))
+  newNameScope str (declareOut (toIfcTerm out) (toIfcType out))
 
 -- Declare an input, generically over any interface type
 declareIn :: IfcType -> Declare IfcTerm
-declareIn (IfcTypeField selName t) =
-  newScope selName (declareIn t)
+declareIn (IfcTypeMeta (MetaField selName) t) =
+  newNameScope selName (declareIn t)
+declareIn (IfcTypeMeta MetaTriStateWire t) =
+  newPortIdScope (declareIn t)
 declareIn IfcTypeUnit = return IfcTermUnit
 declareIn (IfcTypeBV w) = do
   bv <- declareInputBV "" w
   return (IfcTermBV bv)
 declareIn (IfcTypeAction t) = do
   -- Declare return value as input
-  ret <- newScope "ret" (declareIn t)
+  ret <- newNameScope "ret" (declareIn t)
   -- Create enable wire
   enWire :: Wire (Bit 1) <- liftModule (makeWire 0)
   -- Declare enable signal as output
@@ -338,7 +365,7 @@ declareIn t@(IfcTypeFun _ _) = do
     IfcTypeAction{} -> do
       -- Declare each argument as an output
       drivers <- forM argTypes \argType ->
-        newScope "" (driver argType)
+        newNameScope "" (driver argType)
       -- Declare return type as input
       ret <- declareIn retType
       case ret of
@@ -361,7 +388,7 @@ declareIn t@(IfcTypeFun _ _) = do
     -- Declare an output and return assignment
     -- function (driver) for that output
     driver :: IfcType -> Declare (IfcTerm -> Action ())
-    driver (IfcTypeField selName t) = newScope selName (driver t)
+    driver (IfcTypeMeta (MetaField selName) t) = newNameScope selName (driver t)
     driver IfcTypeUnit = return (\x -> return ())
     driver (IfcTypeBV w) =
       liftNat w $ \(_ :: Proxy n) -> do
@@ -381,7 +408,7 @@ declareIn t@(IfcTypeFun _ _) = do
 -- Typed version of 'declareIn'
 declareInput :: forall a. Interface a => String -> Declare a
 declareInput str =
-  newScope str do
+  newNameScope str do
     let t = toIfcType (undefined :: a)
     x <- declareIn t
     return (fromIfcTerm x)
@@ -434,7 +461,7 @@ instance {-# OVERLAPPABLE #-} Interface a => Modular a where
 -- Realise declarations to give standalone module
 modularise :: Declare a -> Module a
 modularise ifc = noName mdo
-    (_, w, a) <- runDeclare ifc 0 [] inps
+    (_, w, a) <- runDeclare ifc 0 ([], []) inps
     inps <- mod w
     return a
   where
@@ -452,7 +479,7 @@ instantiate :: String -> InstanceInfo -> Bool -> Declare a
 instantiate name info doAddRoots ifc mcnl = noName mdo
     let (bvs, env) = case custom w of Left bv -> ([bv], [])
                                       Right e -> (snd <$> e, e)
-    (_, w, a) <- runDeclare ifc 0 [] env
+    (_, w, a) <- runDeclare ifc 0 ([], []) env
     addRoots [x | x <- bvs, doAddRoots]
     return a
   where

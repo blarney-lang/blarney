@@ -44,7 +44,7 @@ makeDeviceB = makeBoundary "deviceB" deviceB
 
 top :: Module ()
 top = do
-  tsWire <- makeTriStateWire @(Bit 8) ones
+  tsWire <- makeTriStateWire @(Bit 8)
   --deviceA tsWire
   --deviceB tsWire
   makeDeviceA tsWire

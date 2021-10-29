@@ -50,7 +50,6 @@ module Blarney.Core.RTL (
 , makeWire          -- Create wire with a default value
 , makeWireU         -- Create uninitialised wire
 , makeTriStateWire  -- Create tristate wire
-, makeTriStateWireU -- Create tristate wire
   -- * Simulation-time statements
 , Displayable(..)   -- To support N-ary display statement
 , display           -- Display statement
@@ -344,32 +343,32 @@ writeWire v x = do
                                     , rhs = toBV (pack x) }
 
 -- | Create a wire with an explicit merging strategy and default value
-makeWireCore :: Bits a => MergeStrat -> a -> RTL (Wire a)
-makeWireCore mergeStrat defaultVal = do
+makeWireCore :: forall a. Bits a => MergeStrat -> Maybe a -> RTL (Wire a)
+makeWireCore mergeStrat mDefaultVal = do
   v <- freshVarId
-  assigns <- findWithDefault [] v <$> askAssigns
+  rawAssigns <- findWithDefault [] v <$> askAssigns
   nameHints <- askNameHints
-  let w = sizeOf defaultVal
-      dfltBV = toBV $ pack defaultVal
-      any = toBV $ orList (map enable assigns)
-      none = invBV any
-      out = case assigns of
-              []    -> dfltBV
-              other -> mergeBV mergeStrat w
-                               ([(toBV $ enable a, rhs a) | a <- assigns] ++
-                                [(none, dfltBV)])
+  let w = sizeOf (undefined :: a)
+  let any = orList (map enable rawAssigns)
+  let none = inv any
+  let assigns =
+        maybe rawAssigns (\x -> Assign { enable = none
+                                       , lhs = v
+                                       , rhs = toBV $ pack x } : rawAssigns)
+                         mDefaultVal
+  let out = mergeBV mergeStrat w [(toBV $ enable a, rhs a) | a <- assigns]
   return $ Wire { wireId  = v
                 , wireVal = bvHintsUpdt out nameHints
-                , active  = bvHintsUpdt any $ insert (NmSuffix 0 "act")
-                                                     nameHints }
+                , active  = bvHintsUpdt (toBV any) $ insert (NmSuffix 0 "act")
+                                                            nameHints }
 
 -- | Create a wire with an explicit default value
 makeWire :: Bits a => a -> RTL (Wire a)
-makeWire = makeWireCore MStratOr
+makeWire x = makeWireCore MStratOr $ Just x
 
 -- | Create a tristate wire with an explicit default value
-makeTriStateWire :: Bits a => a -> RTL (Wire a)
-makeTriStateWire = makeWireCore MStratHiZ
+makeTriStateWire :: Bits a => RTL (Wire a)
+makeTriStateWire = makeWireCore MStratHiZ Nothing
 
 --------------------------------------------------------------------------------
 
@@ -393,10 +392,6 @@ makeDReg defaultVal = do
 -- | Create a wire with a don't care default value
 makeWireU :: Bits a => RTL (Wire a)
 makeWireU = makeWire dontCare
-
--- | Create a tristate wire with a don't care default value
-makeTriStateWireU :: Bits a => RTL (Wire a)
-makeTriStateWireU = makeTriStateWire dontCare
 
 --------------------------------------------------------------------------------
 

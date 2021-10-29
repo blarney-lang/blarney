@@ -41,8 +41,8 @@ import Blarney.Core.Opts
 
 -- debugging facilities
 --import Debug.Trace
---debugEnabled = True
---dbg act = when debugEnabled act
+debugEnabled = True
+dbg act = when debugEnabled act
 -- debugging facilities
 
 -- file-wide helpers

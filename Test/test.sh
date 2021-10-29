@@ -30,6 +30,7 @@ ALL_BLARNEY_EXAMPLES=(
   Stack
   Counter
   Vectors
+  TriState
 )
 BLARNEY_EXAMPLES="${BLARNEY_EXAMPLES[@]:-${ALL_BLARNEY_EXAMPLES[@]}}"
 

@@ -55,7 +55,7 @@ module Blarney.Core.Module
 
     -- * Wires
     Wire(..), makeWire, makeWireU,
-    TriStateWire(..), makeTriStateWire, makeTriStateWireU,
+    TriStateWire(..), makeTriStateWire,
 
     -- * Read-Write and Write-Only interfaces
     ReadWrite(..), WriteOnly(..),
@@ -230,14 +230,8 @@ instance Assign TriStateWire where
   (TriStateWire wire) <== x = writeWire wire x
 
 -- | Create a tristate wire with a default value
-makeTriStateWire :: Bits a => a -> Module (TriStateWire a)
-makeTriStateWire dflt =
-  M (TriStateWire . fromRTLWire <$> RTL.makeTriStateWire dflt)
-
--- | Create a tristate wire with a don't care default value
-makeTriStateWireU :: Bits a => Module (TriStateWire a)
-makeTriStateWireU =
-  M (TriStateWire . fromRTLWire <$> RTL.makeTriStateWireU)
+makeTriStateWire :: Bits a => Module (TriStateWire a)
+makeTriStateWire = M (TriStateWire . fromRTLWire <$> RTL.makeTriStateWire)
 
 -- |Read-Write interface
 data ReadWrite a =
