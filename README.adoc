@@ -25,13 +25,11 @@ toc::[]
 
 == Prerequisites
 
-To use Blarney, we'll need Verilator (e.g. `sudo apt install
-verilator` on Ubuntu) and GHC 9.2.1 or later (e.g. using
-[ghcup](https://www.haskell.org/ghcup/)).
-
-After cloning the Blarney, we set the `BLARNEY_ROOT` environment
-variable to point to it, and add the `Scripts` directory to our
-`PATH`, e.g.
+To use Blarney, we'll need Verilator (e.g. `apt install verilator`)
+and GHC 9.2.1 or later (e.g. using
+(ghcup)[https://www.haskell.org/ghcup/]).  After cloning this repo
+repo, we set the `BLARNEY_ROOT` environment variable to point to it,
+and add the `Scripts` directory to our `PATH`, e.g.
 
 [source, shell]
 ----
@@ -39,9 +37,6 @@ $ git clone --recursive https://github.com/blarney-lang/blarney
 $ export BLARNEY_ROOT=$(pwd)/blarney
 $ export PATH=$PATH:$BLARNEY_ROOT/Scripts
 ----
-
-We can set these environment variables in our `.bashrc` (or
-equivalent) for future logins.
 
 == Examples
 
@@ -275,9 +270,9 @@ top = do
 ----
 
 This example introduces a number of new library functions: `makeReg`
-creates a register, initialised to the given value; `val` returns the
-value of a register; and `when` allows conditional actions to be
-introduced.  In addition to `when`, we can also use if-then-else in an
+creates a register, initialised to the given value; the `val` field
+yeilds the current value of the register; and `when` allows
+conditional actions to be introduced.  We can use if-then-else in an
 `Action` context.  For example, the final three lines above could have
 been written as:
 
