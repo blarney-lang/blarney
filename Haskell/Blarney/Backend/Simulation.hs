@@ -23,7 +23,7 @@ module Blarney.Backend.Simulation (
 import Prelude
 import Numeric
 import Data.List
-import Data.Bits
+import Data.Bits ( (.|.), (.&.), testBit, shiftL, complement, zeroBits )
 import Data.Char
 import Data.Maybe
 import Control.Monad

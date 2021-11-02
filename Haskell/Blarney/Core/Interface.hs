@@ -223,14 +223,14 @@ type Scope = [String]
 
 -- Instances of Monad, Applicable, Functor
 instance Monad Declare where
-  return a = Declare \c s e -> return (c, [], a)
+  return = pure
   m >>= f = Declare \c s e -> noName do
     (c', w0, a) <- runDeclare m c s e
     (c'', w1, b) <- runDeclare (f a) c' s e
     return (c'', w0 ++ w1, b)
 
 instance Applicative Declare where
-  pure = return
+  pure a = Declare \c s e -> return (c, [], a)
   (<*>) = ap
 
 instance Functor Declare where
