@@ -90,6 +90,7 @@ import qualified Blarney.Core.JList as JL
 import Prelude
 import Data.IORef
 import Data.Array
+import GHC.Records
 import GHC.TypeLits
 import GHC.Generics
 import Control.Monad.Fix
@@ -156,6 +157,7 @@ class Valid t where
 -- |Variable value (read)
 class Val v a | v -> a where
   val :: v -> a
+
 -- |Variable assignment (write)
 infix 1 <==
 class Assign v where
@@ -183,6 +185,8 @@ instance Val (Reg t) t where
   val reg = readReg reg
 instance Assign Reg where
   reg <== x = writeReg reg x
+instance HasField "val" (Reg t) t where
+  getField reg = readReg reg
 fromRTLReg :: Bits t => RTL.Reg t -> Reg t
 fromRTLReg r = Reg { readReg  = val r
                    , writeReg = \x -> r <== x
@@ -207,6 +211,8 @@ instance Val (Wire t) t where
   val wire = readWire wire
 instance Assign Wire where
   wire <== x = writeWire wire x
+instance HasField "val" (Wire t) t where
+  getField wire = readWire wire
 fromRTLWire :: Bits t => RTL.Wire t -> Wire t
 fromRTLWire w = Wire { readWire  = val w
                      , writeWire = \x -> w <== x

@@ -36,7 +36,7 @@ top t w h = do
     -- Increment time
     timer <== timer.val + 1
     -- Termination
-    when (timer.val .==. fromInteger t) $ do
+    when (timer.val .==. fromInteger t) do
       forM_ (zip [0..] grid) $ \(i, row) ->
         forM_ (zip [0..] row) $ \(j, cell) -> do
           let out = cell.val .>>. (16 :: Bit 5)

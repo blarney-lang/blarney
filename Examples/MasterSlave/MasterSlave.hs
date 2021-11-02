@@ -11,26 +11,26 @@ slave reqs = do
   buffer <- makeQueue
 
   always do
-    when (reqs.canPeek .&. buffer.notFull) do
-      consume reqs
-      enq buffer (reqs.peek.fst * reqs.peek.snd)
+    when (reqs.canPeek .&&. buffer.notFull) do
+      reqs.consume
+      buffer.enq (fst reqs.peek * snd reqs.peek)
 
-  return (buffer.toStream)
+  return (toStream buffer)
 
 master :: Stream MulResp -> Module (Stream MulReq)
 master resps = do
   buffer <- makeQueue
 
   always do
-    when (buffer.notFull) do
-      enq buffer (16, 4)
+    when buffer.notFull do
+      buffer.enq (16, 4)
 
-    when (resps.canPeek) do
-      consume resps
-      display "Response: 0x" (formatHex 8 (resps.peek))
+    when resps.canPeek do
+      resps.consume
+      display "Response: 0x" (formatHex 8 resps.peek)
       finish
 
-  return (buffer.toStream)
+  return (toStream buffer)
 
 makeSlave :: Stream MulReq -> Module (Stream MulResp)
 makeSlave = makeBoundary "slave" slave

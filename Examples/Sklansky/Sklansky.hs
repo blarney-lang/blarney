@@ -44,8 +44,11 @@ main = do
   cwd <- getCurrentDirectory
   let smtDir = cwd ++ "/Sklansky-SMT2/"
   -- generate smt2 scripts
-  writeSMT2Script (prop_scan @4 @4 sklansky (+))      "goodSklansky4_4"   smtDir
-  writeSMT2Script (prop_scan @4 @4 doom_sklansky (+)) "brokenSklansky4_4" smtDir
+  let verifyConf = dfltVerifyConf
+  writeSMTScript verifyConf (prop_scan @4 @4 sklansky (+))
+                 "goodSklansky4_4" smtDir
+  writeSMTScript verifyConf (prop_scan @4 @4 doom_sklansky (+))
+                 "brokenSklansky4_4" smtDir
   -- helper usage message
   putStrLn $ "SMT2 scripts generated under " ++ smtDir
   putStrLn $ "Run an SMT solver such as z3 with an SMT2 script as input:"

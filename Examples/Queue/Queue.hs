@@ -15,13 +15,13 @@ top = do
     count <== count.val + 1
 
     -- Feed queue
-    when (queue.notFull) do
-      enq queue (count.val)
+    when queue.notFull do
+      queue.enq count.val
 
     -- Consume queue
-    when (queue.canDeq .&. (count.val .>. 50)) do
+    when (queue.canDeq .&&. count.val .>. 50) do
       queue.deq
-      display "Got " (queue.first)
+      display "Got " queue.first
       when (queue.first .>. 100) finish
 
 -- Main function

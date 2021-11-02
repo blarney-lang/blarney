@@ -4,9 +4,9 @@ import System.Environment
 
 data Counter n =
   Counter {
-    inc   :: Action ()
-  , dec   :: Action ()
-  , value :: Bit n
+    inc :: Action ()
+  , dec :: Action ()
+  , val :: Bit n
   }
 
 makeCounter :: KnownNat n => Module (Counter n)
@@ -20,19 +20,19 @@ makeCounter = do
 
   always do
     -- Increment
-    when (incWire.val .&. decWire.val.inv) do
+    when (incWire.val .&. inv decWire.val) do
       count <== count.val + 1
 
     -- Decrement
-    when (incWire.val.inv .&. decWire.val) do
+    when (inv incWire.val .&. decWire.val) do
       count <== count.val - 1
 
   -- Interface
-  let inc   = incWire <== 1
-  let dec   = decWire <== 1
-  let value = val count
+  let inc = incWire <== 1
+  let dec = decWire <== 1
+  let val = count.val
 
-  return (Counter inc dec value)
+  return (Counter inc dec val)
 
 -- Top-level module
 top :: Module ()
@@ -58,7 +58,7 @@ top = do
 
   always do
     when done do
-      display "Final count = " (value counter)
+      display "Final count = " counter.val
       finish
 
   return ()

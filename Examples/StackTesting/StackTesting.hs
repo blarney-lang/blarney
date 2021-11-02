@@ -24,7 +24,7 @@ makeStack logSize = do
   liftNat logSize $ \(_ :: Proxy n) -> do
 
     -- RAM, wide enough to hold entire stack
-    ram :: RAM (Bit n) a <- makeDualRAMForward 0
+    ram :: RAM (Bit n) a <- makeDualRAMForward
 
     -- Stack pointer
     sp :: Reg (Bit n) <- makeReg 0
@@ -38,15 +38,15 @@ makeStack logSize = do
 
     -- Read top element from RAM
     always do
-      load ram (speculateWire.active ? (speculateWire.val, speculateReg.val))
-      when (speculateWire.active) do
+      ram.load (speculateWire.active ? (speculateWire.val, speculateReg.val))
+      when speculateWire.active do
         speculateReg <== speculateWire.val
 
-    return $
+    return
       Stack {
         push = \a -> do
           topReg <== a
-          store ram (sp.val) (topReg.val)
+          ram.store sp.val topReg.val
           speculateWire <== sp.val
           sp <== sp.val + 1
       , pop = do
@@ -71,16 +71,16 @@ makeStackSpec logSize =
     -- Size of stack
     size :: Reg (Bit n) <- makeReg 0
 
-    return $
+    return
       Stack {
         push = \a -> do
-          elems.head <== a
+          head elems <== a
           zipWithM_ (<==) (tail elems) (map val elems)
           size <== size.val + 1
       , pop = do
           zipWithM_ (<==) elems (tail (map val elems))
           size <== size.val - 1
-      , top = elems.head.val
+      , top = (head elems).val
       , isEmpty = size.val .==. 0
       , clear = size <== 0
       }

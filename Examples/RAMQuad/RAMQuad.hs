@@ -17,18 +17,18 @@ top = do
     while (i.val .<. 30) do
       action do
         let writeVal = 1 .<<. i.val
-        store ramA (i.val) writeVal
-        store ramB (100 + i.val) (inv writeVal)
+        ramA.store i.val writeVal
+        ramB.store (100 + i.val) (inv writeVal)
         i <== i.val + 1
     action do
       i <== 0
     while (i.val .<. 30) do
       action do
-        load ramA (100 + i.val)
-        load ramB (i.val)
+        ramA.load (100 + i.val)
+        ramB.load i.val
       action do
-        display "ramA[100+" (i.val) "] = 0x" (formatHex 32 (ramA.out))
-        display "ramB[" (i.val) "] = 0x" (formatHex 32 (ramB.out))
+        display "ramA[100+" i.val "] = 0x" (formatHex 32 ramA.out)
+        display "ramB[" i.val "] = 0x" (formatHex 32 ramB.out)
         i <== i.val + 1
     action do
       finish

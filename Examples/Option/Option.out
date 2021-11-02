@@ -1,45 +1,45 @@
-opt = Option { optValid = 1, optValue = 0 }, noopt = 0
+opt = Option { valid = 1, val = 0 }, noopt = 0
 cnt = 0
-opt = Option { optValid = 0, optValue = 0 }, noopt = 1
+opt = Option { valid = 0, val = 0 }, noopt = 1
 cnt = 1
-opt = Option { optValid = 0, optValue = 0 }, noopt = 2
+opt = Option { valid = 0, val = 0 }, noopt = 2
 cnt = 1
-opt = Option { optValid = 0, optValue = 0 }, noopt = 3
+opt = Option { valid = 0, val = 0 }, noopt = 3
 cnt = 1
-opt = Option { optValid = 0, optValue = 0 }, noopt = 4
+opt = Option { valid = 0, val = 0 }, noopt = 4
 cnt = 1
-opt = Option { optValid = 1, optValue = 5 }, noopt = 5
+opt = Option { valid = 1, val = 5 }, noopt = 5
 cnt = 1
-opt = Option { optValid = 0, optValue = 0 }, noopt = 6
+opt = Option { valid = 0, val = 0 }, noopt = 6
 cnt = 2
-opt = Option { optValid = 0, optValue = 0 }, noopt = 7
+opt = Option { valid = 0, val = 0 }, noopt = 7
 cnt = 2
-opt = Option { optValid = 0, optValue = 0 }, noopt = 8
+opt = Option { valid = 0, val = 0 }, noopt = 8
 cnt = 2
-opt = Option { optValid = 0, optValue = 0 }, noopt = 9
+opt = Option { valid = 0, val = 0 }, noopt = 9
 cnt = 2
-opt = Option { optValid = 1, optValue = 10 }, noopt = 10
+opt = Option { valid = 1, val = 10 }, noopt = 10
 cnt = 2
-opt = Option { optValid = 0, optValue = 0 }, noopt = 11
+opt = Option { valid = 0, val = 0 }, noopt = 11
 cnt = 3
-opt = Option { optValid = 0, optValue = 0 }, noopt = 12
+opt = Option { valid = 0, val = 0 }, noopt = 12
 cnt = 3
-opt = Option { optValid = 0, optValue = 0 }, noopt = 13
+opt = Option { valid = 0, val = 0 }, noopt = 13
 cnt = 3
-opt = Option { optValid = 0, optValue = 0 }, noopt = 14
+opt = Option { valid = 0, val = 0 }, noopt = 14
 cnt = 3
-opt = Option { optValid = 1, optValue = 15 }, noopt = 15
+opt = Option { valid = 1, val = 15 }, noopt = 15
 cnt = 3
-opt = Option { optValid = 0, optValue = 0 }, noopt = 16
+opt = Option { valid = 0, val = 0 }, noopt = 16
 cnt = 4
-opt = Option { optValid = 0, optValue = 0 }, noopt = 17
+opt = Option { valid = 0, val = 0 }, noopt = 17
 cnt = 4
-opt = Option { optValid = 0, optValue = 0 }, noopt = 18
+opt = Option { valid = 0, val = 0 }, noopt = 18
 cnt = 4
-opt = Option { optValid = 0, optValue = 0 }, noopt = 19
+opt = Option { valid = 0, val = 0 }, noopt = 19
 cnt = 4
-opt = Option { optValid = 1, optValue = 20 }, noopt = 20
+opt = Option { valid = 1, val = 20 }, noopt = 20
 cnt = 4
-opt = Option { optValid = 0, optValue = 0 }, noopt = 21
+opt = Option { valid = 0, val = 0 }, noopt = 21
 cnt = 5
 Finished

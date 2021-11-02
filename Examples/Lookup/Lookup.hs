@@ -14,19 +14,19 @@ top = do
     cycleCount <== cycleCount.val + 1
 
     -- Create index using lower 2 bits of cycle count
-    let ind :: Bit 2 = cycleCount.val.truncate
+    let ind :: Bit 2 = truncate cycleCount.val
 
     -- Pick a queue using the index
     let q = queues ! ind
 
     -- Write to queue
-    when (q.notFull) do
-      enq q (ind.zeroExtend)
+    when q.notFull do
+      q.enq (zeroExtend ind)
 
     -- Consume from queue
-    when (q.canDeq) do
-      deq q
-      display (cycleCount.val) ": " (q.first)
+    when q.canDeq do
+      q.deq
+      display cycleCount.val ": " q.first
 
     -- Terminate simulation when count reaches 16
     when (cycleCount.val .==. 16) do

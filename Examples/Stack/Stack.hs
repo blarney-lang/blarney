@@ -69,7 +69,7 @@ makeStack = do
     sp1 <== (sp1.val - popWire.val) + inc
 
     -- Pushing and not popping
-    when (pushOrCopy .&. popWire.active.inv) do
+    when (pushOrCopy .&. inv popWire.active) do
       if push1Wire.active
         then reg1 <== push1Wire.val
         else do
@@ -81,21 +81,21 @@ makeStack = do
       if push2Wire.active
         then do
           reg2 <== push2Wire.val
-          store ram1 (sp1.val) topVal1
+          ram1.store sp1.val topVal1
         else do
           reg2 <== topVal1
-          load ram1 (sp1.val - copyWire.val)
-      store ram2 (sp.val) topVal2
+          ram1.load (sp1.val - copyWire.val)
+      ram2.store sp.val topVal2
 
     -- Popping and not pushing
-    when (popWire.active .&. push1Wire.active.inv) do
+    when (popWire.active .&. inv push1Wire.active) do
       unlatched2 <== true
-      load ram2 (sp.val - popWire.val)
+      ram2.load (sp.val - popWire.val)
       if popWire.val .==. 1
         then reg1 <== topVal2
         else do
           unlatched1 <== true
-          load ram1 (sp1.val - popWire.val)
+          ram1.load (sp1.val - popWire.val)
 
     -- Pushing and popping
     when (push1Wire.active .&. popWire.active) do
@@ -103,10 +103,10 @@ makeStack = do
       reg2 <== topVal2
       when (popWire.val .!=. 1) do
         unlatched2 <== true
-        load ram2 (sp1.val - popWire.val)
+        ram2.load (sp1.val - popWire.val)
 
     -- Neither pushing, nor popping
-    when (pushOrCopy.inv .&. popWire.active.inv) do
+    when (inv pushOrCopy .&. inv popWire.active) do
       reg1 <== topVal1
       reg2 <== topVal2
 

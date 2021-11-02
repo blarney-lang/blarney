@@ -56,9 +56,9 @@ module Blarney.BitScan
   , FieldMap
   , matchSel
   , SelMap
-  , getField
-  , getFieldStrict
-  , getFieldSel
+  , getBitField
+  , getBitFieldStrict
+  , getBitFieldSel
   , makeFieldSelector
   ) where
 
@@ -456,29 +456,29 @@ packTagMap tagMap
 
 -- |Get field value from a map, and cast to required size using
 -- truncation or sign-extension.
-getField :: KnownNat n => FieldMap -> String -> Option (Bit n)
-getField m key = result
+getBitField :: KnownNat n => FieldMap -> String -> Option (Bit n)
+getBitField m key = result
   where
     result =
       case Data.Map.lookup key m of
-        Nothing -> error ("BitScan.getField: unknown key " ++ key)
-        Just opt -> Option (opt.valid) (fromBitList (resize (opt.val)))
+        Nothing -> error ("BitScan.getBitField: unknown key " ++ key)
+        Just opt -> Option opt.valid (fromBitList (resize opt.val))
 
-    resize [] = error "BitScan.getField: resize"
-    resize list = take (widthOf (result.val)) (list ++ repeat (last list))
+    resize [] = error "BitScan.getBitField: resize"
+    resize list = take (widthOf result.val) (list ++ repeat (last list))
 
 -- |Get field value from a map, and raise an error the size is incorrect
-getFieldStrict :: KnownNat n => FieldMap -> String -> Option (Bit n)
-getFieldStrict m key = result
+getBitFieldStrict :: KnownNat n => FieldMap -> String -> Option (Bit n)
+getBitFieldStrict m key = result
   where
     result =
       case Data.Map.lookup key m of
-        Nothing -> error ("BitScan.getFieldStrict: unknown key " ++ key)
-        Just opt -> Option (opt.valid) (fromBitList (resize (opt.val)))
+        Nothing -> error ("BitScan.getBitFieldStrict: unknown key " ++ key)
+        Just opt -> Option opt.valid (fromBitList (resize opt.val))
 
     resize list
-      | length list == widthOf (result.val) = list
-      | otherwise = error ("BitScan.getFieldStrict: width mismatch "  ++
+      | length list == widthOf result.val = list
+      | otherwise = error ("BitScan.getBitFieldStrict: width mismatch "  ++
                              "for field " ++ key)
 
 -- |Mapping from field names to field selectors
@@ -511,18 +511,18 @@ matchSel alts = mapWithKey combine fieldMap
             | b <- bits ]
 
 -- |Get field selector function from a selector map.
-getFieldSel :: (KnownNat n, KnownNat m) =>
+getBitFieldSel :: (KnownNat n, KnownNat m) =>
   SelMap n -> String -> Bit n -> Bit m
-getFieldSel m key subj = result
+getBitFieldSel m key subj = result
   where
     result =
       case Data.Map.lookup key m of
-        Nothing -> error ("BitScan.getFieldSel: undefined field " ++ key)
+        Nothing -> error ("BitScan.getBitFieldSel: undefined field " ++ key)
         Just f -> fromBitList (resize (f subj))
 
     resize list
       | length list == widthOf result = list
-      | otherwise = error ("BitScan.getFieldSel: width mismatch "  ++
+      | otherwise = error ("BitScan.getBitFieldSel: width mismatch "  ++
                              "for result of field selector " ++ key)
 
 -- |Make field selector function from a list of alternatives.
@@ -530,4 +530,4 @@ makeFieldSelector :: (KnownNat n, KnownNat m) =>
   [(String, tag)] -> String -> Bit n -> Bit m
 makeFieldSelector alts field =
   let selMap = matchSel alts in
-    \subj -> getFieldSel selMap field subj
+    \subj -> getBitFieldSel selMap field subj
