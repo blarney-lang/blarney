@@ -27,7 +27,7 @@ toc::[]
 
 To use Blarney, we'll need Verilator (e.g. `apt install verilator`)
 and GHC 9.2.1 or later (e.g. using
-(https://www.haskell.org/ghcup/)[ghcup]).  After cloning this repo
+https://www.haskell.org/ghcup/)[ghcup]).  After cloning this repo
 repo, we set the `BLARNEY_ROOT` environment variable to point to it,
 and add the `Scripts` directory to our `PATH`, e.g.
 
