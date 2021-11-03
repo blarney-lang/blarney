@@ -18,9 +18,9 @@ module Blarney.Backend.Verilog (
 ) where
 
 -- Standard imports
-import Prelude hiding ((<>))
+import Prelude hiding ( (<>) )
 import qualified Data.Set as Set
-import Data.Bits
+import Data.Bits ( (.&.), shiftR )
 import Data.List
 import System.IO
 import Data.Maybe

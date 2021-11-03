@@ -35,7 +35,7 @@ import Blarney.Recipe
 data Stmt a = Stmt Recipe a
 
 instance Monad Stmt where
-  return a = Stmt Skip a
+  return = pure
   Stmt r1 a >>= f = Stmt (Seq [r1, r2]) b
     where Stmt r2 b = f a
 
@@ -43,7 +43,7 @@ instance Functor Stmt where
   fmap = liftM
 
 instance Applicative Stmt where
-  pure = return
+  pure a = Stmt Skip a
   (<*>) = ap
 
 skip :: Stmt ()

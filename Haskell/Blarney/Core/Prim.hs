@@ -53,9 +53,10 @@ module Blarney.Core.Prim (
 ) where
 
 import Prelude
-import Data.Set (Set, union, empty)
-import Data.List (elemIndex)
-import Data.Bits
+import Data.Set ( Set, union, empty )
+import Data.List ( elemIndex )
+import Data.Bits ( Bits, (.&.), (.|.), shiftL, shiftR, testBit, bit
+                 , complement, zeroBits, xor )
 import Data.Maybe
 import Data.Array
 
@@ -439,7 +440,7 @@ type PrimSample a = (Num a, Ord a, Integral a, Bits a)
 -- | Helper to retrieve a primitive's semantic evaluation function or lack
 --   thereof
 primSemEvalRaw :: PrimSample a => Prim -> Maybe ([a] -> [a])
-primSemEvalRaw = semEval . primInfo
+primSemEvalRaw p = semEval (primInfo p)
 
 -- | Helper to retrieve a primitive's semantic evaluation function
 primSemEval :: PrimSample a => Prim -> [a] -> [a]
