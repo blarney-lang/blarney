@@ -6,6 +6,7 @@
 {-# LANGUAGE NoImplicitPrelude      #-}
 {-# LANGUAGE DeriveGeneric          #-}
 {-# LANGUAGE DeriveAnyClass         #-}
+{-# LANGUAGE OverloadedRecordDot    #-}
 
 {-|
 Module      : Blarney.SourceSink

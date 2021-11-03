@@ -7,6 +7,7 @@
 {-# LANGUAGE RebindableSyntax       #-}
 {-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE ScopedTypeVariables    #-}
+{-# LANGUAGE OverloadedRecordDot    #-}
 {-# LANGUAGE MultiParamTypeClasses  #-}
 {-# LANGUAGE FunctionalDependencies #-}
 
