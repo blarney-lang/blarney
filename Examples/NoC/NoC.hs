@@ -26,10 +26,10 @@ condMerge readys inputs = do
   always do
     forM_ (zip inputs choice) $ \(input, cond) -> do
       when (cond .&. buffer.notFull) do
-        consume input
-        enq buffer (input.peek)
+        input.consume
+        buffer.enq input.peek
 
-  return (buffer.toStream)
+  return (toStream buffer)
 
 -- |Merger
 merge :: Bits a => [Stream a] -> Module (Stream a)
@@ -51,8 +51,8 @@ fork n inp = do
   always do
     forM_ (zip buffers choice) $ \(buffer, cond) -> do
       when (cond .&. inp.canPeek) do
-        consume inp
-        enq buffer (inp.peek)
+        inp.consume
+        buffer.enq inp.peek
 
   return (map toStream buffers)
 
@@ -74,11 +74,11 @@ meshRouter :: Bits a
            -> Module [Stream a]
 meshRouter (getX, getY) (x, y) inputs = router route inputs
   where
-    mine  pkt = (pkt.getX .==. x) .&. (pkt.getY .==. y)
-    north pkt = pkt.getY .>. y
-    south pkt = pkt.getY .<. y
-    east  pkt = (pkt.getY .==. y) .&. (pkt.getX .>. x)
-    west  pkt = (pkt.getY .==. y) .&. (pkt.getX .<. x)
+    mine  pkt = (getX pkt .==. x) .&. (getY pkt .==. y)
+    north pkt = getY pkt .>. y
+    south pkt = getY pkt .<. y
+    east  pkt = (getY pkt .==. y) .&. (getX pkt .>. x)
+    west  pkt = (getY pkt .==. y) .&. (getX pkt .<. x)
     route pkt = [mine pkt, north pkt, south pkt, east pkt, west pkt]
 
 -- |Multi-channel 2D mesh
@@ -136,16 +136,16 @@ testMesh (lenX, lenY) =
         timer <== timer.val + 1
 
         when (input.canPeek) do
-          consume input
+          input.consume
           display (x,y) ": dest=("
-                  (input.peek.destX) "," (input.peek.destY)
-                  ") t=" (timer.val)
+                  (destX input.peek) "," (destY input.peek)
+                  ") t=" timer.val
 
         when (buffer.notFull) do
           let pkt = MeshPkt { payload = 0,
                               destX   = regX.val,
                               destY   = regY.val }
-          enq buffer pkt
+          buffer.enq pkt
           if regX.val .==. fromIntegral (lenX-1)
             then do
               regX <== 0
@@ -155,7 +155,7 @@ testMesh (lenX, lenY) =
             else do
               regX <== regX.val + 1
 
-      return (buffer.toStream)
+      return (toStream buffer)
 
 -- Top level
 top :: Module ()

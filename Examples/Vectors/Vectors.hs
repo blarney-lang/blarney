@@ -8,7 +8,7 @@ makeElement i = do
   reg :: Reg (Bit n) <- makeReg $ fromInteger i
   let src :: Source (Bit n) = Source { canPeek = true
                                      , peek    = reg.val
-                                     , consume = reg <== (reg.val) + 1
+                                     , consume = reg <== reg.val + 1
                                      }
   return $ debugSource src (fshow $ "src"++show i)
 
@@ -16,7 +16,7 @@ testVecModule :: Module (Vec 4 (Source (Bit 3)))
 testVecModule = genWithM makeElement
 
 testVecReg :: Module (Vec 4 (Reg (Bit 3)))
-testVecReg = genWithM (makeReg `o` fromInteger)
+testVecReg = genWithM (makeReg . fromInteger)
 
 top :: Module ()
 top = do

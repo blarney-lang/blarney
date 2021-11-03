@@ -27,7 +27,6 @@ module Blarney.Core.Prelude
   , selectList      -- One-hot selection returning list
   , listIndex       -- Index a list of bit-vectors using a bit-vector
   , (?)             -- Ternary conditional operator
-  , o               -- Function composition
   , (===)           -- Generic equality
   , (=!=)           -- Generic disequality
   , zero            -- Generic zero
@@ -115,11 +114,6 @@ c ? (a, b) = unpack (mux c [pack b, pack a])
 -- |Overloaded if-then-else
 instance {-# OVERLAPPABLE #-} Bits a => IfThenElse (Bit 1) a where
   ifThenElse cond a b = cond ? (a, b)
-
--- |Function composition
-infixr 9 `o`
-o :: (a -> b) -> (c -> a) -> c -> b
-(f `o` g) x = f (g x)
 
 -- |Generic equality
 infix 4 ===

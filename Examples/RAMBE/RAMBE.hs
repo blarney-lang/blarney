@@ -15,15 +15,15 @@ top = do
   runStmt do
     while (i.val .<. 1000) do
       action do
-        storeBE ram (i.val) 1 (i.val.zeroExtend)
+        ram.storeBE i.val 1 (zeroExtend i.val)
         i <== i.val + 1
     action do
       i <== 0
     while (i.val .<. 1000) do
       action do
-        loadBE ram (i.val)
+        ram.loadBE i.val
       action do
-        display "ram[" (i.val) "] = " (ram.outBE)
+        display "ram[" i.val "] = " ram.outBE
         i <== i.val + 1
     action do
       finish

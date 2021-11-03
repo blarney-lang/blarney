@@ -5,15 +5,15 @@ top :: Module ()
 top = do
   -- Create a register
   cycleCount :: Reg (Bit 4) <- makeReg 0
-  let a = nameBits "AAA" (cycleCount.val)
-  let b = nameBits "BBB" (cycleCount.val)
+  let a = nameBits "AAA" cycleCount.val
+  let b = nameBits "BBB" cycleCount.val
 
   always do
     -- Increment on every cycle
     cycleCount <== b + 1
 
     -- Display value an every cycle
-    display "cycleCount    = " (cycleCount.val)
+    display "cycleCount    = " cycleCount.val
     display "cycleCount(a) = " a
     display "cycleCount(b) = " b
 

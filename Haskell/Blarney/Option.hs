@@ -31,17 +31,9 @@ import Blarney
 
 data Option t =
   Option {
-    optValid :: Bit 1
-  , optValue :: t
+    valid :: Bit 1
+  , val :: t
   } deriving (Generic, Bits, Interface, FShow)
-
--- | 'Valid' instance for the 'Option' type
-instance  Valid (Option t) where
-  valid = optValid
-
--- | 'Val' instance for the 'Option' type
-instance Val (Option t) t where
-  val = optValue
 
 instance Functor Option where
   fmap f (Option valid value) = Option valid (f value)
@@ -60,7 +52,7 @@ isSome opt = opt.valid
 
 -- | Tests if an 'Option' is a 'none'
 isNone :: Bits t => Option t -> Bit 1
-isNone opt = opt.valid.inv
+isNone opt = inv opt.valid
 
 -- | Gets the value from a valid 'Option', or a given default value otherwise
 fromOption :: Bits t => t -> Option t -> t

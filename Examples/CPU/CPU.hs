@@ -60,7 +60,7 @@ makeCPU = do
 
   -- Program counter
   pcNext :: Wire (Bit 8) <- makeWire 0
-  let pc = reg 0 (pcNext.val)
+  let pc = reg 0 pcNext.val
 
   -- Result of the execute stage
   result :: Wire (Bit 8) <- makeWire 0
@@ -70,7 +70,7 @@ makeCPU = do
 
   -- Cycle counter
   count :: Reg (Bit 32) <- makeReg 0
-  always (count <== count.val + 1)
+  always do count <== count.val + 1
 
   -- Trigger for each pipeline stage
   go1 :: Reg (Bit 1) <- makeDReg 0
@@ -82,7 +82,7 @@ makeCPU = do
     -- ==========================
 
     -- Index the instruction memory
-    load instrMem (pcNext.val)
+    instrMem.load pcNext.val
 
     -- Start the pipeline after one cycle
     go1 <== 1
@@ -90,47 +90,47 @@ makeCPU = do
     -- Stage 1: Operand Fetch
     -- ======================
 
-    when (go1.val) do
-      when (flush.val.inv) do
+    when go1.val do
+      when (inv flush.val) do
         pcNext <== pc + 1
         go2 <== 1
 
-    load regFileA (instrMem.out.rA)
-    load regFileB (instrMem.out.rB)
+    regFileA.load (rA instrMem.out)
+    regFileB.load (rB instrMem.out)
 
     -- Stage 2: Latch Operands
     -- =======================
 
     -- Latch instruction
-    instr <== instrMem.out.old
+    instr <== old instrMem.out
 
     -- Register forwarding logic
     let forward rS other =
-          (result.active .&. (instr.val.rD .==. instrMem.out.old.rS)) ?
+          (result.active .&. (rD instr.val .==. rS (old instrMem.out))) ?
           (result.val, other)
 
     -- Latch operands
-    opA <== forward rA (regFileA.out)
-    opB <== forward rB (regFileB.out)
+    opA <== forward rA regFileA.out
+    opB <== forward rB regFileB.out
 
     -- Trigger stage 3
-    when (flush.val.inv) do
+    when (inv flush.val) do
       go3 <== go2.val
 
     -- Stage 3: Execute
     -- ================
 
     -- Instruction dispatch
-    when (go3.val) do
-      switch (instr.val.opcode)
+    when go3.val do
+      switch (opcode instr.val)
         [
           -- Load-immediate instruction
-          0b00 --> result <== zeroExtend (instr.val.imm),
+          0b00 --> result <== zeroExtend (imm instr.val),
           -- Add instruction
           0b01 --> result <== opA.val + opB.val,
           -- Branch instruction
           0b10 --> when (opB.val .!=. 0) do
-                     pcNext <== pc - zeroExtend (instr.val.offset) - 2
+                     pcNext <== pc - zeroExtend (offset instr.val) - 2
                      -- Control hazard
                      flush <== 1,
           -- Halt instruction
@@ -139,10 +139,10 @@ makeCPU = do
 
       -- Writeback
       when (result.active) do
-        store regFileA (instr.val.rD) (result.val)
-        store regFileB (instr.val.rD) (result.val)
-        display (formatDec 8 (count.val))
-                ": rf[" (instr.val.rD) "] := " (result.val)
+        regFileA.store (rD instr.val) result.val
+        regFileB.store (rD instr.val) result.val
+        display (formatDec 8 count.val)
+                ": rf[" (rD instr.val) "] := " result.val
 
 -- Main function
 main :: IO ()

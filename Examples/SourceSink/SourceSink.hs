@@ -30,12 +30,12 @@ top = do
   -- feed chain of queues
   always do
     -- chain queues
-    when (canPut q0snk) do (q0snk.put) (count.val) -- put count in q0's sink
+    when (canPut q0snk) do q0snk.put count.val -- put count in q0's sink
     let q2src = toSource s2 -- example use of toSource
     -- Consume from q2
-    when (q2src.canPeek .&. (count.val .>. 50)) do
+    when (q2src.canPeek .&&. count.val .>. 50) do
       q2src.consume
-      display "Got " (q2src.peek)
+      display "Got " q2src.peek
       when (q2src.peek .>. 100) finish
     count <== count.val + 1
 

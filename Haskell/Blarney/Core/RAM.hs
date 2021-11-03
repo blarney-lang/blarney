@@ -3,6 +3,7 @@
 {-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 
 {-|
@@ -74,6 +75,7 @@ import Blarney.Core.Module
 import Blarney.Core.Prelude
 
 -- GHC imports
+import GHC.Records
 import GHC.TypeNats
 
 -- |RAM primitive (for internal use only)
@@ -278,8 +280,8 @@ makeRAMCore init = do
                 addrBus <== a
                 dataBus <== d
                 writeEn <== 1
-  , out     = ramPrimitive (val addrBus, val dataBus, val writeEn, val readEn)
-  , storeActive = val writeEn
+  , out     = ramPrimitive (addrBus.val, dataBus.val, writeEn.val, readEn.val)
+  , storeActive = writeEn.val
   , preserveOut = readEn <== 0
   }
 
@@ -315,8 +317,8 @@ makeTrueDualRAMCore init = do
 
   -- RAM output
   let (outA, outB) = ramPrimitive
-        (val addrBusA, val dataBusA, val writeEnA, val readEnA)
-        (val addrBusB, val dataBusB, val writeEnB, val readEnB)
+        (addrBusA.val, dataBusA.val, writeEnA.val, readEnA.val)
+        (addrBusB.val, dataBusB.val, writeEnB.val, readEnB.val)
 
   -- Return interface
   return (RAM {
@@ -325,7 +327,7 @@ makeTrueDualRAMCore init = do
                                    dataBusA <== d
                                    writeEnA <== 1
             , out     = outA
-            , storeActive = val writeEnA
+            , storeActive = writeEnA.val
             , preserveOut = readEnA <== 0
             },
           RAM {
@@ -334,7 +336,7 @@ makeTrueDualRAMCore init = do
                                    dataBusB <== d
                                    writeEnB <== 1
             , out     = outB
-            , storeActive = val writeEnB
+            , storeActive = writeEnB.val
             , preserveOut = readEnB <== 0
             })
 
@@ -371,9 +373,9 @@ makeDualRAMCore init = do
                 wrAddrBus <== a
                 dataBus <== d
                 writeEn <== 1
-  , out     = ramPrimitive (val rdAddrBus, val wrAddrBus,
-                            val dataBus, val writeEn, val readEn)
-  , storeActive = val writeEn
+  , out     = ramPrimitive (rdAddrBus.val, wrAddrBus.val,
+                            dataBus.val, writeEn.val, readEn.val)
+  , storeActive = writeEn.val
   , preserveOut = readEn <== 0
   }
 
@@ -411,16 +413,16 @@ makeDualRAMForwardCore init = do
       storeAddr <== a
       storeData <== d
   , out =
-      let en = inv $ val $ preserveWire
+      let en = inv preserveWire.val
           forwardCond =
             delayEn false en $
               andList [
                 active loadAddr
               , active storeAddr
-              , val loadAddr === val storeAddr
+              , loadAddr.val === storeAddr.val
               ]
           forwardData =
-            delayEn dontCare en (val storeData)
+            delayEn dontCare en storeData.val
       in forwardCond ? (forwardData, out ram)
   , storeActive = storeActive ram
   , preserveOut = do
@@ -475,8 +477,8 @@ makeRAMBECore init = do
                 writeEn <== 1
                 byteEn  <== be
   , outBE = ramPrimitive
-      (val addrBus, val dataBus, val writeEn, val readEn, val byteEn)
-  , storeActiveBE = val writeEn
+      (addrBus.val, dataBus.val, writeEn.val, readEn.val, byteEn.val)
+  , storeActiveBE = writeEn.val
   , preserveOutBE = readEn <== 0
   }
 
@@ -513,8 +515,8 @@ makeTrueDualRAMBECore init = do
 
   -- RAM output
   let (outA, outB) = ramPrimitive
-        (val addrBusA, val dataBusA, val writeEnA, val readEnA, val byteEnA)
-        (val addrBusB, val dataBusB, val writeEnB, val readEnB, val byteEnB)
+        (addrBusA.val, dataBusA.val, writeEnA.val, readEnA.val, byteEnA.val)
+        (addrBusB.val, dataBusB.val, writeEnB.val, readEnB.val, byteEnB.val)
 
   -- Return interface
   return (RAMBE {
@@ -524,7 +526,7 @@ makeTrueDualRAMBECore init = do
                                       writeEnA <== 1
                                       byteEnA  <== be
             , outBE   = outA
-            , storeActiveBE = val writeEnA
+            , storeActiveBE = writeEnA.val
             , preserveOutBE = readEnA <== 0
             },
           RAMBE {
@@ -534,7 +536,7 @@ makeTrueDualRAMBECore init = do
                                       writeEnB <== 1
                                       byteEnB  <== be
             , outBE   = outB
-            , storeActiveBE = val writeEnB
+            , storeActiveBE = writeEnB.val
             , preserveOutBE = readEnB <== 0
             })
 
@@ -573,9 +575,9 @@ makeDualRAMBECore init = do
                   dataBus <== d
                   writeEn <== 1
                   byteEn  <== be
-  , outBE     = ramPrimitive (val rdAddrBus, val wrAddrBus, val dataBus,
-                              val writeEn, val readEn, val byteEn)
-  , storeActiveBE = val writeEn
+  , outBE     = ramPrimitive (rdAddrBus.val, wrAddrBus.val, dataBus.val,
+                              writeEn.val, readEn.val, byteEn.val)
+  , storeActiveBE = writeEn.val
   , preserveOutBE = readEn <== 0
   }
 
@@ -619,18 +621,18 @@ makeDualRAMForwardBECore init = do
       storeData <== d
       storeByteEn <== be
   , outBE =
-      let en = inv $ val $ preserveWire
+      let en = inv preserveWire.val
           forwardCond =
             delayEn false en $
               andList [
                 active loadAddr
               , active storeAddr
-              , val loadAddr === val storeAddr
+              , loadAddr.val === storeAddr.val
               ]
           forwardData =
-            delayEn dontCare en (val storeData)
+            delayEn dontCare en storeData.val
           forwardByteEn =
-            delayEn 0 en (val storeByteEn)
+            delayEn 0 en storeByteEn.val
           outData = fromBitList
             [ (forwardCond .&&. be) ? (new, old)
             | (be, new, old) <-

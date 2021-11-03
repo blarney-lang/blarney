@@ -82,27 +82,27 @@ makeQueue = do
   update1 :: Wire (Bit 1) <- makeWire 0
 
   always do
-    if valid0.val.inv .|. doDeq.val
+    if inv valid0.val .|. doDeq.val
       then do
         -- Update element 0
         valid0 <== valid1.val .|. doEnq.active
         elem0  <== valid1.val ? (elem1.val, doEnq.val)
-        when (valid1.val) $ do
+        when (valid1.val) do
           -- Update element 1
           valid1 <== doEnq.active
           update1 <== 1
       else do
-        when (doEnq.active) $ do
+        when (doEnq.active) do
           -- Update element 1
           valid1 <== 1
           update1 <== 1
 
-    when (update1.val) (elem1 <== doEnq.val)
+    when update1.val (elem1 <== doEnq.val)
 
-  return $
+  return
     Queue {
       notEmpty = valid0.val
-    , notFull  = valid1.val.inv
+    , notFull  = inv valid1.val
     , enq      = \a -> doEnq <== a
     , deq      = doDeq <== 1
     , canDeq   = valid0.val
@@ -144,11 +144,11 @@ makeSizedQueueConfig config = do
 
   always do
     -- Connect big queue to small queue
-    when (small.notFull .&. big.canDeq) $ do
+    when (small.notFull .&. big.canDeq) do
       deq big
       enq small (big.first)
 
-  return $
+  return
     Queue {
       notEmpty = small.notEmpty .&. big.notEmpty
     , notFull  = big.notFull
@@ -182,29 +182,29 @@ makeSizedQueueCore logSize =
     always do
       -- Read from new front pointer and update
       let newFront = doDeq.val ? (front.val + 1, front.val)
-      load ram newFront
+      ram.load newFront
       front <== newFront
 
       if doEnq.active
         then do
           let newBack = back.val + 1
           back <== newBack
-          store ram (back.val) (doEnq.val)
-          when (doDeq.val.inv) $ do
+          ram.store back.val doEnq.val
+          when (inv doDeq.val) do
             empty <== 0
             when (newBack .==. front.val) (full <== 1)
         else do
-          when (doDeq.val) $ do
+          when doDeq.val do
             full <== 0
             when (newFront .==. back.val) (empty <== 1)
 
-    return $
+    return
       Queue {
-        notEmpty = empty.val.inv
-      , notFull  = full.val.inv
+        notEmpty = inv empty.val
+      , notFull  = inv full.val
       , enq      = \a -> doEnq <== a
       , deq      = doDeq <== 1
-      , canDeq   = empty.val.inv
+      , canDeq   = inv empty.val
       , first    = ram.out
       }
 
@@ -260,7 +260,7 @@ makeShiftQueueCore mode n = do
   doDeq :: Wire (Bit 1) <- makeWire 0
 
   -- Register enable line to each element
-  let ens = tail $ scanl (.|.) (doDeq.val) [v.val.inv | v <- valids]
+  let ens = tail $ scanl (.|.) doDeq.val [inv v.val | v <- valids]
 
   always do
     -- Update elements
@@ -272,25 +272,25 @@ makeShiftQueueCore mode n = do
               | (en, x, y) <- zip3 ens valids (tail valids) ]
 
     -- Don't insert new element
-    when (doEnq.active.inv .&. ens.last) $ do
-      valids.last <== 0
+    when (inv doEnq.active .&. last ens) do
+      last valids <== 0
 
     -- Insert new element
-    when (doEnq.active) $ do
-      valids.last <== 1
-      elems.last <== doEnq.val
+    when (doEnq.active) do
+      last valids <== 1
+      last elems <== doEnq.val
 
   return
     ( Queue {
-        notEmpty = orList (map val valids)
-      , notFull  = inv (andList (map val valids)) .|.
+        notEmpty = orList (map (.val) valids)
+      , notFull  = inv (andList (map (.val) valids)) .|.
                      (if mode == OptFmax then 0 else doDeq.val)
       , enq      = \a -> doEnq <== a
       , deq      = doDeq <== 1
-      , canDeq   = valids.head.val
-      , first    = elems.head.val
+      , canDeq   = (head valids).val
+      , first    = (head elems).val
       }
-    , [Option (v.val) (e.val) | (v, e) <- zip valids elems] )
+    , [Option v.val e.val | (v, e) <- zip valids elems] )
 
 -- |Single element bypass queue
 makeBypassQueue :: Bits a => Module (Queue a)
@@ -299,7 +299,7 @@ makeBypassQueue = do
   dataReg <- makeReg dontCare
   dataRegFull <- makeReg false
   -- Data wire (by default emits the value of the data register)
-  dataWire <- makeWire (dataReg.val)
+  dataWire <- makeWire dataReg.val
   -- Dequeue trigger
   doDeq <- makeWire false
 
@@ -314,10 +314,10 @@ makeBypassQueue = do
   -- Can dequeue when wire is being enqueued, or when data reg full
   let canDeqVal = dataWire.active .|. dataRegFull.val
 
-  return $
+  return
     Queue {
       notEmpty = canDeqVal
-    , notFull  = dataRegFull.val.inv
+    , notFull  = inv dataRegFull.val
     , enq      = \a -> dataWire <== a
     , deq      = doDeq <== true
     , canDeq   = canDeqVal

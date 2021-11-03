@@ -82,26 +82,26 @@ makeGenericFairMergeTwo makeQueue g isFinal (origInA, origInB) = do
     -- Only one lock can be true at any time
     dynamicAssert (inv (lockA.val .&&. lockB.val))
       "makeGenericFairMergeTwo: both locks acquired!"
-    when (buffer.notFull) do
+    when buffer.notFull do
       -- Take next input from stream B?
-      let chooseB = lockA.val.inv .&&. inB.canPeek .&&.
-            (inA.canPeek.inv .||. prevChoiceWasA.val)
+      let chooseB = inv lockA.val .&&. inB.canPeek .&&.
+            (inv inA.canPeek .||. prevChoiceWasA.val)
       -- Consume input and produce output
       if lockB.val .||. chooseB
         then
-          when (inB.canPeek) do
+          when inB.canPeek do
             inB.consume
-            lockB <== inB.peek.isFinal.inv
-            enq buffer (inB.peek)
+            lockB <== inv (isFinal inB.peek)
+            buffer.enq inB.peek
             prevChoiceWasA <== false
         else
-          when (inA.canPeek) do
+          when inA.canPeek do
             inA.consume
-            lockA <== inA.peek.isFinal.inv
-            enq buffer (inA.peek)
+            lockA <== inv (isFinal inA.peek)
+            buffer.enq inA.peek
             prevChoiceWasA <== true
 
-  return (buffer.toStream)
+  return (toStream buffer)
 
 -- | Buffered fair switch between two streams, based on routing function
 makeFairExchange :: Bits a =>
@@ -140,7 +140,7 @@ makeTwoWayBroadcast isBroadcast streamIn = do
   -- State machine
   always do
     when (streamIn.canPeek) do
-      if streamIn.peek.isBroadcast
+      if isBroadcast streamIn.peek
         then do
           -- Broadcast
           if waiting.val

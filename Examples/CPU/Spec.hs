@@ -28,14 +28,14 @@ makeCPUSpec = do
 
   -- Load immediate instruction
   let li rd imm = do
-        update regFile rd (zeroExtend imm)
+        regFile.update rd (zeroExtend imm)
         pc <== pc.val + 1
         display "rf[" rd "] := 0x" (formatHex 2 (zeroExtend imm :: Bit 8))
 
   -- Add instruction
   let add rd rs0 rs1 = do
         let sum = regFile!rs0 + regFile!rs1
-        update regFile rd sum
+        regFile.update rd sum
         pc <== pc.val + 1
         display "rf[" rd "] := 0x" (formatHex 2 sum)
 
@@ -50,13 +50,13 @@ makeCPUSpec = do
 
   always do
     -- Fetch
-    when (fetch.val) $ do
-      load instrMem (pc.val)
+    when fetch.val do
+      instrMem.load pc.val
       fetch <== 0
 
     -- Execute
-    when (fetch.val.inv) $ do
-      match (instrMem.out)
+    when (inv fetch.val) do
+      match instrMem.out
         [
           lit 0b00 <#> var @2 <#> var @4              ==>  li,
           lit 0b01 <#> var @2 <#> var @2  <#> var @2  ==>  add,

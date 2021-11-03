@@ -20,13 +20,12 @@ module Blarney (
   module Blarney.Core
 , module Blarney.Netlist
 , module Blarney.Backend
--- * Defined Blarney functions / operators
-, (.)
 -- Other modules
 , module Control.Monad
 , module Control.Monad.Fix
+, HasField(..)
+, Generic(..)
 , module GHC.TypeLits
-, module GHC.Generics
 , module P
 ) where
 
@@ -35,11 +34,7 @@ import Blarney.Netlist
 import Blarney.Backend
 import Control.Monad hiding (when)
 import Control.Monad.Fix
-import GHC.TypeLits
+import GHC.Records (HasField(..))
 import GHC.Generics (Generic(..))
-import Prelude as P hiding ((.), truncate)
-
--- | Reverse function application
-infixl 9 .
-(.) :: a -> (a -> b) -> b
-x.f = f x
+import GHC.TypeLits
+import Prelude as P hiding (truncate)

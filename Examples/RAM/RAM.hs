@@ -15,15 +15,15 @@ top = do
   runStmt do
     while (i.val .<. 100) do
       action do
-        store ram (i.val) (1 .<<. i.val)
+        ram.store i.val (1 .<<. i.val)
         i <== i.val + 1
     action do
       i <== 0
     while (i.val .<. 100) do
       action do
-        load ram (i.val)
+        ram.load i.val
       action do
-        display "ram[" (i.val) "] = 0x" (formatHex 32 (ram.out))
+        display "ram[" i.val "] = 0x" (formatHex 32 ram.out)
         i <== i.val + 1
     action do
       finish

@@ -229,11 +229,11 @@ update xs idx x = Vec (start ++ (x:end))
 
 -- | Return the head element of the given 'Vec' (element at index 0)
 head :: (1 <= n) => Vec n a -> a
-head = L.head `o` toList
+head = L.head . toList
 
 -- | Return the last element of the given 'Vec' (element at last index)
 last :: (1 <= n) => Vec n a -> a
-last = L.last `o` toList
+last = L.last . toList
 
 -- | Return the given 'Vec' with its head element removed
 tail :: Vec (n+1) a -> Vec (n) a
