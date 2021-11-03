@@ -238,6 +238,8 @@ instance Val (ReadWrite t) t where
   val = rwReadVal
 instance Assign ReadWrite where
   (<==) = rwWriteVal
+instance HasField "val" (ReadWrite t) t where
+  getField = rwReadVal
 
 -- |Write-Only interface
 data WriteOnly a =
