@@ -23,6 +23,7 @@ clean:
 	make -C Option clean
 	make -C Queue clean
 	make -C RAM clean
+	make -C RAMQuad clean
 	make -C Sklansky clean
 	make -C Sorter clean
 	make -C SourceSink clean
