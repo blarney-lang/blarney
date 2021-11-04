@@ -1056,7 +1056,7 @@ first install using cabal
 [source, shell]
 ----
 cd Haskell/BlarneyPlugins/Namer
-cabal install
+cabal install --lib
 ----
 
 and then pass the `--enable-namer-plugin` flag to `blc`.
