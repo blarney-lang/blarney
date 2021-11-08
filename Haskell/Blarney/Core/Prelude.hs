@@ -38,11 +38,13 @@ module Blarney.Core.Prelude
   , delayEn         -- Generic register with enable
   , binaryEncode    -- One-hot to binary encoder
   , firstHot        -- Isolate first hot bit in vector
+  , mergeWrites     -- Merge input values according to a given merging strategy
   ) where
 
 import Prelude
 import GHC.TypeLits
 import Data.List (transpose)
+import Blarney.Core.Prim
 import Blarney.Core.BV
 import Blarney.Core.Bit
 import Blarney.Core.Bits
@@ -92,14 +94,12 @@ treeB b f z xs = if null xs then z else treeB1 b f xs
 
 -- |One-hot select
 select :: Bits a => [(Bit 1, a)] -> a
-select alts =
-  orList [sel ? (val, zero) | (sel, val) <- alts]
+select = mergeWrites MStratOr
 
 -- |Variant of 'select' where right-hand-side is a list
 selectList :: Bits a => [(Bit 1, [a])] -> [a]
-selectList alts =
-  map orList $ transpose
-    [map (\x -> cond ? (x, zero)) rhs | (cond, rhs) <- alts]
+selectList alts = map (mergeWrites MStratOr) alts'
+  where alts' = transpose $ map (\(c, es) -> map (c ,) es) alts
 
 -- |Index a list
 listIndex :: (KnownNat n, Bits a) => Bit n -> [a] -> a
@@ -168,3 +168,8 @@ binaryEncode xs = unsafeFromBitList $ encode $ unsafeToBitList xs
 -- | Isolate first hot bit in a bit vector
 firstHot :: KnownNat n => Bit n -> Bit n
 firstHot x = x .&. (inv x + 1)
+
+mergeWrites :: forall a. Bits a => MergeStrategy -> [(Bit 1, a)] -> a
+mergeWrites strat ins = unpack $ mergeWritesBit strat w ins'
+  where ins' = map (\(en, x) -> (en, pack x)) ins
+        w = sizeOf (error "_|_" :: a)

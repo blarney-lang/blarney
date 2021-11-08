@@ -65,6 +65,7 @@ module Blarney.Core.BV (
 , inputPinBV     -- :: String -> BV
 , regBV          -- :: Width -> Integer -> BV -> BV
 , regEnBV        -- :: Width -> Integer -> BV -> BV -> BV
+, mergeWritesBV  -- :: MergeStrategy -> Width -> [(BV, BV)] -> BV
 , regFileReadBV  -- :: RegFileInfo -> BV -> BV
 , getInitBV      -- :: BV -> Maybe Integer
 , ramBV          -- Single port block RAM
@@ -306,6 +307,12 @@ regBV w i a = makePrim1 (Register (getInitBV i) w) [a]
 -- |Register of given width with initial value and enable wire
 regEnBV :: Width -> BV -> BV -> BV -> BV
 regEnBV w i en a = makePrim1 (RegisterEn (getInitBV i) w) [en, a]
+
+-- | Merge a list of inputs together
+mergeWritesBV :: MergeStrategy -> Width -> [(BV, BV)] -> BV
+mergeWritesBV strat w ins = makePrim1 (MergeWrites strat n w) ins'
+  where n = length ins
+        ins' = concatMap (\(en, x) -> [en, x]) ins
 
 -- |Single-port block RAM.
 -- Inputs: address, data, write-enable, read-enable, optional byte-enable
