@@ -8,6 +8,6 @@ version:             0.1.0.0
 library
   exposed-modules:     BlarneyPlugins.Namer
   exposed:             False
-  build-depends:       base >= 4.12.0.0, syb >= 0.7.1, ghc >= 8.6.1
+  build-depends:       base >= 4.12.0.0, syb >= 0.7.1, ghc >= 9.2.1
   default-language:    Haskell2010
   ghc-options:         -O2
