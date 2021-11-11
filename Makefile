@@ -7,6 +7,7 @@ include $(BLARNEY_ROOT)/blarneyDirs.mk
 BLARNEY_TOP_MODULES_SRC = $(SRC_DIR)/Blarney.hs
 BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/BitPat.hs
 BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/BitScan.hs
+BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/ClientServer.hs
 BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/Connectable.hs
 BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/Interconnect.hs
 BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/Option.hs
