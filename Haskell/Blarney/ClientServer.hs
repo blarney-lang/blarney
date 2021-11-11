@@ -51,8 +51,7 @@ data Server req_t resp_t =
 -- Instances
 -- =========
 
-instance (Bits req_t, Bits resp_t) =>
-           Connectable (Client req_t resp_t) (Server req_t resp_t) where
+instance Connectable (Client req_t resp_t) (Server req_t resp_t) where
   makeConnection c s = do
     makeConnection c.reqs s.reqs
     makeConnection s.resps c.resps
