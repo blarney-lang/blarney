@@ -42,6 +42,7 @@ module Blarney.Core.Prelude
   ) where
 
 import Prelude
+import GHC.Records
 import GHC.TypeLits
 import Data.List (transpose)
 import Blarney.Core.Prim
@@ -173,3 +174,31 @@ mergeWrites :: forall a. Bits a => MergeStrategy -> [(Bit 1, a)] -> a
 mergeWrites strat ins = unpack $ mergeWritesBit strat w ins'
   where ins' = map (\(en, x) -> (en, pack x)) ins
         w = sizeOf (error "_|_" :: a)
+
+-- 2-tuple instances for HasField
+instance HasField "fst" (a,b) a where
+  getField (a,b) = a
+instance HasField "snd" (a,b) b where
+  getField (a,b) = b
+instance HasField "_0" (a,b) a where
+  getField (a,b) = a
+instance HasField "_1" (a,b) b where
+  getField (a,b) = b
+
+-- 3-tuple instances for HasField
+instance HasField "_0" (a,b,c) a where
+  getField (a,b,c) = a
+instance HasField "_1" (a,b,c) b where
+  getField (a,b,c) = b
+instance HasField "_2" (a,b,c) c where
+  getField (a,b,c) = c
+
+-- 4-tuple instances for HasField
+instance HasField "_0" (a,b,c,d) a where
+  getField (a,b,c,d) = a
+instance HasField "_1" (a,b,c,d) b where
+  getField (a,b,c,d) = b
+instance HasField "_2" (a,b,c,d) c where
+  getField (a,b,c,d) = c
+instance HasField "_3" (a,b,c,d) d where
+  getField (a,b,c,d) = d
