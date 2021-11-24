@@ -15,7 +15,6 @@ inspired by https://github.com/B-Lang-org/bsc[Bluespec], such as
 first-class actions and method-based interfaces.  Below, we
 introduce the library by example, supplementing the
 http://blarney-lang.github.io/blarney/index.html[Haddock docs].
-
 Applications of Blarney include
 https://github.com/CTSRD-CHERI/SIMTight[SIMTight] (a CHERI-enabled
 RISC-V GPGPU) and https://github.com/blarney-lang/actora[Actora] (a
