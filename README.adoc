@@ -16,6 +16,11 @@ first-class actions and method-based interfaces.  Below, we
 introduce the library by example, supplementing the
 http://blarney-lang.github.io/blarney/index.html[Haddock docs].
 
+Applications of Blarney include
+https://github.com/CTSRD-CHERI/SIMTight[SIMTight] (a CHERI-enabled
+RISC-V GPGPU) and https://github.com/blarney-lang/SIMTight[Actora] (a
+stack machine, with a compiler for an Erlang-like language).
+
 [discrete]
 == Contents
 
