@@ -71,6 +71,12 @@ ifThenElseStmt c (Stmt r1 _) (Stmt r2 _) =
 instance IfThenElse (Bit 1) (Stmt ()) where
   ifThenElse = ifThenElseStmt
 
+whenStmt :: Bit 1 -> Stmt () -> Stmt ()
+whenStmt c s = ifThenElseStmt c s skip
+
+instance When (Bit 1) Stmt where
+  when = whenStmt
+
 background :: Stmt () -> Stmt ()
 background (Stmt r _) = Stmt (Background r) ()
 

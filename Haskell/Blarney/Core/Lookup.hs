@@ -89,7 +89,7 @@ lookupInterface ifcs i = fromIfcTerm (idx $ toIfcTerm <$> ifcs)
     idx (terms@(IfcTermBV{}:_)) =
       IfcTermBV $ muxBV (toBV i) [ x | (IfcTermBV x) <- terms ]
     idx (terms@(IfcTermAction{}:_)) = IfcTermAction do
-      rets <- sequence [ whenR (i .==. fromInteger j) act
+      rets <- sequence [ whenAction (i .==. fromInteger j) act
                        | (j, IfcTermAction act) <- zip [0..] terms ]
       return (idx rets)
     idx (terms@(IfcTermProduct{}:_)) =
