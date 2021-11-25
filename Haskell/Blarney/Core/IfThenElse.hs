@@ -5,7 +5,7 @@
 
 {-|
 Module      : Blarney.Core.IfThenElse
-Description : Overloaded if-then-else
+Description : Overloaded if-then-else and when conditionals
 Copyright   : (c) Matthew Naylor, 2019, 2021
               (c) Alexandre Joannou, 2019
 License     : MIT
@@ -15,6 +15,7 @@ Stability   : experimental
 module Blarney.Core.IfThenElse where
 
 import Prelude
+import Control.Monad qualified as M
 
 -- | Overloaded if-then-else
 class IfThenElse b a where
@@ -29,3 +30,10 @@ priorityIf :: IfThenElse cond ret => [(cond, ret)] -> ret -> ret
 priorityIf [] ft = ft
 priorityIf ((a, b):rest) ft =
   if a then b else priorityIf rest ft
+
+-- | Overloaded conditionals without an else part
+class When cond act where
+  when :: cond -> act () -> act ()
+
+instance Applicative app => When Bool app where
+  when cond body = M.when cond body

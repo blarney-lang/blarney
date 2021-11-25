@@ -293,7 +293,7 @@ declareOut (IfcTermAction act) (IfcTypeAction t) = do
   -- Declare input wire to trigger execution of act
   en <- declareInputBV "en" 1
   -- Trigger action
-  ret <- liftModule $ always $ whenR (FromBV en :: Bit 1) act
+  ret <- liftModule $ always $ whenAction (FromBV en :: Bit 1) act
   -- Declare return value output
   newScope "ret" (declareOut ret t)
 declareOut (IfcTermProduct x0 x1) (IfcTypeProduct tx0 tx1) = do

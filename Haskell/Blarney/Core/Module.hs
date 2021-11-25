@@ -34,7 +34,7 @@ module Blarney.Core.Module
     noAction,
 
     -- * Conditional actions
-    when, whenR, switch, (-->),
+    whenAction, switch, (-->),
 
     -- * Validity of a value
     Valid(..),
@@ -124,13 +124,13 @@ withName nm m = withNameHint (NmRoot 10 nm) m
 noName :: Module a -> Module a
 noName m = m
 
--- |Conditional block over actions
-when :: Bit 1 -> Action () -> Action ()
-when c a = A (RTL.when c (runAction a))
+-- | Conditional block over actions with return value
+whenAction :: Bit 1 -> Action a -> Action a
+whenAction c a = A (RTL.whenRTL c (runAction a))
 
--- |Conditional block over actions with return value
-whenR :: Bit 1 -> Action a -> Action a
-whenR c a = A (RTL.whenR c (runAction a))
+-- | Overloaded conditional for actions
+instance When (Bit 1) Action where
+  when = whenAction
 
 -- |If-then-else statement for actions
 ifThenElseAction :: Bits a => Bit 1 -> Action a -> Action a -> Action a

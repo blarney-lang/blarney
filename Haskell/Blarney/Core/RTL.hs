@@ -32,8 +32,7 @@ module Blarney.Core.RTL (
 , evalPureRTL
 , evalRTLRoots
   -- * Conditional statements
-, when            -- RTL conditional block
-, whenR           -- RTL conditional block (with return value)
+, whenRTL         -- RTL conditional block (with return value)
 , ifThenElseRTL   -- RTL if-then-else statement
 , switch          -- RTL switch statement
 , (-->)           -- Operator for switch statement alternatives
@@ -93,7 +92,7 @@ import Control.Monad.Trans.State
 import Control.Monad.Trans.Writer
 import Control.Monad.Trans.Reader
 import Data.List (intercalate)
-import Control.Monad hiding (when)
+import Control.Monad
 import Data.Map (Map, findWithDefault, fromListWith)
 
 -- helper types and functions
@@ -209,14 +208,10 @@ withNameHint hint m = do
   localEnv (r { rtlEnvNameHints  = insert hint rtlEnvNameHints }) m
 
 -- | RTL conditional block with return value
-whenR :: Bit 1 -> RTL a -> RTL a
-whenR c a = do
+whenRTL :: Bit 1 -> RTL a -> RTL a
+whenRTL c a = do
   r@RTLEnv{..} <- askEnv
   localEnv (r { rtlEnvCondition = c .&. rtlEnvCondition }) a
-
--- | RTL conditional block
-when :: Bit 1 -> RTL () -> RTL ()
-when = whenR
 
 -- | If-then-else statement for RTL
 ifThenElseRTL :: Bits a => Bit 1 -> RTL a -> RTL a -> RTL a
@@ -229,7 +224,7 @@ ifThenElseRTL c a b = do
 -- | RTL switch statement
 switch :: Bits a => a -> [(a, RTL ())] -> RTL ()
 switch subject alts = forM_ alts \(lhs, rhs) ->
-  when (pack subject .==. pack lhs) rhs
+  whenRTL (pack subject .==. pack lhs) rhs
 
 -- | Operator for switch statement alternatives
 infixl 0 -->
