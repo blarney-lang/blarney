@@ -4,6 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE DeriveAnyClass        #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
 
 {-|
 Module      : Blarney.PulseWire
