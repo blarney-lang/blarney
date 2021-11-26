@@ -17,7 +17,7 @@ A PulseWire hardware module
 -}
 module Blarney.PulseWire
   ( -- * PulseWire
-    PulseWire(..), Pulse(..), makePulseWire
+    PulseWire(..), makePulseWire
   ) where
 
 -- Blarney imports
@@ -25,29 +25,23 @@ import Blarney
 
 -- | 'PulseWire' type
 data PulseWire =
-  PulseWire { pulseWireSend   :: Action () -- ^ Sends a pulse
-            , pulseWirePulsed :: Bit 1     -- ^ Checks whether a pulse was sent
-                                           --   this cycle
-            } deriving (Generic, Interface)
-
--- | 'Pulse' class
-class Pulse v where
-  -- | Sends a pulse
-  pulse :: v -> Action ()
-
--- | 'Pulse' instance for 'PulseWire'
-instance Pulse PulseWire where
-  pulse = pulseWireSend
+  PulseWire {
+    pulse :: Action ()
+    -- ^ Sends a pulse on the wire
+  , val :: Bit 1
+    -- ^ Checks whether a pulse was sent this cycle
+  } deriving (Generic, Interface)
 
 -- | 'Val' instance for 'PulseWire', returning whether the wire was pulsed
 instance Val PulseWire (Bit 1) where
-  val = pulseWirePulsed
+  val w = w.val
 
--- | Constructs a 'PulseWire' 'Module'
+-- | Single-bit wire that emits 0 unless pulsed
 makePulseWire :: Module PulseWire
 makePulseWire = do
   w :: Wire (Bit 0) <- makeWire dontCare
-  return PulseWire {
-    pulseWireSend   = w <== dontCare
-  , pulseWirePulsed = active w
-  }
+  return
+    PulseWire {
+      pulse = do w <== dontCare
+    , val = active w
+    }
