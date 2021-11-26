@@ -5,6 +5,7 @@
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE DeriveAnyClass        #-}
 {-# LANGUAGE OverloadedRecordDot   #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 
 {-|
 Module      : Blarney.PulseWire
