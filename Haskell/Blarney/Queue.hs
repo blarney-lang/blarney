@@ -36,6 +36,7 @@ data Queue a = Queue { notEmpty :: Bit 1
                      , deq      :: Action ()
                      , canDeq   :: Bit 1
                      , first    :: a
+                     , clear    :: Action ()
                      } deriving (Generic, Interface)
 
 -- | ToSource instance for Queue
@@ -80,23 +81,29 @@ makeQueue = do
   -- Wires
   doEnq :: Wire a <- makeWire dontCare
   doDeq :: Wire (Bit 1) <- makeWire 0
+  doClear :: Wire (Bit 1) <- makeWire 0
   update1 :: Wire (Bit 1) <- makeWire 0
 
   always do
-    if inv valid0.val .|. doDeq.val
+    if doClear.val
       then do
-        -- Update element 0
-        valid0 <== valid1.val .|. doEnq.active
-        elem0  <== valid1.val ? (elem1.val, doEnq.val)
-        when (valid1.val) do
-          -- Update element 1
-          valid1 <== doEnq.active
-          update1 <== 1
+        valid0 <== false
+        valid1 <== false
       else do
-        when (doEnq.active) do
-          -- Update element 1
-          valid1 <== 1
-          update1 <== 1
+        if inv valid0.val .|. doDeq.val
+          then do
+            -- Update element 0
+            valid0 <== valid1.val .|. doEnq.active
+            elem0  <== valid1.val ? (elem1.val, doEnq.val)
+            when (valid1.val) do
+              -- Update element 1
+              valid1 <== doEnq.active
+              update1 <== 1
+          else do
+            when (doEnq.active) do
+              -- Update element 1
+              valid1 <== 1
+              update1 <== 1
 
     when update1.val (elem1 <== doEnq.val)
 
@@ -108,6 +115,7 @@ makeQueue = do
     , deq      = doDeq <== 1
     , canDeq   = valid0.val
     , first    = elem0.val
+    , clear    = doClear <== 1
     }
 
 {-|
@@ -157,6 +165,7 @@ makeSizedQueueConfig config = do
     , deq      = deq small
     , canDeq   = small.canDeq
     , first    = small.first
+    , clear    = small.clear >> big.clear
     }
 
 -- |This one has no output buffer (low latency, but not great for Fmax)
@@ -179,25 +188,33 @@ makeSizedQueueCore logSize =
     -- Wires
     doEnq :: Wire a <- makeWire dontCare
     doDeq :: Wire (Bit 1) <- makeWire 0
+    doClear :: Wire (Bit 1) <- makeWire 0
 
     always do
-      -- Read from new front pointer and update
-      let newFront = doDeq.val ? (front.val + 1, front.val)
-      ram.load newFront
-      front <== newFront
-
-      if doEnq.active
+      if doClear.val
         then do
-          let newBack = back.val + 1
-          back <== newBack
-          ram.store back.val doEnq.val
-          when (inv doDeq.val) do
-            empty <== 0
-            when (newBack .==. front.val) (full <== 1)
+          full <== 0
+          empty <== 1
+          front <== 0
+          back <== 0
         else do
-          when doDeq.val do
-            full <== 0
-            when (newFront .==. back.val) (empty <== 1)
+          -- Read from new front pointer and update
+          let newFront = doDeq.val ? (front.val + 1, front.val)
+          ram.load newFront
+          front <== newFront
+
+          if doEnq.active
+            then do
+              let newBack = back.val + 1
+              back <== newBack
+              ram.store back.val doEnq.val
+              when (inv doDeq.val) do
+                empty <== 0
+                when (newBack .==. front.val) (full <== 1)
+            else do
+              when doDeq.val do
+                full <== 0
+                when (newFront .==. back.val) (empty <== 1)
 
     return
       Queue {
@@ -207,6 +224,7 @@ makeSizedQueueCore logSize =
       , deq      = doDeq <== 1
       , canDeq   = inv empty.val
       , first    = ram.out
+      , clear    = doClear <== 1
       }
 
 {-|
@@ -259,27 +277,32 @@ makeShiftQueueCore mode n = do
   -- Wires
   doEnq :: Wire a <- makeWire dontCare
   doDeq :: Wire (Bit 1) <- makeWire 0
+  doClear :: Wire (Bit 1) <- makeWire 0
 
   -- Register enable line to each element
   let ens = tail $ scanl (.|.) doDeq.val [inv v.val | v <- valids]
 
   always do
-    -- Update elements
-    sequence_ [ when en (x <== y.val)
-              | (en, x, y) <- zip3 ens elems (tail elems) ]
+    if doClear.val
+      then do
+        sequence_ [ v <== false | v <- valids ]
+      else do       
+        -- Update elements
+        sequence_ [ when en (x <== y.val)
+                  | (en, x, y) <- zip3 ens elems (tail elems) ]
 
-    -- Update valid bits
-    sequence_ [ when en (x <== y.val)
-              | (en, x, y) <- zip3 ens valids (tail valids) ]
+        -- Update valid bits
+        sequence_ [ when en (x <== y.val)
+                  | (en, x, y) <- zip3 ens valids (tail valids) ]
 
-    -- Don't insert new element
-    when (inv doEnq.active .&. last ens) do
-      last valids <== 0
+        -- Don't insert new element
+        when (inv doEnq.active .&. last ens) do
+          last valids <== 0
 
-    -- Insert new element
-    when (doEnq.active) do
-      last valids <== 1
-      last elems <== doEnq.val
+        -- Insert new element
+        when (doEnq.active) do
+          last valids <== 1
+          last elems <== doEnq.val
 
   return
     ( Queue {
@@ -290,6 +313,7 @@ makeShiftQueueCore mode n = do
       , deq      = doDeq <== 1
       , canDeq   = (head valids).val
       , first    = (head elems).val
+      , clear    = doClear <== 1
       }
     , [Option v.val e.val | (v, e) <- zip valids elems] )
 
@@ -303,14 +327,19 @@ makeBypassQueue = do
   dataWire <- makeWire dataReg.val
   -- Dequeue trigger
   doDeq <- makeWire false
+  -- Clear trigger
+  doClear <- makeWire false
 
   always do
-    if doDeq.val
+    if doClear.val
       then dataRegFull <== false
       else do
-        when (dataWire.active) do
-          dataRegFull <== true
-          dataReg <== dataWire.val
+        if doDeq.val
+          then dataRegFull <== false
+          else do
+            when (dataWire.active) do
+              dataRegFull <== true
+              dataReg <== dataWire.val
 
   -- Can dequeue when wire is being enqueued, or when data reg full
   let canDeqVal = dataWire.active .|. dataRegFull.val
@@ -323,6 +352,7 @@ makeBypassQueue = do
     , deq      = doDeq <== true
     , canDeq   = canDeqVal
     , first    = dataWire.val
+    , clear    = doClear <== true
     }
 
 -- | Insert a queue in front of a sink
