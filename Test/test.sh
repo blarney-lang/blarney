@@ -28,6 +28,7 @@ ALL_BLARNEY_EXAMPLES=(
   Sorter
   SourceSink
   Stack
+  SizedStack
   Counter
   Vectors
 )

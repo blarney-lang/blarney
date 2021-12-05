@@ -28,6 +28,7 @@ clean:
 	make -C Sorter clean
 	make -C SourceSink clean
 	make -C Stack clean
+	make -C SizedStack clean
 	make -C StackTesting clean
 	make -C Counter clean
 	make -C Vectors clean

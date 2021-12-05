@@ -16,6 +16,7 @@ BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/Queue.hs
 BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/Recipe.hs
 BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/SourceSink.hs
 BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/Stmt.hs
+BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/Stack.hs
 BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/Stream.hs
 BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/Vector.hs
 
