@@ -308,7 +308,8 @@ genNetVerilog netlist net = case netPrim net of
   showPrim (Concat w0 w1) [e0, e1] =
     braces $ showNetInput e0 <> comma <+> showNetInput e1
   showPrim (Identity w) [e0] = showNetInput e0
-  showPrim (MergeWrites MStratOr n w) ins =
+  showPrim (MergeWrites MStratOr 0 w) ins = showDontCare w
+  showPrim (MergeWrites MStratOr _ w) ins =
     sep $ intersperse (char '|') (f [] ins)
     where f acc [] = acc
           f acc (en:x:rest) = f (parens (f' en x):acc) rest
