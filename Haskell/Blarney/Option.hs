@@ -34,7 +34,7 @@ data Option t =
   Option {
     valid :: Bit 1
   , val :: t
-  } deriving (Generic, Bits, Interface, FShow)
+  } deriving (Generic, Bits, Interface, FShow, Cmp)
 
 instance Functor Option where
   fmap f (Option valid value) = Option valid (f value)
