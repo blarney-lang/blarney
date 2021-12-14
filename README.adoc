@@ -30,11 +30,23 @@ toc::[]
 
 == Prerequisites
 
-To use Blarney, we'll need Verilator (e.g. `apt install verilator`)
-and GHC 9.2.1 or later (e.g. using
-https://www.haskell.org/ghcup/)[ghcup]).  After cloning this repo,
-we set the `BLARNEY_ROOT` environment variable to point to it,
-and add the `Scripts` directory to our `PATH`, e.g.
+We'll need Verilator and GHC 9.2.1 or later.
+
+On Ubuntu 20.04, we can do:
+
+[source, shell]
+----
+$ sudo apt install verilator
+----
+
+For GHC 9.2.1 or later, [ghcup](https://www.haskell.org/ghcup/) can be
+used.
+
+== Quick start
+
+Recursively clone the repo and set the `BLARNEY_ROOT` environment
+variable to point to it, and add the `Scripts` directory to your
+`PATH`:
 
 [source, shell]
 ----
@@ -43,13 +55,51 @@ $ export BLARNEY_ROOT=$(pwd)/blarney
 $ export PATH=$PATH:$BLARNEY_ROOT/Scripts
 ----
 
-== Examples
+To run an example using Blarney's in-Haskell simulator:
+
+[source, shell]
+----
+$ cd Examples/Sorter
+$ make
+$ ./Sorter --simulate
+----
+
+You should see the output:
+
+----
+sort [3,4,1,0,2] = [0,1,2,3,4]
+----
+
+To generate Verilog for an example, and then simulate the Verilog
+using Verilator, omit the `--simulate` option and then run the
+generated makefile:
+
+[source, shell]
+----
+$ ./Sorter             # Run the verilog generator
+$ cd Sorter-Verilog
+$ make                 # Compile the generated verilog using Verilator
+$ ./Sorter             # Simulate the generated verilog
+----
+
+You should see the same output as before.  Using Verilator is the
+recommended approach for simulating Blarney designs.
+
+To run the regression test suite:
+
+[source, shell]
+----
+$ cd Test
+$ ./test.sh --run-all
+----
+
+== Blarney by example
 
 === Two-sort
 
 Sorting makes for a good introduction to the library.  Let's start
-with perhaps the simplest kind of sorter possible: given a pair of
-8-bit values, the function `twoSort` returns the sorted pair.
+with the simplest kind of sorter possible: given a pair of 8-bit
+values, the function `twoSort` returns the sorted pair.
 
 [source, haskell]
 ----
@@ -73,19 +123,12 @@ top = always do
   finish
 ----
 
-We use Blarney's `always` construct
-
-[source, haskell]
-----
-always :: Action a -> Module a
-----
-
-to perform the given action _on every clock cycle_.  Blarney actions
-include statements for displaying values during simulation
-(`display`), terminating the simulator (`finish`), and mutating state
-(see below).  All statements in an `Action` execute in parallel,
-within a single cycle of an implicit clock.  We can generate
-Verilog for the test bench as follows.
+We use Blarney's `always` construct to perform the given action _on
+every clock cycle_.  Blarney actions include statements for displaying
+values during simulation (`display`), terminating the simulator
+(`finish`), and mutating state (see below).  All statements in an
+`Action` execute in parallel, within a single cycle of an implicit
+clock.  We can generate Verilog for the test bench as follows.
 
 [source, haskell]
 ----
@@ -117,11 +160,10 @@ twoSort (1,2) = (1,2)
 twoSort (2,1) = (1,2)
 ----
 
-Looks like `twoSort` is working!
-
 === In-Haskell simulation
 
-Sometimes it can be convenient to skip Verilog generation, and use the in-Haskell simulator.
+Sometimes it can be convenient to skip Verilog generation, and use the
+in-Haskell simulator.
 
 [source, haskell]
 ----
@@ -638,44 +680,81 @@ To read from a register file, use the `index` method or the generic lookup
 operator `!`.  Unlike block RAMs, register files (especially large ones) do not
 always map efficiently onto hardware, so use with care!
 
-=== Streams
+=== Sources, Sinks, and Streams
 
-Streams are another commonly-used abstraction in hardware description.  They
-are often used to implement hardware modules that consume data at a _variable
-rate_, depending on internal details of the module that the implementer does
-not wish to (or is unable to) expose.  In Blarney,
-http://blarney-lang.github.io/blarney/Blarney-Stream.html[streams] are captured by the
-following interface.
+Sources and sinks are commonly-used flow-control abstractions in
+hardware description.  They are often used to implement hardware
+modules that produce or consume data at a _variable rate_, depending
+on internal details of the module that the implementer does not wish
+to (or is unable to) expose.  In Blarney,
+http://blarney-lang.github.io/blarney/Blarney-SourceSink.html[sources
+and sinks] are captured by the following interfaces.
 
 [source, haskell]
 ----
-type Stream a = Source a
-
-data Source a =
+-- Data is consumed from a source
+data Source t =
   Source {
-    canPeek :: Bit 1
-  , peek    :: a
+    -- The next value being produced by the source
+    peek :: t
+    -- Invoke this action to consume the next value
   , consume :: Action ()
+    -- Can the source currently be peeked or consumed?
+  , canPeek :: Bit 1
   }
+
+-- Data is injected into a sink
+data Sink t =
+  Sink {
+    -- Can a value be injected into the sink?
+    canPut :: Bit 1
+    -- Inject the given value into the sink
+  , put :: t -> Action ()
+  }
+
+-- A stream is another name for a source (discussed below)
+type Stream t = Source t
 ----
 
-Streams are closely related to queues.  Indeed, any queue can be converted to a
-stream:
+A queue is both a source and a sink.
 
 [source, haskell]
 ----
--- Convert a queue to a stream
-toStream :: Queue a -> Stream a
-toStream q =
-  Source {
-    canPeek  = q.canDeq
-  , peek     = q.first
-  , consume  = q.deq
-  }
+-- Convert a queue to a source
+instance ToSource (Queue t) t where
+  toSource q =
+    Source {
+      canPeek  = q.canDeq
+    , peek     = q.first
+    , consume  = q.deq
+    }
+
+-- Convert a queue to a sink
+instance ToSink (Queue t) t where
+  toSink q =
+    Sink {
+      canPut = q.notFull
+    , put    = q.enq
+    }
+
+-- Another name for toSource (discussed below)
+toStream :: ToSource a b => a -> Source b
+toStream = toSource
 ----
 
-As an example, here's a function that increments each value in the input stream
-to produce the output stream.
+Note that taking a sink as a function argument (input) is very similar
+to returning a source as a function result (output).  Both allow the
+function to produce data at a variable rate.  Isn't it therefore
+redundant to provide both `Source` and `Sink`?  Not quite. When a
+function takes a sink as input, it knows when the caller is ready to
+consume before producing data; but when a function returns a source as
+output, it does not.  This can be the difference between
+requiring or not requiring a buffer between producer and consumer.
+Often, we don't mind buffering (it's good for Fmax) and in such cases
+our convention is to use the `Stream` type.
+
+As an example, here's a function that increments each value in an
+input stream to produce an output stream.
 
 [source, haskell]
 ----
@@ -844,9 +923,9 @@ instance that it encounters.
 === Master-slave pattern
 
 This is a common pattern in hardware design.  Suppose we wish to move
-multiplication out of a module and into an separate slave module, where the
-slave takes requests (pairs of 32-bit integers to multiply) and produces
-responses (32-bit results).
+a multiplier out of a module and into an separate slave module, where
+the slave takes requests (pairs of 32-bit integers to multiply) and
+produces responses (32-bit results).
 
 [source, haskell]
 ----
@@ -1222,3 +1301,28 @@ class Cmp a where
 
 Only the first three operators must be defined; the others have
 default definitions.
+
+=== ToSource and ToSink
+
+Converting interfaces to
+http://blarney-lang.github.io/blarney/Blarney-SourceSink.html[sources
+and sinks] may turn out to be common.  For example,
+http://blarney-lang.github.io/blarney/Blarney-Queue.html[Queue] and
+http://blarney-lang.github.io/blarney/Blarney-Stack.html[Stack] are
+both sources and sinks.  Therefore the following type classes are
+provided.
+
+[source, Haskell]
+----
+-- Convert to a source
+class ToSource a b | a -> b where
+  toSource :: a -> Source b
+
+-- Convert to a sink
+class ToSink a b | a -> b where
+  toSink :: a -> Sink b
+
+-- Another name for toSource
+toStream :: ToSource a b => a -> Source b
+toStream = toSource
+----
