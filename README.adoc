@@ -76,10 +76,10 @@ generated makefile:
 
 [source, shell]
 ----
-$ ./Sorter             # Run the verilog generator
+$ ./Sorter             # Run the Verilog generator
 $ cd Sorter-Verilog
-$ make                 # Compile the generated verilog using Verilator
-$ ./Sorter             # Simulate the generated verilog
+$ make                 # Compile the generated Verilog using Verilator
+$ ./Sorter             # Simulate the generated Verilog
 ----
 
 You should see the same output as before.  Using Verilator is the
@@ -722,6 +722,7 @@ A queue is both a source and a sink.
 ----
 -- Convert a queue to a source
 instance ToSource (Queue t) t where
+  toSource :: Queue t -> Source t
   toSource q =
     Source {
       canPeek  = q.canDeq
@@ -731,6 +732,7 @@ instance ToSource (Queue t) t where
 
 -- Convert a queue to a sink
 instance ToSink (Queue t) t where
+  toSink :: Queue t -> Sink t
   toSink q =
     Sink {
       canPut = q.notFull
