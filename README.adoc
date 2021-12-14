@@ -39,7 +39,7 @@ On Ubuntu 20.04, we can do:
 $ sudo apt install verilator
 ----
 
-For GHC 9.2.1 or later, [ghcup](https://www.haskell.org/ghcup/) can be
+For GHC 9.2.1 or later, https://www.haskell.org/ghcup/[ghcup] can be
 used.
 
 == Quick start
