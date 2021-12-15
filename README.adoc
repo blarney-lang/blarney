@@ -750,10 +750,10 @@ function to produce data at a variable rate.  Isn't it therefore
 redundant to provide both `Source` and `Sink`?  Not quite. When a
 function takes a sink as input, it knows when the caller is ready to
 consume before producing data; but when a function returns a source as
-output, it does not.  This can be the difference between
-requiring or not requiring a buffer between producer and consumer.
-Often, we don't mind buffering (it's good for Fmax) and in such cases
-our convention is to use the `Stream` type.
+output, it does not.  This can be the difference between requiring or
+not requiring a buffer between producer and consumer.  Often, we don't
+mind buffering (it's good for Fmax) so our convention is to use the
+`Stream` type whenever possible.
 
 As an example, here's a function that increments each value in an
 input stream to produce an output stream.
@@ -1152,7 +1152,7 @@ To further improve the readability of generated code, we can also pass the
 generator.  This will enable the (experimental) name propagation and netlist
 simplification passes respectively.
 
-== Classes
+== Type class overview
 
 === Bits
 
@@ -1304,6 +1304,23 @@ class Cmp a where
 Only the first three operators must be defined; the others have
 default definitions.
 
+=== Assign
+
+The assignment operator `<==` is overloaded.
+
+[source, Haskell]
+----
+infix 1 <==
+class Assign v where
+  (<==) :: Bits a => v a -> a -> Action ()
+----
+
+Example instances are
+http://blarney-lang.github.io/blarney/Blarney-Core-Module.html#t:Reg[Reg],
+http://blarney-lang.github.io/blarney/Blarney-Core-Module.html#t:Wire[Wire],
+and
+http://blarney-lang.github.io/blarney/Blarney-Core-Module.html#t:WriteOnly[WriteOnly].
+
 === ToSource and ToSink
 
 Converting interfaces to
@@ -1328,3 +1345,4 @@ class ToSink a b | a -> b where
 toStream :: ToSource a b => a -> Source b
 toStream = toSource
 ----
+
