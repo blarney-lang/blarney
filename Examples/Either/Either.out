@@ -1,0 +1,2 @@
+[foo] isLeft: 1 isRight: 0 getLeft: Option { valid = 1, val = 100 }
+[bar] isLeft: 0 isRight: 1 getReft: 15

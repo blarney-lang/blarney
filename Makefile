@@ -9,6 +9,7 @@ BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/BitPat.hs
 BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/BitScan.hs
 BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/ClientServer.hs
 BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/Connectable.hs
+BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/Either.hs
 BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/Interconnect.hs
 BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/Option.hs
 BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/PulseWire.hs
@@ -18,6 +19,7 @@ BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/SourceSink.hs
 BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/Stmt.hs
 BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/Stack.hs
 BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/Stream.hs
+BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/TypeNatHelpers.hs
 BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/Vector.hs
 
 all: ghc-build blc-build

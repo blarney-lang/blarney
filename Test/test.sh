@@ -12,6 +12,7 @@ ALL_BLARNEY_EXAMPLES=(
   BitScan
   CPU
   Derive
+  Either
   FIFO
   Factorial
   Interface
