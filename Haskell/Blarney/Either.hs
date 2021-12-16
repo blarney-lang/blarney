@@ -26,7 +26,7 @@ data a :|: b = Either BV BV
 
 -- | Bottom value, used internally
 bottom :: a
-bottom = error "Pebbles.Util.Either.bottom"
+bottom = error "Blarney.Either.bottom"
 
 -- | Bits instance for either type
 instance (Bits t, Bits u) => Bits (t :|: u) where
