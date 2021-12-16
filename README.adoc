@@ -680,7 +680,9 @@ To read from a register file, use the `index` method or the generic lookup
 operator `!`.  Unlike block RAMs, register files (especially large ones) do not
 always map efficiently onto hardware, so use with care!
 
-=== Sources, Sinks, and Streams
+=== Sources, sinks, and streams
+
+[#sources-sinks-streams]
 
 Sources and sinks are commonly-used flow-control abstractions in
 hardware description.  They are often used to implement hardware
@@ -740,20 +742,25 @@ instance ToSink (Queue t) t where
     }
 
 -- Another name for toSource (discussed below)
-toStream :: ToSource a b => a -> Source b
+toStream :: ToSource a b => a -> Stream b
 toStream = toSource
 ----
 
+Sources and sinks can be
+https://blarney-lang.github.io/blarney/Blarney-Connectable.html[connected
+together].
+
 Note that taking a sink as a function argument (input) is very similar
 to returning a source as a function result (output).  Both allow the
-function to produce data at a variable rate.  Isn't it therefore
+function to produce data at a variable rate.  Is it therefore
 redundant to provide both `Source` and `Sink`?  Not quite. When a
 function takes a sink as input, it knows when the caller is ready to
-consume before producing data; but when a function returns a source as
-output, it does not.  This can be the difference between requiring or
-not requiring a buffer between producer and consumer.  Often, we don't
-mind buffering (it's good for Fmax) so our convention is to use the
-`Stream` type whenever possible.
+consume before producing data; when a function returns a source as
+output, it knows when the caller does consume after producing data.
+This subtle difference can be important when the programmer wants
+minimise buffering and latency between producer and consumer.  Often
+though, we don't mind buffering (it's good for Fmax) so our convention
+is to use the `Stream` type in most circumstances.
 
 As an example, here's a function that increments each value in an
 input stream to produce an output stream.
@@ -782,7 +789,8 @@ outputs, being converted to Verilog.  In fact, any Blarney function whose
 inputs and outputs are members of the
 http://blarney-lang.github.io/blarney/Blarney-Core-Interface.html[Interface] class can
 be converted to Verilog (and the `Interface` class supports generic deriving).
-To illustrate, we can convert the function `inc` (defined in xref:Streams[xrefstyle=short]) into
+To illustrate, we can convert the function `inc` (defined
+<<sources-sinks-streams, above>>) into
 a Verilog module as follows.
 
 [source, haskell]
@@ -1306,11 +1314,10 @@ default definitions.
 
 === Assign
 
-The assignment operator `<==` is overloaded.
+The assignment operator is overloaded.
 
 [source, Haskell]
 ----
-infix 1 <==
 class Assign v where
   (<==) :: Bits a => v a -> a -> Action ()
 ----
