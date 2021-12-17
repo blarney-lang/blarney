@@ -11,11 +11,12 @@ top = do
     let foo :: Foo = makeLeft (some 100)
     display "[foo] isLeft: " foo.isLeft
             " isRight: " foo.isRight
-            " getLeft: " foo.left
+            " left: " foo.left
+            " size: " (sizeOf foo)
     let bar :: Foo = makeRight 15
     display "[bar] isLeft: " bar.isLeft
             " isRight: " bar.isRight
-            " getReft: " bar.right
+            " right: " bar.right
     finish
 
 main :: IO ()
