@@ -43,6 +43,7 @@ EXTS="$EXTS -XDeriveAnyClass -XRecursiveDo -XBlockArguments"
 EXTS="$EXTS -XNumericUnderscores -XTypeApplications"
 EXTS="$EXTS -XDuplicateRecordFields -XRankNTypes"
 EXTS="$EXTS -XNoStarIsType -XMultiWayIf -XOverloadedRecordDot"
+EXTS="$EXTS -XOverloadedLabels"
 WARN="-Wno-partial-type-signatures"
 FLAGS="-fno-cse -fno-full-laziness"
 if [ "$USE_NAMER_PLUGIN" = "YES" ]; then

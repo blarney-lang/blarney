@@ -1,0 +1,2 @@
+[foo] isLeft: 1 isRight: 0 left: Option { valid = 1, val = 100 } size: 10
+[bar] isLeft: 0 isRight: 1 right: 15

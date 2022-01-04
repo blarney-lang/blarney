@@ -12,6 +12,7 @@ clean:
 	make -C BitScan clean
 	make -C CPU clean
 	make -C Derive clean
+	make -C Either clean
 	make -C Factorial clean
 	make -C FIFO clean
 	make -C Interface clean
