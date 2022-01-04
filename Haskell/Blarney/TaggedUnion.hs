@@ -8,7 +8,7 @@ module Blarney.TaggedUnion
   , (:::)
   , module GHC.OverloadedLabels
   , hasTag, is
-  , tag, untag
+  , tag, untag, untagMaybe
   , whenTag
   ) where
 
@@ -157,15 +157,16 @@ tag _ x =
     numMembers = taggedUnionCount (bottom :: TaggedUnion fields)
     maxMemberWidth = taggedUnionMaxWidth (bottom :: TaggedUnion fields)
 
--- | Get the value of given field if the tag matches
-untag :: forall name fields fieldIdx field.
+-- | Get the value of given field if the tag matches.  If tag doesn't
+-- match, use optional default value.
+untagMaybe :: forall name fields fieldIdx field.
      ( TaggedUnionInfo fields
      , field ~ GetField name fields
      , fieldIdx ~ GetFieldIdx name fields
      , KnownNat fieldIdx
      , Bits field )
   => TagName name -> Maybe field -> TaggedUnion fields -> field
-untag _ defaultVal u =
+untagMaybe _ defaultVal u =
   case defaultVal of
     Nothing -> val
     Just def -> match ? (val, def)
@@ -178,6 +179,17 @@ untag _ defaultVal u =
     val = unpack $ FromBV $ selectBV (fieldSize-1, 0) u.memberVal
     match = FromBV $ equalBV (constBV wi i) u.memberIdx
 
+-- | Get the value of given field if the tag matches.  If tag doesn't
+-- match, return default value.
+untag :: forall name fields fieldIdx field.
+     ( TaggedUnionInfo fields
+     , field ~ GetField name fields
+     , fieldIdx ~ GetFieldIdx name fields
+     , KnownNat fieldIdx
+     , Bits field )
+  => TagName name -> field -> TaggedUnion fields -> field
+untag t defaultVal u = untagMaybe t (Just defaultVal) u
+
 -- | Conditional statement for tagged unions
 whenTag ::
      ( TaggedUnionInfo fields
@@ -187,4 +199,4 @@ whenTag ::
   => TagName name
   -> TaggedUnion fields
   -> (field -> Action a) -> Action a
-whenTag tag u f = whenAction (u `hasTag` tag) (f (untag tag Nothing u))
+whenTag tag u f = whenAction (u `hasTag` tag) (f (untagMaybe tag Nothing u))
