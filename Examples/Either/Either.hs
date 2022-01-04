@@ -17,12 +17,12 @@ top = do
     let foo :: Foo = tag #left (some 100)
     display "[foo] isLeft: " (foo `is` #left)
             " isRight: " (foo `is` #right)
-            " left: " (untag #left dontCare foo)
+            " left: " (untag #left foo)
             " size: " (sizeOf foo)
     let bar :: Foo = tag #right 15
     display "[bar] isLeft: " (bar `is` #left)
             " isRight: " (bar `is` #right)
-            " right: " (untag #right dontCare bar)
+            " right: " (untag #right bar)
     finish
 
 main :: IO ()

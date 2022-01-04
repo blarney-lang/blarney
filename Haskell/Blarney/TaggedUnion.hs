@@ -8,7 +8,7 @@ module Blarney.TaggedUnion
   , (:::)
   , module GHC.OverloadedLabels
   , hasTag, is
-  , tag, untag, untagMaybe
+  , tag, untag, untagDefault
   , whenTag
   ) where
 
@@ -120,6 +120,7 @@ instance TaggedUnionInfo fields => Bits (TaggedUnion fields) where
 -- ===
 
 -- | Does given tagged union have given tag?
+infix 7 `hasTag`
 hasTag :: forall name fields fieldIdx.
      ( TaggedUnionInfo fields
      , fieldIdx ~ GetFieldIdx name fields
@@ -180,15 +181,26 @@ untagMaybe _ defaultVal u =
     match = FromBV $ equalBV (constBV wi i) u.memberIdx
 
 -- | Get the value of given field if the tag matches.  If tag doesn't
--- match, return default value.
+-- match, return 'dontCare'.
 untag :: forall name fields fieldIdx field.
      ( TaggedUnionInfo fields
      , field ~ GetField name fields
      , fieldIdx ~ GetFieldIdx name fields
      , KnownNat fieldIdx
      , Bits field )
+  => TagName name -> TaggedUnion fields -> field
+untag t u = untagMaybe t Nothing u
+
+-- | Get the value of given field if the tag matches.  If tag doesn't
+-- match, return default value.
+untagDefault :: forall name fields fieldIdx field.
+     ( TaggedUnionInfo fields
+     , field ~ GetField name fields
+     , fieldIdx ~ GetFieldIdx name fields
+     , KnownNat fieldIdx
+     , Bits field )
   => TagName name -> field -> TaggedUnion fields -> field
-untag t defaultVal u = untagMaybe t (Just defaultVal) u
+untagDefault t defaultVal u = untagMaybe t (Just defaultVal) u
 
 -- | Conditional statement for tagged unions
 whenTag ::
@@ -199,4 +211,4 @@ whenTag ::
   => TagName name
   -> TaggedUnion fields
   -> (field -> Action a) -> Action a
-whenTag tag u f = whenAction (u `hasTag` tag) (f (untagMaybe tag Nothing u))
+whenTag tag u f = whenAction (u `hasTag` tag) (f (untag tag u))
