@@ -1101,6 +1101,8 @@ the `imm[11:5]` part of the immediate is combined with the `imm[4:0]` part to
 give the final 12-bit immediate value passed to the right-hand-side function.
 Scattered immediates appear a lot in the RISC-V specification.  Thanks to Jon
 Woodruff for suggesting this feature!
+For a fuller example of the `BitScan` module, see the Pebbles RV32I
+https://github.com/blarney-lang/pebbles/blob/master/src/Pebbles/Instructions/RV32_I.hs[instruction decoder].
 
 === CPUs
 
