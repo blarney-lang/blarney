@@ -1035,14 +1035,14 @@ makeLeft x = tag #left x
 isLeft :: Either a b -> Bit 1
 isLeft x = x `is` #left
 
+isRight :: Either a b -> Bit 1
+isRight x = x `is` #right
+
 getLeft :: Bits a => Either a b -> a
 getLeft x = untag #left x
 
 getLeftOrZero :: Bits a => Either a b -> a
 getLeftOrZero x = untagDefault #left zero x
-
-isRight :: Bits a => Either a b -> b
-isRight x = x `is` #right
 
 exampleAction :: Action ()
 exampleAction = do
