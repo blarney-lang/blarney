@@ -996,6 +996,61 @@ top = mdo
   return ()
 ----
 
+=== Tagged unions
+
+[#tagged-unions]
+
+Sum types such as
+
+[source, haskell]
+----
+data Either a b = Left a | Right b
+----
+
+do not permit generic deriving for the `Bits` class, so cannot be used
+for circuit-time values.  (An elaboration-time value cannot be
+influenced by a circuit-time value, making the definition of `unpack`
+problematic for sum types, at least without resorting to language
+plugins). However, Blarney does support _tagged unions_, allowing the
+following definition.
+
+[source, haskell]
+----
+import Blarney.TaggedUnion
+
+type Either a b =
+  TaggedUnion [
+    "left"  ::: a
+  , "right" ::: b
+  ]
+----
+
+The API for tagged unions is illustrated by the sample functions below.
+
+[source, haskell]
+----
+makeLeft :: Bits a => a -> Either a b
+makeLeft x = tag #left x
+
+isLeft :: Either a b -> Bit 1
+isLeft x = x `is` #left
+
+getLeft :: Bits a => Either a b -> a
+getLeft x = untag #left x
+
+getLeftOrZero :: Bits a => Either a b -> a
+getLeftOrZero x = untagDefault #left zero x
+
+isRight :: Bits a => Either a b -> b
+isRight x = x `is` #right
+
+exampleAction :: Action ()
+exampleAction = do
+  let foo :: Either (Bit 2) (Bit 4) = tag #right 15
+  whenTagged #right foo \r -> do
+    display "Right val: " r
+----
+
 === Bit selection and lookup
 
 Bit selection operators are used to extract a subset of bits out of a
@@ -1104,59 +1159,6 @@ Woodruff for suggesting this feature!
 For a fuller example of the `BitScan` module, see the Pebbles RV32I
 https://github.com/blarney-lang/pebbles/blob/master/src/Pebbles/Instructions/RV32_I.hs[instruction decoder].
 
-=== Tagged unions
-
-Sum types such as
-
-[source, haskell]
-----
-data Either a b = Left a | Right b
-----
-
-do not permit generic deriving for the `Bits` class, so cannot be used
-for circuit-time values.  (An elaboration-time value cannot be
-influenced by a circuit-time value, making the definition of `unpack`
-problematic for sum types, at least without resorting to language
-plugins). However, Blarney does support _tagged unions_, allowing the
-following definition.
-
-[source, haskell]
-----
-import Blarney.TaggedUnion
-
-type Either a b =
-  TaggedUnion [
-    "left"  ::: a
-  , "right" ::: b
-  ]
-----
-
-The API for tagged unions is illustrated by the sample functions below.
-
-[source, haskell]
-----
-makeLeft :: Bits a => a -> Either a b
-makeLeft x = tag #left x
-
-isLeft :: Either a b -> Bit 1
-isLeft x = x `is` #left
-
-getLeft :: Bits a => Either a b -> a
-getLeft x = untag #left x
-
-getLeftOrZero :: Bits a => Either a b -> a
-getLeftOrZero x = untagDefault #left zero x
-
-isRight :: Bits a => Either a b -> b
-isRight x = x `is` #right
-
-exampleAction :: Action ()
-exampleAction = do
-  let foo :: Either (Bit 2) (Bit 4) = tag #right 15
-  whenTagged #right foo \r -> do
-    display "Right val: " r
-----
-
 === CPUs
 
 A few processor cores have been implemented in Blarney:
@@ -1250,7 +1252,7 @@ To make this type a member of the `Bits` class, we have suffixed it with
 `derving (Generic, Bits)`.  The generic deriving mechanism for `Bits` does not
 support _sum types_: there is no way to convert a bit-vector (run-time circuit
 value) to a sum type (elaboration-time value) using the circuit primitives
-provided by Blarney.
+provided by Blarney (however, see <<tagged-unions, tagged unions>>).
 
 === Interface
 
