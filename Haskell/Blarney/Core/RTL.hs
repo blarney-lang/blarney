@@ -250,13 +250,23 @@ class Displayable a where
 
 -- | Base case
 instance Displayable (RTL a) where
-  disp x suffix = do
-    cond <- askCondition
-    let Format items = x <> suffix
-    let prim = Display (map fst items)
-    let inps = toBV cond : [bv | (DisplayArgBit {}, bv) <- items]
-    addRTLAction . RTLRoot $ makePrim0 prim inps
-    return $ error "Return value of 'display' should be ignored"
+  disp x suffix =
+      do cond <- askCondition
+         let Format items = x <> suffix
+         dispItems [toBV cond] items
+         return $ error "Return value of 'display' should be ignored"
+    where
+      dispItems :: [BV] -> [FormatItem] -> RTL ()
+      dispItems conds [] = return ()
+      dispItems conds ((DisplayCondBlockBegin, Just cond):items) = do
+        dispItems (cond:conds) items
+      dispItems conds ((DisplayCondBlockEnd, _):items) = do
+        dispItems (drop 1 conds) items
+      dispItems conds ((cmd, bv):items) = do
+        let cond = tree1 andBV conds
+        let inps = cond : catMaybes [bv | DisplayArgBit {} <- [cmd]]
+        addRTLAction . RTLRoot $ makePrim0 (Display [cmd]) inps
+        dispItems conds items
 
 -- | Recursive case
 instance (FShow b, Displayable a) => Displayable (b -> a) where

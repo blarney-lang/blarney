@@ -40,20 +40,26 @@ import GHC.Generics
 data Format = Format [FormatItem]
 
 -- | A format item is a display arg, tagged with a bit vector
-type FormatItem = (DisplayArg, BV)
+type FormatItem = (DisplayArg, Maybe BV)
 
 -- | Convert a string to a format
 formatString :: String -> Format
-formatString str = Format [(DisplayArgString str, noBV)]
-  where noBV = error "Blarney.Core.FShow: string has no bit vector"
+formatString str = Format [(DisplayArgString str, Nothing)]
 
 -- | Convert bit vector to a format
 formatBit :: DisplayArgRadix -> Maybe Int -> Bit n -> Format
 formatBit radix pad b =
-    Format [(DisplayArgBit w radix pad True, bv)]
+    Format [(DisplayArgBit w radix pad True, Just bv)]
   where
     bv = toBV b
     w = bvPrimOutWidth bv
+
+-- | Conditional format (empty if condition fails)
+formatCond :: Bit 1 -> Format -> Format
+formatCond cond fmt =
+     Format [(DisplayCondBlockBegin, Just (toBV cond))]
+  <> fmt
+  <> Format [(DisplayCondBlockEnd, Nothing)]
 
 -- | Format bit vector in binary with given amount of zero padding
 formatBin :: Int -> Bit n -> Format
