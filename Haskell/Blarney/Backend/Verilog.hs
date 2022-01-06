@@ -468,24 +468,33 @@ genNetVerilog netlist net = case netPrim net of
     <>  brackets (showNetInput (netInputs net !! 0)) <> semi
 
   -- always block helpers
-  --------------------------------------------------------------------------------
+  ------------------------------------------------------------------------------
   alwsRegister net = showWire (netInstId net, Nothing) <+> text "<="
                  <+> showNetInput (netInputs net !! 0) <> semi
   alwsRegisterEn net =
         text "if" <+> parens (showNetInput (netInputs net !! 0) <+> text "== 1")
     <+> showWire (netInstId net, Nothing)
-    <+> text "<=" <+> showNetInput (netInputs net !! 1) <>  semi
+    <+> text "<=" <+> showNetInput (netInputs net !! 1) <> semi
   alwsDisplay args net =
-        hang (    text "if"
-              <+> parens (showNetInput (netInputs net !! 0) <+> text "== 1")
-              <+> text "$write")
-             2 ((parens (argStyle $ fmtArgs args (tail $ netInputs net))) <> semi)
-    where fmtArgs [] _ = []
+        hang (text "if" <+> parens
+                (showNetInput (netInputs net !! 0) <+> text "== 1")
+                  <+> text "begin") 2
+             (fmtArgs args (tail $ netInputs net)) $+$ text "end"
+    where fmtArgs [] _ = mempty
           fmtArgs (DisplayArgString s : args) ins =
-            text (show (escape s)) : fmtArgs args ins
+                text "$write" <+> parens (text $ show $ escape s) <> semi
+            $+$ fmtArgs args ins
           fmtArgs (DisplayArgBit _ r p z : args) (x:ins) =
-            text (show ("%" ++ fmtPad z p ++ fmtRadix r)) :
-              showNetInput x : fmtArgs args ins
+                text "$write" <+> parens
+                  (text (show ("%" ++ fmtPad z p ++ fmtRadix r))
+                     <> text "," <+> showNetInput x) <> semi
+            $+$ fmtArgs args ins
+          fmtArgs (DisplayCondBlockBegin:args) (x:ins) =
+              text "if" <+> parens (showNetInput x <+> text "== 1")
+                        <+> text "begin"
+                        $+$ fmtArgs args ins
+          fmtArgs (DisplayCondBlockEnd:args) ins =
+            text "end" $+$ fmtArgs args ins
 
           escape str = concat [if c == '%' then "%%" else [c] | c <- str]
 
