@@ -23,6 +23,8 @@ top = do
     display "[bar] isLeft: " (bar `is` #left)
             " isRight: " (bar `is` #right)
             " right: " (untag #right bar)
+    display "foo = " foo
+    display "bar = " bar
     finish
 
 main :: IO ()
