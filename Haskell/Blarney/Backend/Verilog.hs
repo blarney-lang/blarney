@@ -482,8 +482,13 @@ genNetVerilog netlist net = case netPrim net of
              (fmtArgs args (tail $ netInputs net)) $+$ text "end"
     where fmtArgs [] _ = mempty
           fmtArgs (DisplayArgString s : args) ins =
-                text "$write" <+> parens (text $ show $ escape s) <> semi
-            $+$ fmtArgs args ins
+            let isStr (DisplayArgString _) = True
+                isStr _ = False
+                strs = s : map (\(DisplayArgString s) -> s)
+                               (takeWhile isStr args)
+            in  text "$write"
+            <+> parens (argStyle (map (text . show . escape) strs)) <> semi
+            $+$ fmtArgs (dropWhile isStr args) ins
           fmtArgs (DisplayArgBit _ r p z : args) (x:ins) =
                 text "$write" <+> parens
                   (text (show ("%" ++ fmtPad z p ++ fmtRadix r))
