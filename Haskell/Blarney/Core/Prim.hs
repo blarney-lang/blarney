@@ -124,6 +124,9 @@ data DisplayArg =
       -- | Pad with zeros or spaces?
     , displayArgZeroPad :: Bool
     }
+    -- | Subsequences of arguments of a display can be conditionally displayed
+  | DisplayCondBlockBegin
+  | DisplayCondBlockEnd
   deriving Show
 
 -- | Format for displaying bit vectors

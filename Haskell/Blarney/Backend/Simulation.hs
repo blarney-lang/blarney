@@ -198,12 +198,18 @@ compileSimEffect ctxt memo currentIns childrenOutputs
   ins <- mapM (compileNetInputSignal ctxt memo currentIns childrenOutputs)
               netInputs
   return $ map (\(en:inpts) ->
-                 when (en /= 0) do putStr . concat $ fmt args inpts)
+                 when (en /= 0) do putStr . concat $ fmt args inpts [])
                (transpose ins)
-  where fmt [] _ = []
-        fmt (DisplayArgString s : rest) ins = escape s : fmt rest ins
-        fmt (DisplayArgBit _ r p z : rest) (x:ins) =
-          (pad (fromMaybe 0 p) z $ radixShow r x) : fmt rest ins
+  where fmt [] _ conds = []
+        fmt (DisplayArgString s : rest) ins conds =
+          [escape s | all (== 1) conds] ++ fmt rest ins conds
+        fmt (DisplayArgBit _ r p z : rest) (x:ins) conds =
+          [pad (fromMaybe 0 p) z $ radixShow r x | all (== 1) conds]
+            ++ fmt rest ins conds
+        fmt (DisplayCondBlockBegin : rest) (x:ins) conds =
+          fmt rest ins (x : conds)
+        fmt (DisplayCondBlockEnd : rest) (ins) conds =
+          fmt rest ins (drop 1 conds)
         escape str = concat [if c == '%' then "%%" else [c] | c <- str]
         radixShow Bin n = showIntAtBase  2 intToDigit n ""
         radixShow Dec n = showIntAtBase 10 intToDigit n ""

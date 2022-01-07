@@ -19,12 +19,15 @@ module Blarney.TaggedUnion
   , HasMember(..)
   ) where
 
+-- GHC imports
 import GHC.Types
 import GHC.TypeLits
 import GHC.OverloadedLabels
 import Data.Type.Bool
 import Data.Type.Equality
+import Data.Proxy
 
+-- Blarney imports
 import Blarney
 import Blarney.Option
 import Blarney.Core.BV
@@ -219,3 +222,34 @@ whenTagged :: (HasMember name memberTy unionTy, Bits memberTy)
            -> unionTy
            -> (memberTy -> Action a) -> Action a
 whenTagged tag u f = whenAction (u `isTagged` tag) (f (untag tag u))
+
+-- FShow instance
+-- ==============
+
+-- | For showing tagged unions
+class FShowMember a where
+  fshowMember :: Integer -> TaggedUnion a -> Format
+
+instance FShowMember '[] where
+  fshowMember i _ = mempty
+
+instance (FShow memberTy, Bits memberTy, FShowMember rest, KnownSymbol tag)
+      => FShowMember ((tag ::: memberTy) : rest) where
+  fshowMember i u =
+         formatCond (FromBV cond)
+           (fshow "#" <> fshow tagStr <> fshow "("
+                      <> fshow memberVal <> fshow ")")
+      <> fshowMember (i+1) urest
+    where
+      cond = equalBV (constBV (bvPrimOutWidth u.memberIdx) i) u.memberIdx
+      tagStr = symbolVal (Proxy :: Proxy tag)
+      memberVal :: memberTy = unpack (FromBV u.memberVal)
+      urest :: TaggedUnion rest =
+        TaggedUnion {
+          memberIdx = u.memberIdx
+        , memberVal = u.memberVal
+        }
+
+instance (IsTaggedUnion (TaggedUnion members), FShowMember members)
+      => FShow (TaggedUnion members) where
+  fshow = fshowMember 0

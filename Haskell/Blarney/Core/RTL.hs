@@ -254,7 +254,7 @@ instance Displayable (RTL a) where
     cond <- askCondition
     let Format items = x <> suffix
     let prim = Display (map fst items)
-    let inps = toBV cond : [bv | (DisplayArgBit {}, bv) <- items]
+    let inps = toBV cond : [bv | (_, Just bv) <- items]
     addRTLAction . RTLRoot $ makePrim0 prim inps
     return $ error "Return value of 'display' should be ignored"
 
