@@ -253,3 +253,20 @@ instance (FShow memberTy, Bits memberTy, FShowMember rest, KnownSymbol tag)
 instance (IsTaggedUnion (TaggedUnion members), FShowMember members)
       => FShow (TaggedUnion members) where
   fshow = fshowMember 0
+
+-- Interface instance
+-- ==================
+
+instance IsTaggedUnion (TaggedUnion members)
+      => Interface (TaggedUnion members) where
+  toIfcTerm u =
+    IfcTermProduct (IfcTermBV u.memberIdx)
+                   (IfcTermBV u.memberVal)
+  fromIfcTerm ~(IfcTermProduct (IfcTermBV idx) (IfcTermBV val)) =
+    TaggedUnion { memberIdx = idx, memberVal = val }
+  toIfcType u =
+    IfcTypeProduct (IfcTypeField "tag" (IfcTypeBV idxWidth))
+                   (IfcTypeField "val" (IfcTypeBV valWidth))
+    where
+      idxWidth = log2ceil (getNumMembers u)
+      valWidth = getMaxMemberWidth u
