@@ -51,9 +51,9 @@ mergeChain = foldr mergeTwo nullStream
 mergeTree :: Bits a => [Stream a] -> Stream a
 mergeTree = tree mergeTwo nullStream
 
--- | Buffering fair merger of N streams
-fairMergeN :: Bits a => [Stream a] -> Module (Stream a)
-fairMergeN ss = 
+-- | Buffered fair merger of a list of streams
+makeFairMerger :: Bits a => [Stream a] -> Module (Stream a)
+makeFairMerger ss =
   liftNat (length ss) $ \(_ :: Proxy n) -> do
 
     -- Track which streams we've consumed recently
