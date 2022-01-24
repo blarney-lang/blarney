@@ -65,16 +65,17 @@ fairMergeN ss =
     always do
       -- Choose a stream to consume from
       let (hist, chosen) = sched (history.val, fromBitList $ map (.canPeek) ss)
-      -- Update history
-      history <== hist
-      -- Consume chosen stream
-      sequence
-        [ when cond s.consume
-        | (cond, s) <- zip (toBitList chosen) ss ]
-      -- Insert chosen item
-      when (chosen .!=. 0) do
-        outQueue.enq $ select [ (g, s.peek)
-                              | (g, s) <- zip (toBitList chosen) ss ]
+      when outQueue.notFull do
+        -- Consume chosen stream
+        sequence
+          [ when cond s.consume
+          | (cond, s) <- zip (toBitList chosen) ss ]
+        -- Insert chosen item
+        when (chosen .!=. 0) do
+          outQueue.enq $ select [ (g, s.peek)
+                                | (g, s) <- zip (toBitList chosen) ss ]
+          -- Update history
+          history <== hist
 
     return (toStream outQueue)
   where
