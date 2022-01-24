@@ -27,6 +27,7 @@ import Blarney.Queue
 import Blarney.Stream
 
 -- Generic imports
+import Data.Proxy
 import Control.Applicative
 
 -- Stream mergers and switches
@@ -49,6 +50,48 @@ mergeChain = foldr mergeTwo nullStream
 -- where each merger is left biased
 mergeTree :: Bits a => [Stream a] -> Stream a
 mergeTree = tree mergeTwo nullStream
+
+-- | Buffering fair merger of N streams
+fairMergeN :: Bits a => [Stream a] -> Module (Stream a)
+fairMergeN ss = 
+  liftNat (length ss) $ \(_ :: Proxy n) -> do
+
+    -- Track which streams we've consumed recently
+    history :: Reg (Bit n) <- makeReg 0
+
+    -- Output queue of merger
+    outQueue <- makeQueue
+
+    always do
+      -- Choose a stream to consume from
+      let (hist, chosen) = sched (history.val, fromBitList $ map (.canPeek) ss)
+      -- Update history
+      history <== hist
+      -- Consume chosen stream
+      sequence
+        [ when cond s.consume
+        | (cond, s) <- zip (toBitList chosen) ss ]
+      -- Insert chosen item
+      when (chosen .!=. 0) do
+        outQueue.enq $ select [ (g, s.peek)
+                              | (g, s) <- zip (toBitList chosen) ss ]
+
+    return (toStream outQueue)
+  where
+    -- Function for fair scheduling of n clients
+    sched :: KnownNat n => (Bit n, Bit n) -> (Bit n, Bit n)
+    sched (hist, avail) =
+        -- Return new history, and chosen bit
+        if first .!=. 0
+          -- Return first choice, and update history
+          then (hist .|. first, first)
+          -- Return second choice, and reset history
+          else (second, second)
+      where
+       -- First choice: an available bit that's not in the history
+       first = firstHot (avail .&. inv hist)
+       -- Second choice: any available bit
+       second = firstHot avail
 
 -- | Shorthand for a two-way switch
 type TwoWaySwitch a =
