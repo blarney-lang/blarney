@@ -118,19 +118,13 @@ makeQueue = do
     , clear    = doClear <== 1
     }
 
-{-|
-A full-throughput N-element queue implemented using 2 registers and a RAM:
-
-  * No combinatorial paths between sides.
-
-  * There's a mux on the enqueue path.
--}
+-- | A full-throughput N-element queue
 makeSizedQueue :: Bits a => Int -> Module (Queue a)
 makeSizedQueue logSize =
   makeSizedQueueConfig
     SizedQueueConfig {
       sizedQueueLogSize = logSize
-    , sizedQueueBuffer = makeQueue
+    , sizedQueueBuffer = makePipelineQueue 1
     }
 
 -- | Config options for a sized queue
