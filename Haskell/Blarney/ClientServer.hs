@@ -76,3 +76,11 @@ debugServer s msg =
     reqs = debugSink s.reqs msg
   , resps = debugSource s.resps msg
   }
+
+-- | Server that ignores all requests and generates no responses
+nullServer :: Bits resp_t => Server req_t resp_t
+nullServer = Server { reqs = nullSink, resps = nullSource }
+
+-- | Client that ignores all responses and generates no requests
+nullClient :: Bits req_t => Client req_t resp_t
+nullClient = Client { reqs = nullSource, resps = nullSink }
