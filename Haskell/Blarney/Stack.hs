@@ -51,6 +51,18 @@ instance ToSink (Stack t) t where
                   , put    = s.push
                   }
 
+-- | Empty stack
+emptyStack :: Bits a => Stack a
+emptyStack =
+  Stack {
+    notEmpty = false
+  , notFull  = false
+  , push     = \x -> return ()
+  , pop      = return ()
+  , top      = dontCare
+  , clear    = return ()
+  }
+
 -- | Sized queue of given size, backed by RAM, with top element cached
 -- in a register
 makeSizedStack :: Bits a =>
@@ -117,3 +129,77 @@ makeSizedStack logSize = do
       , top = topReg.val
       , clear = clearWire.pulse
       }
+
+-- | Dual-port sized queue of given size, backed by RAM.  Pop
+-- operations run before push operations.
+makeDualSizedStack :: Bits a =>
+     Int
+     -- ^ Log of the capacity of the stack
+  -> Module (Stack a, Stack a)
+makeDualSizedStack logSize = do
+  -- Odd and even stack elements stored on two single port stacks
+  odds  :: Stack a <- makeSizedStack (logSize-1)
+  evens :: Stack a <- makeSizedStack (logSize-1)
+
+  -- Pulse wires for method calls
+  push1 <- makePulseWire
+  push2 <- makePulseWire
+  pop1  <- makePulseWire
+  pop2  <- makePulseWire
+
+  -- Is number of elements odd before pop1?
+  isCountOddPrePop1 :: Reg (Bit 1) <- makeReg false
+  always do
+    -- TODO: update this reg as appropriate
+
+  -- Is number of elements odd after pop1?
+  let isCountOddPostPop1 =
+        if pop1.val then inv isCountOddPrePop1 else isCountOddPrePop1
+
+  -- Is number of elements odd after both pops and have run?
+  let isCountOddPostPops =
+        if pop1.val .==. pop2.val then isCountOddPrePop1
+                                  else inv isCountOddPrePop1
+
+  -- Is number of elements odd after both pops and push1?
+  let isCountOddPostPush1 =
+       if push1.val then inv isCountOddPostPops else isCountOddPostPops
+
+
+  let stack1 =
+        Stack {
+          notEmpty = evens.notEmpty
+        , notFull = odds.notFull
+        , push = \x -> do
+            push1.pulse
+            if isCountOddPostPops
+              then odds.push x
+              else evens.push x
+        , pop = do
+            pop1.pulse
+            if isCountOddPrePop1
+              then evens.pop
+              else odds.pop
+        , top = if isCountOdd1 then evens.out else odds.out
+        , clear = stack1.clear >> stack2.clear
+        }
+
+  let stack2 =
+        Stack {
+          notEmpty = evens.notEmpty
+        , notFull = odds.notFull
+        , push = \x -> do
+            push2.pulse
+            if isCountOddPostPush1
+              then odds.push x
+              else evens.push x
+        , pop = do
+            pop2.pulse
+            if isCountOddPostPop1
+              then evens.pop
+              else odds.pop
+        , top = if isCountOdd2 then evens.out else odds.out
+        , clear = stack1.clear >> stack2.clear
+        }
+
+  return (stack1, stack2)
