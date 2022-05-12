@@ -130,14 +130,15 @@ makeSizedStack logSize = do
       , clear = clearWire.pulse
       }
 
--- | Dual-port sized queue of given size, backed by RAM.  Pop
--- operations run before push operations.
+-- | Dual-port sized queue of given size, backed by RAM.
+-- XXX: assume push & pop never in parallel, per port
+-- XXX: move to pebbles utils
 makeDualSizedStack :: Bits a =>
      Int
      -- ^ Log of the capacity of the stack
   -> Module (Stack a, Stack a)
 makeDualSizedStack logSize = do
-  -- Odd and even stack elements stored on two single port stacks
+  -- Odd and even stack elements stored on separate single-port stacks
   odds  :: Stack a <- makeSizedStack (logSize-1)
   evens :: Stack a <- makeSizedStack (logSize-1)
 
@@ -149,22 +150,18 @@ makeDualSizedStack logSize = do
 
   -- Is number of elements odd before pop1?
   isCountOddPrePop1 :: Reg (Bit 1) <- makeReg false
-  always do
-    -- TODO: update this reg as appropriate
 
   -- Is number of elements odd after pop1?
-  let isCountOddPostPop1 =
-        if pop1.val then inv isCountOddPrePop1 else isCountOddPrePop1
+  let isCountOddPostPop1 = isCountOddPrePop1.val .^. pop1.val
 
-  -- Is number of elements odd after both pops and have run?
-  let isCountOddPostPops =
-        if pop1.val .==. pop2.val then isCountOddPrePop1
-                                  else inv isCountOddPrePop1
+  -- Is number of elements odd after both pops?
+  let isCountOddPostPops = isCountOddPostPop1 .^. pop2.val
 
   -- Is number of elements odd after both pops and push1?
-  let isCountOddPostPush1 =
-       if push1.val then inv isCountOddPostPops else isCountOddPostPops
+  let isCountOddPostPush1 = isCountOddPostPops .^. push1.val
 
+  always do
+    isCountOddPrePop1 <== isCountOddPostPush1 .^. push2.val
 
   let stack1 =
         Stack {
@@ -177,17 +174,17 @@ makeDualSizedStack logSize = do
               else evens.push x
         , pop = do
             pop1.pulse
-            if isCountOddPrePop1
+            if isCountOddPrePop1.val
               then evens.pop
               else odds.pop
-        , top = if isCountOdd1 then evens.out else odds.out
+        , top = if isCountOddPrePop1.val then evens.top else odds.top
         , clear = stack1.clear >> stack2.clear
         }
 
   let stack2 =
         Stack {
-          notEmpty = evens.notEmpty
-        , notFull = odds.notFull
+          notEmpty = if pop1.val then odds.notEmpty else evens.notEmpty
+        , notFull = if push1.val then evens.notFull else odds.notFull
         , push = \x -> do
             push2.pulse
             if isCountOddPostPush1
@@ -198,7 +195,7 @@ makeDualSizedStack logSize = do
             if isCountOddPostPop1
               then evens.pop
               else odds.pop
-        , top = if isCountOdd2 then evens.out else odds.out
+        , top = if isCountOddPostPop1.val then evens.top else odds.top
         , clear = stack1.clear >> stack2.clear
         }
 
