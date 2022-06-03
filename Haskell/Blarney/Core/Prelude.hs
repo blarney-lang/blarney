@@ -37,6 +37,7 @@ module Blarney.Core.Prelude
   , old             -- Generic register with don't care initialiser
   , delayEn         -- Generic register with enable
   , binaryEncode    -- One-hot to binary encoder
+  , binaryDecode    -- Binary to one-hot decoder
   , firstHot        -- Isolate first hot bit in vector
   , mergeWrites     -- Merge input values according to a given merging strategy
   ) where
@@ -165,6 +166,15 @@ binaryEncode xs = unsafeFromBitList $ encode $ unsafeToBitList xs
     encode [_] = []
     encode as  = zipWith (.|.) (encode ls) (encode rs) ++ [orList rs]
       where (ls, rs) = splitAt (length as `div` 2) as
+
+-- | Binary to one-hot decoder
+binaryDecode :: Bit n -> Bit (2^n)
+binaryDecode xs = unsafeFromBitList $ decode $ unsafeToBitList xs
+  where
+    decode [] = [true]
+    decode [x] = [inv x, x]
+    decode (x:xs) = concatMap (\y -> [inv x .&. y, x .&. y]) rest
+      where rest = decode xs
 
 -- | Isolate first hot bit in a bit vector
 firstHot :: KnownNat n => Bit n -> Bit n
