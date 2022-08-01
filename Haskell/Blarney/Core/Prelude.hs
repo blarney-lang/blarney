@@ -40,6 +40,7 @@ module Blarney.Core.Prelude
   , binaryDecode    -- Binary to one-hot decoder
   , firstHot        -- Isolate first hot bit in vector
   , mergeWrites     -- Merge input values according to a given merging strategy
+  , fairScheduler   -- Function for fair scheduling of n clients
   ) where
 
 import Prelude
@@ -184,6 +185,21 @@ mergeWrites :: forall a. Bits a => MergeStrategy -> [(Bit 1, a)] -> a
 mergeWrites strat ins = unpack $ mergeWritesBit strat w ins'
   where ins' = map (\(en, x) -> (en, pack x)) ins
         w = sizeOf (error "_|_" :: a)
+
+-- | Function for fair scheduling of n clients
+fairScheduler :: KnownNat n => (Bit n, Bit n) -> (Bit n, Bit n)
+fairScheduler (hist, avail) =
+    -- Return new history, and chosen bit
+    if first .!=. 0
+      -- Return first choice, and update history
+      then (hist .|. first, first)
+      -- Return second choice, and reset history
+      else (second, second)
+  where
+   -- First choice: an available bit that's not in the history
+   first = firstHot (avail .&. inv hist)
+   -- Second choice: any available bit
+   second = firstHot avail
 
 -- 2-tuple instances for HasField
 instance HasField "fst" (a,b) a where

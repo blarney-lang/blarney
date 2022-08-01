@@ -64,7 +64,8 @@ makeFairMerger ss =
 
     always do
       -- Choose a stream to consume from
-      let (hist, chosen) = sched (history.val, fromBitList $ map (.canPeek) ss)
+      let (hist, chosen) =
+            fairScheduler (history.val, fromBitList $ map (.canPeek) ss)
       when outQueue.notFull do
         -- Consume chosen stream
         sequence
@@ -78,21 +79,6 @@ makeFairMerger ss =
           history <== hist
 
     return (toStream outQueue)
-  where
-    -- Function for fair scheduling of n clients
-    sched :: KnownNat n => (Bit n, Bit n) -> (Bit n, Bit n)
-    sched (hist, avail) =
-        -- Return new history, and chosen bit
-        if first .!=. 0
-          -- Return first choice, and update history
-          then (hist .|. first, first)
-          -- Return second choice, and reset history
-          else (second, second)
-      where
-       -- First choice: an available bit that's not in the history
-       first = firstHot (avail .&. inv hist)
-       -- Second choice: any available bit
-       second = firstHot avail
 
 -- | Shorthand for a two-way switch
 type TwoWaySwitch a =
