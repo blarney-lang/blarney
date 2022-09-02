@@ -4,8 +4,16 @@
 :toc-placement!:
 :source-highlighter:
 
+++++
+<br/>
+++++
+
 image::blarney-logo.svg#gh-light-mode-only[Blarney logo, width=275]
 image::blarney-logo-dark.svg#gh-dark-mode-only[Blarney logo, width=275]
+
+++++
+<br/>
+++++
 
 Blarney is a Haskell library for hardware description that builds a
 range of HDL abstractions on top of a small set of pure functional
