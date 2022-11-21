@@ -12,6 +12,7 @@ BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/Connectable.hs
 BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/Interconnect.hs
 BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/Option.hs
 BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/PulseWire.hs
+BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/PulseReg.hs
 BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/Queue.hs
 BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/Recipe.hs
 BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/SourceSink.hs
