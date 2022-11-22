@@ -142,17 +142,17 @@ instance (KnownNat n, Bits a) => Bits (Vec n a) where
                        | (i,b) <- L.zip [0..] (toList xs) ]
 
 instance (KnownNat n, Interface a) => Interface (Vec n a) where
-  toIfcTerm vec = encode (valueOf @n) (toList vec)
+  toIfc vec = (tm, ty)
     where
+      tm = encode (valueOf @n) (toList vec)
+      ty = L.foldr IfcTypeProduct IfcTypeUnit (L.replicate (valueOf @n) t)
+      t = IfcTypeField "" (toIfcType (undefined :: a))
       encode 0 _ = IfcTermUnit
       encode i ~(x:xs) = IfcTermProduct (toIfcTerm x) (encode (i-1) xs)
-  fromIfcTerm term = Vec $ decode (valueOf @n) term
+  fromIfc term = Vec $ decode (valueOf @n) term
     where
       decode 0 _ = []
       decode i ~(IfcTermProduct x0 x1) = fromIfcTerm x0 : decode (i-1) x1
-  toIfcType _ =
-    L.foldr IfcTypeProduct IfcTypeUnit (L.replicate (valueOf @n) t)
-    where t = IfcTypeField "" (toIfcType (undefined :: a))
 
 -- | Generate a 'Vec' of size 'n' initialized with 'undefined' in each element
 newVec :: forall n a. KnownNat n => Vec n a

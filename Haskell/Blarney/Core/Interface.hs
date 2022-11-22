@@ -13,6 +13,7 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE UndecidableInstances  #-}
 {-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 {-|
 Module      : Blarney.Core.Interface
@@ -31,10 +32,15 @@ modules, and external modules to be instantiated in a Blarney description.
 module Blarney.Core.Interface (
   -- Class of types that can be converted to external module I/O ports
   Interface(..)
-  -- Generic term representation
+  -- Generic term & type representation
 , IfcTerm(..)
-  -- Generic type representation
 , IfcType(..)
+, toIfcTerm
+, fromIfcTerm
+, toIfcType
+  -- Syntactic sugar for making manual Interface instances
+, toPorts
+, fromPorts
   -- Function types convertible to external module I/O ports
 , Method(..)
   -- Types that can be turned into external modules
@@ -95,37 +101,48 @@ data IfcType =
   | IfcTypeField String IfcType
 
 class Interface a where
-  toIfcTerm   :: a -> IfcTerm
-  fromIfcTerm :: IfcTerm -> a
-  toIfcType   :: a -> IfcType
+  toIfc :: a -> (IfcTerm, IfcType)
+  fromIfc :: IfcTerm -> a
 
   -- |For generic deriving
-  default toIfcTerm :: (Generic a, GInterface (Rep a)) => a -> IfcTerm
-  toIfcTerm x = gtoIfcTerm (from x)
-  default fromIfcTerm :: (Generic a, GInterface (Rep a)) => IfcTerm -> a
-  fromIfcTerm x = to (gfromIfcTerm x)
-  default toIfcType :: (Generic a, GInterface (Rep a)) => a -> IfcType
-  toIfcType x = gtoIfcType (from x)
+  default toIfc :: (Generic a, GInterface (Rep a)) => a -> (IfcTerm, IfcType)
+  toIfc x = (gtoIfcTerm (from x), gtoIfcType (from x))
+  default fromIfc :: (Generic a, GInterface (Rep a)) => IfcTerm -> a
+  fromIfc x = to (gfromIfcTerm x)
+
+toIfcTerm :: Interface a => a -> IfcTerm
+toIfcTerm x = fst (toIfc x)
+
+toIfcType :: Interface a => a -> IfcType
+toIfcType x = snd (toIfc x)
+
+fromIfcTerm :: Interface a => IfcTerm -> a
+fromIfcTerm x = fromIfc x
 
 instance KnownNat n => Interface (Bit n) where
-  toIfcTerm x = IfcTermBV (toBV x)
-  fromIfcTerm ~(IfcTermBV x) = FromBV x
-  toIfcType x = IfcTypeBV (fromIntegral (widthOf x))
+  toIfc x =(tm, ty)
+    where
+      tm = IfcTermBV (toBV x)
+      ty = IfcTypeBV (fromIntegral (widthOf x))
+  fromIfc ~(IfcTermBV x) = FromBV x
 
 instance KnownNat n => Interface (Signed n) where
-  toIfcTerm x = toIfcTerm (fromSigned x)
-  fromIfcTerm x = toSigned (fromIfcTerm x)
-  toIfcType x = toIfcType (fromSigned x)
+  toIfc x = (tm, ty)
+    where
+      tm = toIfcTerm (fromSigned x)
+      ty = toIfcType (fromSigned x)
+  fromIfc x = toSigned (fromIfc x)
 
 instance Interface a => Interface (Action a) where
-  toIfcTerm act = IfcTermAction (toIfcTerm <$> act)
-  fromIfcTerm ~(IfcTermAction act) = fromIfcTerm <$> act
-  toIfcType _ = IfcTypeAction (toIfcType (undefined :: a))
+  toIfc act = (tm, ty)
+    where
+      tm = IfcTermAction (toIfcTerm <$> act)
+      ty = IfcTypeAction (toIfcType (undefined :: a))
+  fromIfc ~(IfcTermAction act) = fromIfc <$> act
 
 instance (Interface a, Bits a, Method b) => Interface (a -> b) where
-  toIfcTerm = toMethodTerm
-  fromIfcTerm = fromMethodTerm
-  toIfcType = toMethodType
+  toIfc x = (toMethodTerm x, toMethodType x)
+  fromIfc = fromMethodTerm
 
 -- |This class defines which functions make a valid 'Interface'.
 -- Specifially, a 'Method' is any function returning an 'Action'
@@ -200,6 +217,35 @@ instance (Interface a, Bits a) => Interface (ReadWrite a)
 instance (Interface a, Bits a) => Interface (WriteOnly a)
 instance Interface Clock
 instance Interface Reset
+
+-- Sugar for writing manual interface instances
+class ToPorts a where
+  toPortsAcc :: [(IfcTerm, IfcType)] -> a
+
+instance ToPorts (IfcTerm, IfcType) where
+  toPortsAcc acc = (tm, ty)
+    where
+      tm = foldr IfcTermProduct IfcTermUnit tms
+      ty = foldr IfcTypeProduct IfcTypeUnit tys
+      (tms, tys) = unzip (reverse acc)
+
+instance (Interface a, ToPorts b) => ToPorts ((String, a) -> b) where
+  toPortsAcc acc = \(name, x) ->
+    let (tm_x, ty_x) = toIfc x in
+      toPortsAcc ((tm_x, IfcTypeField name ty_x) : acc)
+
+toPorts :: ToPorts a => a
+toPorts = toPortsAcc []
+
+class FromPorts a b where
+  fromPorts :: IfcTerm -> a -> b
+
+instance FromPorts a a where
+  fromPorts _ x = x
+
+instance (Interface a, FromPorts b c) => FromPorts (a -> b) c where
+  fromPorts ~(IfcTermProduct tm0 tm1) f =
+    fromPorts tm1 (f (fromIfc tm0))
 
 -- |Declaration reader/writer monad for declaring named inputs and outputs.
 -- The writer part of the monad collects declarations.  Any names
