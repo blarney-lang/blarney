@@ -37,6 +37,9 @@ module Blarney.Core.Interface (
 , toIfcTerm
 , fromIfcTerm
 , toIfcType
+  -- Syntactic sugar for making manual Interface instances
+, toPorts
+, fromPorts
   -- Function types convertible to external module I/O ports
 , Method(..)
   -- Types that can be turned into external modules
@@ -213,6 +216,35 @@ instance (Interface a, Bits a) => Interface (ReadWrite a)
 instance (Interface a, Bits a) => Interface (WriteOnly a)
 instance Interface Clock
 instance Interface Reset
+
+-- Syntactic sugar for writing manual interface instances
+class ToPorts a where
+  toPortsAcc :: [(IfcTerm, IfcType)] -> a
+
+instance ToPorts (IfcTerm, IfcType) where
+  toPortsAcc acc = (tm, ty)
+    where
+      tm = foldr IfcTermProduct IfcTermUnit tms
+      ty = foldr IfcTypeProduct IfcTypeUnit tys
+      (tms, tys) = unzip (reverse acc)
+
+instance (Interface a, ToPorts b) => ToPorts ((String, a) -> b) where
+  toPortsAcc acc = \(name, x) ->
+    let (tm_x, ty_x) = toIfc x in
+      toPortsAcc ((tm_x, IfcTypeField name ty_x) : acc)
+
+toPorts :: ToPorts a => a
+toPorts = toPortsAcc []
+
+class FromPorts a b where
+  fromPorts :: IfcTerm -> a -> b
+
+instance FromPorts a a where
+  fromPorts _ x = x
+
+instance (Interface a, FromPorts b c) => FromPorts (a -> b) c where
+  fromPorts ~(IfcTermProduct tm0 tm1) f =
+    fromPorts tm1 (f (fromIfc tm0))
 
 -- |Declaration reader/writer monad for declaring named inputs and outputs.
 -- The writer part of the monad collects declarations.  Any names
