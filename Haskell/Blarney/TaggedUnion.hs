@@ -259,14 +259,13 @@ instance (IsTaggedUnion (TaggedUnion members), FShowMember members)
 
 instance IsTaggedUnion (TaggedUnion members)
       => Interface (TaggedUnion members) where
-  toIfcTerm u =
-    IfcTermProduct (IfcTermBV u.memberIdx)
-                   (IfcTermBV u.memberVal)
-  fromIfcTerm ~(IfcTermProduct (IfcTermBV idx) (IfcTermBV val)) =
-    TaggedUnion { memberIdx = idx, memberVal = val }
-  toIfcType u =
-    IfcTypeProduct (IfcTypeField "tag" (IfcTypeBV idxWidth))
-                   (IfcTypeField "val" (IfcTypeBV valWidth))
+  toIfc u = (tm, ty)
     where
+      tm = IfcTermProduct (IfcTermBV u.memberIdx)
+                          (IfcTermBV u.memberVal)
+      ty = IfcTypeProduct (IfcTypeField "tag" (IfcTypeBV idxWidth))
+                          (IfcTypeField "val" (IfcTypeBV valWidth))
       idxWidth = log2ceil (getNumMembers u)
       valWidth = getMaxMemberWidth u
+  fromIfc ~(IfcTermProduct (IfcTermBV idx) (IfcTermBV val)) =
+    TaggedUnion { memberIdx = idx, memberVal = val }
