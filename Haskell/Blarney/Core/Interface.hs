@@ -13,6 +13,7 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE UndecidableInstances  #-}
 {-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 {-|
 Module      : Blarney.Core.Interface
@@ -217,7 +218,7 @@ instance (Interface a, Bits a) => Interface (WriteOnly a)
 instance Interface Clock
 instance Interface Reset
 
--- Syntactic sugar for writing manual interface instances
+-- Sugar for writing manual interface instances
 class ToPorts a where
   toPortsAcc :: [(IfcTerm, IfcType)] -> a
 
