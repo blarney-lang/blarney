@@ -11,6 +11,7 @@
 {-# LANGUAGE DefaultSignatures     #-}
 {-# LANGUAGE NoRebindableSyntax    #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
 {-# LANGUAGE UndecidableInstances  #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
