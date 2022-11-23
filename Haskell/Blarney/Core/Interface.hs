@@ -15,6 +15,7 @@
 {-# LANGUAGE UndecidableInstances  #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FunctionalDependencies #-}
 
 {-|
 Module      : Blarney.Core.Interface
@@ -286,7 +287,7 @@ instance (Interface a, ToPorts b) => ToPorts ((PortInfo, a) -> b) where
 toPorts :: ToPorts a => a
 toPorts = toPortsAcc []
 
-class FromPorts a b where
+class FromPorts a b | a -> b where
   fromPorts :: IfcTerm -> a -> b
 
 instance FromPorts a a where
