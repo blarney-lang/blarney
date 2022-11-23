@@ -146,7 +146,7 @@ instance (KnownNat n, Interface a) => Interface (Vec n a) where
     where
       tm = encode (valueOf @n) (toList vec)
       ty = L.foldr IfcTypeProduct IfcTypeUnit (L.replicate (valueOf @n) t)
-      t = IfcTypeField "" (toIfcType (undefined :: a))
+      t = IfcTypeField portEmpty (toIfcType (undefined :: a))
       encode 0 _ = IfcTermUnit
       encode i ~(x:xs) = IfcTermProduct (toIfcTerm x) (encode (i-1) xs)
   fromIfc term = Vec $ decode (valueOf @n) term

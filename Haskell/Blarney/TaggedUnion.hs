@@ -263,8 +263,8 @@ instance IsTaggedUnion (TaggedUnion members)
     where
       tm = IfcTermProduct (IfcTermBV u.memberIdx)
                           (IfcTermBV u.memberVal)
-      ty = IfcTypeProduct (IfcTypeField "tag" (IfcTypeBV idxWidth))
-                          (IfcTypeField "val" (IfcTypeBV valWidth))
+      ty = IfcTypeProduct (IfcTypeField (portName "tag") (IfcTypeBV idxWidth))
+                          (IfcTypeField (portName "val") (IfcTypeBV valWidth))
       idxWidth = log2ceil (getNumMembers u)
       valWidth = getMaxMemberWidth u
   fromIfc ~(IfcTermProduct (IfcTermBV idx) (IfcTermBV val)) =
