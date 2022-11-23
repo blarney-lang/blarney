@@ -11,6 +11,7 @@
 {-# LANGUAGE DefaultSignatures     #-}
 {-# LANGUAGE NoRebindableSyntax    #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE OverloadedRecordDot   #-}
 {-# LANGUAGE UndecidableInstances  #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -41,6 +42,11 @@ module Blarney.Core.Interface (
   -- Syntactic sugar for making manual Interface instances
 , toPorts
 , fromPorts
+, PortInfo(..)
+, portEmpty
+, portName
+, portMethod
+, portMethodAlwaysEn
   -- Function types convertible to external module I/O ports
 , Method(..)
   -- Types that can be turned into external modules
@@ -98,7 +104,40 @@ data IfcType =
   | IfcTypeProduct IfcType IfcType
   | IfcTypeFun IfcType IfcType
     -- Marks each field / constructor argument (with name, which can be "")
-  | IfcTypeField String IfcType
+  | IfcTypeField PortInfo IfcType
+
+-- | The user can request certain properties, e.g. names, in a generated
+-- flat interface (e.g. Verilog). Such properties are captured per-port as:
+data PortInfo =
+  PortInfo {
+    name :: String
+    -- ^ Desired field name
+  , argNames :: [String]
+    -- ^ Desired method argument names
+  , alwaysEnabled :: Bool
+    -- ^ Avoid generation of method enable wire
+  , skipName :: Bool
+    -- ^ Do not generate a name for this port. Useful when we are only
+    -- intested in a method's arguments. Use with care; this can
+    -- introduce ambiguous names in generated interface.
+  }
+
+-- | Empty information about a port
+portEmpty :: PortInfo
+portEmpty =
+  PortInfo { name = "", argNames = [], alwaysEnabled = False, skipName = False }
+
+-- | Name a port
+portName :: String -> PortInfo
+portName nm = portEmpty { name = nm }
+
+-- | Name a method port, i.e. the method and its args
+portMethod :: String -> [String] -> PortInfo
+portMethod m args = portEmpty { name = m, argNames = args, skipName = null m }
+
+-- | Name an always-enabled method port
+portMethodAlwaysEn :: String -> [String] -> PortInfo
+portMethodAlwaysEn m args = (portMethod m args) { alwaysEnabled = True }
 
 class Interface a where
   toIfc :: a -> (IfcTerm, IfcType)
@@ -185,7 +224,7 @@ instance (GInterface a, GInterface b) => GInterface (a :*: b) where
 instance (GInterface a, Selector c) => GInterface (M1 S c a) where
   gtoIfcTerm ~(m@(M1 x)) = gtoIfcTerm x
   gfromIfcTerm x = M1 (gfromIfcTerm x)
-  gtoIfcType ~(m@(M1 x)) = IfcTypeField (selName m) (gtoIfcType x)
+  gtoIfcType ~(m@(M1 x)) = IfcTypeField (portName (selName m)) (gtoIfcType x)
 
 instance {-# OVERLAPPABLE #-} GInterface a => GInterface (M1 i c a)  where
   gtoIfcTerm ~(m@(M1 x)) = gtoIfcTerm x
@@ -229,10 +268,10 @@ instance ToPorts (IfcTerm, IfcType) where
       ty = foldr IfcTypeProduct IfcTypeUnit tys
       (tms, tys) = unzip (reverse acc)
 
-instance (Interface a, ToPorts b) => ToPorts ((String, a) -> b) where
-  toPortsAcc acc = \(name, x) ->
+instance (Interface a, ToPorts b) => ToPorts ((PortInfo, a) -> b) where
+  toPortsAcc acc = \(info, x) ->
     let (tm_x, ty_x) = toIfc x in
-      toPortsAcc ((tm_x, IfcTypeField name ty_x) : acc)
+      toPortsAcc ((tm_x, IfcTypeField info ty_x) : acc)
 
 toPorts :: ToPorts a => a
 toPorts = toPortsAcc []
@@ -264,8 +303,9 @@ type Env = [(String, BV)]
 -- (A named input with a width, or a named output bit-vector)
 data Decl = DeclInput String Width | DeclOutput String BV
 
--- A scope is a stack of names, used to generate sensible names
-type Scope = [String]
+-- As we flatten a high-level (hiearchical) interface to a low-level
+-- (flat) one, we track port information along the current path
+type Scope = [PortInfo]
 
 -- Instances of Monad, Applicable, Functor
 instance Monad Declare where
@@ -291,11 +331,21 @@ lookupInputBV name = Declare $ \c s e ->
              Just bv -> bv
   in  return (c, [], bv)
 
+
+-- Get current arg counter
+getArgCounter :: Declare Int
+getArgCounter = Declare \c s e -> return (c, [], c)
+
+-- Get scope
+getScope :: Declare Scope
+getScope = Declare \c s e -> return (c, [], s)
+
 -- Start a new scope
-newScope :: String -> Declare a -> Declare a
-newScope name m = Declare \c s e -> noName do
-  let name' = case name of { "" -> show c; other -> name }
-  (_, ds, a) <- runDeclare m 0 (name':s) e
+newScope :: PortInfo -> Declare a -> Declare a
+newScope info m = Declare \c s e -> noName do
+  let nm = case info.name of { "" -> show c; other -> info.name }
+  let newInfo = if info.skipName then info else info { name = nm }
+  (_, ds, a) <- runDeclare m 0 (newInfo:s) e
   return (c+1, ds, a)
 
 -- Lift module monad to declare monad
@@ -306,8 +356,30 @@ liftModule m = Declare \c s e -> noName do
 
 -- Get a meaningful name
 getName :: Declare String
-getName = Declare \c s e ->
-  return (c, [], concat (intersperse "_" (reverse s)))
+getName = do
+  s <- getScope 
+  return (concat $ intersperse "_"
+                 $ filter (not . null)
+                 $ map (.name)
+                 $ reverse s)
+
+-- Get method argument name
+getArgName :: Declare String
+getArgName = do
+  i <- getArgCounter
+  s <- getScope
+  let nm = case s of
+             pi:_ | i < length pi.argNames -> pi.argNames !! i
+             other -> show i
+  return nm
+
+-- Dertmine if current method being processed is always enabled
+getAlwaysEnabled :: Declare Bool
+getAlwaysEnabled = do
+  s <- getScope
+  case s of
+    PortInfo { alwaysEnabled = True } : _ -> return True
+    _ -> return False
 
 -- Add a declaration to the collection
 addDecl :: Decl -> Declare ()
@@ -330,49 +402,63 @@ declareInputBV suffix width = do
 
 -- Declare an output, generically over any interface type
 declareOut :: IfcTerm -> IfcType -> Declare ()
-declareOut x (IfcTypeField selName t) =
-  newScope selName (declareOut x t)
+declareOut x (IfcTypeField info t) =
+  newScope info (declareOut x t)
 declareOut IfcTermUnit _ = return ()
 declareOut (IfcTermBV bv) _ =
   declareOutputBV "" bv
 declareOut (IfcTermAction act) (IfcTypeAction t) = do
-  -- Declare input wire to trigger execution of act
-  en <- declareInputBV "en" 1
-  -- Trigger action
-  ret <- liftModule $ always $ whenAction (FromBV en :: Bit 1) act
-  -- Declare return value output
-  newScope "ret" (declareOut ret t)
+  alwaysEn <- getAlwaysEnabled
+  if alwaysEn
+    then do
+      -- Trigger action
+      ret <- liftModule (always act)
+      -- Declare return value output
+      newScope (portName "ret") (declareOut ret t)
+    else do
+      -- Declare input wire to trigger execution of act
+      en <- declareInputBV "en" 1
+      -- Trigger action
+      ret <- liftModule $ always $ whenAction (FromBV en :: Bit 1) act
+      -- Declare return value output
+      newScope (portName "ret") (declareOut ret t)
 declareOut (IfcTermProduct x0 x1) (IfcTypeProduct tx0 tx1) = do
   declareOut x0 tx0
   declareOut x1 tx1
 declareOut (IfcTermFun fun) (IfcTypeFun argType retType) = do
   -- Declare argument as input
-  arg <- newScope "" (declareIn argType)
+  argName <- getArgName
+  arg <- newScope (portName argName) (declareIn argType)
   -- Apply argument and declare return value as output
   declareOut (fun arg) retType
 
 -- Typed version of 'declareOut'
 declareOutput :: Interface a => String -> a -> Declare ()
 declareOutput str out =
-  newScope str (declareOut (toIfcTerm out) (toIfcType out))
+  newScope (portName str) (declareOut (toIfcTerm out) (toIfcType out))
 
 -- Declare an input, generically over any interface type
 declareIn :: IfcType -> Declare IfcTerm
-declareIn (IfcTypeField selName t) =
-  newScope selName (declareIn t)
+declareIn (IfcTypeField info t) =
+  newScope info (declareIn t)
 declareIn IfcTypeUnit = return IfcTermUnit
 declareIn (IfcTypeBV w) = do
   bv <- declareInputBV "" w
   return (IfcTermBV bv)
 declareIn (IfcTypeAction t) = do
+  alwaysEn <- getAlwaysEnabled
   -- Declare return value as input
-  ret <- newScope "ret" (declareIn t)
-  -- Create enable wire
-  enWire :: Wire (Bit 1) <- liftModule (makeWire 0)
-  -- Declare enable signal as output
-  declareOutputBV "en" (toBV (val enWire))
-  -- When action block is called, trigger the enable line
-  return (IfcTermAction $ do { enWire <== 1; return ret })
+  ret <- newScope (portName "ret") (declareIn t)
+  -- Is action always enabled?
+  if alwaysEn
+    then return (IfcTermAction (return ret))
+    else do
+      -- Create enable wire
+      enWire :: Wire (Bit 1) <- liftModule (makeWire 0)
+      -- Declare enable signal as output
+      declareOutputBV "en" (toBV (val enWire))
+      -- When action block is called, trigger the enable line
+      return (IfcTermAction $ do { enWire <== 1; return ret })
 declareIn (IfcTypeProduct t0 t1) =
   IfcTermProduct <$> declareIn t0 <*> declareIn t1
 declareIn t@(IfcTypeFun _ _) = do
@@ -382,8 +468,9 @@ declareIn t@(IfcTypeFun _ _) = do
   case retType of
     IfcTypeAction{} -> do
       -- Declare each argument as an output
-      drivers <- forM argTypes \argType ->
-        newScope "" (driver argType)
+      drivers <- forM argTypes \argType -> do
+        nm <- getArgName
+        newScope (portName nm) (driver argType)
       -- Declare return type as input
       ret <- declareIn retType
       case ret of
@@ -406,7 +493,7 @@ declareIn t@(IfcTypeFun _ _) = do
     -- Declare an output and return assignment
     -- function (driver) for that output
     driver :: IfcType -> Declare (IfcTerm -> Action ())
-    driver (IfcTypeField selName t) = newScope selName (driver t)
+    driver (IfcTypeField info t) = newScope info (driver t)
     driver IfcTypeUnit = return (\x -> return ())
     driver (IfcTypeBV w) =
       liftNat w $ \(_ :: Proxy n) -> do
@@ -426,7 +513,7 @@ declareIn t@(IfcTypeFun _ _) = do
 -- Typed version of 'declareIn'
 declareInput :: forall a. Interface a => String -> Declare a
 declareInput str =
-  newScope str do
+  newScope (portName str) do
     let t = toIfcType (undefined :: a)
     x <- declareIn t
     return (fromIfcTerm x)
