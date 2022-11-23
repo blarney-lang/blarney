@@ -46,6 +46,7 @@ module Blarney.Core.Interface (
 , portEmpty
 , portName
 , portMethod
+, portMethodEn
 , portMethodAlwaysEn
   -- Function types convertible to external module I/O ports
 , Method(..)
@@ -120,12 +121,16 @@ data PortInfo =
     -- ^ Do not generate a name for this port. Useful when we are only
     -- intested in a method's arguments. Use with care; this can
     -- introduce ambiguous names in generated interface.
+  , enableName :: String
+    -- ^ Name extension for a method's enable wire
   }
 
 -- | Empty information about a port
 portEmpty :: PortInfo
 portEmpty =
-  PortInfo { name = "", argNames = [], alwaysEnabled = False, skipName = False }
+  PortInfo { name = "", argNames = []
+           , alwaysEnabled = False, skipName = False
+           , enableName = "en" }
 
 -- | Name a port
 portName :: String -> PortInfo
@@ -134,6 +139,11 @@ portName nm = portEmpty { name = nm }
 -- | Name a method port, i.e. the method and its args
 portMethod :: String -> [String] -> PortInfo
 portMethod m args = portEmpty { name = m, argNames = args, skipName = null m }
+
+-- | Name a method port and its enable wire
+portMethodEn :: String -> String -> [String] -> PortInfo
+portMethodEn m en args =
+  portEmpty { name = m, argNames = args, skipName = null m, enableName = en }
 
 -- | Name an always-enabled method port
 portMethodAlwaysEn :: String -> [String] -> PortInfo
@@ -381,6 +391,14 @@ getAlwaysEnabled = do
     PortInfo { alwaysEnabled = True } : _ -> return True
     _ -> return False
 
+-- Determine name for enable wire of current method being processed
+getMethodEnableName :: Declare String
+getMethodEnableName = do
+  s <- getScope
+  case s of
+    pi:_ -> return pi.enableName
+    _ -> return "en"
+
 -- Add a declaration to the collection
 addDecl :: Decl -> Declare ()
 addDecl d = Declare \c s e -> return (c, [d], ())
@@ -409,6 +427,7 @@ declareOut (IfcTermBV bv) _ =
   declareOutputBV "" bv
 declareOut (IfcTermAction act) (IfcTypeAction t) = do
   alwaysEn <- getAlwaysEnabled
+  enName <- getMethodEnableName
   if alwaysEn
     then do
       -- Trigger action
@@ -417,7 +436,7 @@ declareOut (IfcTermAction act) (IfcTypeAction t) = do
       newScope (portName "ret") (declareOut ret t)
     else do
       -- Declare input wire to trigger execution of act
-      en <- declareInputBV "en" 1
+      en <- declareInputBV enName 1
       -- Trigger action
       ret <- liftModule $ always $ whenAction (FromBV en :: Bit 1) act
       -- Declare return value output
@@ -447,6 +466,7 @@ declareIn (IfcTypeBV w) = do
   return (IfcTermBV bv)
 declareIn (IfcTypeAction t) = do
   alwaysEn <- getAlwaysEnabled
+  enName <- getMethodEnableName
   -- Declare return value as input
   ret <- newScope (portName "ret") (declareIn t)
   -- Is action always enabled?
@@ -456,7 +476,7 @@ declareIn (IfcTypeAction t) = do
       -- Create enable wire
       enWire :: Wire (Bit 1) <- liftModule (makeWire 0)
       -- Declare enable signal as output
-      declareOutputBV "en" (toBV (val enWire))
+      declareOutputBV enName (toBV (val enWire))
       -- When action block is called, trigger the enable line
       return (IfcTermAction $ do { enWire <== 1; return ret })
 declareIn (IfcTypeProduct t0 t1) =
