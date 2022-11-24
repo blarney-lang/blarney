@@ -290,7 +290,7 @@ toPorts = toPortsAcc []
 class FromPorts a b where
   fromPorts :: IfcTerm -> a -> b
 
-instance FromPorts a a where
+instance {-# OVERLAPPABLE #-} a ~ b => FromPorts a b where
   fromPorts _ x = x
 
 instance (Interface a, FromPorts b c) => FromPorts (a -> b) c where
