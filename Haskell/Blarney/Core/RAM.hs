@@ -6,6 +6,8 @@
 {-# LANGUAGE OverloadedRecordDot   #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 
+{-# OPTIONS_GHC -Wno-partial-type-signatures #-}
+
 {-|
 Module      : Blarney.Core.RAM
 Description : Library of various block RAM components

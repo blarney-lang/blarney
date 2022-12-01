@@ -1,6 +1,7 @@
 {-# LANGUAGE RebindableSyntax      #-}
 {-# LANGUAGE NoImplicitPrelude     #-}
 {-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE ImportQualifiedPost   #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 {-|
