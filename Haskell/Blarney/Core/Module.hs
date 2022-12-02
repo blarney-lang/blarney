@@ -321,3 +321,6 @@ addRoots roots = M (RTL.addRoots roots)
 --   If the module has side effects, raise an error.
 runPureModule :: Module a -> String -> a
 runPureModule mod errStr = RTL.evalPureRTL (runModule mod) errStr
+
+instance MonadFail Module where
+  fail = error
