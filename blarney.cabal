@@ -1,0 +1,96 @@
+cabal-version: 2.4
+name: blarney
+version: 0.1.0.0
+
+library blarney-core
+  default-language: GHC2021
+  hs-source-dirs: Haskell
+  exposed-modules: Blarney.Core
+  other-modules:
+    Blarney.Core.BV
+    Blarney.Core.Bit
+    Blarney.Core.Bits
+    Blarney.Core.ClockReset
+    Blarney.Core.FShow
+    Blarney.Core.Flatten
+    Blarney.Core.IfThenElse
+    Blarney.Core.Interface
+    Blarney.Core.JList
+    Blarney.Core.Lookup
+    Blarney.Core.Module
+    Blarney.Core.NetHelpers
+    Blarney.Core.Prelude
+    Blarney.Core.Prim
+    Blarney.Core.RAM
+    Blarney.Core.RTL
+    Blarney.Core.Utils
+  build-depends:
+      base
+    , containers
+    , array
+    , mtl
+    , transformers
+
+library
+  default-language: GHC2021
+  hs-source-dirs: Haskell
+  exposed-modules:
+    Blarney
+    Blarney.Queue
+    Blarney.Vector
+    Blarney.SourceSink
+  other-modules:
+    Blarney.Backend
+    Blarney.Backend.SMT
+    Blarney.Backend.SMT.BasicDefinitions
+    Blarney.Backend.SMT.NetlistUtils
+    Blarney.Backend.SMT.Utils
+    Blarney.Backend.Simulation
+    Blarney.Backend.Verilog
+    Blarney.Connectable
+    Blarney.Core
+    Blarney.Core.BV
+    Blarney.Core.Bit
+    Blarney.Core.Bits
+    Blarney.Core.ClockReset
+    Blarney.Core.FShow
+    Blarney.Core.Flatten
+    Blarney.Core.IfThenElse
+    Blarney.Core.Interface
+    Blarney.Core.JList
+    Blarney.Core.Lookup
+    Blarney.Core.Module
+    Blarney.Core.NetHelpers
+    Blarney.Core.Opts
+    Blarney.Core.Prelude
+    Blarney.Core.Prim
+    Blarney.Core.RAM
+    Blarney.Core.RTL
+    Blarney.Core.Utils
+    Blarney.Misc.ANSIEscapeSequences
+    Blarney.Misc.MonadLoops
+    Blarney.Netlist
+    Blarney.Netlist.Passes
+    Blarney.Netlist.Passes.ConstantEliminate
+    Blarney.Netlist.Passes.ConstantFold
+    Blarney.Netlist.Passes.ConstantPropagate
+    Blarney.Netlist.Passes.DeadNetEliminate
+    Blarney.Netlist.Passes.DontCareDeInline
+    Blarney.Netlist.Passes.NamePropagate
+    Blarney.Netlist.Passes.NetInline
+    Blarney.Netlist.Passes.Prune
+    Blarney.Netlist.Passes.Types
+    Blarney.Netlist.Passes.Utils
+    Blarney.Netlist.Passes.ZeroWidthNetIgnore
+    Blarney.Option
+    Blarney.Stream
+  build-depends:
+      base
+    , pretty
+    , process
+    , containers
+    , array
+    , mtl
+    , transformers
+    -- internal
+    , blarney-core
