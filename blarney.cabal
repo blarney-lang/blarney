@@ -2,43 +2,47 @@ cabal-version: 2.4
 name: blarney
 version: 0.1.0.0
 
-library blarney-core
-  default-language: GHC2021
-  hs-source-dirs: Haskell
-  exposed-modules: Blarney.Core
-  other-modules:
-    Blarney.Core.BV
-    Blarney.Core.Bit
-    Blarney.Core.Bits
-    Blarney.Core.ClockReset
-    Blarney.Core.FShow
-    Blarney.Core.Flatten
-    Blarney.Core.IfThenElse
-    Blarney.Core.Interface
-    Blarney.Core.JList
-    Blarney.Core.Lookup
-    Blarney.Core.Module
-    Blarney.Core.NetHelpers
-    Blarney.Core.Prelude
-    Blarney.Core.Prim
-    Blarney.Core.RAM
-    Blarney.Core.RTL
-    Blarney.Core.Utils
-  build-depends:
-      base
-    , containers
-    , array
-    , mtl
-    , transformers
-
 library
   default-language: GHC2021
+  extensions:
+    BlockArguments
+    DataKinds
+    DeriveAnyClass
+    DuplicateRecordFields
+    MultiWayIf
+    NoImplicitPrelude
+    NoStarIsType
+    OverloadedRecordDot
+    OverloadedLabels
+    PartialTypeSignatures
+    RebindableSyntax
+    RecursiveDo
+    TypeFamilies
+  ghc-options:
+    -fno-cse
+    -fno-full-laziness
+    -Wno-partial-type-signatures
   hs-source-dirs: Haskell
   exposed-modules:
     Blarney
+    Blarney.BitPat
+    Blarney.BitScan
+    Blarney.ClientServer
+    Blarney.Connectable
+    Blarney.Interconnect
+    Blarney.Option
+    Blarney.PulseReg
+    Blarney.PulseWire
+    Blarney.QuadPortRAM
     Blarney.Queue
-    Blarney.Vector
+    Blarney.Recipe
     Blarney.SourceSink
+    Blarney.Stack
+    Blarney.Stmt
+    Blarney.Stream
+    Blarney.TaggedUnion
+    Blarney.TypeFamilies
+    Blarney.Vector
   other-modules:
     Blarney.Backend
     Blarney.Backend.SMT
@@ -47,14 +51,13 @@ library
     Blarney.Backend.SMT.Utils
     Blarney.Backend.Simulation
     Blarney.Backend.Verilog
-    Blarney.Connectable
     Blarney.Core
-    Blarney.Core.BV
     Blarney.Core.Bit
     Blarney.Core.Bits
+    Blarney.Core.BV
     Blarney.Core.ClockReset
-    Blarney.Core.FShow
     Blarney.Core.Flatten
+    Blarney.Core.FShow
     Blarney.Core.IfThenElse
     Blarney.Core.Interface
     Blarney.Core.JList
@@ -82,15 +85,12 @@ library
     Blarney.Netlist.Passes.Types
     Blarney.Netlist.Passes.Utils
     Blarney.Netlist.Passes.ZeroWidthNetIgnore
-    Blarney.Option
-    Blarney.Stream
   build-depends:
-      base
+      array
+    , base
+    , containers
+    , ghc-prim
+    , mtl
     , pretty
     , process
-    , containers
-    , array
-    , mtl
     , transformers
-    -- internal
-    , blarney-core
