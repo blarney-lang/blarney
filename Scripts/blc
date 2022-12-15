@@ -35,15 +35,21 @@ if [ `basename $0` == "blci" ]; then
   GHC="ghci"
   OPT=""
 fi
-
-EXTS="-XScopedTypeVariables -XDataKinds -XTypeOperators -XTypeFamilies"
-EXTS="$EXTS -XBinaryLiterals -XNoImplicitPrelude -XFlexibleContexts"
-EXTS="$EXTS -XRebindableSyntax -XPartialTypeSignatures -XDeriveGeneric"
-EXTS="$EXTS -XDeriveAnyClass -XRecursiveDo -XBlockArguments"
-EXTS="$EXTS -XNumericUnderscores -XTypeApplications"
-EXTS="$EXTS -XDuplicateRecordFields -XRankNTypes"
-EXTS="$EXTS -XNoStarIsType -XMultiWayIf -XOverloadedRecordDot"
-EXTS="$EXTS -XOverloadedLabels"
+EXTS="-XGHC2021 \
+      -XBlockArguments \
+      -XDataKinds \
+      -XDeriveAnyClass \
+      -XDuplicateRecordFields \
+      -XMultiWayIf \
+      -XNoImplicitPrelude \
+      -XNoStarIsType \
+      -XOverloadedRecordDot \
+      -XOverloadedLabels \
+      -XPartialTypeSignatures \
+      -XRebindableSyntax \
+      -XRecursiveDo \
+      -XTypeFamilies \
+     "
 WARN="-Wno-partial-type-signatures"
 FLAGS="-fno-cse -fno-full-laziness"
 if [ "$USE_NAMER_PLUGIN" = "YES" ]; then
