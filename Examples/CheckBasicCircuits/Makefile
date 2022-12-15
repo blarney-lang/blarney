@@ -1,6 +1,5 @@
-.PHONEY: all
-all:
-	blc $(BLC_FLAGS) CheckBasicCircuits.hs
+BLARNEY_ROOT ?= $(realpath ../../)
 
-clean:
-	rm -rf *.o *.hi CheckBasicCircuits CheckBasicCircuits-SMT
+SRCS = CheckBasicCircuits.hs
+
+include $(BLARNEY_ROOT)/Examples/blarneyTest.mk

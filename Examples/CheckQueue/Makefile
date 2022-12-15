@@ -1,6 +1,5 @@
-.PHONY: all
-all:
-	blc $(BLC_FLAGS) CheckQueue.hs -cpp
+BLARNEY_ROOT ?= $(realpath ../../)
 
-clean:
-	rm -rf *.o *.hi CheckQueue CheckQueue-SMT
+SRCS = CheckQueue.hs
+
+include $(BLARNEY_ROOT)/Examples/blarneyTest.mk

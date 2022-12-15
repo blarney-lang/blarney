@@ -111,7 +111,8 @@ sub()
 ################################################################################
 
 if [ -z "$BLARNEY_ROOT" ]; then
-  echo Please set the BLARNEY_ROOT environment variable
+  BLARNEY_DIR=$(dirname -- "$0")/../
+  export BLARNEY_ROOT=$(realpath -- "$BLARNEY_DIR")
 fi
 BLARNEY_TESTING_ROOT="${BLARNEY_TESTING_ROOT:-$BLARNEY_ROOT}"
 

@@ -1,6 +1,5 @@
-.PHONEY: all
-all:
-	blc $(BLC_FLAGS) CheckAdder.hs
+BLARNEY_ROOT ?= $(realpath ../../)
 
-clean:
-	rm -rf *.o *.hi CheckAdder CheckAdder-SMT
+SRCS = CheckAdder.hs
+
+include $(BLARNEY_ROOT)/Examples/blarneyTest.mk

@@ -4,6 +4,7 @@ endif
 
 include $(BLARNEY_ROOT)/blarneyDirs.mk
 
+BLC = $(BLARNEY_ROOT)/Scripts/blc
 GENS = $(basename $(SRCS))
 
 all: $(GENS)
@@ -16,7 +17,7 @@ all: $(GENS)
 	./$< --simulate
 
 %: %.hs
-	blc --make -j -hidir $(HI_DIR) -odir $(O_DIR) $(BLC_FLAGS) $<
+	BLARNEY_ROOT=$(BLARNEY_ROOT) $(BLC) --make -j -hidir $(HI_DIR) -odir $(O_DIR) $(BLC_FLAGS) $<
 
 .SECONDARY: $(addsuffix -Verilog, $(GEN))
 %-Verilog: %
@@ -24,7 +25,7 @@ all: $(GENS)
 
 .PHONY: clean mrproper
 clean:
-	rm -rf $(GENS) *Verilog
+	rm -rf $(GENS) *-Verilog *-SMT
 
 mrproper: clean
 	rm -rf $(BUILD_DIR)

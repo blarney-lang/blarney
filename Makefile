@@ -1,6 +1,4 @@
-ifndef BLARNEY_ROOT
-$(error "the BLARNEY_ROOT environment variable must be set")
-endif
+BLARNEY_ROOT ?= $(realpath .)
 
 include $(BLARNEY_ROOT)/blarneyDirs.mk
 

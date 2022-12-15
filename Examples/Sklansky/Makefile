@@ -1,6 +1,5 @@
-.PHONEY: all
-all:
-	blc $(BLC_FLAGS) Sklansky.hs
+BLARNEY_ROOT ?= $(realpath ../../)
 
-clean:
-	rm -rf *.o *.hi Sklansky Sklansky-Verilog Sklansky-SMT2
+SRCS = Sklansky.hs
+
+include $(BLARNEY_ROOT)/Examples/blarneyTest.mk
