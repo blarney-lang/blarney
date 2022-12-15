@@ -2,6 +2,11 @@ cabal-version: 2.4
 name: blarney
 version: 0.1.0.0
 
+flag enable-namer-plugin
+  description: Enable namer plugin
+  manual: True
+  default: False
+
 library
   default-language: GHC2021
   extensions:
@@ -29,6 +34,7 @@ library
     Blarney.BitScan
     Blarney.ClientServer
     Blarney.Connectable
+    Blarney.Core.Module
     Blarney.Interconnect
     Blarney.Option
     Blarney.PulseReg
@@ -62,7 +68,6 @@ library
     Blarney.Core.Interface
     Blarney.Core.JList
     Blarney.Core.Lookup
-    Blarney.Core.Module
     Blarney.Core.NetHelpers
     Blarney.Core.Opts
     Blarney.Core.Prelude
@@ -94,3 +99,8 @@ library
     , pretty
     , process
     , transformers
+  if flag(enable-namer-plugin)
+    build-depends:
+      blarney-plugins-namer
+    ghc-options:
+      -fplugin BlarneyPlugins.Namer
