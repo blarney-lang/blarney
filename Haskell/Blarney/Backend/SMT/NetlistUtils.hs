@@ -201,6 +201,11 @@ showPrim (Mux n wsel w) (sel:ins) = mux $ zip [0..] ins
     mux ((i,e):xs) = applyOp (text "ite")
                              [ applyOp (text "=") [sel, int2bv wsel i]
                              , e, mux xs ]
+showPrim (MergeWrites MStratOr n w) ins = applyOp (text "bvor") (gather ins)
+  where
+    f en val = applyOp (text "ite") [ bvIsTrue en, val, int2bv w 0 ]
+    gather [] = []
+    gather (en:val:rest) = f en val : gather rest
 -- unsupported primitives
 showPrim p ins = error $
   "Blarney.Backend.SMT.NetlistUtils: cannot showPrim Prim '" ++ show p ++ "'"
