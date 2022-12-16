@@ -181,7 +181,8 @@ twoSort (2,1) = (1,2)
 
 The in-Haskell simulator is much slower than Verilator, but can be
 more convenient for small designs.  It is currently an experimental
-feature.
+feature; using Verilator is the recommended method of simulating
+Blarney designs.
 
 === Bubble sort
 
