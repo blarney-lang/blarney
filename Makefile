@@ -1,6 +1,4 @@
-ifndef BLARNEY_ROOT
-$(error "the BLARNEY_ROOT environment variable must be set")
-endif
+BLARNEY_ROOT ?= $(realpath .)
 
 include $(BLARNEY_ROOT)/blarneyDirs.mk
 
@@ -31,7 +29,7 @@ ghc-build:
         $(BLARNEY_TOP_MODULES_SRC)
 
 blc-build:
-	blc --make -j \
+	BLARNEY_ROOT=$(BLARNEY_ROOT) blc --make -j \
         -hidir $(HI_DIR) -odir $(O_DIR) -i$(SRC_DIR) \
         $(BLARNEY_TOP_MODULES_SRC)
 

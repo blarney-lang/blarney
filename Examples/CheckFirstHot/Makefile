@@ -1,6 +1,5 @@
-.PHONEY: all
-all:
-	blc $(BLC_FLAGS) CheckFirstHot.hs
+BLARNEY_ROOT ?= $(realpath ../../)
 
-clean:
-	rm -rf *.o *.hi CheckFirstHot prop_firstHot.smt2
+SRCS = CheckFirstHot.hs
+
+include $(BLARNEY_ROOT)/Examples/blarneyTest.mk

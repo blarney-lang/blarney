@@ -19,13 +19,13 @@ Blarney is a Haskell library for hardware description that builds a
 range of HDL abstractions on top of a small set of pure functional
 circuit primitives.  It is a modern variant of
 http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.110.5587&rep=rep1&type=pdf[Lava]
-with Verilog and SMT backends.  Some aspects of the library are also
-inspired by https://github.com/B-Lang-org/bsc[Bluespec], such as
-first-class actions and method-based interfaces.  Applications of
+using many of the latest features of GHC.  Some aspects of the library
+are also inspired by https://github.com/B-Lang-org/bsc[Bluespec], such
+as first-class actions and method-based interfaces.  Applications of
 Blarney include https://github.com/CTSRD-CHERI/SIMTight[SIMTight] (a
 CHERI-enabled RISC-V GPGPU) and
-https://github.com/blarney-lang/actora[Actora] (a stack machine with
-a compiler for an Erlang-like language).  Below, we introduce the
+https://github.com/blarney-lang/actora[Actora] (a stack processor with a
+compiler for an Erlang-like language).  Below, we introduce the
 library by example, supplementing the
 http://blarney-lang.github.io/blarney/index.html[Haddock docs].
 
@@ -45,7 +45,7 @@ On Ubuntu 20.04, we can do:
 
 [source, shell]
 ----
-$ sudo apt install verilator
+$ sudo apt install verilator libgmp-dev
 ----
 
 For GHC 9.2.1 or later, https://www.haskell.org/ghcup/[ghcup] can be
@@ -53,24 +53,27 @@ used.
 
 == Quick start
 
-Recursively clone the repo and set the `BLARNEY_ROOT` environment
-variable to point to it, and add the `Scripts` directory to your
-`PATH`:
+Recursively clone the repo:
 
 [source, shell]
 ----
 $ git clone --recursive https://github.com/blarney-lang/blarney
-$ export BLARNEY_ROOT=$(pwd)/blarney
-$ export PATH=$PATH:$BLARNEY_ROOT/Scripts
 ----
 
-To run an example using Blarney's in-Haskell simulator:
+To simulate the
+https://github.com/blarney-lang/blarney/tree/master/Examples/Sorter/Sorter.hs[Sorter]
+example from Blarney's
+https://github.com/blarney-lang/blarney/tree/master/Examples[Examples]
+directory:
 
 [source, shell]
 ----
-$ cd Examples/Sorter
-$ make
-$ ./Sorter --simulate
+$ cd blarney/Examples/Sorter
+$ make                  # Build the example using GHC
+$ ./Sorter              # Generate Verilog for the example
+$ cd Sorter-Verilog     # Go to the generated Verilog
+$ make                  # Compile the generated Verilog using Verilator
+$ ./Sorter              # Simulate the generated Verilog
 ----
 
 You should see the output:
@@ -79,21 +82,6 @@ You should see the output:
 sort [3,4,1,0,2] = [0,1,2,3,4]
 ----
 
-To generate Verilog for an example, and then simulate the Verilog
-using Verilator, omit the `--simulate` option and then run the
-generated makefile:
-
-[source, shell]
-----
-$ ./Sorter             # Run the Verilog generator
-$ cd Sorter-Verilog
-$ make                 # Compile the generated Verilog using Verilator
-$ ./Sorter             # Simulate the generated Verilog
-----
-
-You should see the same output as before.  Using Verilator is the
-recommended approach for simulating Blarney designs.
-
 To run the regression test suite:
 
 [source, shell]
@@ -101,6 +89,10 @@ To run the regression test suite:
 $ cd Test
 $ ./test.sh --run-all
 ----
+
+To start development of your own Blarney application or library, take
+a look at the
+(https://github.com/blarney-lang/template-project/)[Blarney template project].
 
 == Blarney by example
 
@@ -145,20 +137,9 @@ main :: IO ()
 main = writeVerilogTop top "top" "/tmp/twoSort/"
 ----
 
-Assuming the above code is in a file named `Sorter.hs`, it can be
-compiled at the command-line using
-
-[source, shell]
-----
-$ blc Sorter.hs
-----
-
-where `blc` stands for _Blarney compiler_.  This is just a script
-(from Blarney's `Scripts` directory) that invokes GHC with the
-appropriate compiler flags.  Running the resulting executable
-`./Sorter` will produce Verilog in the `/tmp/twoSort` directory,
-including a makefile to build a Verilator simulator.  The simulator
-can be built and run as follows.
+Compiling this and running the resulting executable will produce
+Verilog in the `/tmp/twoSort` directory, including a makefile to build
+a Verilator simulator.  The simulator can be built and run as follows.
 
 [source, shell]
 ----
@@ -1210,8 +1191,15 @@ http://blarney-lang.github.io/blarney/Blarney-Core-Module.html#v:withName[withNa
 a Blarney primitive that introduces name information inside `m` This simple
 approach captures quite a lot of useful names.
 
-The plugin is _completely optional_, and disabled by default.  To enable it,
-first install using cabal
+The plugin is _completely optional_, and disabled by default.  To
+enable it, use the cabal flag `enable-namer-plugin` as demonstrated in
+the Blarney template project's
+https://github.com/blarney-lang/template-project/blob/master/cabal.project[cabal.project]
+file.
+
+If you're using `blc` rather than cabal for building your code (or you
+want to run `test.sh --plugin-namer`), then you need to install the
+plugin using cabal:
 
 [source, shell]
 ----
@@ -1219,10 +1207,10 @@ cd Haskell/BlarneyPlugins/Namer
 cabal v1-install
 ----
 
-and then pass the `--enable-namer-plugin` flag to `blc`.
+You can then pass the `--enable-namer-plugin` flag to `blc`.
 
-To further improve the readability of generated code, we can also pass the
-`--enable-name-prop` and `--enable-simplifier` options to our circuit
+To further improve the readability of generated code, you can also pass the
+`--enable-name-prop` and `--enable-simplifier` options to the circuit
 generator.  This will enable the (experimental) name propagation and netlist
 simplification passes respectively.
 

@@ -42,7 +42,7 @@ main :: IO ()
 main = do
   -- path to script output directory
   cwd <- getCurrentDirectory
-  let smtDir = cwd ++ "/Sklansky-SMT2/"
+  let smtDir = cwd ++ "/Sklansky-SMT/"
   -- generate smt2 scripts
   let verifyConf = dfltVerifyConf
   writeSMTScript verifyConf (prop_scan @4 @4 sklansky (+))
