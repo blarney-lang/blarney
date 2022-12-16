@@ -18,9 +18,9 @@ sklansky op xs = ys' ++ map (last ys' `op`) zs'
     zs' = sklansky op zs
 
 -- | Broken Sklansky implementation
-doom_sklansky :: (a -> a -> a) -> [a] -> [a]
-doom_sklansky op [x] = [x]
-doom_sklansky op xs = ys' ++ map (head ys' `op`) zs'
+buggy_sklansky :: (a -> a -> a) -> [a] -> [a]
+buggy_sklansky op [x] = [x]
+buggy_sklansky op xs = ys' ++ map (head ys' `op`) zs'
   where
     (ys, zs) = halve xs
     ys' = sklansky op ys
@@ -31,8 +31,8 @@ prop_scan :: forall n m.
              ((Bit n -> Bit n -> Bit n) -> [Bit n] -> [Bit n])
           -> (Bit n -> Bit n -> Bit n)
           -> V.Vec m (Bit n)
-          -> Bit 1
-prop_scan sklansky_imp op ins = equal
+          -> Action ()
+prop_scan sklansky_imp op ins = assert equal "prop_scan"
   where
     res0 = sklansky_imp op (V.toList ins)
     res1 = scanl1 op (V.toList ins)
@@ -47,7 +47,7 @@ main = do
   let verifyConf = dfltVerifyConf
   writeSMTScript verifyConf (prop_scan @4 @4 sklansky (+))
                  "goodSklansky4_4" smtDir
-  writeSMTScript verifyConf (prop_scan @4 @4 doom_sklansky (+))
+  writeSMTScript verifyConf (prop_scan @4 @4 buggy_sklansky (+))
                  "brokenSklansky4_4" smtDir
   -- helper usage message
   putStrLn $ "SMT2 scripts generated under " ++ smtDir

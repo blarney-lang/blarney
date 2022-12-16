@@ -4,6 +4,7 @@ all:
 clean:
 	make -C CheckAdder clean
 	make -C CheckBasicCircuits clean
+	make -C CheckSklansky clean
 	make -C CheckQueue clean
 	make -C Background clean
 	make -C BasicRTL clean
@@ -25,7 +26,6 @@ clean:
 	make -C Queue clean
 	make -C RAM clean
 	make -C RAMQuad clean
-	make -C Sklansky clean
 	make -C Sorter clean
 	make -C SourceSink clean
 	make -C Stack clean

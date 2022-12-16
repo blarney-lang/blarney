@@ -1,5 +1,5 @@
 BLARNEY_ROOT ?= $(realpath ../../)
 
-SRCS = Sklansky.hs
+SRCS = CheckSklansky.hs
 
 include $(BLARNEY_ROOT)/Examples/blarneyTest.mk
