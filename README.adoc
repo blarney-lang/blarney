@@ -89,7 +89,9 @@ To start development of your own Blarney application or library, take
 a look at the
 https://github.com/blarney-lang/template-project/[Blarney template project].
 
-== Applications of Blarney
+== Applications
+
+Our current list of applications developed using Blarney:
 
 * https://github.com/blarney-lang/actora/[Actora]: A 3-stage stack
 processor that runs code written a subset of Erlang. It has higher
