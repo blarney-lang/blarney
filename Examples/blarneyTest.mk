@@ -17,7 +17,7 @@ all: $(GENS)
 	./$< --simulate
 
 %: %.hs
-	BLARNEY_ROOT=$(BLARNEY_ROOT) $(BLC) --make -j -hidir $(HI_DIR) -odir $(O_DIR) $(BLC_FLAGS) $<
+	BLARNEY_ROOT=$(BLARNEY_ROOT) $(BLC) --make -hidir $(HI_DIR) -odir $(O_DIR) $(BLC_FLAGS) $<
 
 .SECONDARY: $(addsuffix -Verilog, $(GEN))
 %-Verilog: %

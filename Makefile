@@ -23,13 +23,13 @@ BLARNEY_TOP_MODULES_SRC += $(SRC_DIR)/Blarney/Vector.hs
 all: ghc-build blc-build
 
 ghc-build:
-	ghc --make -j \
+	ghc --make \
         -hidir $(HI_DIR) -odir $(O_DIR) -i$(SRC_DIR) \
         -Wno-partial-type-signatures \
         $(BLARNEY_TOP_MODULES_SRC)
 
 blc-build:
-	BLARNEY_ROOT=$(BLARNEY_ROOT) blc --make -j \
+	BLARNEY_ROOT=$(BLARNEY_ROOT) blc --make \
         -hidir $(HI_DIR) -odir $(O_DIR) -i$(SRC_DIR) \
         $(BLARNEY_TOP_MODULES_SRC)
 
