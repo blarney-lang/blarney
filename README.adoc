@@ -21,14 +21,9 @@ circuit primitives.  It is a modern variant of
 http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.110.5587&rep=rep1&type=pdf[Lava]
 using many of the latest features of GHC.  Some aspects of the library
 are also inspired by https://github.com/B-Lang-org/bsc[Bluespec], such
-as first-class actions and method-based interfaces.  Applications of
-Blarney include https://github.com/CTSRD-CHERI/SIMTight[SIMTight] (a
-CHERI-enabled RISC-V GPGPU) and
-https://github.com/blarney-lang/actora[Actora] (a stack processor with a
-compiler for an Erlang-like language).  Below, we introduce the
-library by example, supplementing the
+as first-class actions and method-based interfaces.  Below, we
+introduce the library by example, supplementing the
 http://blarney-lang.github.io/blarney/index.html[Haddock docs].
-
 
 [discrete]
 == Contents
@@ -93,6 +88,18 @@ $ ./test.sh --run-all
 To start development of your own Blarney application or library, take
 a look at the
 https://github.com/blarney-lang/template-project/[Blarney template project].
+
+== Applications of Blarney
+
+* https://github.com/blarney-lang/actora/[Actora]: A 3-stage stack
+processor that runs code written a subset of Erlang. It has higher
+performance density than Intel's register-based NIOS-II core for
+compiled Erlang code.
+
+* https://github.com/CTSRD-CHERI/SIMTight/[SIMTight]: A
+https://cheri-cpu.org[CHERI]-enabled
+RISC-V GPGPU with dynamic scalarisation features and high performance
+density on Intel's Stratix 10 FPGA.
 
 == Blarney by example
 
@@ -1149,17 +1156,6 @@ Woodruff for suggesting this feature!
 For a fuller example of the `BitScan` module, see the Pebbles RV32I
 https://github.com/blarney-lang/pebbles/blob/master/src/Pebbles/Instructions/RV32_I.hs[instruction decoder].
 
-=== CPUs
-
-A few processor cores have been implemented in Blarney:
-
-* https://github.com/blarney-lang/blarney/blob/master/Examples/CPU/CPU.hs[Simple]:
-4-stage 8-bit CPU, with just 4 instructions, for learning.
-* https://github.com/blarney-lang/pebbles/[Pebbles]:
-RISC-V CPU+GPU using plugable pipelines.
-* https://github.com/blarney-lang/actora/[Actora]: 3-stage stack
-machine that runs code written a subset of Erlang.
-
 === Namer plugin
 
 One of the classic limitations of Lava is that identifier names are lost when
@@ -1249,7 +1245,8 @@ To make this type a member of the `Bits` class, we have suffixed it with
 `derving (Generic, Bits)`.  The generic deriving mechanism for `Bits` does not
 support _sum types_: there is no way to convert a bit-vector (run-time circuit
 value) to a sum type (elaboration-time value) using the circuit primitives
-provided by Blarney (however, see <<tagged-unions, tagged unions>>).
+provided by Blarney. However, see <<tagged-unions, tagged unions>> for
+an alternative way to capture sum types in Blarney.
 
 === Interface
 
@@ -1406,4 +1403,3 @@ class ToSink a b | a -> b where
 toStream :: ToSource a b => a -> Source b
 toStream = toSource
 ----
-
