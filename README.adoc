@@ -92,7 +92,7 @@ $ ./test.sh --run-all
 
 To start development of your own Blarney application or library, take
 a look at the
-(https://github.com/blarney-lang/template-project/)[Blarney template project].
+https://github.com/blarney-lang/template-project/[Blarney template project].
 
 == Blarney by example
 
