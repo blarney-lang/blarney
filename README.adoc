@@ -1351,7 +1351,7 @@ for the <<Option-type, Option>> type.
 
 [source, haskell]
 ----
-instace FShow a => FShow (Option a) where
+instance FShow a => FShow (Option a) where
   fshow opt = formatCond (inv opt.valid) (fshow "none")
            <> formatCond opt.valid (fshow "some " <> fshow opt.val)
 ----
