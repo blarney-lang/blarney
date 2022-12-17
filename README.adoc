@@ -1095,6 +1095,49 @@ because
 https://blarney-lang.github.io/blarney/Blarney-Core-Prelude.html#v:dontCare[dontCare]
 has type `forall a. Bits a => a`.
 
+=== Enumeration types
+
+As the <<Bits>> class does <<Bits, not support Haskell sum types>>, we
+need a different way to capture enum types that will be stored
+as circuit values.  We suggest that enum types such as
+
+[source, haskell]
+----
+data Colour = Red | Green | Blue
+----
+
+are simply expressed as:
+
+[source, haskell]
+----
+data Colour = Colour (Bit 2) deriving (Generic, Bits, Cmp)
+red         = Colour 0
+green       = Colour 1
+blue        = Colour 2
+----
+
+This has the disadvantage of having to express how many bits are used
+to represent the type, and how its data constructors are encoded,
+although sometimes specifying these details is desiable, e.g. when
+interfacing to lower-level languages such as Verilog.  For an
+alternative approach that does not suffer from this disadvantage, see
+<<tagged-unions, tagged unions>>.
+
+To display values of type `Colour`, we can simply add <<FShow>> to the
+deriving list.  However, if we want to see the constructor names
+rather than the low-level representation, we can provide an instance
+along the following lines.
+
+[source, haskell]
+----
+instance FShow Colour where
+  fshow col = formatCond (col .==. red)   (fshow "red")
+           <> formatCond (col .==. green) (fshow "green")
+           <> formatCond (col .==. blue)  (fshow "blue")
+----
+
+For further details, see the <<FShow>> class.
+
 === Bit selection and lookup
 
 Bit selection operators are used to extract a subset of bits out of a
