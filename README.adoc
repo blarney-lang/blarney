@@ -48,7 +48,7 @@ used.
 
 == Quick start
 
-Recursively clone the repo:
+To clone the repo:
 
 [source, shell]
 ----
@@ -81,7 +81,7 @@ To run the regression test suite:
 
 [source, shell]
 ----
-$ cd Test
+$ cd blarney/Test
 $ ./test.sh --run-all
 ----
 
@@ -318,7 +318,7 @@ top = do
 
 This example introduces a number of new library functions: `makeReg`
 creates a register, initialised to the given value; the `val` field
-yeilds the current value of the register; and `when` allows
+yields the current value of the register; and `when` allows
 conditional actions to be introduced.  We can use if-then-else in an
 `Action` context.  For example, the final three lines above could have
 been written as:
@@ -1051,6 +1051,50 @@ exampleAction = do
     display "Right val: " r
 ----
 
+=== Option type
+
+The 
+http://blarney-lang.github.io/blarney/Blarney-Option.html#t:Option[Option]
+type, defined in the
+http://blarney-lang.github.io/blarney/Blarney-Option.html[Blarney.Option]
+module, is a commonly used Blarney type, similar to `Maybe` in
+Haskell except defined as a product type rather than a sum type:
+
+[source, haskell]
+----
+data Option a =
+  Option {
+    valid :: Bit 1
+  , val :: a
+  }
+----
+
+It captures a value that may or may not be valid. Our use of a product
+type is motiviated by a few reasons: (1) the <<Bits>> class does
+<<Bits, not support Haskell sum types>>; (2) <<tagged-unions, tagged
+unions>> feel overkill in this case as the `valid` field is only a
+single bit; and (3) the nature of hardware is to always compute a
+value and then to select whether or not to use it, which corresponds
+with the use of a product type.
+
+Helper functions are provided for constructing optional values:
+
+[source, haskell]
+----
+-- Construct an optional value with no value present
+none :: Bits a => Option a
+none = Option { valid = false, val = dontCare }
+
+-- Construct an optional value with a value present
+some :: a -> Option a
+some a = Option { value = true, val = a }
+----
+
+Note that the definition of `none` requires a <<Bits>> constraint
+because
+https://blarney-lang.github.io/blarney/Blarney-Core-Prelude.html#v:dontCare[dontCare]
+has type `forall a. Bits a => a`.
+
 === Bit selection and lookup
 
 Bit selection operators are used to extract a subset of bits out of a
@@ -1089,9 +1133,10 @@ upperNibble x = unsafeSlice (7, 4) x
 ----
 
 The argument to `unsafeAt` could be out of range, and the result of
-`unsafeSlice` could have a different width to that implied by the range.  Such
-cases will lead to confusing error messages, hence the "unsafe" prefix on the
-function names.
+`unsafeSlice` could have a different width to that implied by the
+range.  Such cases will not be caught by the type checker and will
+lead to error messages at circuit generation time, hence the "unsafe"
+prefix on the function names.
 
 Finally, for circuit-level indicies of type `Bit n`, the generic lookup
 operator `!` can be used:
@@ -1105,7 +1150,7 @@ getBit x i = x!i
 
 Blarney's generic lookup operator `x!i` returns the element of `x` at
 index `i`, and works for many different types of `x` and `i`.  See
-<<Lookup>> for more details.
+the <<Lookup>> class for more details.
 
 === Bit-string pattern matching
 
@@ -1158,60 +1203,6 @@ Scattered immediates appear a lot in the RISC-V specification.  Thanks to Jon
 Woodruff for suggesting this feature!
 For a fuller example of the `BitScan` module, see the Pebbles RV32I
 https://github.com/blarney-lang/pebbles/blob/master/src/Pebbles/Instructions/RV32_I.hs[instruction decoder].
-
-=== Namer plugin
-
-One of the classic limitations of Lava is that identifier names are lost when
-the netlist is generated.  In particular, this is problematic when we want to
-analyse, say, the critical-path of our circuit using a third-party tool, but
-there is no way to map the netlist names reported by the tool back to the Lava
-names in the original description.
-
-Blarney provides a solution to this problem in the form of the 
-https://github.com/blarney-lang/blarney/blob/master/Haskell/BlarneyPlugins/Namer[Namer plugin].
-This is a simple GHC plugin (around 150 lines of code) that looks for monadic
-bindings of the form
-
-[source, haskell]
-----
-  x <- m
-----
-
-where `m` has type `Module a` for any `a`, and automatically rewrites the
-binding as
-
-[source, haskell]
-----
-  x <- withName "x" m
-----
-
-where
-http://blarney-lang.github.io/blarney/Blarney-Core-Module.html#v:withName[withName] is
-a Blarney primitive that introduces name information inside `m` This simple
-approach captures quite a lot of useful names.
-
-The plugin is _completely optional_, and disabled by default.  To
-enable it, use the cabal flag `enable-namer-plugin` as demonstrated in
-the Blarney template project's
-https://github.com/blarney-lang/template-project/blob/master/cabal.project[cabal.project]
-file.
-
-If you're using `blc` rather than cabal for building your code (or you
-want to run `test.sh --plugin-namer`), then you need to install the
-plugin using cabal:
-
-[source, shell]
-----
-cd Haskell/BlarneyPlugins/Namer
-cabal v1-install
-----
-
-You can then pass the `--enable-namer-plugin` flag to `blc`.
-
-To further improve the readability of generated code, you can also pass the
-`--enable-name-prop` and `--enable-simplifier` options to the circuit
-generator.  This will enable the (experimental) name propagation and netlist
-simplification passes respectively.
 
 == Type class overview
 
@@ -1346,6 +1337,24 @@ formatHex :: Int -> Bit n -> Format
 ----
 
 The `FShow` instance for `Bit n` uses decimal format with no padding.
+Another useful format combinator is `formatCond cond fmt` which
+returns `fmt` if `cond` is true, and `mempty` otherwise:
+
+[source, haskell]
+----
+-- Conditional format (empty of condition fails)
+formatCond :: Bit 1 -> Format -> Format
+----
+
+For example, `formatCond` would allow the following `FShow` instance
+for the <<Option-type, Option>> type.
+
+[source, haskell]
+----
+instace FShow a => FShow (Option a) where
+  fshow opt = formatCond (inv opt.valid) (fshow "none")
+           <> formatCond opt.valid (fshow "some " <> fshow opt.val)
+----
 
 === Cmp
 
@@ -1406,3 +1415,59 @@ class ToSink a b | a -> b where
 toStream :: ToSource a b => a -> Source b
 toStream = toSource
 ----
+
+== Optional GHC plugins
+
+=== Namer plugin
+
+One of the classic limitations of Lava is that identifier names are lost when
+the netlist is generated.  In particular, this is problematic when we want to
+analyse, say, the critical-path of our circuit using a third-party tool, but
+there is no way to map the netlist names reported by the tool back to the Lava
+names in the original description.
+
+Blarney provides a solution to this problem in the form of the 
+https://github.com/blarney-lang/blarney/blob/master/Haskell/BlarneyPlugins/Namer[Namer plugin].
+This is a simple GHC plugin (around 150 lines of code) that looks for monadic
+bindings of the form
+
+[source, haskell]
+----
+  x <- m
+----
+
+where `m` has type `Module a` for any `a`, and automatically rewrites the
+binding as
+
+[source, haskell]
+----
+  x <- withName "x" m
+----
+
+where
+http://blarney-lang.github.io/blarney/Blarney-Core-Module.html#v:withName[withName] is
+a Blarney primitive that introduces name information inside `m`. This simple
+approach captures quite a lot of useful names.
+
+The plugin is _completely optional_, and disabled by default.  To
+enable it, use the cabal flag `enable-namer-plugin` as demonstrated in
+the Blarney template project's
+https://github.com/blarney-lang/template-project/blob/master/cabal.project[cabal.project]
+file.
+
+If you're using `blc` rather than cabal for building your code (or you
+want to run `test.sh --plugin-namer`), then you need to install the
+plugin using cabal:
+
+[source, shell]
+----
+cd Haskell/BlarneyPlugins/Namer
+cabal v1-install
+----
+
+You can then pass the `--enable-namer-plugin` flag to `blc`.
+
+To further improve the readability of generated code, you can also pass the
+`--enable-name-prop` and `--enable-simplifier` options to the circuit
+generator.  This will enable the (experimental) name propagation and netlist
+simplification passes respectively.
