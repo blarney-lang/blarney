@@ -24,13 +24,18 @@ module Blarney.Backend (
   -- * Simulation backend
 , module Blarney.Backend.Simulation
 , simulate
+, eval
+, evalFor
 ) where
 
 import Prelude
 import Data.Map ((!), toList, fromList)
 
+import Blarney.Core.Bit
 import Blarney.Core.Interface (Modular(..), makeModule)
+import Blarney.Core.IfThenElse
 import Blarney.Core.Flatten (ToNetlist(..))
+import Blarney.Core.FShow
 import Blarney.Core.Module
 import Blarney.Netlist
 
@@ -114,3 +119,21 @@ simulate circuit = do
   runSim topSim mempty
   return ()
   where topSimName = "circuit under simulation"
+
+-- | Display the value of the given expression for 1 cycle
+eval :: FShow a => a -> IO ()
+eval expr =
+  simulate do
+    always do
+      display expr
+      finish
+
+-- | Display the value of the given expression for n cycles
+evalFor :: FShow a => Int -> a -> IO ()
+evalFor n expr =
+  simulate do
+    count :: Reg (Bit 32) <- makeReg 1
+    always do
+      display expr
+      count <== count.val + 1
+      when (count.val .==. fromIntegral n) finish
