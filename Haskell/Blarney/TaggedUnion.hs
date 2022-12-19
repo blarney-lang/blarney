@@ -122,7 +122,7 @@ instance IsTaggedUnion (TaggedUnion fields) => Bits (TaggedUnion fields) where
     Log2Ceil (Length fields) + MaxMemberWidth fields
   sizeOf u = log2ceil (length members) + maximum (map snd members)
     where members = getMembers u
-  pack u = FromBV $ concatBV u.memberVal u.memberIdx
+  pack u = FromBV $ concatBV u.memberIdx u.memberVal
   unpack inp =
     TaggedUnion {
       memberIdx = selectBV (msbIdx-1, maxMemberWidth) (toBV inp)
