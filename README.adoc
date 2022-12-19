@@ -1078,8 +1078,9 @@ newtype Either a b =
 
 All of the API examples above continue to work unmodified.  The only
 caveat is that the user must enable `UndecidableInstances` for this to
-work, though it is perfectly safe to do so (termination of type
-checking is unaffected by this).
+work. This is safe (with regard to termination of type checking) as
+long as the type is not recursive (which would imply a non statically
+sized type, not storable in hardware).
 
 === Option type
 
