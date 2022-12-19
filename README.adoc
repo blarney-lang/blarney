@@ -1051,6 +1051,26 @@ exampleAction = do
     display "Right val: " r
 ----
 
+Above, we have used a type synonym above to define `Either`, but we
+could have also created a new type:
+
+[source, haskell]
+----
+newtype Either a b =
+  Either (
+    TaggedUnion [
+      "left"  ::: a
+    , "right" ::: b
+    ]
+  )
+  deriving newtype (IsTaggedUnion, Bits, FShow)
+----
+
+All of the API examples above continue to work unmodified.  The only
+caveat is that the user must enable `UndecidableInstances` for this to
+work, though it is perfectly safe to do so (termination of type
+checking is unaffected by this).
+
 === Option type
 
 The 
