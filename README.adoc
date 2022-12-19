@@ -1266,12 +1266,66 @@ an alternative way to capture sum types in Blarney.
 === Interface
 
 Any type in the
-http://blarney-lang.github.io/blarney/Blarney-Core-Interface.html[Interface] class can
-be used as a module input or output when doing <<modular-compilation, modular
-compilation>>.  Furthermore, collections of interfaces can be indexed by
-circuit-time values using the `!` operator.  To illustrate, here is an example
-circuit to split a stream of <<bits, MemReq>> into four streams, using the
-lower two bits of the address to decide which output stream to use.
+http://blarney-lang.github.io/blarney/Blarney-Core-Interface.html[Interface]
+class can be used as a module input or output when doing
+<<modular-compilation, modular code generation>> for low-level
+languages such as Verilog.
+
+[source, haskell]
+----
+class Interface a where
+  toIfc :: a -> (IfcTerm, IfcType)
+  fromIfc :: IfcTerm -> a
+----
+
+The `Interface` class supports generic deriving: just add `Interface`
+to the deriving clause for the datatype.  The automatic instance for
+`Interface` will use the field names of the data constructor as
+low-level port names.  Sometimes, it is desirable to have more control
+over the naming of low-levels ports.  In that case, a manual instance
+can be given.
+
+[source, haskell]
+----
+instance Interface MemReq where
+  toIfc req =
+    toPorts (portName "operation", req.memOp)
+            (portName "address",   req.memAddr)
+            (portName "data",      req.memData)
+  fromIfc ifc =
+    fromPorts \op addr dat ->
+      MemReq {
+        memOp   = op
+      , memAddr = addr
+      , memData = dat
+      }
+----
+
+Various information (not just names) can be specified regarding a
+port.  See the
+http://blarney-lang.github.io/blarney/Blarney-Core-Interface.html#v:PortInfo[PortInfo]
+structure and associated helper functions.
+
+=== Lookup
+
+The generic lookup operator `!` is provided by the
+http://blarney-lang.github.io/blarney/Blarney-Core-Lookup.html[Lookup] class.
+
+[source, haskell]
+----
+-- Index a collection 'c' of elements 'e' using index 'i'
+class Lookup c i e | c -> e where
+  (!) :: c -> i -> e
+----
+
+A wide range of combinations of types are supported.  The functional dependency
+`c -> e` allows the return type to be inferred from the collection type.
+
+Collections of <<Interface, interfaces>> can be indexed by
+circuit-time values using the `!` operator.  To illustrate, here is an
+example circuit to split a stream of <<bits, MemReq>> into four
+streams, using the lower two bits of the address to decide which
+output stream to use.
 
 [source, haskell]
 ----
@@ -1290,25 +1344,6 @@ split reqs = do
 
   return (map toStream queues)
 ----
-
-The `Interface` class supports generic deriving: just add `Interface` to the
-deriving clause for the datatype.  In the above example, `MemReq` is an
-`Interface`, and so too is `Queue a` for any `a` that is also an `Interface`.
-
-=== Lookup
-
-The generic lookup operator `!` is provided by the
-http://blarney-lang.github.io/blarney/Blarney-Core-Lookup.html[Lookup] class.
-
-[source, haskell]
-----
--- Index a collection 'c' of elements 'e' using index 'i'
-class Lookup c i e | c -> e where
-  (!) :: c -> i -> e
-----
-
-A wide range of combinations of types are supported.  The functional dependency
-`c -> e` allows the return type to be inferred from the collection type.
 
 === FShow
 
