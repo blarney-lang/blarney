@@ -39,3 +39,4 @@ clean:
 	rm -rf $(BUILD_DIR)
 	rm -rf Haskell/BlarneyPlugins/Namer/dist
 	make -C Examples clean
+	cabal clean

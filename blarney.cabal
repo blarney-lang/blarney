@@ -9,10 +9,11 @@ flag enable-namer-plugin
 
 library
   default-language: GHC2021
-  extensions:
+  default-extensions:
     BlockArguments
     DataKinds
     DeriveAnyClass
+    DerivingStrategies
     DuplicateRecordFields
     MultiWayIf
     NoImplicitPrelude

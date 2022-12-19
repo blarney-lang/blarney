@@ -1,3 +1,5 @@
+{-# LANGUAGE UndecidableInstances #-}
+
 import Blarney
 import Blarney.Option
 import Blarney.TaggedUnion
@@ -9,7 +11,17 @@ type MyEither a b =
   , "right" ::: b
   ]
 
-type Foo = MyEither (Option (Bit 8)) (Bit 4)
+newtype NewEither a b =
+  NewEither (
+    TaggedUnion [
+      "left"  ::: a
+    , "right" ::: b
+    ]
+  )
+  deriving newtype (IsTaggedUnion, Bits, FShow)
+
+--type Foo = MyEither (Option (Bit 8)) (Bit 4)
+type Foo = NewEither (Option (Bit 8)) (Bit 4)
 
 top :: Module ()
 top = do
