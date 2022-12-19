@@ -1,6 +1,8 @@
-{-# LANGUAGE RecursiveDo        #-}
-{-# LANGUAGE BlockArguments     #-}
-{-# LANGUAGE NoRebindableSyntax #-}
+{-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE RecursiveDo         #-}
+{-# LANGUAGE BlockArguments      #-}
+{-# LANGUAGE NoRebindableSyntax  #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 
 {-|
 Module      : Blarney.Backend
