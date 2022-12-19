@@ -39,6 +39,7 @@ EXTS="-XGHC2021 \
       -XBlockArguments \
       -XDataKinds \
       -XDeriveAnyClass \
+      -XDerivingStrategies \
       -XDuplicateRecordFields \
       -XMultiWayIf \
       -XNoImplicitPrelude \

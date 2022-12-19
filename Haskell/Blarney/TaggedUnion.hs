@@ -16,7 +16,6 @@ module Blarney.TaggedUnion
   , tag, untag, untagDefault
   , whenTagged
   , IsTaggedUnion(..)
-  , HasMember(..)
   ) where
 
 -- GHC imports
@@ -55,21 +54,13 @@ data TagName (sym :: Symbol) = TagName
 instance sym0 ~ sym1 => IsLabel sym0 (TagName sym1) where
   fromLabel = TagName
 
--- Type familes
--- ============
+--- Type familes
+--- ============
 
--- | Extract the type of a given field
-type family GetField name fields where
-  GetField name '[] = 
-    TypeError (Text "TaggedUnion: tag " :<>:
-                 ShowType name :<>: Text " doesn't exist")
-  GetField name ((n ::: ty) ': rest) =
-    If (name == n) ty (GetField name rest)
-
--- | Determine max field size
-type family MaxFieldSize fields where
-  MaxFieldSize '[] = 0
-  MaxFieldSize ((n ::: ty) ': rest) = Max (SizeOf ty) (MaxFieldSize rest)
+--- | Determine max member size
+type family MaxMemberWidth fields where
+  MaxMemberWidth '[] = 0
+  MaxMemberWidth ((n ::: ty) ': rest) = Max (SizeOf ty) (MaxMemberWidth rest)
 
 -- Type classes
 -- ============
@@ -79,48 +70,48 @@ bottom :: a
 bottom = error "Blarney.TaggedUnion.bottom"
 
 class IsTaggedUnion t where
-  getNumMembers :: t -> Int
-  getMaxMemberWidth :: t -> Int
+  type GetMemberType t (tag :: Symbol) :: Type
+  getMembers :: t -> [(String, Int)]
   toRaw :: t -> (BV, BV)
   fromRaw :: (BV, BV) -> t
 
 instance IsTaggedUnion (TaggedUnion '[]) where
-  getNumMembers _ = 0
-  getMaxMemberWidth _ = 0
+  type GetMemberType (TaggedUnion '[]) name = 
+    TypeError (Text "TaggedUnion: tag " :<>:
+                 ShowType name :<>: Text " doesn't exist")
+  getMembers _ = []
   toRaw u = (u.memberIdx, u.memberVal)
   fromRaw (idx, val) = TaggedUnion { memberIdx = idx, memberVal = val }
 
-instance (Bits t, IsTaggedUnion (TaggedUnion rest))
+instance ( Bits t
+         , IsTaggedUnion (TaggedUnion rest)
+         , KnownSymbol tag
+         )
       => IsTaggedUnion (TaggedUnion ((tag ::: t) ': rest)) where
-  getNumMembers _ = 1 +  getNumMembers (bottom :: TaggedUnion rest)
-  getMaxMemberWidth _ =
-    max (sizeOf (bottom :: t))
-        (getMaxMemberWidth (bottom :: TaggedUnion rest))
+  type GetMemberType (TaggedUnion ((tag ::: t) ': rest)) name =
+    If (tag == name) t (GetMemberType (TaggedUnion rest) name)
+  getMembers _ =
+      (memberName, memberWidth) : getMembers (bottom :: TaggedUnion rest)
+    where
+      memberName = symbolVal (Proxy :: Proxy tag)
+      memberWidth = sizeOf (bottom :: t)
   toRaw u = (u.memberIdx, u.memberVal)
   fromRaw (idx, val) = TaggedUnion { memberIdx = idx, memberVal = val }
 
-class IsTaggedUnionMember tag memberTy members | tag members -> memberTy where
-  getTagIdx :: TagName tag -> memberTy -> TaggedUnion members -> Integer
+-- Helper functions
+getNumMembers :: IsTaggedUnion u => u -> Int
+getNumMembers = length . getMembers
 
-instance {-# OVERLAPPING #-}
-         IsTaggedUnionMember tag memberTy ((tag ::: memberTy) ': rest) where
-  getTagIdx _ _ _ = 0
+getMaxMemberWidth :: IsTaggedUnion u => u -> Int
+getMaxMemberWidth = maximum . map snd . getMembers
 
-instance IsTaggedUnionMember tag memberTy rest
-      => IsTaggedUnionMember tag memberTy ((tag' ::: memberTy') ': rest) where
-  getTagIdx _ _ _ =
-    1 + getTagIdx (bottom :: TagName tag)
-                       (bottom :: memberTy)
-                       (bottom :: TaggedUnion rest)
-
-class IsTaggedUnion unionTy => HasMember tag memberTy unionTy
-                                 | tag unionTy -> memberTy where
-  getMemberIdx :: TagName tag -> memberTy -> unionTy -> Integer
-
-instance ( IsTaggedUnion (TaggedUnion members)
-         , IsTaggedUnionMember tag memberTy members )
-      => HasMember tag memberTy (TaggedUnion members) where
-  getMemberIdx = getTagIdx
+getMemberIdx :: IsTaggedUnion u => u -> String -> Integer
+getMemberIdx u tag = 
+  case [idx | ((n, w), idx) <- zip members [0..], n == tag] of
+    [idx] -> idx
+    _ -> error ("Blarney.TaggedUnion.getMemberIdx: " ++ tag)
+  where
+    members = getMembers u
 
 -- Bits instance
 -- =============
@@ -128,8 +119,9 @@ instance ( IsTaggedUnion (TaggedUnion members)
 -- | Bits instance for tagged unions
 instance IsTaggedUnion (TaggedUnion fields) => Bits (TaggedUnion fields) where
   type SizeOf (TaggedUnion fields) =
-    Log2Ceil (Length fields) + MaxFieldSize fields
-  sizeOf u = log2ceil (getNumMembers u) + getMaxMemberWidth u
+    Log2Ceil (Length fields) + MaxMemberWidth fields
+  sizeOf u = log2ceil (length members) + maximum (map snd members)
+    where members = getMembers u
   pack u = FromBV $ concatBV u.memberIdx u.memberVal
   unpack inp =
     TaggedUnion {
@@ -137,12 +129,12 @@ instance IsTaggedUnion (TaggedUnion fields) => Bits (TaggedUnion fields) where
     , memberVal = selectBV (maxMemberWidth-1, 0) (toBV inp)
     }
     where
-      numMembers = getNumMembers (bottom :: TaggedUnion fields)
-      maxMemberWidth = getMaxMemberWidth (bottom :: TaggedUnion fields)
-      msbIdx = log2ceil numMembers + maxMemberWidth
+      members = getMembers (bottom :: TaggedUnion fields)
+      maxMemberWidth = maximum (map snd members)
+      msbIdx = log2ceil (length members) + maxMemberWidth
   nameBits nm u =
     TaggedUnion {
-      memberIdx = addBVNameHint u.memberIdx (NmRoot 0 ("uidx" ++ nm))
+      memberIdx = addBVNameHint u.memberIdx (NmRoot 0 ("utag" ++ nm))
     , memberVal = addBVNameHint u.memberVal (NmRoot 0 ("uval" ++ nm))
     }
 
@@ -151,76 +143,75 @@ instance IsTaggedUnion (TaggedUnion fields) => Bits (TaggedUnion fields) where
 
 -- | Does given tagged union have given tag?
 infix 7 `isTagged`
-isTagged :: forall name memberTy unionTy.
-     HasMember name memberTy unionTy
-  => unionTy -> TagName name -> Bit 1
+isTagged :: forall u name.
+     (IsTaggedUnion u, KnownSymbol name)
+  => u -> TagName name -> Bit 1
 isTagged u _ = FromBV $ equalBV (constBV w i) idx
   where
-    i = getMemberIdx (bottom :: TagName name)
-                     (bottom :: memberTy)
-                     (bottom :: unionTy)
-    w = log2ceil (getNumMembers (bottom :: unionTy))
+    str = symbolVal (Proxy :: Proxy name)
+    i   = getMemberIdx u str
+    w   = log2ceil (getNumMembers u)
     (idx, _) = toRaw u
 
 -- | Shorthand for 'isTagged'
 infix 7 `is`
-is :: forall name memberTy unionTy.
-      HasMember name memberTy unionTy
-   => unionTy -> TagName name -> Bit 1
+is :: forall u name.
+      (IsTaggedUnion u, KnownSymbol name)
+   => u -> TagName name -> Bit 1
 is = isTagged
 
 -- | Construct a value of a tagged union
-tag :: forall name memberTy unionTy.
-     (HasMember name memberTy unionTy, Bits memberTy)
-  => TagName name -> memberTy -> unionTy
+tag :: forall name m u.
+       (IsTaggedUnion u, KnownSymbol name, m ~ GetMemberType u name, Bits m)
+    => TagName name -> m -> u
 tag _ x = fromRaw
             ( constBV (log2ceil numMembers) i
             , zeroExtendBV maxMemberWidth (toBV (pack x)) )
   where
-    i = getMemberIdx (bottom :: TagName name)
-                     (bottom :: memberTy)
-                     (bottom :: unionTy)
-    numMembers = getNumMembers (bottom :: unionTy)
-    maxMemberWidth = getMaxMemberWidth (bottom :: unionTy)
+    str = symbolVal (Proxy :: Proxy name)
+    i = getMemberIdx (bottom :: u) str
+    numMembers = getNumMembers (bottom :: u)
+    maxMemberWidth = getMaxMemberWidth (bottom :: u)
 
 -- | Get the value of given field if the tag matches.  If tag doesn't
 -- match, use optional default value.
-untagMaybe :: forall name memberTy unionTy.
-     (HasMember name memberTy unionTy, Bits memberTy)
-  => TagName name -> Maybe memberTy -> unionTy -> memberTy
+untagMaybe :: forall name m u.
+     (IsTaggedUnion u, KnownSymbol name, m ~ GetMemberType u name, Bits m)
+  => TagName name -> Maybe m -> u -> m
 untagMaybe _ defaultVal u =
   case defaultVal of
     Nothing -> val
     Just def -> match ? (val, def)
   where
-    i = getMemberIdx (bottom :: TagName name)
-                     (bottom :: memberTy)
-                     (bottom :: unionTy)
+    str = symbolVal (Proxy :: Proxy name)
+    i = getMemberIdx u str
     wi = log2ceil numMembers
-    numMembers = getNumMembers (bottom :: unionTy)
-    maxMemberWidth = getMaxMemberWidth (bottom :: unionTy)
-    fieldSize = sizeOf (bottom :: memberTy)
+    numMembers = getNumMembers u
+    maxMemberWidth = getMaxMemberWidth u
+    fieldSize = sizeOf (bottom :: m)
     (rawIdx, rawVal) = toRaw u
     val = unpack $ FromBV $ selectBV (fieldSize-1, 0) rawVal
     match = FromBV $ equalBV (constBV wi i) rawIdx
 
 -- | Get the value of given field if the tag matches.  If tag doesn't
 -- match, return 'dontCare'.
-untag :: (HasMember name memberTy unionTy, Bits memberTy)
-      => TagName name -> unionTy -> memberTy
+untag :: (IsTaggedUnion u, KnownSymbol name, m ~ GetMemberType u name, Bits m)
+      => TagName name -> u -> m
 untag t u = untagMaybe t Nothing u
 
 -- | Get the value of given field if the tag matches.  If tag doesn't
 -- match, return default value.
-untagDefault :: (HasMember name memberTy unionTy, Bits memberTy)
-             => TagName name -> memberTy -> unionTy -> memberTy
+untagDefault :: forall name m u.
+     (IsTaggedUnion u, KnownSymbol name, m ~ GetMemberType u name, Bits m)
+  => TagName name -> m -> u -> m
 untagDefault t defaultVal u = untagMaybe t (Just defaultVal) u
 
 -- | Conditional statement for tagged unions
-whenTagged :: (HasMember name memberTy unionTy, Bits memberTy)
-           => TagName name
-           -> unionTy
-           -> (memberTy -> Action a) -> Action a
+whenTagged ::
+     (IsTaggedUnion u, KnownSymbol name, m ~ GetMemberType u name, Bits m)
+  => TagName name
+  -> u
+  -> (GetMemberType u name -> Action a) -> Action a
 whenTagged tag u f = whenAction (u `isTagged` tag) (f (untag tag u))
 
 -- FShow instance
