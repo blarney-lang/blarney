@@ -1250,9 +1250,9 @@ The upper and lower bits of a bit vector can also be obtained using
 the functions
 http://blarney-lang.github.io/blarney/Blarney-Core-Bit.html#v:upper[upper]
 and
-http://blarney-lang.github.io/blarney/Blarney-Core-Bit.html#v:upper[lower]
+http://blarney-lang.github.io/blarney/Blarney-Core-Bit.html#v:lower[lower]
 (also called
-http://blarney-lang.github.io/blarney/Blarney-Core-Bit.html#v:upper[truncate]).
+http://blarney-lang.github.io/blarney/Blarney-Core-Bit.html#v:truncate[truncate]).
 
 == Type classes
 
