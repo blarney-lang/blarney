@@ -511,6 +511,7 @@ data Server req resp =
 As an example, here is a server that consumes bytes, increments them,
 and produces the incremented bytes.
 
+[source, haskell]
 ----
 incServer :: Module (Server (Bit 8) (Bit 8))
 incServer = do
@@ -576,7 +577,7 @@ operate over streams, or modules that return clients and servers.
 === Cyclic dependencies
 
 Suppose we want to test our `incStream` function by generating a stream of
-values to increment, and display the results.
+values to increment, and displaying the results.
 
 [source, haskell]
 ----
@@ -1019,10 +1020,10 @@ data Option a =
 
 It captures a value that may or may not be valid. Our use of a product
 type is motiviated by a few reasons: (1) the <<Bits>> class does
-<<Bits, not support Haskell sum types>>; (2) <<tagged-unions, tagged
-unions>> feel overkill in this case as the `valid` field is only a
-single bit; and (3) the nature of hardware is to always compute a
-value and then to select whether or not to use it, which corresponds
+<<record-types, not support Haskell sum types>>; (2) <<tagged-unions,
+tagged unions>> feel overkill in this case as the `valid` field is
+only a single bit; and (3) the nature of hardware is to always compute
+a value and then to select whether or not to use it, which corresponds
 with the use of a product type.
 
 Helper functions are provided for constructing optional values:
@@ -1045,9 +1046,9 @@ has type `forall a. Bits a => a`.
 
 === Enumeration types
 
-As the <<Bits>> class does <<Bits, not support Haskell sum types>>, we
-need a different way to capture enum types that will be stored
-as circuit values.  We suggest that enum types such as
+As the <<Bits>> class does <<record-types, not support Haskell sum
+types>>, we need a different way to capture enum types that will be
+stored as circuit values.  We suggest that enum types such as
 
 [source, haskell]
 ----
