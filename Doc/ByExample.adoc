@@ -1,0 +1,1538 @@
+:toc: macro
+:toclevels: 4
+:toc-title:
+:toc-placement!:
+:source-highlighter:
+
+[discrete]
+= Blarney by Example
+
+This document introduces the
+https://github.com/blarney-lang/blarney[Blarney library] through
+simple examples, supplementing the
+http://blarney-lang.github.io/blarney/index.html[Haddock docs].
+
+[discrete]
+== Contents
+
+toc::[]
+
+:sectnums:
+
+== Introductory example: sorting
+
+=== Two-sorter
+
+Sorting makes for a good introduction to the library.  Let's start
+with the simplest kind of sorter possible: given a pair of 8-bit
+values, the function `twoSort` returns the sorted pair.
+
+[source, haskell]
+----
+import Blarney
+
+twoSort :: (Bit 8, Bit 8) -> (Bit 8, Bit 8)
+twoSort (a, b) = a .<. b ? ((a, b), (b, a))
+----
+
+This definition makes use of three Blarney constructs: the `Bit` type
+for bit vectors (parametised by the size of the vector); the
+comparison operator `.<.`; and the ternary conditional operator `?`.
+A quick test bench to check that it works:
+
+[source, haskell]
+----
+top :: Module ()
+top = always do
+  display "twoSort (1,2) = " (twoSort (1,2))
+  display "twoSort (2,1) = " (twoSort (2,1))
+  finish
+----
+
+We use Blarney's `always` construct to perform the given action _on
+every clock cycle_.  Blarney actions include statements for displaying
+values during simulation (`display`), terminating the simulator
+(`finish`), and mutating state (see below).  All statements in an
+`Action` execute in parallel, within a single cycle of an implicit
+clock.  We can generate Verilog for the test bench as follows.
+
+[source, haskell]
+----
+main :: IO ()
+main = writeVerilogTop top "top" "/tmp/twoSort/"
+----
+
+Compiling this and running the resulting executable will produce
+Verilog in the `/tmp/twoSort` directory, including a makefile to build
+a Verilator simulator.  The simulator can be built and run as follows.
+
+[source, shell]
+----
+$ cd /tmp/twoSort
+$ make
+$ ./top
+twoSort (1,2) = (1,2)
+twoSort (2,1) = (1,2)
+----
+
+=== In-Haskell simulation
+
+Sometimes it can be convenient to skip Verilog generation, and use the
+in-Haskell simulator.
+
+[source, haskell]
+----
+main :: IO ()
+main = simulate top
+----
+
+Now after running `./Sorter` we see the test bench output directly.
+
+[source, shell]
+----
+$ ./Sorter
+twoSort (1,2) = (1,2)
+twoSort (2,1) = (1,2)
+----
+
+We can avoid compilation altogether by using the REPL. In the root of
+the Blarney repo:
+
+[source, shell]
+----
+$ cabal repl
+ghci> :l Examples/Sorter/Sorter.hs
+ghci> eval $ twoSort (2,1)
+(1,2)
+----
+
+The in-Haskell simulator is much slower than Verilator, but can be
+convenient for very small designs.  In general, using Verilator is the
+recommended method of simulating Blarney designs.
+
+=== Bubble sort
+
+We can build a general _N_-element sorter by connecting together
+multiple two-sorters.  One of the simplest ways to do this is the
+_bubble sort_ network.  The key component is a function `bubble` that
+takes a list of inputs and returns a new list in which the smallest
+element comes first.
+
+[source, haskell]
+----
+bubble :: [Bit 8] -> [Bit 8]
+bubble [] = []
+bubble [x] = [x]
+bubble (x:y:rest) = bubble (small:rest) ++ [large]
+  where (small, large) = twoSort (x, y)
+----
+
+If we repeatedly call `bubble` then we end up with a sorted list.
+
+[source, haskell]
+----
+sort :: [Bit 8] -> [Bit 8]
+sort [] = []
+sort xs = smallest : sort rest
+  where smallest:rest = bubble xs
+----
+
+Running the test bench
+
+[source, haskell]
+----
+top :: Module ()
+top = always do
+  let inputs = [3, 4, 1, 0, 2]
+  display "sort " inputs " = " (sort inputs)
+  finish
+----
+
+in simulation yields:
+
+----
+sort [3,4,1,0,2] = [0,1,2,3,4]
+----
+
+To see that the `sort` function really is describing a circuit, let's
+draw the circuit digram for a 5-element bubble sorter.
+
+----
+        -->.
+           |
+        -->+---.
+           |   |
+Inputs  -->+---+---.
+           |   |   |
+        -->+---+---+---.
+           |   |   |   |
+        -->+---+---+---+---.
+           |   |   |   |   |
+           v   v   v   v   v
+
+                Outputs
+----
+
+The input list is supplied on the left, and the sorted output list is
+produced at the bottom.  Each `+` denotes a two-sorter that takes
+inputs from the top and the left, and produces the smaller value to
+the bottom and the larger value to the right.  See
+https://pdfs.semanticscholar.org/de30/22efc5aec833d7b52bd4770a382fea729bba.pdf[The
+design and verification of a sorter core] for a more in-depth
+exploration of sorting circuits in Haskell.
+
+=== Polymorphism
+
+For simplicity, we've made our sorter specific to lists of 8-bit values.  But
+if we look at the types of the primitive functions it uses, we can see that it
+actually has a more general type.
+
+[source, haskell]
+----
+(.<.) :: Cmp a  => a -> a -> Bit 1
+(?)   :: Bits a => Bit 1 -> (a, a) -> a
+----
+
+So `.<.` can be used on any type in the
+http://blarney-lang.github.io/blarney/Blarney-Core-Bit.html#t:Cmp[Cmp] (comparator)
+class.  Similarly, `?` can be used on any type in the <<Bits>>
+class (which allows packing to a bit vector and back again). So a more generic
+definition of `twoSort` would be:
+
+[source, haskell]
+----
+twoSort :: (Bits a, Cmp a) => (a, a) -> (a, a)
+twoSort (a, b) = a .<. b ? ((a, b), (b, a))
+----
+
+Indeed, this would be the type inferred by the Haskell compiler if no type
+signature was supplied.  Using Haskell's rebindable syntax, we can also use an
+if-then-else expression instead of the ternary conditional operator:
+
+[source, haskell]
+----
+twoSort :: (Bits a, Cmp a) => (a, a) -> (a, a)
+twoSort (a, b) = if a .<. b then (a, b) else (b, a)
+----
+
+== Mutable state
+
+=== Registers
+
+So far, we've only seen `display` and `finish` actions inside a Blarney module.
+Also supported are creation and assignment of registers.  To illustrate, here
+is a module that creates a 4-bit `cycleCount` register, increments it on each
+cycle, stopping when it reaches 10.
+
+[source, haskell]
+----
+top :: Module ()
+top = do
+  -- Create a register
+  cycleCount :: Reg (Bit 4) <- makeReg 0
+
+  always do
+    -- Increment on every cycle
+    cycleCount <== cycleCount.val + 1
+
+    -- Display value on every cycle
+    display "cycleCount = " cycleCount.val
+
+    -- Terminate simulation when count reaches 10
+    when (cycleCount.val .==. 10) do
+      display "Finished"
+      finish
+----
+
+This example introduces a number of new library functions: `makeReg`
+creates a register, initialised to the given value; the `val` field
+yields the current value of the register; and `when` allows
+conditional actions to be introduced.  We can use if-then-else in an
+`Action` context.  For example, the final three lines above could have
+been written as:
+
+[source, haskell]
+----
+  -- Terminate simulation when count reaches 10
+  if cycleCount.val .==. 10
+    then do
+      display "Finished"
+      finish
+    else
+      display "Not finished"
+----
+
+Running `top` in simulation gives
+
+----
+cycleCount = 0
+cycleCount = 1
+cycleCount = 2
+cycleCount = 3
+cycleCount = 4
+cycleCount = 5
+cycleCount = 6
+cycleCount = 7
+cycleCount = 8
+cycleCount = 9
+cycleCount = 10
+Finished
+----
+
+=== Queues
+
+Queues (also known as FIFOs) are a commonly used abstraction in hardware
+design.  Blarney provides http://blarney-lang.github.io/blarney/Blarney-Queue.html[a
+range of different queue implementations], all of which implement the following
+interface available when importing `Blarney.Queue`.
+
+[source, haskell]
+----
+-- Queue interface
+data Queue a =
+  Queue {
+    notEmpty :: Bit 1           -- Is the queue non-empty?
+  , notFull  :: Bit 1           -- Is there any space in the queue?
+  , enq      :: a -> Action ()  -- Insert an element (assuming notFull)
+  , deq      :: Action ()       -- Remove the first element (assuming canDeq)
+  , canDeq   :: Bit 1           -- Guard on the deq and first methods
+  , first    :: a               -- View the first element (assuming canDeq)
+  }
+----
+
+The type `Queue a` represents a queue holding elements of type `a`, and
+provides a range of standard functions on queues.  The `enq` method should only
+be called when `notFull` is true and the `deq` method should only be called
+when `canDeq` is true.  Similarly, the `first` element of the queue is only
+valid when `canDeq` is true.  Below, we present the simplest possible
+implementation of a one-element queue.
+
+[source, haskell]
+----
+import Blarney.Queue
+
+-- Simple one-element queue implementation
+makeSimpleQueue :: Bits a => Module (Queue a)
+makeSimpleQueue = do
+  -- Register holding the one element
+  reg :: Reg a <- makeReg dontCare
+
+  -- Register defining whether or not queue is full
+  full :: Reg (Bit 1) <- makeReg 0
+
+  -- Methods
+  return
+    Queue {
+      notFull  = full.val .==. 0
+    , notEmpty = full.val .==. 1
+    , enq      = \a -> do reg <== a
+                          full <== 1
+    , deq      = full <== 0
+    , canDeq   = full.val .==. 1
+    , first    = reg.val
+    }
+----
+
+The following simple test bench illustrates how to use a queue.
+
+[source, haskell]
+----
+-- Small test bench for queues
+top :: Module ()
+top = do
+  -- Instantiate a queue of 8-bit values
+  queue :: Queue (Bit 8) <- makeSimpleQueue
+
+  -- Create an 8-bit count register
+  count :: Reg (Bit 8) <- makeReg 0
+
+  always do
+    count <== count.val + 1
+
+    -- Writer side
+    when queue.notFull do
+      queue.enq count.val
+      display "Enqueued " count.val
+
+    -- Reader side
+    when queue.canDeq do
+      queue.deq
+      display "Dequeued " queue.first
+
+    -- Terminate after 100 cycles
+    when (count.val .==. 100) finish
+----
+
+=== Wires
+
+_Wires_ are a feature of the `Action` monad that offer a way for separate
+action blocks to communicate _within the same clock cycle_.  Whereas assignment
+to a register becomes visible on the clock cycle after the assigment occurs,
+assignment to a wire is visible on the same cycle as the assignment.  If no
+assignment is made to a wire on a particular cycle, then the wire emits its
+_default value_ on that cycle.  When multiple assignments to the same wire
+occur on the same cycle, the wire emits the bitwise disjunction of all the
+assigned values.
+
+To illustrate, let's implement an _n_-bit counter module that supports
+increment and decrement operations.
+
+[source, haskell]
+----
+-- Interface for a n-bit counter
+data Counter n =
+  Counter {
+    inc    :: Action ()
+  , dec    :: Action ()
+  , output :: Bit n
+  }
+----
+
+We'd like the counter to support _parallel calls_ to `inc` and `dec`.  That is,
+if `inc` and `dec` are called on the same cycle then the counter's `output` is
+unchanged.  We'll achieve this using wires.
+
+[source, haskell]
+----
+makeCounter :: KnownNat n => Module (Counter n)
+makeCounter = do
+  -- State
+  count :: Reg (Bit n) <- makeReg 0
+
+  -- Wires
+  incWire :: Wire (Bit 1) <- makeWire 0
+  decWire :: Wire (Bit 1) <- makeWire 0
+
+  always do
+    -- Increment
+    when (incWire.val .&&. inv decWire.val) do
+      count <== count.val + 1
+
+    -- Decrement
+    when (inv incWire.val .&&. decWire.val) do
+      count <== count.val - 1
+
+  -- Interface
+  return
+    Counter {
+      inc = do incWire <== 1
+      dec = do decWire <== 1
+      output = count.val
+    }
+----
+
+== Flow control
+
+=== Sources and sinks
+
+[#sources-sinks]
+
+Sources and sinks are commonly-used flow-control abstractions in
+hardware description.  They are often used to implement hardware
+modules that produce or consume data at a _variable rate_, depending
+on internal details of the module that the implementer does not wish
+to (or is unable to) expose.  In Blarney,
+http://blarney-lang.github.io/blarney/Blarney-SourceSink.html[sources
+and sinks] are captured by the following interfaces.
+
+[source, haskell]
+----
+-- Data is consumed from a source
+data Source t =
+  Source {
+    -- The next value being produced by the source
+    peek :: t
+    -- Invoke this action to consume the next value
+  , consume :: Action ()
+    -- Can the source currently be peeked or consumed?
+  , canPeek :: Bit 1
+  }
+
+-- Data is injected into a sink
+data Sink t =
+  Sink {
+    -- Can a value be injected into the sink?
+    canPut :: Bit 1
+    -- Inject the given value into the sink
+  , put :: t -> Action ()
+  }
+----
+
+A queue is both a source and a sink.
+
+[source, haskell]
+----
+-- Convert a queue to a source
+instance ToSource (Queue t) t where
+  toSource :: Queue t -> Source t
+  toSource q =
+    Source {
+      canPeek  = q.canDeq
+    , peek     = q.first
+    , consume  = q.deq
+    }
+
+-- Convert a queue to a sink
+instance ToSink (Queue t) t where
+  toSink :: Queue t -> Sink t
+  toSink q =
+    Sink {
+      canPut = q.notFull
+    , put    = q.enq
+    }
+
+----
+
+Sources and sinks can be
+https://blarney-lang.github.io/blarney/Blarney-Connectable.html[connected
+together].
+
+=== Clients and servers
+
+Pairs of sources and sinks can be viewed as clients and servers:
+
+[source, haskell]
+----
+-- Clients produce requests and consume responses
+data Client req resp =
+  Client {
+    reqs :: Source req
+  , resps :: Sink resp
+  }
+
+-- Servers consume requests and produce responses
+data Server req resp =
+  Server {
+    reqs :: Sink req
+  , resps :: Source resp
+  }
+----
+
+As an example, here is a server that consumes bytes, increments them,
+and produces the incremented bytes.
+
+----
+incServer :: Module (Server (Bit 8) (Bit 8))
+incServer = do
+  -- Output buffer
+  buffer <- makeQueue
+
+  return
+    Server {
+      reqs =
+        Sink {
+          canPut = buffer.notFull
+        , put = \x -> buffer.enq (x+1)
+        }
+    , resps = toSource buffer
+    }
+----
+
+=== Streams
+
+Taking a sink as a function argument (input) is very similar to
+returning a source as a function result (output).  Both allow the
+function to produce data at a variable rate.  Is it therefore
+redundant to provide both `Source` and `Sink`?  Not quite. When a
+function takes a sink as input, it knows when the caller is ready to
+consume, before producing data; when a function returns a source as
+output, it knows when the caller does consume, after producing data.
+This subtle difference is useful when timing is important, but it is
+often more convenient to work just with a single `Stream` type:
+
+[source, haskell]
+----
+-- Another name for Source
+type Stream t = Source t
+
+-- Another name for toSource
+toStream :: ToSource a b => a -> Stream b
+toStream = toSource
+----
+
+Our `incServer` module can be rewritten as a function that operates
+over streams:
+
+[source, haskell]
+----
+incStream :: Stream (Bit 8) -> Module (Stream (Bit 8))
+incStream reqs = do
+  -- Output buffer
+  buffer <- makeQueue
+
+  always do
+    -- Incrementer
+    when (reqs.canPeek .&&. buffer.notFull) do
+      reqs.consume
+      buffer.enq (reqs.peek + 1)
+
+  -- Convert buffer to a stream
+  return (toStream buffer)
+----
+
+It is mostly a matter of taste whether you prefer functions that
+operate over streams, or modules that return clients and servers.
+
+=== Cyclic dependencies
+
+Suppose we want to test our `incStream` function by generating a stream of
+values to increment, and display the results.
+
+[source, haskell]
+----
+testIncStream :: Stream (Bit 8) -> Module (Stream (Bit 8))
+testIncStream resps = 
+  -- Request queue
+  reqs <- makeQueue
+
+  -- Counter
+  count :: Reg (Bit 8)) <- makeReg 0
+
+  -- Produce requests
+  always do
+    when reqs.notFull do
+      reqs.enq count.val
+      count <== count.val + 1
+
+  -- Consume responses
+  always do
+    when resps.canPeek do
+      resps.consume
+      display "Result: " resps.peek
+
+  return (toStream reqs)
+----
+
+The top-level module which connects the tester to `incStream` needs to
+introduce a cycle, which can be achieved simply using Haskell's
+recursive-do (`mdo`) notation:
+
+[source, haskell]
+----
+top :: Module ()
+top = mdo
+  resps <- incStream reqs
+  reqs <- testIncStream resps
+  return ()
+----
+
+== Control flow
+
+=== Recipes
+
+State machines are a common way of defining the control-path of a circuit. They
+are typically expressed by doing case-analysis of the current state and
+manually setting the next state. Quite often however, they can be expressed
+more neatly in a http://blarney-lang.github.io/blarney/Blarney-Recipe.html[Recipe] --
+a simple imperative language with various control-flow constructs.
+
+[source, haskell]
+----
+data Recipe =
+    Skip                         -- Do nothing (in zero cycles)
+  | Tick                         -- Do nothing (in one cycle)
+  | Action (Action ())           -- Perform action (in one cycle)
+  | Seq [Recipe]                 -- Execute recipes in sequence
+  | Par [Recipe]                 -- Fork-join parallelism
+  | Wait (Bit 1)                 -- Block until condition holds
+  | When (Bit 1) Recipe          -- Conditional recipe
+  | If (Bit 1) Recipe Recipe     -- If-then-else recipe
+  | While (Bit 1) Recipe         -- Loop
+  | Background Recipe            -- Run recipe in background
+----
+
+To illustrate, here is a small state machine that computes factorials.
+
+[source, haskell]
+----
+fact :: Stream (Bit 32) -> Module (Stream (Bit 32))
+fact inputs = do
+  -- Output buffer
+  buffer <- makeQueue
+
+  -- State
+  n   :: Reg (Bit 32) <- makeReg 0
+  acc :: Reg (Bit 32) <- makeReg 1
+
+  -- Compute factorials of inputs
+  runRecipe $
+    Seq [
+      Wait inputs.canPeek
+    , Action do
+        n <== inputs.peek
+        inputs.consume
+    , While (n.val .>. 0) (
+        Action do
+          n <== n.val - 1
+          acc <== acc.val * n.val
+      )
+    , Wait buffer.notFull
+    , Action do
+        buffer.enq acc.val
+    ]
+
+  return (toStream buffer)
+----
+
+Blarney provides a lightweight compiler for the `Recipe` language (under 100
+lines of code), which we invoke above through the call to `runRecipe`.
+
+=== Statements
+
+For convenience, recipes can also be constucted using `do` notation.  The
+http://blarney-lang.github.io/blarney/Blarney-Stmt.html[Stmt] monad is simply a
+wrapper around `Recipe`, which defines monadic bind as sequential composition.
+It is entirely syntatic sugar, providing no new functionality.
+
+To illustrate, here's the factorial example from earlier, rewritten using the
+`Stmt` monad.
+
+[source, haskell]
+----
+fact :: Stream (Bit 32) -> Module (Stream (Bit 32))
+fact inputs = do
+  -- Output buffer
+  buffer <- makeQueue
+
+  -- State
+  n   :: Reg (Bit 32) <- makeReg 0
+  acc :: Reg (Bit 32) <- makeReg 1
+
+  -- Compute factorials of inputs
+  runStmt do
+    wait inputs.canPeek
+    action do
+      n <== inputs.peek
+      inputs.consume
+    while (n.val .>. 0) do
+      action do
+        n <== n.val - 1
+        acc <== acc.val * n.val
+    wait buffer.notFull
+    action do
+      buffer.enq acc.val
+
+  return (toStream buffer)
+----
+
+The choice between `Recipe` syntax and `Stmt` syntax is purely a
+matter of taste.
+
+=== Test sequences
+
+A very common use of recipes is to define test sequences.  For
+example, here is a simple test sequence for the <<wires, Counter>>
+module defined earlier.
+
+[source, haskell]
+----
+-- Test-bench for a counter
+top :: Module ()
+top = do
+  -- Instantiate an 4-bit counter
+  counter :: Counter 4 <- makeCounter
+
+  -- Sample test sequence
+  runStmt do
+    action do
+      counter.inc
+    action do
+      counter.inc
+    action do
+      counter.inc
+      counter.dec
+    action do
+      display "counter = " counter.output
+      finish
+----
+
+Here, we increment `counter` on the first cycle, and then again on the second.
+On the third cycle, we both increment and decrement it in parallel.  On the
+fourth cycle, we display the value and terminate the simulator.
+
+== On-chip memory
+
+=== Block RAMs
+
+Blarney provides http://blarney-lang.github.io/blarney/Blarney-Core-RAM.html[a variety
+of block RAM modules] commonly supported on FPGAs.  They are all based around
+the following interface.
+
+[source, haskell]
+----
+-- Block RAM interface
+-- (Parameterised by the address width a and the data width d)
+data RAM a d =
+  RAM {
+    load    :: a -> Action ()
+  , store   :: a -> d -> Action ()
+  , out     :: d
+  }
+----
+
+When a `load` is issued for a given address, the value at that address appears
+on `out` on the next clock cycle.  When a `store` is issued, the value is
+written to the RAM on the current cycle, and a load of the new value can be
+requested on the subsequent cycle.  A parallel `load` and `store` should only
+be issued on the same cycle if the RAM has been created as a dual-port RAM (as
+opposed to a single-port RAM).  To illustrate, here is a test bench that
+creates a single-port block RAM and performs a `store` followed by a `load`.
+
+[source, haskell]
+----
+top :: Module ()
+top = do
+  -- Instantiate a 256 element RAM of 5-bit values
+  ram :: RAM (Bit 8) (Bit 5) <- makeRAM
+
+  -- Write 10 to ram[0] and read it back again
+  runStmt do
+    action do
+      store ram 0 10
+    action do
+      load ram 0
+    action do
+      display "Got " ram.out
+      finish
+----
+
+=== Register files
+
+Somewhat-related to block RAMs are
+http://blarney-lang.github.io/blarney/Blarney-Core-Module.html#t:RegFile[register
+files].  The difference is that a register file allows the value at an address
+to be determined _within_ a clock cycle.  It also allows any number of reads
+and writes to be performed within the same cycle.  Register files have the
+following interface.
+
+[source, haskell]
+----
+data RegFile a d =
+  RegFile {
+    index  :: a -> d                -- Read
+  , update :: a -> d -> Action()    -- Write
+  }
+----
+
+To read from a register file, use the `index` method or the generic lookup
+operator `!`.  Unlike block RAMs, register files (especially large ones) do not
+always map efficiently onto hardware, so use with care!
+
+== Interfaces
+
+=== Exporting Verilog
+
+So far we've seen examples of top-level modules, i.e. modules with no
+inputs or outputs, being converted to Verilog.  In fact, any Blarney
+function whose inputs and outputs are members of the <<interface,
+Interface>> class can be converted to Verilog (and the
+`Interface` class supports generic deriving).  To illustrate, we can
+convert the function `incStream` (defined <<streams, earlier>>) into a
+Verilog module as follows.
+
+[source, haskell]
+----
+main :: IO ()
+main = writeVerilogModule incStream "incStream" "/tmp/inc"
+----
+
+The generated Verilog module `/tmp/inc/incStream.v` has the following
+interface:
+
+[source, systemverilog]
+----
+module incStream(
+  input  wire clock
+, input  wire reset
+, output wire [0:0] in0_consume_en
+, input  wire [0:0] in0_canPeek
+, input  wire [7:0] in0_peek
+, input  wire [0:0] out_consume_en
+, output wire [7:0] out_peek
+, output wire [0:0] out_canPeek
+);
+----
+
+Considering the definition of the `Stream` type, the correspondance between the
+Blarney and the Verilog is as follows.
+
+[cols="1,3", options="header"]
+|===
+|Signal
+|Description
+
+|`in0_consume_en`
+|Output asserted whenever the module consumes an element from the input stream.
+
+|`in0_canPeek`
+|Input signalling when there is data available in the input stream.
+
+|`in0_peek`
+|Input containing the next value in the input stream.
+
+|`out_canPeek`
+|Output asserted whenever there is data available in the output stream.
+
+|`out_peek`
+|Output containing the next value in the output stream.
+
+|`out_consume_en`
+|Input signalling when the caller consumes an element from the output stream.
+|===
+
+=== Importing Verilog
+
+It is possible to instantiate a Verilog module inside a Blarney
+description.  To illustrate, here is a function that creates an instance of the
+Verilog `incStream` module shown above.
+
+[source, haskell]
+----
+-- This function creates an instance of a Verilog module called "incStream"
+makeIncStream :: Stream (Bit 8) -> Module (Stream (Bit 8))
+makeIncStream = makeInstance "incStream"
+----
+
+Notice that interface of the Verilog module being instantiated is determined
+from the type signature.  Here's a sample top-level module that uses the
+`makeInc` function:
+
+[source, haskell]
+----
+top :: Module ()
+top = do
+  -- Counter
+  count :: Reg (Bit 8) <- makeReg 0
+
+  -- Input buffer
+  buffer <- makeQueue
+
+  -- Create an instance of incStream
+  out <- makeIncStream (toStream buffer)
+
+  always do
+    -- Fill input
+    when buffer.notFull do
+      buffer.enq count.val
+      count <== count.val + 1
+
+    -- Consume
+    when out.canPeek do
+      out.consume
+      display "Got " out.peek
+      when (out.peek .==. 100) finish
+----
+
+Using the following `main` function we can generate both the
+`incStream` module and a top-level module that instantiates it.
+
+[source, haskell]
+----
+main :: IO ()
+main = do
+  let dir = "/tmp/inc"
+  writeVerilogModule inc "incStream" dir
+  writeVerilogTop top "top" dir
+----
+
+Using this approach, we can maintain the module hierarchy of a Blarney
+design whenever we generate Verilog, rather than having to flatten it
+to big monolithic netlist.  This technique can also be used to
+instantiate any Verilog module within a Blarney design.
+
+=== Synthesis boundaries
+
+When simply marking netlist boundaries within a Blarney design, the
+`makeInstance`/`writeVerilogModule` combination is rather low-level
+and error-prone.  In particular, there is no requirement for the type
+of the instance to match the type of the module, and it would be nice
+to specify a boundary in a backend-independent way.  To solve these
+problems, Blarney provides a `makeBoundary` function.  We can now
+define `makeInc` as:
+
+[source, haskell]
+----
+makeInc :: Stream (Bit 8) -> Module (Stream (Bit 8))
+makeInc = makeBoundary "incStream" inc
+----
+
+Unlike `makeInstance`, `makeBoundary` takes the module to instantiate
+as an argument.  The type of the argument to `makeBoundary` must match
+the return type:
+
+[source, haskell]
+----
+makeBoundary :: Modular m => String -> m -> m
+----
+
+This means that it is unncessary to supply a type signature for
+`makeInc` now; it will be inferred.  Furthermore, the top-level of our
+design no longer needs to call `writeVerilogModule` for the `inc`
+module because Blarney now knows how to generate a module for any
+instance that it encounters.
+
+== User-defined types
+
+=== Record types
+
+Any type in the
+http://blarney-lang.github.io/blarney/Blarney-Core-Bits.html[Bits]
+class can be represented in hardware, e.g.  stored in a wire, a
+register, or a RAM.  The `Bits` class supports _generic deriving_.
+For example, suppose we have a simple data type for memory requests:
+
+[source, haskell]
+----
+data MemReq =
+  MemReq {
+    memOp   :: Bit 1    -- Is it a load or a store request?
+  , memAddr :: Bit 32   -- 32-bit address
+  , memData :: Bit 32   -- 32-bit data for stores
+  }
+  deriving (Generic, Bits)
+----
+
+To make this type a member of the `Bits` class, we have suffixed it with
+`derving (Generic, Bits)`.  The generic deriving mechanism for `Bits` does not
+support _sum types_: there is no way to convert a bit-vector (run-time circuit
+value) to a sum type (elaboration-time value) using the circuit primitives
+provided by Blarney. However, see <<tagged-unions, tagged unions>> for
+an alternative way to capture sum types in Blarney.
+
+=== The Option type
+
+The 
+http://blarney-lang.github.io/blarney/Blarney-Option.html#t:Option[Option]
+type, defined in the
+http://blarney-lang.github.io/blarney/Blarney-Option.html[Blarney.Option]
+module, is a commonly used Blarney type, similar to `Maybe` in
+Haskell except defined as a product type rather than a sum type:
+
+[source, haskell]
+----
+data Option a =
+  Option {
+    valid :: Bit 1
+  , val :: a
+  }
+----
+
+It captures a value that may or may not be valid. Our use of a product
+type is motiviated by a few reasons: (1) the <<Bits>> class does
+<<Bits, not support Haskell sum types>>; (2) <<tagged-unions, tagged
+unions>> feel overkill in this case as the `valid` field is only a
+single bit; and (3) the nature of hardware is to always compute a
+value and then to select whether or not to use it, which corresponds
+with the use of a product type.
+
+Helper functions are provided for constructing optional values:
+
+[source, haskell]
+----
+-- Construct an optional value with no value present
+none :: Bits a => Option a
+none = Option { valid = false, val = dontCare }
+
+-- Construct an optional value with a value present
+some :: a -> Option a
+some a = Option { value = true, val = a }
+----
+
+Note that the definition of `none` requires a <<Bits>> constraint
+because
+https://blarney-lang.github.io/blarney/Blarney-Core-Prelude.html#v:dontCare[dontCare]
+has type `forall a. Bits a => a`.
+
+=== Enumeration types
+
+As the <<Bits>> class does <<Bits, not support Haskell sum types>>, we
+need a different way to capture enum types that will be stored
+as circuit values.  We suggest that enum types such as
+
+[source, haskell]
+----
+data Colour = Red | Green | Blue
+----
+
+are simply expressed as:
+
+[source, haskell]
+----
+data Colour = Colour (Bit 2) deriving (Generic, Bits, Cmp)
+red         = Colour 0
+green       = Colour 1
+blue        = Colour 2
+----
+
+This has the disadvantage of having to express how many bits are used
+to represent the type, and how its data constructors are encoded,
+although sometimes specifying these details is desiable, e.g. when
+interfacing to lower-level languages such as Verilog.  For an
+alternative approach that does not suffer from this disadvantage, see
+<<tagged-unions, tagged unions>>.
+
+To display values of type `Colour`, we can simply add <<FShow>> to the
+deriving list.  However, if we want to see the constructor names
+rather than the low-level representation, we can provide an instance
+along the following lines.
+
+[source, haskell]
+----
+instance FShow Colour where
+  fshow col = formatCond (col .==. red)   (fshow "red")
+           <> formatCond (col .==. green) (fshow "green")
+           <> formatCond (col .==. blue)  (fshow "blue")
+----
+
+For further details, see the <<FShow>> class.
+
+=== Tagged unions
+
+[#tagged-unions]
+
+Sum types such as
+
+[source, haskell]
+----
+data Either a b = Left a | Right b
+----
+
+do not permit generic deriving for the `Bits` class, so cannot be used
+for circuit-time values.  (An elaboration-time value cannot be
+influenced by a circuit-time value, making the definition of `unpack`
+problematic for sum types, at least without resorting to language
+plugins). However, Blarney does support _tagged unions_, allowing the
+following definition.
+
+[source, haskell]
+----
+import Blarney.TaggedUnion
+
+type Either a b =
+  TaggedUnion [
+    "left"  ::: a
+  , "right" ::: b
+  ]
+----
+
+The API for tagged unions is illustrated by the sample functions below.
+
+[source, haskell]
+----
+makeLeft :: Bits a => a -> Either a b
+makeLeft x = tag #left x
+
+isLeft :: Either a b -> Bit 1
+isLeft x = x `is` #left
+
+isRight :: Either a b -> Bit 1
+isRight x = x `is` #right
+
+getLeft :: Bits a => Either a b -> a
+getLeft x = untag #left x
+
+getLeftOrZero :: Bits a => Either a b -> a
+getLeftOrZero x = untagDefault #left zero x
+
+exampleAction :: Action ()
+exampleAction = do
+  let foo :: Either (Bit 2) (Bit 4) = tag #right 15
+  whenTagged #right foo \r -> do
+    display "Right val: " r
+----
+
+Above, we have used a type synonym above to define `Either`, but we
+could have also created a new type:
+
+[source, haskell]
+----
+newtype Either a b =
+  Either (
+    TaggedUnion [
+      "left"  ::: a
+    , "right" ::: b
+    ]
+  )
+  deriving newtype (IsTaggedUnion, Bits, FShow)
+----
+
+All of the API examples above continue to work unmodified.  The only
+caveat is that the user must enable `UndecidableInstances` for this to
+work. This is safe (with regard to termination of type checking) as
+long as the type is not recursive (which would imply a non statically
+sized type, not storable in hardware).
+
+== Bit manipulation
+
+=== Bit selection and lookup
+
+Bit selection operators are used to extract a subset of bits out of a
+bit-vector.  There are different flavours, depending on whether the indices are
+_type-level_ numbers, _elaboration-time_ numbers, or _circuit-level_ numbers.
+
+For type-level indices, we provide functions
+http://blarney-lang.github.io/blarney/Blarney-Core-Bit.html#v:at[at] and
+http://blarney-lang.github.io/blarney/Blarney-Core-Bit.html#v:slice[slice], and use
+type application to specify the type-level indices:
+
+[source, haskell]
+----
+-- Extract most-sigificant bit of a byte
+msb :: Bit 8 -> Bit 1
+msb x = at @7 x
+
+-- Extract upper 4 bits of a byte
+upperNibble :: Bit 8 -> Bit 4
+upperNibble x = slice @7 @4 x
+----
+
+For elaboration-time indices of type `Int`, we provide
+http://blarney-lang.github.io/blarney/Blarney-Core-Bit.html#v:unsafeAt[unsafeAt] and
+http://blarney-lang.github.io/blarney/Blarney-Core-Bit.html#v:unsafeSlice[unsafeSlice]:
+
+[source, haskell]
+----
+-- Extract most-sigificant bit of a byte
+msb :: Bit 8 -> Bit 1
+msb x = unsafeAt 7 x
+
+-- Extract upper 4 bits of a byte
+upperNibble :: Bit 8 -> Bit 4
+upperNibble x = unsafeSlice (7, 4) x
+----
+
+The argument to `unsafeAt` could be out of range, and the result of
+`unsafeSlice` could have a different width to that implied by the
+range.  Such cases will not be caught by the type checker and will
+lead to error messages at circuit generation time, hence the "unsafe"
+prefix on the function names.
+
+Finally, for circuit-level indicies of type `Bit n`, the generic lookup
+operator `!` can be used:
+
+[source, haskell]
+----
+-- Extract bit from byte at given index
+getBit :: Bit 8 -> Bit 3 -> Bit 1
+getBit x i = x!i
+----
+
+Blarney's generic lookup operator `x!i` returns the element of `x` at
+index `i`, and works for many different types of `x` and `i`.  See
+the <<Lookup>> class for more details.
+
+=== Concatenation and splitting
+
+The bit concatentation operator in Blarney is `#`.
+
+[source, haskell]
+----
+(#) :: Bit n -> Bit m -> Bit (n+m)
+----
+
+For example:
+
+[source, haskell]
+----
+concatNibbles :: Bit 4 -> Bit 4 -> Bit 8
+concatNibbles a b = a # b
+----
+
+There is also the inverse operation to split a bit-vector in two.
+
+[source, haskell]
+----
+split :: KnownNat n => Bit (n+m) -> (Bit n, Bit m)
+----
+
+The upper and lower bits of a bit vector can also be obtained using
+the functions
+http://blarney-lang.github.io/blarney/Blarney-Core-Bit.html#v:upper[upper]
+and
+http://blarney-lang.github.io/blarney/Blarney-Core-Bit.html#v:upper[lower]
+(also called
+http://blarney-lang.github.io/blarney/Blarney-Core-Bit.html#v:upper[truncate]).
+
+== Type classes
+
+=== Bits
+
+Any type in the http://blarney-lang.github.io/blarney/Blarney-Core-Bits.html[Bits]
+class can be represented in hardware, e.g.  stored in a wire, a register, or a
+RAM.
+
+[source, haskell]
+----
+class Bits a where
+  type SizeOf a :: Nat
+  sizeOf        :: a -> Int
+  pack          :: a -> Bit (SizeOf a)
+  unpack        :: Bit (SizeOf a) -> a
+----
+
+The `Bits` class supports _generic deriving_.
+
+=== Interface
+
+Any type in the
+http://blarney-lang.github.io/blarney/Blarney-Core-Interface.html[Interface]
+class can be used as a module input or output when doing
+<<modular-compilation, modular code generation>> for low-level
+languages such as Verilog.
+
+[source, haskell]
+----
+class Interface a where
+  toIfc :: a -> (IfcTerm, IfcType)
+  fromIfc :: IfcTerm -> a
+----
+
+The `Interface` class supports generic deriving: just add `Interface`
+to the deriving clause for the datatype.  The automatic instance for
+`Interface` will use the field names of the data constructor as
+low-level port names.  Sometimes, it is desirable to have more control
+over the naming of low-levels ports.  In that case, a manual instance
+can be given.
+
+[source, haskell]
+----
+instance Interface MemReq where
+  toIfc req =
+    toPorts (portName "operation", req.memOp)
+            (portName "address",   req.memAddr)
+            (portName "data",      req.memData)
+  fromIfc ifc =
+    fromPorts \op addr dat ->
+      MemReq {
+        memOp   = op
+      , memAddr = addr
+      , memData = dat
+      }
+----
+
+Various information (not just names) can be specified regarding a
+port.  See the
+http://blarney-lang.github.io/blarney/Blarney-Core-Interface.html#v:PortInfo[PortInfo]
+structure and associated helper functions.
+
+=== Lookup
+
+The generic lookup operator `!` is provided by the
+http://blarney-lang.github.io/blarney/Blarney-Core-Lookup.html[Lookup] class.
+
+[source, haskell]
+----
+-- Index a collection 'c' of elements 'e' using index 'i'
+class Lookup c i e | c -> e where
+  (!) :: c -> i -> e
+----
+
+A wide range of combinations of types are supported.  The functional dependency
+`c -> e` allows the return type to be inferred from the collection type.
+
+Collections of <<Interface, interfaces>> can be indexed by
+circuit-time values using the `!` operator.  To illustrate, here is an
+example circuit to split a stream of <<bits, MemReq>> into four
+streams, using the lower two bits of the address to decide which
+output stream to use.
+
+[source, haskell]
+----
+split :: Stream MemReq -> Module [Stream MemReq]
+split reqs = do
+  -- Create a list of 4 queues
+  queues :: [Queue MemReq] <- replicateM 4 makeQueue
+
+  always do
+    -- Consume request, and put into appropriate queue
+    when reqs.canPeek do
+      let i :: Bit 2 = truncate reqs.peek.memAddr
+      when (queues!i).notFull do
+        reqs.consume
+        (queues!i).enq reqs.peek
+
+  return (map toStream queues)
+----
+
+=== FShow
+
+Any value whose type is in the
+http://blarney-lang.github.io/blarney/Blarney-Core-FShow.html[FShow] class, or any
+value of type `Format`, can be passed as arguments to the variadic `display`
+function.
+
+[source, haskell]
+----
+class FShow a where
+  fshow     :: a -> Format
+  fshowList :: [a] -> Format     -- Has default definition
+
+-- Abstract data type for things that can be displayed
+newtype Format
+
+-- Format constructors
+mempty :: Format                         -- Empty (from Monoid class)
+(<>)   :: Format -> Format -> Format     -- Append (from Monoid class)
+----
+
+As an example, here is how the `FShow` instance for pairs is defined.
+
+[source, haskell]
+----
+-- Example instance: displaying pairs
+instance (FShow a, FShow b) => FShow (a, b) where
+  fshow (a, b) = fshow "(" <> fshow a <> fshow "," <> fshow b <> fshow ")"
+----
+
+The `FShow` class supports generic deriving.
+
+The radix and padding used to display a bit vector can be specified using the
+following functions.
+
+[source, haskell]
+----
+-- Display bit vector in binary with given amount of zero padding
+formatBin :: Int -> Bit n -> Format
+
+-- Display bit vector in decimal with given amount of zero padding
+formatDec :: Int -> Bit n -> Format
+
+-- Display bit vector in hex with given amount of zero padding
+formatHex :: Int -> Bit n -> Format
+----
+
+The `FShow` instance for `Bit n` uses decimal format with no padding.
+Another useful format combinator is `formatCond cond fmt` which
+returns `fmt` if `cond` is true, and `mempty` otherwise:
+
+[source, haskell]
+----
+-- Conditional format (empty of condition fails)
+formatCond :: Bit 1 -> Format -> Format
+----
+
+For example, `formatCond` would allow the following `FShow` instance
+for the <<Option-type, Option>> type.
+
+[source, haskell]
+----
+instance FShow a => FShow (Option a) where
+  fshow opt = formatCond (inv opt.valid) (fshow "none")
+           <> formatCond opt.valid (fshow "some " <> fshow opt.val)
+----
+
+=== Cmp
+
+The `Cmp` (comparator) class provides a range of familiar comparison
+operators, and supports generic deriving.
+
+[source, Haskell]
+----
+class Cmp a where
+  (.<.)  :: a -> a -> Bit 1
+  (.<=.) :: a -> a -> Bit 1
+  (.==.) :: a -> a -> Bit 1
+  (.>.)  :: a -> a -> Bit 1
+  (.>=.) :: a -> a -> Bit 1
+  (.!=.) :: a -> a -> Bit 1
+----
+
+Only the first three operators must be defined; the others have
+default definitions.
+
+=== Assign
+
+The assignment operator is overloaded.
+
+[source, Haskell]
+----
+class Assign v where
+  (<==) :: Bits a => v a -> a -> Action ()
+----
+
+Example instances are
+http://blarney-lang.github.io/blarney/Blarney-Core-Module.html#t:Reg[Reg],
+http://blarney-lang.github.io/blarney/Blarney-Core-Module.html#t:Wire[Wire],
+and
+http://blarney-lang.github.io/blarney/Blarney-Core-Module.html#t:WriteOnly[WriteOnly].
+
+=== ToSource and ToSink
+
+Converting interfaces to
+http://blarney-lang.github.io/blarney/Blarney-SourceSink.html[sources
+and sinks] may turn out to be common.  For example,
+http://blarney-lang.github.io/blarney/Blarney-Queue.html[Queue] and
+http://blarney-lang.github.io/blarney/Blarney-Stack.html[Stack] are
+both sources and sinks.  Therefore the following type classes are
+provided.
+
+[source, Haskell]
+----
+-- Convert to a source
+class ToSource a b | a -> b where
+  toSource :: a -> Source b
+
+-- Convert to a sink
+class ToSink a b | a -> b where
+  toSink :: a -> Sink b
+
+-- Another name for toSource
+toStream :: ToSource a b => a -> Source b
+toStream = toSource
+----
+
+== Optional GHC plugins
+
+=== Namer plugin
+
+One of the classic limitations of Lava is that identifier names are lost when
+the netlist is generated.  In particular, this is problematic when we want to
+analyse, say, the critical-path of our circuit using a third-party tool, but
+there is no way to map the netlist names reported by the tool back to the Lava
+names in the original description.
+
+Blarney provides a solution to this problem in the form of the 
+https://github.com/blarney-lang/blarney/blob/master/Haskell/BlarneyPlugins/Namer[Namer plugin].
+This is a simple GHC plugin (around 150 lines of code) that looks for monadic
+bindings of the form
+
+[source, haskell]
+----
+  x <- m
+----
+
+where `m` has type `Module a` for any `a`, and automatically rewrites the
+binding as
+
+[source, haskell]
+----
+  x <- withName "x" m
+----
+
+where
+http://blarney-lang.github.io/blarney/Blarney-Core-Module.html#v:withName[withName] is
+a Blarney primitive that introduces name information inside `m`. This simple
+approach captures quite a lot of useful names.
+
+The plugin is _completely optional_, and disabled by default.  To
+enable it, use the cabal flag `enable-namer-plugin` as demonstrated in
+the Blarney template project's
+https://github.com/blarney-lang/template-project/blob/master/cabal.project[cabal.project]
+file.
+
+If you're using `blc` rather than cabal for building your code (or you
+want to run `test.sh --plugin-namer`), then you need to install the
+plugin using cabal:
+
+[source, shell]
+----
+cd Haskell/BlarneyPlugins/Namer
+cabal v1-install
+----
+
+You can then pass the `--enable-namer-plugin` flag to `blc`.
+
+To further improve the readability of generated code, you can also pass the
+`--enable-name-prop` and `--enable-simplifier` options to the circuit
+generator.  This will enable the (experimental) name propagation and netlist
+simplification passes respectively.
