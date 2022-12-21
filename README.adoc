@@ -76,6 +76,27 @@ To start development of your own Blarney application or library, take
 a look at the
 https://github.com/blarney-lang/template-project/[Blarney template project].
 
+== Applications
+
+Our current list of applications developed using Blarney:
+
+* https://github.com/blarney-lang/actora/[Actora]: A 3-stage stack
+processor that runs code written a subset of Erlang. It has higher
+performance density than Intel's register-based NIOS-II core for
+compiled Erlang code.
+
+* https://github.com/CTSRD-CHERI/SIMTight/[SIMTight]: A
+https://cheri-cpu.org[CHERI]-enabled
+RISC-V GPGPU with dynamic scalarisation features and high performance
+density on Intel's Stratix 10 FPGA.
+
+== Documentation
+
+See
+https://github.com/blarney-lang/blarney/blob/master/Doc/ByExample.adoc[Blarney
+by Example], our introduction to Blarney, which supplements the
+http://blarney-lang.github.io/blarney/index.html[Haddock docs].
+
 == Taster
 
 Like Haskell, Blarney's main strength is support for writing clear,
@@ -111,7 +132,7 @@ The first stage of our server farm splits the request stream into _n_
 streams, forwarding requests to each stream in a round-robin fashion.
 Each stream is then passed through an instance of the server.
 Finally, the response streams are merged using the same round-robin
-strategy that was used to split the request streams, thereby keeping
+strategy that was used to split the request stream, thereby keeping
 responses in order with respect to their corresponding requests.
 
 To implement the splitting stage, we need to keep track of the next
@@ -176,24 +197,3 @@ farm example].  The biggest weakness of this implementation is that it
 must produce responses in order, even if later responses become
 available before earlier ones.  An interesting exercise might be to
 develop a server farm that supports out-of-order responses.
-
-== Applications
-
-Our current list of applications developed using Blarney:
-
-* https://github.com/blarney-lang/actora/[Actora]: A 3-stage stack
-processor that runs code written a subset of Erlang. It has higher
-performance density than Intel's register-based NIOS-II core for
-compiled Erlang code.
-
-* https://github.com/CTSRD-CHERI/SIMTight/[SIMTight]: A
-https://cheri-cpu.org[CHERI]-enabled
-RISC-V GPGPU with dynamic scalarisation features and high performance
-density on Intel's Stratix 10 FPGA.
-
-== Documentation
-
-See
-https://github.com/blarney-lang/blarney/blob/master/Doc/ByExample.adoc[Blarney
-by Example], our introduction to Blarney, which supplements the
-http://blarney-lang.github.io/blarney/index.html[Haddock docs].
