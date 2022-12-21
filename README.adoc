@@ -83,7 +83,7 @@ modular, strongly typed code.  To get a feel for this, we will briefly
 demonstrate how to implement a _server farm_ in Blarney.
 
 The concept of a server (or slave) is commonly used in hardware design
-to capture the idea of a module that processes requests and produces
+to capture the idea of a module that consumes requests and produces
 responses.  In Blarney, it can be modelled as a function over streams:
 
 [source, haskell]
@@ -172,10 +172,10 @@ mergeStreams ss = do
 This concludes the definition of the server farm. To see it in action,
 take a look at the
 https://github.com/blarney-lang/blarney/tree/master/Examples/GCDFarm/GCDFarm.hs[GCD
-farm example].  Its biggest weakness is that it must return responses
-in order, even if later responses become available before earlier
-ones.  An interesting exercise might be to develop a server farm that
-supports out-of-order responses.
+farm example].  The biggest weakness of this implementation is that it
+must produce responses in order, even if later responses become
+available before earlier ones.  An interesting exercise might be to
+develop a server farm that supports out-of-order responses.
 
 == Applications
 
