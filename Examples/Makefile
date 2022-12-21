@@ -16,6 +16,7 @@ clean:
 	make -C Either clean
 	make -C Factorial clean
 	make -C FIFO clean
+	make -C GCDFarm clean
 	make -C Interface clean
 	make -C Lookup clean
 	make -C MasterSlave clean

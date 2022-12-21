@@ -55,6 +55,10 @@ infixl 8 !
 instance (Interface a, KnownNat n) => Lookup [a] (Bit n) a where
   (!) = lookupInterface
 
+-- |Index a list using a one-hot bit list
+instance Interface a => Lookup [a] OneHotList a where
+  (!) = lookupInterfaceOneHot
+
 -- |Index a list using an 'Int'
 instance Lookup [a] Int a where
   rs ! i = rs !! i
@@ -71,6 +75,10 @@ instance Lookup (RegFile a d) a d where
 instance KnownNat m => Lookup (Bit n) (Bit m) (Bit 1) where
   b ! i = unsafeToBitList b ! i
 
+-- |Index a bit vector using a one-hot bit list
+instance Lookup (Bit n) OneHotList (Bit 1) where
+  b ! i = unsafeToBitList b ! i
+
 -- |Index a bit vector using an Int
 instance Lookup (Bit n) Int (Bit 1) where
   b ! i = unsafeToBitList b ! i
@@ -79,7 +87,7 @@ instance Lookup (Bit n) Int (Bit 1) where
 instance Lookup (Bit n) Integer (Bit 1) where
   b ! i = unsafeToBitList b ! i
 
--- |Index a list of interfaces using bit-vector
+-- |Index a list of interfaces using binary-encoded bit-vector
 lookupInterface :: (KnownNat n, Interface a) => [a] -> Bit n -> a
 lookupInterface ifcs i = fromIfcTerm (idx $ toIfcTerm <$> ifcs)
   where
@@ -91,6 +99,28 @@ lookupInterface ifcs i = fromIfcTerm (idx $ toIfcTerm <$> ifcs)
     idx (terms@(IfcTermAction{}:_)) = IfcTermAction do
       rets <- sequence [ whenAction (i .==. fromInteger j) act
                        | (j, IfcTermAction act) <- zip [0..] terms ]
+      return (idx rets)
+    idx (terms@(IfcTermProduct{}:_)) =
+      IfcTermProduct (idx [x0 | IfcTermProduct x0 _ <- terms])
+                     (idx [x1 | IfcTermProduct _ x1 <- terms])
+    idx (terms@(IfcTermFun{}:_)) =
+      IfcTermFun $ \x -> idx [f x | IfcTermFun f <- terms]
+
+-- |Index a list of interfaces using one-hot list of bits
+lookupInterfaceOneHot :: Interface a => [a] -> OneHotList -> a
+lookupInterfaceOneHot ifcs (OneHotList bs) =
+    fromIfcTerm (idx $ toIfcTerm <$> ifcs)
+  where
+    -- All elements in 'ifcs' have the same type, and hence all elements
+    -- in the argument to 'idx' are the same constructor.
+    idx [] = error "Blarney.Core.Lookup: looking up an empty list"
+    idx (terms@(IfcTermBV{}:_)) =
+      IfcTermBV $ tree1 orBV
+                    [ maskBV b x
+                    | (b, IfcTermBV x) <- zip bs terms ]
+    idx (terms@(IfcTermAction{}:_)) = IfcTermAction do
+      rets <- sequence [ whenAction b act
+                       | (b, IfcTermAction act) <- zip bs terms ]
       return (idx rets)
     idx (terms@(IfcTermProduct{}:_)) =
       IfcTermProduct (idx [x0 | IfcTermProduct x0 _ <- terms])
