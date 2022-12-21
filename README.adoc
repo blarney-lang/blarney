@@ -76,6 +76,13 @@ To start development of your own Blarney application or library, take
 a look at the
 https://github.com/blarney-lang/template-project/[Blarney template project].
 
+== Documentation
+
+See
+https://github.com/blarney-lang/blarney/blob/master/Doc/ByExample.adoc[Blarney
+by Example], our introduction to Blarney, which supplements the
+http://blarney-lang.github.io/blarney/index.html[Haddock docs].
+
 == Applications
 
 Our current list of applications developed using Blarney:
@@ -89,13 +96,6 @@ compiled Erlang code.
 https://cheri-cpu.org[CHERI]-enabled
 RISC-V GPGPU with dynamic scalarisation features and high performance
 density on Intel's Stratix 10 FPGA.
-
-== Documentation
-
-See
-https://github.com/blarney-lang/blarney/blob/master/Doc/ByExample.adoc[Blarney
-by Example], our introduction to Blarney, which supplements the
-http://blarney-lang.github.io/blarney/index.html[Haddock docs].
 
 == Taster
 
