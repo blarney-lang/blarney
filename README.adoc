@@ -99,27 +99,27 @@ http://blarney-lang.github.io/blarney/index.html[Haddock docs].
 
 == Taster
 
-Like Haskell, Blarney's main strength is support for writing clear,
-modular, strongly typed code.  To get a feel for this, we will briefly
-demonstrate how to implement a _server farm_ in Blarney.
+Like Haskell, Blarney supports writing clear, modular, strongly typed
+code.  To get a feel for this, let's briefly look at how a _server
+farm_ can be described in Blarney.
 
 The concept of a server (or slave) is commonly used in hardware design
 to capture the idea of a module that consumes requests and produces
-responses.  In Blarney, it can be modelled as a function over streams:
+responses.  In Blarney, it can be defined as a function over streams:
 
 [source, haskell]
 ----
 type Server req resp = Stream req -> Module (Stream resp)
 ----
 
-Some servers take longer than others to process requests. For example,
-a divider server that implements division by repeated substraction,
-and which is only able to process one request at a time, would be very
-slow: if it took _n_ cycles to perform a division on average, the
-server's throughput would be _1/n_ requests per cycle.  The idea of a
-server farm is that if you instantiate _n_ such servers, you can
-obtain a new server with a average throughput of 1 request per cycle.
-So a server farm is a function from a server to a server:
+Sometimes a server can take long time to process a request, hindering
+throughput.  More specifically, if on average it takes _n_ clock
+cycles to process a request, and only one request can be processed at
+a time, then the server's throughput would be _1/n_ requests per
+cycle.  The idea of a server farm is that if you instantiate _n_ such
+servers, you can obtain a new server with a average throughput of 1
+request per cycle.  So a server farm is a function from a server (with
+low throuhgput) to a server (with higher throughput):
 
 [source, haskell]
 ----
@@ -130,10 +130,11 @@ makeServerFarm n server reqs =
 
 The first stage of our server farm splits the request stream into _n_
 streams, forwarding requests to each stream in a round-robin fashion.
-Each stream is then passed through an instance of the server.
-Finally, the response streams are merged using the same round-robin
-strategy that was used to split the request stream, thereby keeping
-responses in order with respect to their corresponding requests.
+Each of these streams is then passed through an instance of the
+server.  Finally, the response streams are merged using the same
+round-robin strategy that was used to split the request stream,
+thereby keeping responses in order with respect to their corresponding
+requests.
 
 To implement the splitting stage, we need to keep track of the next
 server to feed. For this, we use a _n_-element list of 1-bit
@@ -182,7 +183,7 @@ mergeStreams ss = do
   next :: [Reg (Bit 1)] <-
     mapM makeReg ([true] ++ replicate (length ss - 1) false)
 
-  -- Select stream using general indexing operator
+  -- Select stream using Blarney's general indexing operator
   let s = ss ! OneHotList (map (.val) next)
 
   -- When output is consumed, move to the next input stream
@@ -190,10 +191,9 @@ mergeStreams ss = do
     s { consume = s.consume >> rotate next }
 ----
 
-This concludes the definition of the server farm. To see it in action,
-take a look at the
+We have managed to seperate the description of the server farm into
+reusable stages, each of which has a clean, strongly-typed interface.
+To see the server farm in action, take a look at the
 https://github.com/blarney-lang/blarney/tree/master/Examples/GCDFarm/GCDFarm.hs[GCD
-farm example].  The biggest weakness of this implementation is that it
-must produce responses in order, even if later responses become
-available before earlier ones.  An interesting exercise might be to
-develop a server farm that supports out-of-order responses.
+farm example].  For further and more detailed explanations, see the
+https://github.com/blarney-lang/blarney/blob/master/Doc/ByExample.adoc[introductory docs].
