@@ -80,7 +80,7 @@ https://github.com/blarney-lang/template-project/[Blarney template project].
 
 Like Haskell, Blarney's main strength is support for writing clear,
 modular, strongly typed code.  To get a feel for this, we will briefly
-demonstrate how to implement a *server farm* in Blarney.
+demonstrate how to implement a _server farm_ in Blarney.
 
 The concept of a server (or slave) is commonly used in hardware design
 to capture the idea of a module that processes requests and produces
@@ -94,9 +94,9 @@ type Server req resp = Stream req -> Module (Stream resp)
 Some servers take longer than others to process requests. For example,
 a server that implements division by repeated substraction, and which
 is only able to process one request at a time, would be very slow: if
-it took *n* cycles to perform a division on average, the server's
-throughput would be *1/n* requests per cycle.  The idea of a server
-farm is that if you instantiate *n* such servers, you can obtain a new
+it took _n_ cycles to perform a division on average, the server's
+throughput would be _1/n_ requests per cycle.  The idea of a server
+farm is that if you instantiate _n_ such servers, you can obtain a new
 server with a average throughput of 1 request per cycle.  So a server
 farm is a function from a server to a server:
 
@@ -108,14 +108,14 @@ makeServerFarm n server reqs =
 ----
 
 The first stage of our server farm is to split the request stream into
-*n* streams, forwarding requests to each stream in a round-robin
+_n_ streams, forwarding requests to each stream in a round-robin
 fashion.  Each stream is then passed through an instance of the server.
 Finally, the response streams are merged using the same round-robin
 strategy that was used to split the request streams, thereby keeping
 responses in order with respect to their corresponding requests.
 
 To implement the splitting stage, we need to keep track of the next
-output stream to feed. For this, we use a *n*-element list of 1-bit
+output stream to feed. For this, we use a _n_-element list of 1-bit
 registers, the first of which is initialised to true, and the others
 to false.  When an input request is consumed, we rotate the values of
 the registers so that a different output stream is fed next.
