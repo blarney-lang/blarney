@@ -115,10 +115,11 @@ strategy that was used to split the request streams, thereby keeping
 responses in order with respect to their corresponding requests.
 
 To implement the splitting stage, we need to keep track of the next
-output stream to feed. For this, we use a _n_-element list of 1-bit
+server to feed. For this, we use a _n_-element list of 1-bit
 registers, the first of which is initialised to true, and the others
-to false.  When an input request is consumed, we rotate the values of
-the registers so that a different output stream is fed next.
+to false.  When the next scheduled server consumes a request, we
+rotate the values of the registers so that a different server is fed
+next.
 
 [source, haskell]
 ----
@@ -147,9 +148,10 @@ rotate xs = zipWithM_ (<==) xs (drop 1 vals ++ take 1 vals)
   where vals = map (.val) xs
 ----
 
-To implement the merging stage, we track the next stream to consume
-using the same bit rotation strategy as the splitting stage. We
-then use this one-hot bit mask as an index into the list of streams.
+To implement the merging stage, we track the next server to consume
+from using the same bit rotation strategy as the splitting stage.  We
+then use this one-hot bit mask as an index into the list of response
+streams.
 
 [source, haskell]
 ----
@@ -170,7 +172,7 @@ mergeStreams ss = do
 This concludes the definition of the server farm. To see it in action,
 take a look at the
 https://github.com/blarney-lang/blarney/tree/master/Examples/GCDFarm/GCDFarm.hs[GCD
-farm example].  It's biggest weakness is that it must return responses
+farm example].  Its biggest weakness is that it must return responses
 in order, even if later responses become available before earlier
 ones.  An interesting exercise might be to develop a server farm that
 supports out-of-order responses.
