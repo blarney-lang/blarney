@@ -92,13 +92,13 @@ type Server req resp = Stream req -> Module (Stream resp)
 ----
 
 Some servers take longer than others to process requests. For example,
-a server that implements division by repeated substraction, and which
-is only able to process one request at a time, would be very slow: if
-it took _n_ cycles to perform a division on average, the server's
-throughput would be _1/n_ requests per cycle.  The idea of a server
-farm is that if you instantiate _n_ such servers, you can obtain a new
-server with a average throughput of 1 request per cycle.  So a server
-farm is a function from a server to a server:
+a divider server that implements division by repeated substraction,
+and which is only able to process one request at a time, would be very
+slow: if it took _n_ cycles to perform a division on average, the
+server's throughput would be _1/n_ requests per cycle.  The idea of a
+server farm is that if you instantiate _n_ such servers, you can
+obtain a new server with a average throughput of 1 request per cycle.
+So a server farm is a function from a server to a server:
 
 [source, haskell]
 ----
@@ -107,9 +107,9 @@ makeServerFarm n server reqs =
   splitStream n reqs >>= mapM server >>= mergeStreams
 ----
 
-The first stage of our server farm is to split the request stream into
-_n_ streams, forwarding requests to each stream in a round-robin
-fashion.  Each stream is then passed through an instance of the server.
+The first stage of our server farm splits the request stream into _n_
+streams, forwarding requests to each stream in a round-robin fashion.
+Each stream is then passed through an instance of the server.
 Finally, the response streams are merged using the same round-robin
 strategy that was used to split the request streams, thereby keeping
 responses in order with respect to their corresponding requests.
@@ -148,7 +148,7 @@ rotate xs = zipWithM_ (<==) xs (drop 1 vals ++ take 1 vals)
 ----
 
 To implement the merging stage, we track the next stream to consume
-from using the same bit rotation strategy as the splitting stage. We
+using the same bit rotation strategy as the splitting stage. We
 then use this one-hot bit mask as an index into the list of streams.
 
 [source, haskell]
@@ -169,7 +169,11 @@ mergeStreams ss = do
 
 This concludes the definition of the server farm. To see it in action,
 take a look at the
-https://github.com/blarney-lang/blarney/tree/master/Examples/GCDFarm/GCDFarm.hs[GCD farm example].
+https://github.com/blarney-lang/blarney/tree/master/Examples/GCDFarm/GCDFarm.hs[GCD
+farm example].  It's biggest weakness is that it must return responses
+in order, even if later responses become available before earlier
+ones.  An interesting exercise might be to develop a server farm that
+supports out-of-order responses.
 
 == Applications
 
