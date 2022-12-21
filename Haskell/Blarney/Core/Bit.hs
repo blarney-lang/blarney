@@ -4,11 +4,11 @@
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE NoStarIsType          #-}
 {-# LANGUAGE TypeOperators         #-}
-{-# LANGUAGE DeriveGeneric        #-}
+{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE TypeApplications      #-}
-{-# LANGUAGE DefaultSignatures    #-}
+{-# LANGUAGE DefaultSignatures     #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE AllowAmbiguousTypes   #-}
 {-# LANGUAGE ScopedTypeVariables   #-}
@@ -399,6 +399,9 @@ fromBitList xs
 toBitList :: KnownNat n => Bit n -> [Bit 1]
 toBitList vec = [unsafeAt i vec | i <- [0..n-1]]
   where n = widthOf vec
+
+-- | One-hot bit list
+newtype OneHotList = OneHotList [Bit 1]
 
 -- | Collapse a '[Bit 1]' of size n to a single 'Bit n'
 unsafeFromBitList :: [Bit 1] -> Bit n

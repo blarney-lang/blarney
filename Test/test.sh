@@ -15,6 +15,7 @@ ALL_BLARNEY_EXAMPLES=(
   Either
   FIFO
   Factorial
+  GCDFarm
   Interface
   Lookup
   MasterSlave
