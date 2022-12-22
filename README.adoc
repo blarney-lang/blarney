@@ -99,9 +99,9 @@ density on Intel's Stratix 10 FPGA.
 
 == Taster
 
-Like Haskell, Blarney supports writing clear, modular, strongly typed
-code.  To get a feel for this, let's briefly look at how a _server
-farm_ can be described in Blarney.
+Like Haskell, Blarney aims to support writing clear, modular, strongly
+typed code.  To get a feel for this, let's briefly look at how to
+implement a _server farm_ in Blarney.
 
 The concept of a server (or slave) is commonly used in hardware design
 to capture the idea of a module that consumes requests and produces
@@ -113,13 +113,13 @@ type Server req resp = Stream req -> Module (Stream resp)
 ----
 
 Sometimes a server can take long time to process a request, hindering
-throughput.  More specifically, if on average it takes _n_ clock
-cycles to process a request, and only one request can be processed at
-a time, then the server's throughput would be _1/n_ requests per
-cycle.  The idea of a server farm is that if you instantiate _n_ such
-servers, you can obtain a new server with a average throughput of 1
-request per cycle.  So a server farm is a function from a server (with
-low throuhgput) to a server (with higher throughput):
+throughput. If on average a server takes _n_ clock cycles to process a
+request, and only one request can be processed at a time, then the
+server's throughput would be _1/n_ requests per cycle.  The idea of a
+server farm is that if you instantiate _n_ such servers, you can
+obtain a new server with a average throughput of 1 request per cycle.
+So a server farm is a function from a server (with low throuhgput) to
+a server (with higher throughput):
 
 [source, haskell]
 ----
@@ -172,7 +172,7 @@ rotate xs = zipWithM_ (<==) xs (drop 1 vals ++ take 1 vals)
 
 To implement the merging stage, we track the next server to consume
 from using the same bit rotation strategy as the splitting stage.  We
-then use this one-hot bit mask as an index into the list of response
+then use this one-hot bit mask to select a stream from the list of
 streams.
 
 [source, haskell]
@@ -191,7 +191,7 @@ mergeStreams ss = do
     s { consume = s.consume >> rotate next }
 ----
 
-We have managed to seperate the description of the server farm into
+We have managed to split the description of the server farm into
 reusable stages, each of which has a clean, strongly-typed interface.
 To see the server farm in action, take a look at the
 https://github.com/blarney-lang/blarney/tree/master/Examples/GCDFarm/GCDFarm.hs[GCD
