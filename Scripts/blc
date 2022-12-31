@@ -30,10 +30,8 @@ if [ -z "$1" ]; then
 fi
 
 GHC="ghc --make"
-OPT="-O"
 if [ `basename $0` == "blci" ]; then
   GHC="ghci"
-  OPT=""
 fi
 EXTS="-XGHC2021 \
       -XBlockArguments \
@@ -59,4 +57,4 @@ fi
 INC="$BLARNEY_ROOT/Haskell"
 INC_H="$BLARNEY_ROOT/Haskell/Blarney/:./"
 
-$GHC $OPT $FLAGS $WARN -cpp -I$INC_H $EXTS -i$INC $@
+$GHC $FLAGS $WARN -cpp -I$INC_H $EXTS -i$INC $@
