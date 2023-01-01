@@ -49,6 +49,7 @@ module Blarney.Core.Interface (
 , portMethod
 , portMethodEn
 , portMethodAlwaysEn
+, portSkipName
   -- Function types convertible to external module I/O ports
 , Method(..)
   -- Types that can be turned into external modules
@@ -149,6 +150,10 @@ portMethodEn m en args =
 -- | Name an always-enabled method port
 portMethodAlwaysEn :: String -> [String] -> PortInfo
 portMethodAlwaysEn m args = (portMethod m args) { alwaysEnabled = True }
+
+-- | Skip name augmentation for a port
+portSkipName :: PortInfo
+portSkipName = portEmpty { skipName = True }
 
 class Interface a where
   toIfc :: a -> (IfcTerm, IfcType)
