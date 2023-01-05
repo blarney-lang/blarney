@@ -127,12 +127,12 @@ simulate :: Modular a => a -> IO ()
 simulate = simulateCore putStr
 
 -- | Simulate the provided Blarney circuit, capturing the displayed output
-simulateCapture :: Modular a => a -> IO [String]
+simulateCapture :: Modular a => a -> IO String
 simulateCapture circuit = do
   log :: IORef [String] <- newIORef []
   simulateCore (\s -> modifyIORef log (s:)) circuit
   lines <- readIORef log
-  return (reverse lines)
+  return (concat $ reverse lines)
 
 -- | Display the value of the given expression for 1 cycle
 eval :: FShow a => a -> IO ()
