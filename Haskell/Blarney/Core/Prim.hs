@@ -776,7 +776,8 @@ primInfo (Mux n wsel w) =
   PrimInfo { isInlineable = False
            , inputsInlineable = True
            , strRep = "Mux"
-           , semEval = Just \(s:is) -> [is !! fromIntegral s]
+           , semEval = Just \(s:is) ->
+               [is !! (fromIntegral s `mod` n)]
            , dontKill = False
            , isRoot = False
            , inputs = ("sel", wsel)
