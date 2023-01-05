@@ -67,8 +67,10 @@ compileSim :: Map.Map String Simulator
            -- ^ existing 'Simulator's (for nested 'Custom')
            -> Netlist
            -- ^ 'Netlist' for the circuit to compile a 'Simulator' for
+           -> (String -> IO ())
+           -- ^ Function to implement Blarney's display statement
            -> IO Simulator
-compileSim allSims originalNl = do
+compileSim allSims originalNl puts = do
   -- prepare compilation context
   ctxt <- mkCompCtxt originalNl
   -- handle on the netlist
@@ -106,7 +108,7 @@ compileSim allSims originalNl = do
         truncate = map snd . zip endStreams'
     -- compile simulation effects streams
     allEffectStreams <- sequence
-      [ compileSimEffect ctxt memo currentIns childrenOutputs n
+      [ compileSimEffect puts ctxt memo currentIns childrenOutputs n
       | n@Net{ netPrim = p } <- IArray.elems nl, case p of Display _ -> True
                                                            _         -> False ]
     let effectStreams = map sequence_ $ transpose $
@@ -192,13 +194,13 @@ compileCustomInputs ctxt memo currentIns childrenOutputs
 
 -- | compile the '[IO ()]' stream of simulation effects for a given simulation
 --   effect capable 'Net' (currently, only 'Display' nets)
-compileSimEffect :: CompFun s Net [IO ()]
-compileSimEffect ctxt memo currentIns childrenOutputs
+compileSimEffect :: (String -> IO ()) -> CompFun s Net [IO ()]
+compileSimEffect puts ctxt memo currentIns childrenOutputs
                  Net{ netPrim = Display args, .. } = do
   ins <- mapM (compileNetInputSignal ctxt memo currentIns childrenOutputs)
               netInputs
   return $ map (\(en:inpts) ->
-                 when (en /= 0) do putStr . concat $ fmt args inpts [])
+                 when (en /= 0) do puts . concat $ fmt args inpts [])
                (transpose ins)
   where fmt [] _ conds = []
         fmt (DisplayArgString s : rest) ins conds =

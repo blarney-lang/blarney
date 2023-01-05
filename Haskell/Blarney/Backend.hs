@@ -26,12 +26,14 @@ module Blarney.Backend (
   -- * Simulation backend
 , module Blarney.Backend.Simulation
 , simulate
+, simulateCapture
 , eval
 , evalFor
 ) where
 
 import Prelude
 import Data.Map ((!), toList, fromList)
+import Data.IORef
 
 import Blarney.Core.Bit
 import Blarney.Core.Interface (Modular(..), makeModule)
@@ -110,17 +112,27 @@ verifyWith conf circuit =
 --------------------------------------------------------------------------------
 
 -- | Simulate the provided Blarney circuit
-simulate :: Modular a
-         => a     -- ^ Blarney circuit
-         -> IO ()
-simulate circuit = do
+simulateCore :: Modular a => (String -> IO ()) -> a -> IO ()
+simulateCore puts circuit = do
   topSim <- onNetlists circuit topSimName \nls -> mdo
-    sims <- fromList <$> sequence [ (,) name <$> compileSim sims nl
+    sims <- fromList <$> sequence [ (,) name <$> compileSim sims nl puts
                                   | (name, nl) <- toList nls ]
     return $ sims ! topSimName
   runSim topSim mempty
   return ()
   where topSimName = "circuit under simulation"
+
+-- | Simulate the provided Blarney circuit
+simulate :: Modular a => a -> IO ()
+simulate = simulateCore putStr
+
+-- | Simulate the provided Blarney circuit, capturing the displayed output
+simulateCapture :: Modular a => a -> IO [String]
+simulateCapture circuit = do
+  log :: IORef [String] <- newIORef []
+  simulateCore (\s -> modifyIORef log (s:)) circuit
+  lines <- readIORef log
+  return (reverse lines)
 
 -- | Display the value of the given expression for 1 cycle
 eval :: FShow a => a -> IO ()
