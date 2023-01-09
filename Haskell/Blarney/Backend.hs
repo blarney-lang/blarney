@@ -111,8 +111,8 @@ verifyWith conf circuit =
 -- Simulation backend
 --------------------------------------------------------------------------------
 
--- | Simulate the provided Blarney circuit
-simulateCore :: Modular a => (String -> IO ()) -> a -> IO ()
+-- | Simulate the provided module
+simulateCore :: (String -> IO ()) -> Module () -> IO ()
 simulateCore puts circuit = do
   topSim <- onNetlists circuit topSimName \nls -> mdo
     sims <- fromList <$> sequence [ (,) name <$> compileSim sims nl puts
@@ -120,14 +120,15 @@ simulateCore puts circuit = do
     return $ sims ! topSimName
   runSim topSim mempty
   return ()
-  where topSimName = "circuit under simulation"
+  where
+    topSimName = "circuit under simulation"
 
--- | Simulate the provided Blarney circuit
-simulate :: Modular a => a -> IO ()
+-- | Simulate the provided module
+simulate :: Module () -> IO ()
 simulate = simulateCore putStr
 
--- | Simulate the provided Blarney circuit, capturing the displayed output
-simulateCapture :: Modular a => a -> IO String
+-- | Simulate the provided module, capturing the displayed output
+simulateCapture :: Module () -> IO String
 simulateCapture circuit = do
   log :: IORef [String] <- newIORef []
   simulateCore (\s -> modifyIORef log (s:)) circuit
