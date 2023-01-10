@@ -181,6 +181,24 @@ infixl 8 .>>>.
 (.>>>.) :: Bit n -> Bit m -> Bit n
 a .>>>. b = FromBV $ arithRightBV (toBV a) (toBV b)
 
+-- |Rotate left
+rotl :: Bit n -> Bit m -> Bit n
+rotl a b = FromBV $
+  orBV (selectBV (wa-1, 0) ashft)
+       (selectBV (wa*2-1, wa) ashft)
+  where
+    wa = unsafeWidthOf a
+    ashft = leftBV (concatBV (constBV wa 0) (toBV a)) (toBV b)
+
+-- |Rotate right
+rotr :: Bit n -> Bit m -> Bit n
+rotr a b = FromBV $
+  orBV (selectBV (wa-1, 0) ashft)
+       (selectBV (wa*2-1, wa) ashft)
+  where
+    wa = unsafeWidthOf a
+    ashft = rightBV (concatBV (toBV a) (constBV wa 0)) (toBV b)
+
 -- * Bit-vector comparison primitives
 
 -- Comparison operators
