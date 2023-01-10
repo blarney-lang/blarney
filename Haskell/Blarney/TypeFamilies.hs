@@ -21,6 +21,10 @@ import GHC.Types
 import Data.Type.Bool
 import Data.Type.Equality
 
+-- | Type function for computing the min of two type-level nats
+type family Min (x :: Nat) (y::Nat) :: Nat where
+  Min x y = If (CmpNat x y == LT) x y
+
 -- | Type function for computing the max of two type-level nats
 type family Max (a :: Nat) (b :: Nat) :: Nat where
   Max a b = If (CmpNat a b == GT) a b

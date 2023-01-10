@@ -59,11 +59,9 @@ module Blarney.Vector (
 , Blarney.Vector.takeAt
 --
 , Blarney.Vector.rotateL
-, Blarney.Vector.rotate
 , Blarney.Vector.rotateR
+, Blarney.Vector.rotateLBy
 , Blarney.Vector.rotateRBy
-, Blarney.Vector.rotateBy
-, Blarney.Vector.shiftInAt0
 , Blarney.Vector.reverse
 --
 , Blarney.Vector.elem
@@ -104,7 +102,7 @@ module Blarney.Vector (
 , Blarney.Vector.sscanl
 -- TODOs
 -- toChunks
--- shiftInAtN, shiftOutFrom0, shiftOutFromN
+-- shiftInAt0, shiftInAtN, shiftOutFrom0, shiftOutFromN
 -- findElem, findIndex, rotateBitsBy, countOnesAlt
 -- transpose, transposeLN
 -- mapPairs, joinActions
@@ -115,6 +113,7 @@ module Blarney.Vector (
 import Blarney
 import Blarney.Option
 import Blarney.Core.BV
+import Blarney.TypeFamilies
 
 import qualified Data.List as L
 import qualified Data.Type.Bool as B
@@ -184,14 +183,11 @@ replicateM x = do
 genWith :: forall n a. KnownNat n => (Integer -> a) -> Vec n a
 genWith f = Vec (L.take (valueOf @n) $ L.map f [0..])
 
-genWithM :: forall n a m. (Monad m, KnownNat n) => (Integer -> m a) -> m (Vec n a)
+genWithM :: forall n a m. (Monad m, KnownNat n) =>
+              (Integer -> m a) -> m (Vec n a)
 genWithM f = do
   xs <- Blarney.mapM f [0 .. toInteger (valueOf @n - 1)]
   return $ Vec xs
-
--- | TODO
--- toChunks :: (Bits a, Bits b, n * SizeOf b ~ SizeOf a) => a -> Vec n b
--- toChunks x =
 
 -- | Construct a new 'Vec' from a new element and an exisiting 'Vec'. The new
 --   element is the head of the new 'Vec'.
@@ -268,7 +264,6 @@ takeAt idx xs
 rotateL :: Vec n a -> Vec n a
 rotateL xs = Vec (L.tail xss ++ [L.head xss])
              where xss = toList xs
-rotate = rotateL
 
 -- | Return a 'Vec' image of the given 'Vec' with its elements rotated right by
 --   one, with the last element becoming the head element
@@ -276,25 +271,35 @@ rotateR :: Vec n a -> Vec n a
 rotateR xs = Vec (L.last xss : L.init xss)
              where xss = toList xs
 
+-- Internal function: rotate vector left/right
+rotateBy :: Bits a => Bool -> Bit m -> Vec n a -> Vec n a
+rotateBy left i =
+    Vec
+  . L.map unpack
+  . L.map unsafeFromBitList
+  . L.transpose
+  . L.map unsafeToBitList
+  . L.map (`rot` i)
+  . L.map unsafeFromBitList
+  . L.transpose
+  . L.map unsafeToBitList
+  . L.map pack
+  . toList
+  where rot = if left then rotr else rotl
+
 -- | Return a 'Vec' image of the given 'Vec' with its elements rotated right by
 --   'i', with the last 'i' elements becoming the first 'i' elements
-rotateRBy :: Int -> Vec n a -> Vec n a
-rotateRBy i xs = Vec (newInit ++ newTail)
-                 where (newTail, newInit) = splitAt i (toList xs)
-rotateBy = rotateRBy
+rotateRBy :: Bits a => Bit m -> Vec n a -> Vec n a
+rotateRBy = rotateBy False
 
--- | Insert a given element at the head of a given 'Vec' and drops the last
---   element
-shiftInAt0 :: Vec n a -> a -> Vec n a
-shiftInAt0 xs x = Vec (L.init (x : toList xs))
-
--- TODO ? shiftInAtN, shiftOutFrom0, shiftOutFromN
+-- | Return a 'Vec' image of the given 'Vec' with its elements rotated left by
+--   'i', with the first 'i' elements becoming the last 'i' elements
+rotateLBy :: Bits a => Bit m -> Vec n a -> Vec n a
+rotateLBy = rotateBy True
 
 -- | Reverse the given 'Vec'
 reverse :: Vec n a -> Vec n a
 reverse xs = Vec (L.reverse $ toList xs)
-
--- TODO ? transpose, transposeLN
 
 -- | Check that the given value is and element of the given 'Vec'
 elem :: Bits a => a -> Vec n a -> Bit 1
@@ -330,8 +335,6 @@ countIf p xs = L.foldl (\c x -> c .+. if p x then 1 else 0) 0 (toList xs)
 find :: Bits a => (a -> Bit 1) -> Vec n a -> Option a
 find p xs = L.foldl (\c x -> if p x then some x else c) none (toList xs)
 
--- TODO ? findElem, findIndex, rotateBitsBy, countOnesAlt
-
 -- | Return a 'Vec' of pairs of elements at the same index in both given 'Vec's
 zip :: Vec n a -> Vec n b -> Vec n (a, b)
 zip xs ys = Vec $ L.zip (toList xs) (toList ys)
@@ -343,10 +346,6 @@ zip3 xs ys zs = Vec $ L.zip3 (toList xs) (toList ys) (toList zs)
 -- | Return a 'Vec' of tuple-4 of elements at the same index in the given 'Vec's
 zip4 :: Vec n a -> Vec n b -> Vec n c -> Vec n d -> Vec n (a, b, c, d)
 zip4 ws xs ys zs = Vec $ L.zip4 (toList ws) (toList xs) (toList ys) (toList zs)
-
--- type family helper: Min
-type family Min (x :: Nat) (y::Nat) :: Nat where
-  Min x y = B.If (CmpNat x y == LT) x y
 
 -- | Return a 'Vec' of pairs of elements at the same index in both given 'Vec's
 --   with the resulting 'Vec' being as long as the smaller input 'Vec'
@@ -434,8 +433,6 @@ foldl1 f xs = L.foldl1 f (toList xs)
 fold :: 1 <= n => (a -> a -> a) -> Vec n a -> a
 fold f xs = tree1 f (toList xs)
 
--- TODO mapPairs, joinActions
-
 -- | Apply a function over a 'Vec' starting with the given seed and the last
 --   element, yielding a 'Vec' one element bigger than the provided one
 scanr :: (a -> b -> b) -> b -> Vec n a -> Vec (n+1) b
@@ -457,8 +454,6 @@ scanl f seed xs = Vec $ L.scanl f seed (toList xs)
 --   yielding a 'Vec' of the same size as the provided one
 sscanl :: (b -> a -> b) -> b -> Vec n a -> Vec (n+1) b
 sscanl f seed xs = Vec $ L.tail (L.scanl f seed (toList xs))
-
--- TODO mapAccumL, mapAccumR
 
 -- |Index a vector using a bit vector
 instance (Interface a, KnownNat n) => Lookup (Vec m a) (Bit n) a where
