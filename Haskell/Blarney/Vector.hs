@@ -91,6 +91,9 @@ module Blarney.Vector (
 , Blarney.Vector.zipWithAny
 , Blarney.Vector.zipWithAny3
 --
+, Blarney.Vector.tree
+, Blarney.Vector.tree1
+--
 , Blarney.Vector.foldr
 , Blarney.Vector.foldl
 , Blarney.Vector.foldr1
@@ -153,6 +156,9 @@ instance (KnownNat n, Interface a) => Interface (Vec n a) where
     where
       decode 0 _ = []
       decode i ~(IfcTermProduct x0 x1) = fromIfcTerm x0 : decode (i-1) x1
+
+instance Functor (Vec n) where
+  fmap = Blarney.Vector.map
 
 -- | Generate a 'Vec' of size 'n' initialized with 'undefined' in each element
 newVec :: forall n a. KnownNat n => Vec n a
@@ -302,33 +308,33 @@ reverse :: Vec n a -> Vec n a
 reverse xs = Vec (L.reverse $ toList xs)
 
 -- | Check that the given value is and element of the given 'Vec'
-elem :: Bits a => a -> Vec n a -> Bit 1
-elem x = Blarney.Vector.any (=== x)
+elem :: Cmp a => a -> Vec n a -> Bit 1
+elem x = Blarney.Vector.any (.==. x)
 
 -- | Check that the given predicate holds for any element of the given 'Vec'
 any :: (a -> Bit 1) -> Vec n a -> Bit 1
-any pred xs = L.foldl (\acc x -> acc .|. (pred x)) false (toList xs)
-
+any pred = Blarney.Vector.or . fmap pred
 
 -- | Check that the given predicate holds for all element of the given 'Vec'
 all :: (a -> Bit 1) -> Vec n a -> Bit 1
-all pred xs = L.foldl (\acc x -> acc .&. (pred x)) true (toList xs)
+all pred = Blarney.Vector.and . fmap pred
 
 -- | Reduces a 'Vec' of 'Bit 1' by "or-ing" its elements
 or :: Vec n (Bit 1) -> Bit 1
-or = Blarney.Vector.any (.==. true)
+or = Blarney.Vector.tree (.||.) false
 
 -- | Reduces a 'Vec' of 'Bit 1' by "and-ing" its elements
 and :: Vec n (Bit 1) -> Bit 1
-and = Blarney.Vector.all (.==. true)
+and = Blarney.Vector.tree (.&&.) true
 
 -- | Return the number of elements of 'Vec' which are equal to the given value
-countElem :: (Bits a, 1 <= n, _) => a -> Vec n a -> Bit (Log2 n + 1)
-countElem e xs = L.foldl (\c x -> c + if x === e then 1 else 0) 0 (toList xs)
+countElem :: (Cmp a, 1 <= n, _) => a -> Vec n a -> Bit (Log2Ceil n + 1)
+countElem e = countIf (.==. e)
 
 -- | Return the number of elements of 'Vec' for which the given predicate holds
-countIf :: (1 <= n, _) => (a -> Bit 1) -> Vec n a -> Bit (Log2 n + 1)
-countIf p xs = L.foldl (\c x -> c .+. if p x then 1 else 0) 0 (toList xs)
+countIf :: (1 <= n, _) => (a -> Bit 1) -> Vec n a -> Bit (Log2Ceil n + 1)
+countIf p =
+  Blarney.Vector.tree (+) 0 . fmap (\x -> if p x then 1 else 0)
 
 -- | Return a 'some' 'Option' with the first element in the given 'Vec' that
 --   satisfies the given predicate, or 'none' if no such element is found
@@ -409,6 +415,14 @@ zipWithAny3 :: (a -> b -> c -> d) -> Vec n0 a -> Vec n1 b -> Vec n2 c
 zipWithAny3 f xs ys zs = Vec $ L.map (\(x, y, z) -> f x y z)
                                (L.zip3 (toList xs) (toList ys) (toList zs))
 
+-- | Tree reduction for vectors
+tree :: (a -> a -> a) -> a -> Vec n a -> a
+tree f z = Blarney.tree f z . toList
+
+-- | Tree reduction for nonempty vectors
+tree1 :: (a -> a -> a) -> Vec n a -> a
+tree1 f = Blarney.tree1 f . toList
+
 -- | Reduce a 'Vec' using the given function, starting with a provided seed and
 --   the last element of the 'Vec'
 foldr :: (a -> b -> b) -> b -> Vec n a -> b
@@ -431,7 +445,7 @@ foldl1 f xs = L.foldl1 f (toList xs)
 
 -- | Reduce a 'Vec' using the given function in a tree structure
 fold :: 1 <= n => (a -> a -> a) -> Vec n a -> a
-fold f xs = tree1 f (toList xs)
+fold f xs = Blarney.tree1 f (toList xs)
 
 -- | Apply a function over a 'Vec' starting with the given seed and the last
 --   element, yielding a 'Vec' one element bigger than the provided one
