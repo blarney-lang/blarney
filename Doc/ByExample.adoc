@@ -932,7 +932,7 @@ Using the following `main` function we can generate both the
 main :: IO ()
 main = do
   let dir = "/tmp/inc"
-  writeVerilogModule inc "incStream" dir
+  writeVerilogModule incStream "incStream" dir
   writeVerilogTop top "top" dir
 ----
 
@@ -954,7 +954,7 @@ define `makeInc` as:
 [source, haskell]
 ----
 makeInc :: Stream (Bit 8) -> Module (Stream (Bit 8))
-makeInc = makeBoundary "incStream" inc
+makeInc = makeBoundary "incStream" incStream
 ----
 
 Unlike `makeInstance`, `makeBoundary` takes the module to instantiate
@@ -968,7 +968,7 @@ makeBoundary :: Modular m => String -> m -> m
 
 This means that it is unncessary to supply a type signature for
 `makeInc` now; it will be inferred.  Furthermore, the top-level of our
-design no longer needs to call `writeVerilogModule` for the `inc`
+design no longer needs to call `writeVerilogModule` for the `incStream`
 module because Blarney now knows how to generate a module for any
 instance that it encounters.
 
