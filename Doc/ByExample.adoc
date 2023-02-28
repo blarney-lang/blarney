@@ -896,7 +896,7 @@ makeIncStream = makeInstance "incStream"
 
 Notice that interface of the Verilog module being instantiated is determined
 from the type signature.  Here's a sample top-level module that uses the
-`makeInc` function:
+`makeIncStream` function:
 
 [source, haskell]
 ----
@@ -949,12 +949,12 @@ and error-prone.  In particular, there is no requirement for the type
 of the instance to match the type of the module, and it would be nice
 to specify a boundary in a backend-independent way.  To solve these
 problems, Blarney provides a `makeBoundary` function.  We can now
-define `makeInc` as:
+define `makeIncStream` as:
 
 [source, haskell]
 ----
-makeInc :: Stream (Bit 8) -> Module (Stream (Bit 8))
-makeInc = makeBoundary "incStream" incStream
+makeIncStream :: Stream (Bit 8) -> Module (Stream (Bit 8))
+makeIncStream = makeBoundary "incStream" incStream
 ----
 
 Unlike `makeInstance`, `makeBoundary` takes the module to instantiate
