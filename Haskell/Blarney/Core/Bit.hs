@@ -452,6 +452,16 @@ truncateCast x
     wx = widthOf x
     wy = widthOf y
 
+-- | Similar to 'truncateLSB' but width check done at elaboration time
+truncateLSBCast :: (KnownNat n, KnownNat m) => Bit n -> Bit m
+truncateLSBCast x
+  | wx >= wy = y
+  | otherwise = error "truncateLSBCast: output larger than input"
+  where
+    y = unsafeSlice (wx-1, wx-wy) x
+    wx = widthOf x
+    wy = widthOf y
+
 -- | Similar to 'zeroExtend' but width check done at elaboration time
 zeroExtendCast :: (KnownNat n, KnownNat m) => Bit n -> Bit m
 zeroExtendCast x
