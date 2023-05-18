@@ -442,6 +442,10 @@ onBitList f x
     list = unsafeToBitList x
     list' = f list
 
+-- | Cast one size of vector to another (dangerous)
+unsafeBitCast :: Bit n -> Bit m
+unsafeBitCast = FromBV . toBV
+
 -- | Similar to 'truncate' but width check done at elaboration time
 truncateCast :: (KnownNat n, KnownNat m) => Bit n -> Bit m
 truncateCast x
