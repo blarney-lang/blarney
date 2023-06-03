@@ -1254,6 +1254,108 @@ http://blarney-lang.github.io/blarney/Blarney-Core-Bit.html#v:lower[lower]
 (also called
 http://blarney-lang.github.io/blarney/Blarney-Core-Bit.html#v:truncate[truncate]).
 
+== Larger examples
+
+=== Server farm
+
+Like Haskell, Blarney aims to support writing clear, modular, strongly
+typed code.  To get a feel for this, let's briefly look at how to
+implement a _server farm_ in Blarney.
+
+The concept of a server (or slave) is commonly used in hardware design
+to capture the idea of a module that consumes requests and produces
+responses.  In Blarney, it can be defined as a function over streams:
+
+[source, haskell]
+----
+type Server req resp = Stream req -> Module (Stream resp)
+----
+
+Sometimes a server can take long time to process a request, hindering
+throughput. If on average a server takes _n_ clock cycles to process a
+request, and only one request can be processed at a time, then the
+server's throughput would be _1/n_ requests per cycle.  The idea of a
+server farm is that if you instantiate _n_ such servers, you can
+obtain a new server with a average throughput of 1 request per cycle.
+So a server farm is a function from a server (with low throuhgput) to
+a server (with higher throughput):
+
+[source, haskell]
+----
+makeServerFarm :: Interface resp => Int -> Server req resp -> Server req resp
+makeServerFarm n server reqs =
+  splitStream n reqs >>= mapM server >>= mergeStreams
+----
+
+The first stage of our server farm splits the request stream into _n_
+streams, forwarding requests to each stream in a round-robin fashion.
+Each of these streams is then passed through an instance of the
+server.  Finally, the response streams are merged using the same
+round-robin strategy that was used to split the request stream,
+thereby keeping responses in order with respect to their corresponding
+requests.
+
+To implement the splitting stage, we need to keep track of the next
+server to feed. For this, we use a _n_-element list of 1-bit
+registers, the first of which is initialised to true, and the others
+to false.  When the next scheduled server consumes a request, we
+rotate the values of the registers so that a different server is fed
+next.
+
+[source, haskell]
+----
+splitStream :: Int -> Stream a -> Module [Stream a]
+splitStream n s = do
+  -- Which output stream to feed next?
+  next :: [Reg (Bit 1)] <-
+    mapM makeReg ([true] ++ replicate (n-1) false)
+
+  -- When an output stream is consumed, move to the next one
+  return
+    [ s {
+        canPeek = s.canPeek .&&. active.val
+      , consume = s.consume >> rotate next
+      }
+    | active <- next ]
+----
+
+To rotate the values of the registers, we use the following helper
+function.
+
+[source, haskell]
+----
+rotate :: Bits a => [Reg a] -> Action ()
+rotate xs = zipWithM_ (<==) xs (drop 1 vals ++ take 1 vals)
+  where vals = map (.val) xs
+----
+
+To implement the merging stage, we track the next server to consume
+from using the same bit rotation strategy as the splitting stage.  We
+then use this one-hot bit mask to select a stream from the list of
+streams.
+
+[source, haskell]
+----
+mergeStreams :: Interface a => [Stream a] -> Module (Stream a)
+mergeStreams ss = do
+  -- Which input stream to consume next?
+  next :: [Reg (Bit 1)] <-
+    mapM makeReg ([true] ++ replicate (length ss - 1) false)
+
+  -- Select stream using Blarney's general indexing operator
+  let s = ss ! OneHotList (map (.val) next)
+
+  -- When output is consumed, move to the next input stream
+  return
+    s { consume = s.consume >> rotate next }
+----
+
+We have managed to split the description of the server farm into
+reusable stages, each of which has a clean, strongly-typed interface.
+To see the server farm in action, take a look at the
+https://github.com/blarney-lang/blarney/tree/master/Examples/GCDFarm/GCDFarm.hs[GCD
+farm example].
+
 == Type classes
 
 === Bits
