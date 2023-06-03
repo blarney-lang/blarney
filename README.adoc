@@ -79,7 +79,7 @@ https://github.com/blarney-lang/template-project/[Blarney template project].
 == Documentation
 
 See
-https://github.com/blarney-lang/blarney/blob/master/Doc/ByExample.adoc[Blarney
+https://github.com/blarney-lang/blarney/blob/master/Doc/[Blarney
 by Example], our introduction to Blarney, which supplements the
 http://blarney-lang.github.io/blarney/index.html[Haddock docs].
 
@@ -196,4 +196,4 @@ reusable stages, each of which has a clean, strongly-typed interface.
 To see the server farm in action, take a look at the
 https://github.com/blarney-lang/blarney/tree/master/Examples/GCDFarm/GCDFarm.hs[GCD
 farm example].  For further and more detailed explanations, see the
-https://github.com/blarney-lang/blarney/blob/master/Doc/ByExample.adoc[introductory docs].
+https://github.com/blarney-lang/blarney/blob/master/Doc/[introductory docs].
