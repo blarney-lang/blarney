@@ -79,7 +79,7 @@ https://github.com/blarney-lang/template-project/[Blarney template project].
 == Documentation
 
 See
-https://github.com/blarney-lang/blarney/blob/master/Doc/ByExample.md[Blarney
+https://github.com/blarney-lang/blarney/blob/master/Doc/ByExample.adoc[Blarney
 by Example], our introduction to Blarney, which supplements the
 http://blarney-lang.github.io/blarney/index.html[Haddock docs].
 
