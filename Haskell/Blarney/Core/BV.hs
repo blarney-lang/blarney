@@ -62,7 +62,7 @@ module Blarney.Core.BV (
 , muxBV          -- :: BV -> (BV, BV) -> BV
 , idBV           -- :: BV -> BV
 , testPlusArgsBV -- :: String -> BV
-, inputPinBV     -- :: String -> BV
+, inputPinBV     -- :: Width -> String -> BV
 , regBV          -- :: Width -> Integer -> BV -> BV
 , regEnBV        -- :: Width -> Integer -> BV -> BV -> BV
 , mergeWritesBV  -- :: MergeStrategy -> Width -> [(BV, BV)] -> BV

@@ -370,6 +370,12 @@ unsafeAt i a =
     wa = unsafeWidthOf a
     result = FromBV $ selectBV (i, i) (toBV a)
 
+-- * Bit-vector inputs
+
+-- |Input bit-vector
+inputPin :: forall n. KnownNat n => String -> Bit n
+inputPin name = FromBV (inputPinBV (valueOf @n) name)
+
 -- * Bit-vector registers
 
 -- |Register
