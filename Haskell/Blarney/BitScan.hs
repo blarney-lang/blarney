@@ -57,6 +57,7 @@ module Blarney.BitScan
   , FieldMap
   , matchSel
   , SelMap
+  , hasBitField
   , getBitField
   , getBitFieldStrict
   , getBitFieldSel
@@ -454,6 +455,15 @@ packTagMap tagMap
            | tag <- [minBound..maxBound] ]
     numBits = length bits
     vec = fromBitList $ take w (bits ++ repeat 0)
+
+-- |Check if given field is active.
+hasBitField :: FieldMap -> String -> Bit 1
+hasBitField m key = result
+  where
+    result =
+      case Data.Map.lookup key m of
+        Nothing -> error ("BitScan.hasBitField: unknown key " ++ key)
+        Just opt -> opt.valid
 
 -- |Get field value from a map, and cast to required size using
 -- truncation or sign-extension.
