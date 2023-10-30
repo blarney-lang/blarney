@@ -1188,25 +1188,24 @@ upperNibble x = slice @7 @4 x
 ----
 
 For elaboration-time indices of type `Int`, we provide
-http://blarney-lang.github.io/blarney/Blarney-Core-Bit.html#v:unsafeAt[unsafeAt] and
-http://blarney-lang.github.io/blarney/Blarney-Core-Bit.html#v:unsafeSlice[unsafeSlice]:
+http://blarney-lang.github.io/blarney/Blarney-Core-Bit.html#v:untypedAt[untypedAt] and
+http://blarney-lang.github.io/blarney/Blarney-Core-Bit.html#v:untypedSlice[untypedSlice]:
 
 [source, haskell]
 ----
 -- Extract most-sigificant bit of a byte
 msb :: Bit 8 -> Bit 1
-msb x = unsafeAt 7 x
+msb x = untypedAt 7 x
 
 -- Extract upper 4 bits of a byte
 upperNibble :: Bit 8 -> Bit 4
-upperNibble x = unsafeSlice (7, 4) x
+upperNibble x = untypedSlice (7, 4) x
 ----
 
-The argument to `unsafeAt` could be out of range, and the result of
-`unsafeSlice` could have a different width to that implied by the
-range.  Such cases will not be caught by the type checker and will
-lead to error messages at circuit generation time, hence the "unsafe"
-prefix on the function names.
+The argument to `untypedAt` could be out of range, and the result of
+`untypedSlice` could have a different width to that implied by the range.  Such
+cases will not be caught by the type checker (hence the "untyped" prefix) and
+will lead to error messages at circuit generation time.
 
 Finally, for circuit-level indicies of type `Bit n`, the generic lookup
 operator `!` can be used:

@@ -341,8 +341,8 @@ slice :: forall (hi :: Nat) (lo :: Nat) i o.
 slice a = unsafeSlice (valueOf @hi, valueOf @lo) a
 
 -- | Dynamically-typed bit selection
-unsafeCheckedSlice :: KnownNat m => (Int, Int) -> Bit n -> Bit m
-unsafeCheckedSlice (hi, lo) a =
+untypedSlice :: KnownNat m => (Int, Int) -> Bit n -> Bit m
+untypedSlice (hi, lo) a =
   case lo > hi || (hi+1-lo) /= wr of
     True -> error "Blarney: sub-range does not match bit width"
     False -> result
@@ -360,8 +360,8 @@ at :: forall (i :: Nat) n. (KnownNat i, (i+1) <= n)
 at a = unsafeAt (valueOf @i) a
 
 -- | Dynamically-typed bit indexing
-unsafeAt :: Int -> Bit n -> Bit 1
-unsafeAt i a =
+untypedAt :: Int -> Bit n -> Bit 1
+untypedAt i a =
   case i >= wa of
     True -> error ("Bit index " ++ show i ++ " out of range ["
                                 ++ show (wa-1) ++ ":0]")
@@ -369,6 +369,10 @@ unsafeAt i a =
   where
     wa = unsafeWidthOf a
     result = FromBV $ selectBV (i, i) (toBV a)
+
+-- | Dynamically-typed bit indexing
+unsafeAt :: Int -> Bit n -> Bit 1
+unsafeAt = untypedAt
 
 -- * Bit-vector inputs
 
