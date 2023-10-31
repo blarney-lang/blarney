@@ -104,9 +104,6 @@ makeSizedStack logSize = do
             sp <== spMinus1
             empty <== sp.val .==. 1
             full <== false
-          -- When pushing and popping, or neither
-          when (popWire.val .==. pushWire.active) do
-            ram.preserveOut
 
     return
       Stack {

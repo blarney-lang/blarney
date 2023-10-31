@@ -119,14 +119,14 @@ makeQuadRAMCore init = do
   wrAddrBusA :: Wire a <- makeWire dontCare
   dataBusA   :: Wire d <- makeWire dontCare
   writeEnA   :: Wire (Bit 1) <- makeWire 0
-  readEnA    :: Wire (Bit 1) <- makeWire 1
+  readEnA    :: Wire (Bit 1) <- makeWire 0
 
   -- RAM B busses
   rdAddrBusB :: Wire a <- makeWire dontCare
   wrAddrBusB :: Wire a <- makeWire dontCare
   dataBusB   :: Wire d <- makeWire dontCare
   writeEnB   :: Wire (Bit 1) <- makeWire 0
-  readEnB    :: Wire (Bit 1) <- makeWire 1
+  readEnB    :: Wire (Bit 1) <- makeWire 0
 
   -- RAM instance
   let (outA, outB) = ramQuad init
@@ -137,27 +137,29 @@ makeQuadRAMCore init = do
   -- Interface A
   let ramA =
         RAM {
-          load = (rdAddrBusA <==)
+          load = \a -> do
+                   rdAddrBusA <== a
+                   readEnA <== 1
         , store = \a d -> do
                     wrAddrBusA <== a
                     dataBusA <== d
                     writeEnA <== 1
         , out = outA
         , storeActive = val writeEnA
-        , preserveOut = readEnA <== 0
         }
 
   -- Interface B
   let ramB =
         RAM {
-          load = (rdAddrBusB <==)
+          load = \a -> do
+                   rdAddrBusB <== a
+                   readEnB <== 1
         , store = \a d -> do
                     wrAddrBusB <== a
                     dataBusB <== d
                     writeEnB <== 1
         , out = outB
         , storeActive = val writeEnB
-        , preserveOut = readEnB <== 0
         }
 
   return (ramA, ramB)

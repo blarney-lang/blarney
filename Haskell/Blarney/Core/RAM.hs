@@ -250,7 +250,6 @@ data RAM a d =
   , store :: a -> d -> Action ()  -- ^ Issue store request
   , out :: d                      -- ^ Data out
   , storeActive :: Bit 1          -- ^ Is there a store currently happening?
-  , preserveOut :: Action ()      -- ^ Preserve current output on next cycle
   }
 
 -- | Create uninitialised block RAM
@@ -268,7 +267,7 @@ makeRAMCore init = do
   addrBus :: Wire a <- makeWireU
   dataBus :: Wire d <- makeWireU
   writeEn :: Wire (Bit 1) <- makeWire 0
-  readEn  :: Wire (Bit 1) <- makeWire 1
+  readEn  :: Wire (Bit 1) <- makeWire 0
 
   -- RAM primitive
   let ramPrimitive = case init of
@@ -277,14 +276,15 @@ makeRAMCore init = do
 
   -- Return interface
   return RAM {
-    load    = (addrBus <==)
+    load    = \a -> do
+                addrBus <== a
+                readEn <== 1
   , store   = \a d -> do
                 addrBus <== a
                 dataBus <== d
                 writeEn <== 1
   , out     = ramPrimitive (addrBus.val, dataBus.val, writeEn.val, readEn.val)
   , storeActive = writeEn.val
-  , preserveOut = readEn <== 0
   }
 
 -- |Create true dual-port block RAM.
@@ -305,12 +305,12 @@ makeTrueDualRAMCore init = do
   addrBusA :: Wire a <- makeWireU
   dataBusA :: Wire d <- makeWireU
   writeEnA :: Wire (Bit 1) <- makeWire 0
-  readEnA  :: Wire (Bit 1) <- makeWire 1
+  readEnA  :: Wire (Bit 1) <- makeWire 0
 
   addrBusB :: Wire a <- makeWireU
   dataBusB :: Wire d <- makeWireU
   writeEnB :: Wire (Bit 1) <- makeWire 0
-  readEnB  :: Wire (Bit 1) <- makeWire 1
+  readEnB  :: Wire (Bit 1) <- makeWire 0
 
   -- RAM primitive
   let ramPrimitive = case init of
@@ -324,22 +324,24 @@ makeTrueDualRAMCore init = do
 
   -- Return interface
   return (RAM {
-              load    = (addrBusA <==)
+              load    = \a -> do
+                          addrBusA <== a
+                          readEnA <== 1
             , store   = \a d -> do addrBusA <== a
                                    dataBusA <== d
                                    writeEnA <== 1
             , out     = outA
             , storeActive = writeEnA.val
-            , preserveOut = readEnA <== 0
             },
           RAM {
-              load    = (addrBusB <==)
+              load    = \a -> do
+                          addrBusB <== a
+                          readEnB <== 1
             , store   = \a d -> do addrBusB <== a
                                    dataBusB <== d
                                    writeEnB <== 1
             , out     = outB
             , storeActive = writeEnB.val
-            , preserveOut = readEnB <== 0
             })
 
 -- |Create uninitialised dual-port RAM.
@@ -361,7 +363,7 @@ makeDualRAMCore init = do
   wrAddrBus :: Wire a <- makeWireU
   dataBus   :: Wire d <- makeWireU
   writeEn   :: Wire (Bit 1) <- makeWire 0
-  readEn    :: Wire (Bit 1) <- makeWire 1
+  readEn    :: Wire (Bit 1) <- makeWire 0
 
   -- RAM primitive
   let ramPrimitive = case init of
@@ -370,7 +372,9 @@ makeDualRAMCore init = do
 
   -- Return interface
   return RAM {
-    load    = (rdAddrBus <==)
+    load    = \a -> do
+                rdAddrBus <== a
+                readEn <== 1
   , store   = \a d -> do
                 wrAddrBus <== a
                 dataBus <== d
@@ -378,7 +382,6 @@ makeDualRAMCore init = do
   , out     = ramPrimitive (rdAddrBus.val, wrAddrBus.val,
                             dataBus.val, writeEn.val, readEn.val)
   , storeActive = writeEn.val
-  , preserveOut = readEn <== 0
   }
 
 -- | Dual-port forwarding block RAM with initial contents from hex file.
@@ -403,9 +406,6 @@ makeDualRAMForwardCore init = do
   storeAddr :: Wire a <- makeWire dontCare
   storeData :: Wire d <- makeWire dontCare
 
-  -- Preserve current output on the next cycle?
-  preserveWire :: Wire (Bit 1) <- makeWire false
-
   return RAM {
     load = \a -> do
       load ram a
@@ -415,21 +415,17 @@ makeDualRAMForwardCore init = do
       storeAddr <== a
       storeData <== d
   , out =
-      let en = inv preserveWire.val
-          forwardCond =
-            delayEn false en $
+      let forwardCond =
+            delay false $
               andList [
                 active loadAddr
               , active storeAddr
               , loadAddr.val === storeAddr.val
               ]
           forwardData =
-            delayEn dontCare en storeData.val
+            delay dontCare storeData.val
       in forwardCond ? (forwardData, out ram)
   , storeActive = storeActive ram
-  , preserveOut = do
-      preserveWire <== true
-      preserveOut ram
   }
 
 -- |RAM (with byte enables) interface (data width is in bytes)
@@ -443,8 +439,6 @@ data RAMBE aw dw =
   , outBE :: Bit (8*dw)
     -- | Is there a store currently happening?
   , storeActiveBE :: Bit 1
-    -- | Preserve current output on next cycle
-  , preserveOutBE :: Action ()
   }
 
 -- | Create uninitialised block RAM with byte enables
@@ -462,7 +456,7 @@ makeRAMBECore init = do
   addrBus :: Wire (Bit aw) <- makeWireU
   dataBus :: Wire (Bit (8*dw)) <- makeWireU
   writeEn :: Wire (Bit 1) <- makeWire 0
-  readEn  :: Wire (Bit 1) <- makeWire 1
+  readEn  :: Wire (Bit 1) <- makeWire 0
   byteEn  :: Wire (Bit dw) <- makeWire 0
 
   -- RAM primitive
@@ -472,7 +466,9 @@ makeRAMBECore init = do
 
   -- Return interface
   return RAMBE {
-    loadBE = (addrBus <==)
+    loadBE = \a -> do
+               addrBus <== a
+               readEn <== 1
   , storeBE = \a be d -> do
                 addrBus <== a
                 dataBus <== d
@@ -481,7 +477,6 @@ makeRAMBECore init = do
   , outBE = ramPrimitive
       (addrBus.val, dataBus.val, writeEn.val, readEn.val, byteEn.val)
   , storeActiveBE = writeEn.val
-  , preserveOutBE = readEn <== 0
   }
 
 -- |Create true dual-port block RAM with byte enables
@@ -501,13 +496,13 @@ makeTrueDualRAMBECore init = do
   addrBusA :: Wire (Bit aw) <- makeWireU
   dataBusA :: Wire (Bit (8*dw)) <- makeWireU
   writeEnA :: Wire (Bit 1) <- makeWire 0
-  readEnA  :: Wire (Bit 1) <- makeWire 1
+  readEnA  :: Wire (Bit 1) <- makeWire 0
   byteEnA  :: Wire (Bit dw) <- makeWireU
 
   addrBusB :: Wire (Bit aw) <- makeWireU
   dataBusB :: Wire (Bit (8*dw)) <- makeWireU
   writeEnB :: Wire (Bit 1) <- makeWire 0
-  readEnB  :: Wire (Bit 1) <- makeWire 1
+  readEnB  :: Wire (Bit 1) <- makeWire 0
   byteEnB  :: Wire (Bit dw) <- makeWireU
 
   -- RAM primitive
@@ -522,24 +517,24 @@ makeTrueDualRAMBECore init = do
 
   -- Return interface
   return (RAMBE {
-              loadBE  = (addrBusA <==)
+              loadBE  = \a -> do addrBusA <== a
+                                 readEnA <== 1
             , storeBE = \a be d -> do addrBusA <== a
                                       dataBusA <== d
                                       writeEnA <== 1
                                       byteEnA  <== be
             , outBE   = outA
             , storeActiveBE = writeEnA.val
-            , preserveOutBE = readEnA <== 0
             },
           RAMBE {
-              loadBE  = (addrBusB <==)
+              loadBE  = \a -> do addrBusB <== a
+                                 readEnB <== 1
             , storeBE = \a be d -> do addrBusB <== a
                                       dataBusB <== d
                                       writeEnB <== 1
                                       byteEnB  <== be
             , outBE   = outB
             , storeActiveBE = writeEnB.val
-            , preserveOutBE = readEnB <== 0
             })
 
 -- |Create uninitialised dual-port RAM with byte enables.
@@ -561,7 +556,7 @@ makeDualRAMBECore init = do
   wrAddrBus :: Wire (Bit aw) <- makeWireU
   dataBus   :: Wire (Bit (8*dw)) <- makeWireU
   writeEn   :: Wire (Bit 1) <- makeWire 0
-  readEn    :: Wire (Bit 1) <- makeWire 1
+  readEn    :: Wire (Bit 1) <- makeWire 0
   byteEn    :: Wire (Bit dw) <- makeWire 0
 
   -- RAM primitive
@@ -571,7 +566,9 @@ makeDualRAMBECore init = do
 
   -- Return interface
   return RAMBE {
-    loadBE    = (rdAddrBus <==)
+    loadBE    = \a -> do
+                  rdAddrBus <== a
+                  readEn <== 1
   , storeBE   = \a be d -> do
                   wrAddrBus <== a
                   dataBus <== d
@@ -580,7 +577,6 @@ makeDualRAMBECore init = do
   , outBE     = ramPrimitive (rdAddrBus.val, wrAddrBus.val, dataBus.val,
                               writeEn.val, readEn.val, byteEn.val)
   , storeActiveBE = writeEn.val
-  , preserveOutBE = readEn <== 0
   }
 
 -- |Create uninitialised forwarding dual-port RAM with byte enables.
@@ -610,9 +606,6 @@ makeDualRAMForwardBECore init = do
   storeData :: Wire (Bit (8*dw)) <- makeWire dontCare
   storeByteEn :: Wire (Bit dw) <- makeWire dontCare
 
-  -- Preserve current output on the next cycle?
-  preserveWire :: Wire (Bit 1) <- makeWire false
-
   return RAMBE {
     loadBE = \a -> do
       loadBE ram a
@@ -623,18 +616,17 @@ makeDualRAMForwardBECore init = do
       storeData <== d
       storeByteEn <== be
   , outBE =
-      let en = inv preserveWire.val
-          forwardCond =
-            delayEn false en $
+      let forwardCond =
+            delay false $
               andList [
                 active loadAddr
               , active storeAddr
               , loadAddr.val === storeAddr.val
               ]
           forwardData =
-            delayEn dontCare en storeData.val
+            delay dontCare storeData.val
           forwardByteEn =
-            delayEn 0 en storeByteEn.val
+            delay 0 storeByteEn.val
           outData = fromBitList
             [ (forwardCond .&&. be) ? (new, old)
             | (be, new, old) <-
@@ -644,9 +636,6 @@ makeDualRAMForwardBECore init = do
             ]
       in outData
   , storeActiveBE = storeActiveBE ram
-  , preserveOutBE = do
-      preserveWire <== true
-      preserveOutBE ram
   }
 
 -- | RAM interface with no backing functionality
@@ -657,7 +646,6 @@ nullRAM =
   , store = \_ _ -> return ()
   , out = dontCare
   , storeActive = false
-  , preserveOut = return ()
   }
 
 -- | RAMBE interface with no backing functionality
@@ -668,5 +656,4 @@ nullRAMBE =
   , storeBE = \_ _ _ -> return ()
   , outBE = dontCare
   , storeActiveBE = false
-  , preserveOutBE = return ()
   }
