@@ -120,7 +120,7 @@ inserted.
 
 [source, haskell]
 ----
-insert :: (Bits a, Cmp a) => a -> [a] -> [a]
+insert :: Bit 8 -> [Bit 8] -> [Bit 8]
 insert x [] = [x]
 insert x (y:ys) = small : insert big ys
   where (small, big) = twoSort (x, y)
@@ -131,7 +131,7 @@ new list (initially empty) then we end up with a sorted list.
 
 [source, haskell]
 ----
-sort :: (Bits a, Cmp a) => [a] -> [a]
+sort :: [Bit 8] -> [Bit 8]
 sort = foldr insert []
 ----
 
