@@ -110,31 +110,29 @@ The in-Haskell simulator is much slower than Verilator, but can be
 convenient for very small designs.  In general, using Verilator is the
 recommended method of simulating Blarney designs.
 
-=== Bubble sort
+=== Sorting networks
 
 We can build a general _N_-element sorter by connecting together
 multiple two-sorters.  One of the simplest ways to do this is the
-_bubble sort_ network.  The key component is a function `bubble` that
-takes a list of inputs and returns a new list in which the smallest
-element comes first.
+_insertion sort_ network.  The key component is a function `insert` that
+takes a value and a sorted list and returns a new sorted list with the value
+inserted.
 
 [source, haskell]
 ----
-bubble :: [Bit 8] -> [Bit 8]
-bubble [] = []
-bubble [x] = [x]
-bubble (x:y:rest) = bubble (small:rest) ++ [large]
-  where (small, large) = twoSort (x, y)
+insert :: (Bits a, Cmp a) => a -> [a] -> [a]
+insert x [] = [x]
+insert x (y:ys) = small : insert big ys
+  where (small, big) = twoSort (x, y)
 ----
 
-If we repeatedly call `bubble` then we end up with a sorted list.
+If we `insert` each element of an input list into a
+new list (initially empty) then we end up with a sorted list.
 
 [source, haskell]
 ----
-sort :: [Bit 8] -> [Bit 8]
-sort [] = []
-sort xs = smallest : sort rest
-  where smallest:rest = bubble xs
+sort :: (Bits a, Cmp a) => [a] -> [a]
+sort = foldr insert []
 ----
 
 Running the test bench
@@ -155,28 +153,29 @@ sort [3,4,1,0,2] = [0,1,2,3,4]
 ----
 
 To see that the `sort` function really is describing a circuit, let's
-draw the circuit digram for a 5-element bubble sorter.
+draw the circuit digram for a 5-element sorter.
 
 ----
-        -->.
-           |
-        -->+---.
-           |   |
-Inputs  -->+---+---.
-           |   |   |
-        -->+---+---+---.
-           |   |   |   |
-        -->+---+---+---+---.
-           |   |   |   |   |
-           v   v   v   v   v
+  in0  -->.
+          |
+  in1  -->+----.
+          |    |
+  in2  -->+----+----.
+          |    |    |
+  in3  -->+----+----+----.
+          |    |    |    |
+  in4  -->+----+----+----+----.
+          |    |    |    |    |
+          v    v    v    v    v
 
-                Outputs
+       out0 out1 out2 out3 out4
 ----
 
 The input list is supplied on the left, and the sorted output list is
 produced at the bottom.  Each `+` denotes a two-sorter that takes
 inputs from the top and the left, and produces the smaller value to
-the bottom and the larger value to the right.  See
+the bottom and the larger value to the right.  Each row of the network is
+a copy of the `insert` component. See
 https://pdfs.semanticscholar.org/de30/22efc5aec833d7b52bd4770a382fea729bba.pdf[The
 design and verification of a sorter core] for a more in-depth
 exploration of sorting circuits in Haskell.

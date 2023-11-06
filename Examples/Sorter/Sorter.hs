@@ -12,16 +12,14 @@ top = do
   finish
 -}
 
-bubble :: [Bit 8] -> [Bit 8]
-bubble [] = []
-bubble [x] = [x]
-bubble (x:y:rest) = bubble (small:rest) ++ [big]
+insert :: Bit 8 -> [Bit 8] -> [Bit 8]
+insert x [] = [x]
+insert x (y:ys) = small : insert big ys
   where (small, big) = twoSort (x, y)
 
 sort :: [Bit 8] -> [Bit 8]
 sort [] = []
-sort (x:xs) = smallest : sort rest
-  where (smallest:rest) = bubble (x:xs)
+sort (x:xs) = insert x (sort xs)
 
 top :: Module ()
 top = always do
