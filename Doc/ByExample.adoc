@@ -196,6 +196,11 @@ To generate code for, say, an 8-element sorter, we can write:
 ghci> writeVerilogModule (vsort @8) "Sorter8" "Sorter8-Verilog/"
 ----
 
+It is a requirement that the arguments and result of the function passed to
+`writeVerilogModule` are in the <<Interface, Interface>> class.  Lists are not
+in the <<Interface, Interface>> class (as they have unknown size) but vectors
+are. 
+
 === Polymorphism
 
 For simplicity, we've made our sorter specific to lists of 8-bit values.  But
