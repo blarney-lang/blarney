@@ -152,8 +152,8 @@ in simulation yields:
 sort [3,4,1,0,2] = [0,1,2,3,4]
 ----
 
-To see that the `sort` function really is describing a circuit, let's
-draw the circuit digram for a 5-element sorter.
+To see that the `sort` function really is describing a circuit, here
+is the circuit digram for a 5-element sorter.
 
 ----
   in0  -->.
@@ -175,10 +175,26 @@ The input list is supplied on the left, and the sorted output list is
 produced at the bottom.  Each `+` denotes a two-sorter that takes
 inputs from the top and the left, and produces the smaller value to
 the bottom and the larger value to the right.  Each row of the network is
-a copy of the `insert` component. See
-https://pdfs.semanticscholar.org/de30/22efc5aec833d7b52bd4770a382fea729bba.pdf[The
-design and verification of a sorter core] for a more in-depth
+a copy of the `insert` component.
+See
+https://pdfs.semanticscholar.org/de30/22efc5aec833d7b52bd4770a382fea729bba.pdf[The design and verification of a sorter core] for a more in-depth
 exploration of sorting circuits in Haskell.
+
+To generate Verilog for a sorter, it is useful to first lift the `sort`
+function from lists to vectors so that the sorter size is captured in the type:
+
+[source, haskell]
+----
+vsort :: KnownNat n => Vec n (Bit 8) -> Vec n (Bit 8)
+vsort = fromList . sort . toList
+----
+
+To generate code for, say, an 8-element sorter, we can write:
+
+[source, shell]
+----
+ghci> writeVerilogModule (vsort @8) "Sorter8" "Sorter8-Verilog/"
+----
 
 === Polymorphism
 

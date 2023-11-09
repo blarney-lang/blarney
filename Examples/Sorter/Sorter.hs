@@ -1,4 +1,5 @@
 import Blarney
+import Blarney.Vector (Vec, fromList, toList)
 import System.Environment
 
 twoSort :: (Bit 8, Bit 8) -> (Bit 8, Bit 8)
@@ -32,3 +33,9 @@ main = do
   args <- getArgs
   if | "--simulate" `elem` args -> simulate top
      | otherwise -> writeVerilogTop top "Sorter" "Sorter-Verilog/"
+
+vsort :: KnownNat n => Vec n (Bit 8) -> Vec n (Bit 8)
+vsort = fromList . sort . toList
+
+gen :: IO ()
+gen = writeVerilogModule (vsort @8) "Sorter8" "Sorter8-Verilog/"
