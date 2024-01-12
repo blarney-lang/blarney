@@ -18,6 +18,7 @@ clean:
 	make -C FIFO clean
 	make -C GCDFarm clean
 	make -C Interface clean
+	make -C Iterator clean
 	make -C Lookup clean
 	make -C MasterSlave clean
 	make -C Heat clean
