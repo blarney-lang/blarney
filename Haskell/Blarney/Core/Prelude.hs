@@ -109,12 +109,12 @@ selectList alts = map (mergeWrites MStratOr) alts'
 -- |Index a list
 listIndex :: (KnownNat n, Bits a) => Bit n -> [a] -> a
 listIndex _ [] = dontCare
-listIndex i xs = unpack $ mux i (pack <$> xs)
+listIndex i xs = unpack $ nmux i (pack <$> xs)
 
 -- |Ternary conditional operator (generic multiplexer)
 infixl 3 ?
 (?) :: Bits a => Bit 1 -> (a, a) -> a
-c ? (a, b) = unpack (mux c [pack b, pack a])
+c ? (a, b) = unpack (nmux c [pack b, pack a])
 
 -- |Overloaded if-then-else
 instance {-# OVERLAPPABLE #-} Bits a => IfThenElse (Bit 1) a where

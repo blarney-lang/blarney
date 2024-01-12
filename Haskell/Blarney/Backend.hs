@@ -17,6 +17,7 @@ Stability   : experimental
 module Blarney.Backend (
   -- * Verilog backend
   module Blarney.Backend.Verilog
+, writeVerilog
 , writeVerilogModule
 , writeVerilogTop
   -- * SMT backend
@@ -27,8 +28,8 @@ module Blarney.Backend (
 , module Blarney.Backend.Simulation
 , simulate
 , simulateCapture
-, eval
-, evalFor
+, view
+, viewFor
 ) where
 
 import Prelude
@@ -78,6 +79,17 @@ writeVerilogTop mod modName dirName =
     sequence_ [ if name /= modName then genVerilogModule nl name dirName
                                    else genVerilogTop    nl name dirName
               | (name, nl) <- toList nls ]
+
+-- | Shorthand for 'writeVerilogModule', with output directory set to
+-- current directory.
+writeVerilog :: Modular a => String -> a -> IO ()
+writeVerilog modName mod = do
+  putStr ("Writing \"" ++ filename ++ "\"... ")
+  writeVerilogModule mod modName "."
+  putStrLn "done."
+  where
+    filename = modName ++ ".v"
+  
 
 -- SMT backend
 --------------------------------------------------------------------------------
@@ -136,16 +148,16 @@ simulateCapture circuit = do
   return (concat $ reverse lines)
 
 -- | Display the value of the given expression for 1 cycle
-eval :: FShow a => a -> IO ()
-eval expr =
+view :: FShow a => a -> IO ()
+view expr =
   simulate do
     always do
       display expr
       finish
 
 -- | Display the value of the given expression for n cycles
-evalFor :: FShow a => Int -> a -> IO ()
-evalFor n expr =
+viewFor :: FShow a => Int -> a -> IO ()
+viewFor n expr =
   simulate do
     count :: Reg (Bit 32) <- makeReg 1
     always do

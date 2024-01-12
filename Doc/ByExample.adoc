@@ -102,7 +102,7 @@ the Blarney repo:
 ----
 $ cabal repl
 ghci> :l Examples/Sorter/Sorter.hs
-ghci> eval $ twoSort (2,1)
+ghci> vuew $ twoSort (2,1)
 (1,2)
 ----
 
@@ -1056,7 +1056,7 @@ none = Option { valid = false, val = dontCare }
 
 -- Construct an optional value with a value present
 some :: a -> Option a
-some a = Option { value = true, val = a }
+some a = Option { valid = true, val = a }
 ----
 
 Note that the definition of `none` requires a <<Bits>> constraint

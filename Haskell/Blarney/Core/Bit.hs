@@ -68,6 +68,9 @@ constant i = result
     result = FromBV $ constBV w i
     w = widthOf result
 
+lit :: KnownNat n => Integer -> Bit n
+lit = constant
+
 -- | Give a name to a 'Bit n' signal
 nameBit :: String -> Bit n -> Bit n
 nameBit nm = FromBV . (flip addBVNameHint $ NmRoot 0 nm) . toBV
@@ -91,15 +94,24 @@ infixl 6 .+.
 (.+.) :: Bit n -> Bit n -> Bit n
 a .+. b = FromBV $ addBV (toBV a) (toBV b)
 
+-- |Adder
+add a b = a .+. b
+
 -- |Subtractor
 infixl 6 .-.
 (.-.) :: Bit n -> Bit n -> Bit n
 a .-. b = FromBV $ subBV (toBV a) (toBV b)
 
+-- |Subtractor
+sub a b = a .-. b
+
 -- |Multiplier
 infixl 7 .*.
 (.*.) :: Bit n -> Bit n -> Bit n
 a .*. b = FromBV $ mulBV (toBV a) (toBV b)
+
+-- |Multiplier
+mul a b = a .*. b
 
 -- |Multiplier (full precision)
 fullMul :: Bool -> Bit n -> Bit n -> Bit (2*n)
@@ -110,10 +122,16 @@ infixl 7 ./.
 (./.) :: Bit n -> Bit n -> Bit n
 a ./. b = FromBV $ divBV (toBV a) (toBV b)
 
+-- |Quotient
+quotient a b = a ./. b
+
 -- |Remainder
 infixl 7 .%.
 (.%.) :: Bit n -> Bit n -> Bit n
 a .%. b = FromBV $ modBV (toBV a) (toBV b)
+
+-- |Remainder
+remainder a b = a ./. b
 
 -- Arithmetic
 instance KnownNat n => Num (Bit n) where
@@ -121,8 +139,8 @@ instance KnownNat n => Num (Bit n) where
   (-)         = (.-.)
   (*)         = (.*.)
   negate a    = inv a .+. 1
-  abs a       = mux (a `sLT` 0) [a, negate a]
-  signum a    = mux (a .==. 0) [mux (a `sLT` 0) [1, -1], 0]
+  abs a       = nmux (a `signedLess` 0) [a, negate a]
+  signum a    = nmux (a .==. 0) [nmux (a `signedLess` 0) [1, -1], 0]
   fromInteger = constant
 
 -- * Bitwise operations on bit-vectors
@@ -229,31 +247,47 @@ infix 4 .>.
 infix 4 .==.
 infix 4 .!=.
 
+-- |Unsigned less-than
+less :: Bit n -> Bit n -> Bit 1
+less a b = FromBV $ lessThanBV (toBV a) (toBV b)
+
+-- |Unsigned less-than-or-equal-to
+lessEq :: Bit n -> Bit n -> Bit 1
+lessEq a b = FromBV $ lessThanEqBV (toBV a) (toBV b)
+
+-- | Equality
+equal :: Bit n -> Bit n -> Bit 1
+equal a b = FromBV $ equalBV (toBV a) (toBV b)
+
+-- | Disequality
+notEqual :: Bit n -> Bit n -> Bit 1
+notEqual a b = FromBV $ notEqualBV (toBV a) (toBV b)
+
 instance Cmp (Bit n) where
-  a .<.  b = FromBV $ lessThanBV (toBV a) (toBV b)
-  a .<=. b = FromBV $ lessThanEqBV (toBV a) (toBV b)
-  a .==. b = FromBV $ equalBV (toBV a) (toBV b)
-  a .!=. b = FromBV $ notEqualBV (toBV a) (toBV b)
+  (.<.)  = less
+  (.<=.) = lessEq
+  (.==.) = equal
+  (.!=.) = notEqual
 
 -- |Signed less than
-infixl 8 `sLT`
-sLT :: Bit n -> Bit n -> Bit 1
-sLT x y = invMSB x .<. invMSB y
+infixl 8 `signedLess`
+signedLess :: Bit n -> Bit n -> Bit 1
+signedLess x y = invMSB x .<. invMSB y
 
 -- |Signed greater than
-infixl 8 `sGT`
-sGT :: Bit n -> Bit n -> Bit 1
-sGT x y = invMSB x .>. invMSB y
+infixl 8 `signedGreater`
+signedGreater :: Bit n -> Bit n -> Bit 1
+signedGreater x y = invMSB x .>. invMSB y
 
 -- |Signed less than or equal
-infixl 8 `sLTE`
-sLTE :: Bit n -> Bit n -> Bit 1
-sLTE x y = invMSB x .<=. invMSB y
+infixl 8 `signedLessEq`
+signedLessEq :: Bit n -> Bit n -> Bit 1
+signedLessEq x y = invMSB x .<=. invMSB y
 
 -- |Signed greater than or equal
-infixl 8 `sGTE`
-sGTE :: Bit n -> Bit n -> Bit 1
-sGTE x y = invMSB x .>=. invMSB y
+infixl 8 `signedGreaterEq`
+signedGreaterEq :: Bit n -> Bit n -> Bit 1
+signedGreaterEq x y = invMSB x .>=. invMSB y
 
 -- * Bit-vector width adjustment
 
@@ -400,11 +434,15 @@ mergeWritesBit strat w ins = FromBV $ mergeWritesBV strat w ins'
 
 -- * Misc. bit-vector operations
 
+-- | Two-input multiplexer
+mux :: Bit 1 -> Bit n -> Bit n -> Bit n
+mux sel a b = nmux sel [a, b]
+
 -- | Multiplexer using a selector signal to index a list of input signals.
 --   Raises a circuit generation time error on empty list of inputs
-mux :: Bit w -> [Bit n] -> Bit n
-mux _ [] = error "cannot mux an empty list"
-mux sel xs = FromBV $ muxBV (toBV sel) (toBV <$> xs)
+nmux :: Bit w -> [Bit n] -> Bit n
+nmux _ [] = error "cannot mux an empty list"
+nmux sel xs = FromBV $ muxBV (toBV sel) (toBV <$> xs)
 
 -- |Lift integer value to type-level natural
 liftNat :: Int -> (forall n. KnownNat n => Proxy n -> a) -> a
@@ -548,7 +586,7 @@ fromSigned :: Signed n -> Bit n
 fromSigned (Signed bv) = bv
 
 instance Cmp (Signed n) where
-  Signed a .<.  Signed b = a `sLT` b
-  Signed a .<=. Signed b = a `sLTE` b
+  Signed a .<.  Signed b = a `signedLess` b
+  Signed a .<=. Signed b = a `signedLessEq` b
   Signed a .==. Signed b = a .==. b
   Signed a .!=. Signed b = a .!=. b
