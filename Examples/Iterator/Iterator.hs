@@ -45,19 +45,19 @@ makeGCDServer = makeIterator step done
     step (x, y) = if x .>. y then (x - y, y) else (x, y - x)
     done (x, y) = x .==. y
 
+
 top :: Module ()
 top = do
-  -- Instantiate 8-bit remainder server
-  rem <- makeRemServer @(Bit 8)
+  gcd <- makeGCDServer @(Bit 8)
 
   runStmt do
-    wait rem.reqs.canPut
+    wait gcd.reqs.canPut
     action do
-      rem.reqs.put (16, 6)
-    wait rem.resps.canPeek
+      gcd.reqs.put (110, 66)
+    wait gcd.resps.canPeek
     action do
-      display "remainder=" (fst rem.resps.peek)
-      rem.resps.consume
+      display "gcd=" (fst gcd.resps.peek)
+      gcd.resps.consume
       finish
 
 main :: IO ()
