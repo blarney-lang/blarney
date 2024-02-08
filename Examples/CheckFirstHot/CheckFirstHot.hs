@@ -21,3 +21,4 @@ prop_firstHot x = always do
 main :: IO ()
 main = do
   writeSMTScript dfltVerifyConf prop_firstHot "prop_firstHot" "./"
+  --verifyWith dfltVerifyConf prop_firstHot

@@ -104,8 +104,9 @@ assertBounded :: String
               -> (String, String)
               -> [(Integer, InputWidth)]
               -> Int
+              -> Bool
               -> Doc
-assertBounded cFun (inptType, stType) initS depth = decls $+$ assertion
+assertBounded cFun (inptType, stType) initS depth implies = decls $+$ assertion
   where inpts = [ "in" ++ show i | i <- [0 .. depth-1] ]
         decls = vcat $
                   map (\i -> text $ "(declare-const "++i++" "++inptType++")")
@@ -114,11 +115,12 @@ assertBounded cFun (inptType, stType) initS depth = decls $+$ assertion
         bindArgs = [ (text "inpts", mkListX inpts inptType)
                    , (text "initS", createState initS) ]
         createState xs = mkNLDatatype stType (map (\(v, w) -> int2bv w v) xs)
+        reduce = if implies then "impliesReduce" else "andReduce"
         matchInvoke = matchBind (applyOp (text cFun)
                                          [text "inpts", text "initS"])
                                 [( text "(mkTuple2 oks ss)"
                                  , applyOp (text "not")
-                                           [applyOp (text "andReduce")
+                                           [applyOp (text reduce)
                                                     [text "oks"]] )]
 
 -- | Define inputs and assertion of the induction step for proof by induction of

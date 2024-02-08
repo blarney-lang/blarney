@@ -30,6 +30,7 @@ import System.IO
 import Data.List
 import Data.Maybe
 import Control.Monad
+import System.Exit
 import System.Process
 import Text.PrettyPrint
 import Data.Array.IArray
@@ -246,6 +247,7 @@ showSpecificAssert ctxt@Context{..} vMode =
                                         (ctxtInputType, ctxtStateType)
                                         ctxtStateInits
                                         depth
+                                        False
         test1 = (if restrictStates then rStDefs else empty) $+$ cmnt1
                 $+$ assertInduction ctxtCFunName
                                     (ctxtInputType, ctxtStateType)
@@ -312,9 +314,10 @@ verifyWithSMT VerifyConf{..} nl =
     forM_ rootCtxts \ctxt -> do
       maybe (pure ()) (say 0 . (\s -> "------ " ++ s ++ " ------"))
             (ctxtAssertMsg ctxt)
-      say 0 $ "\tproperty \"" ++ ctxtPropName ctxt ++ "\""
-      say 1 $ "\trestricted states: " ++ if restrictSt then blue "enabled"
-                                                       else yellow "disabled"
+      say 2 $ "property \"" ++ ctxtPropName ctxt ++ "\""
+      when doInduction do
+        say 1 $ "restricted states: " ++ if restrictSt then blue "enabled"
+                                                         else yellow "disabled"
       -- send netlist-specific SMT sort definitions
       say 3 $ rStr (showSpecificDefs ctxt True)
       hPutStrLn hIn $ rStr (showSpecificDefs ctxt True)
@@ -329,6 +332,10 @@ verifyWithSMT VerifyConf{..} nl =
                     , False, False )
       Induction vD rSt -> ( rangeVerifyDepth . legalizeVerifyDepth $ vD
                           , True, rSt )
+    -- If we're doing iterative-deepening bounded verification from depth 1
+    -- then when verifying depth d assume the property holds at all depths
+    -- less than d (we have already proven this to be the case)
+    useImplies = not doInduction && fst depthRg == 1
     interactive = userConfInteractive verifyConfUser
     diveStep = userConfIncreasePeriod verifyConfUser
     rootCtxts = [ mkContext nl n | n@Net{netPrim=p} <- elems nl
@@ -346,55 +353,58 @@ verifyWithSMT VerifyConf{..} nl =
                                   (ctxtInputType, ctxtStateType)
                                   ctxtStateInits
                                   curD
-      say 2 "(push)"
+                                  useImplies
+      say 3 "(push)"
       sndLn "(push)"
       say 3 $ rStr bounded
       sndLn $ rStr bounded
-      say 2 "(check-sat)"
+      say 3 "(check-sat)"
       sndLn "(check-sat)"
       ln <- rcvLn
-      say 2 ln
+      say 3 ln
       if | ln == "unsat" -> do
-           say 2 "(pop)"
-           sndLn "(pop)"
            say 1 $ justifyLeft 30 '.'
                      ("(depth " ++ show curD ++ ") bounded ")
                    ++ blue " valid"
            if | doInduction -> do
+                say 3 "(pop)"
+                sndLn "(pop)"
                 let step = assertInduction ctxtCFunName
                                            (ctxtInputType, ctxtStateType)
                                            curD
                                            restrictSt
-                say 2 "(push)"
+                say 3 "(push)"
                 sndLn "(push)"
                 say 3 $ rStr step
                 sndLn $ rStr step
-                say 2 "(check-sat)"
+                say 3 "(check-sat)"
                 sndLn "(check-sat)"
                 ln <- rcvLn
-                say 2 ln
+                say 3 ln
                 if | ln == "unsat" -> do
-                     say 2 "(pop)"
-                     sndLn "(pop)"
                      say 1 $ justifyLeft 30 '.'
                                ("(depth " ++ show curD ++ ") induction step ")
                              ++ blue " valid"
                      successVerify
                    | curD == maxD -> failVerify
                    | otherwise -> do
+                     say 3 "(pop)"
+                     sndLn "(pop)"
                      say 1 $ justifyLeft 30 '.'
                                ("(depth " ++ show curD ++ ") induction step ")
                              ++ yellow " falsifiable"
                      say 3 "failed to verify induction step ---> deepen"
                      diveMore
-              | otherwise -> successVerify
-         | curD == maxD -> failVerify
+              | curD == maxD -> successVerify
+              | otherwise -> do
+                  say 3 "(pop)"
+                  sndLn "(pop)"
+                  diveMore
          | otherwise -> do
-           say 1 $ justifyLeft 30 '.'
-                     ("(depth " ++ show curD ++ ") bounded ")
-                   ++ yellow " falsifiable"
-           say 3 "failed to verify bounded property ---> deepen"
-           diveMore
+             say 1 $ justifyLeft 30 '.'
+                       ("(depth " ++ show curD ++ ") bounded ")
+                     ++ yellow " falsifiable"
+             failVerify
       where sndLn = hPutStrLn hI
             rcvLn = hGetLine hO
             rcvAll = hGetContents hO
@@ -403,22 +413,29 @@ verifyWithSMT VerifyConf{..} nl =
                  askYN "Keep searching for a proof?" False
                        doDive failVerify
               else doDive
-            doDive = do say 2 "(pop)"
-                        sndLn "(pop)"
-                        deepen c (hI, hO) (curD + 1, maxD)
-            successVerify = say 0 $ " >>> property \"" ++ ctxtPropName ++ "\": "
-                                    ++ green "verified"
-            failVerify = do
-              say 0 $ " >>> property \"" ++ ctxtPropName ++ "\": "
-                      ++ red "couldn't verify"
-              if interactive then askYN "Show current counter-example?" False
-                                        (sndLn "(get-model)") (pure ())
-              else sndLn "(get-model)"
+            doDive = deepen c (hI, hO) (curD + 1, maxD)
+            successVerify = do
+              say 0 $ green "verified"
+              say 3 "(pop)"
               sndLn "(pop)"
-              sndLn "(exit)"
-              say 0 =<< rcvAll
+            failVerify = do
+              say 0 $ red "not verified"
+              getModel <- if interactive
+                            then askYN "Show current counter-example?" False
+                                   (return True) (return False)
+                            else return (verifyConfVerbosity >= 2)
+              if getModel
+                then do
+                  sndLn "(get-model)"
+                  sndLn "(exit)"
+                  say 0 =<< rcvAll
+                  exitFailure
+                else do
+                  say 3 "(pop)"
+                  sndLn "(pop)"
               -- XXX TODO deal with parsing the model and exit at the top
-              -- XXX currently cannot recover for next assertiong...
+              -- XXX currently cannot recover for next assertion,
+              -- hence the call to exitFailure...
             askYN msg dflt actY actN = do
               putStrLn (msg ++ " ...... " ++ yes ++ "/" ++ no)
               answer <- getLine
