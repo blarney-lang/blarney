@@ -24,6 +24,7 @@ module Blarney.Backend (
 , module Blarney.Backend.SMT
 , writeSMTScript
 , verifyWith
+, verifyToDepth
   -- * Simulation backend
 , module Blarney.Backend.Simulation
 , simulate
@@ -119,6 +120,11 @@ verifyWith conf circuit =
   onNetlists circuit "circuit under verification" \nls ->
     -- XXX maybe do not consider all nested Netlists?
     sequence_ [ verifyWithSMT conf nl | (name, nl) <- toList nls ]
+
+verifyToDepth :: Modular a => Int -> a -> IO ()
+verifyToDepth d = verifyWith conf
+  where
+    conf = dfltVerifyConf { verifyConfMode = Bounded (Range 1 d) }
 
 -- Simulation backend
 --------------------------------------------------------------------------------
