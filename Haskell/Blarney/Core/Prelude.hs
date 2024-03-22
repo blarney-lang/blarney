@@ -43,6 +43,7 @@ module Blarney.Core.Prelude
   , firstHot        -- Isolate first hot bit in vector
   , mergeWrites     -- Merge input values according to a given merging strategy
   , fairScheduler   -- Function for fair scheduling of n clients
+  , var             -- Universally quantified variable for verification
   ) where
 
 import Prelude
@@ -230,3 +231,8 @@ instance HasField "_2" (a,b,c,d) c where
   getField (a,b,c,d) = c
 instance HasField "_3" (a,b,c,d) d where
   getField (a,b,c,d) = d
+
+-- Obtain universally quantified variable for verification
+var :: forall a. Bits a => String -> a
+var name = unpack (FromBV (inputPinBV width name))
+  where width = sizeOf (undefined :: a)

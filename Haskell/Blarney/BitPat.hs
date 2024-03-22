@@ -15,7 +15,7 @@ Inspired by Morten Rhiger's "Type-Safe Pattern Combinators".
 module Blarney.BitPat
   ( BP        -- Bit patterns
   , literal   -- Literal pattern
-  , var       -- Variable pattern
+  , variable  -- Variable pattern
   , (<#>)     -- Sequential composition of patterns
   , (==>)     -- Case alternative
   , match     -- Match case subject against set of a case alternatives
@@ -40,8 +40,8 @@ literal :: forall n t. KnownNat n => Bit n -> BP n t t
 literal a = \b k -> (a .==. b, k)
 
 -- |Bit pattern to bind a variable
-var :: forall n t. BP n (Bit n -> t) t
-var = one
+variable :: forall n t. BP n (Bit n -> t) t
+variable = one
 
 -- |Sequentially combine bit patterns
 infixl 9 <#>

@@ -18,19 +18,19 @@ top = always do
   -- Dispatch
   match instr
     [
-      literal @2 0b00 <#> var @2 <#> var @4
+      literal @2 0b00 <#> variable @2 <#> variable @4
         ==>
       \z n -> display "li " z ", " n
 
-    , literal @2 0b01 <#> var @2 <#> var @2 <#> var @2
+    , literal @2 0b01 <#> variable @2 <#> variable @2 <#> variable @2
         ==>
       \z x y -> display "add " z ", " x ", " y
 
-    , literal @2 0b10 <#> var @4 <#> var @2
+    , literal @2 0b10 <#> variable @4 <#> variable @2
         ==>
       \n y -> display "bnz " y ", " n
 
-    , literal @2 0b11 <#> var @6
+    , literal @2 0b11 <#> variable @6
         ==>
       \n -> display "halt" >> finish
     ]
