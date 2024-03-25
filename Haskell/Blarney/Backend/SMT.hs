@@ -312,7 +312,7 @@ verifyWithSMT VerifyConf{..} nl =
     hPutStrLn hIn $ rStr (showGeneralDefs True)
     -- for each assertion...
     forM_ rootCtxts \ctxt -> do
-      maybe (pure ()) (say 0 . (\s -> "------ " ++ s ++ " ------"))
+      maybe (pure ()) (say 0 . (\s -> "Assertion: " ++ s))
             (ctxtAssertMsg ctxt)
       say 2 $ "property \"" ++ ctxtPropName ctxt ++ "\""
       when doInduction do
