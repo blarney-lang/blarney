@@ -252,9 +252,9 @@ take :: forall n m a. (KnownNat m, m <= n) => Vec n a -> Vec m a
 take xs = Vec (L.take (valueOf @m) (toList xs))
 
 -- | Return the 'Vec' composed of the last 'm' elements of the given 'Vec'
-drop :: forall n m a. (KnownNat n, m <= n) => Vec n a -> Vec m a
-drop xs = Vec (L.drop (valueOf @n) (toList xs))
-takeTail :: forall n m a. (KnownNat n, m <= n) => Vec n a -> Vec m a
+drop :: forall n m a. (KnownNat n, KnownNat m, m <= n) => Vec n a -> Vec m a
+drop xs = Vec (L.drop (valueOf @n - valueOf @m) (toList xs))
+takeTail :: forall n m a. (KnownNat n, KnownNat m, m <= n) => Vec n a -> Vec m a
 takeTail = Blarney.Vector.drop
 
 -- | Return the 'Vec' composed of the 'm' elements of the given 'Vec' starting
