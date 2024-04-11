@@ -163,7 +163,7 @@ defineChain name (f, (a0Sort, a1Sort), retSort) =
                                  [( text "(mkTuple2 rets ys)", recRet)]
         recRet = applyOp (text "mkTuple2")
                          [ applyOp (text "cons") [text "ret", text "rets"]
-                         , applyOp (text "cons") [text "next", text "ys"] ]
+                         , applyOp (text "cons") [text "prev", text "ys"] ]
         retLst = "(ListX " ++ retSort ++ ")"
         a0Lst = "(ListX " ++ a0Sort ++ ")"
         a1Lst = "(ListX " ++ a1Sort ++ ")"
