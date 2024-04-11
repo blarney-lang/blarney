@@ -54,8 +54,8 @@ module Blarney.Vector (
 , Blarney.Vector.tail
 , Blarney.Vector.init
 , Blarney.Vector.take
-, Blarney.Vector.drop
 , Blarney.Vector.takeTail
+, Blarney.Vector.drop
 , Blarney.Vector.takeAt
 --
 , Blarney.Vector.rotateL
@@ -252,10 +252,13 @@ take :: forall n m a. (KnownNat m, m <= n) => Vec n a -> Vec m a
 take xs = Vec (L.take (valueOf @m) (toList xs))
 
 -- | Return the 'Vec' composed of the last 'm' elements of the given 'Vec'
-drop :: forall n m a. (KnownNat n, KnownNat m, m <= n) => Vec n a -> Vec m a
-drop xs = Vec (L.drop (valueOf @n - valueOf @m) (toList xs))
-takeTail :: forall n m a. (KnownNat n, KnownNat m, m <= n) => Vec n a -> Vec m a
-takeTail = Blarney.Vector.drop
+takeTail :: forall n m a. (KnownNat m, m <= n) => Vec n a -> Vec m a
+takeTail xs = Vec (L.drop (L.length elems - valueOf @m) elems)
+  where elems = toList xs
+
+-- | Drop the first 'i' elements of the given 'Vec'
+drop :: forall i n a. (KnownNat i, i <= n) => Vec n a -> Vec (n-i) a
+drop xs = Vec (L.drop (valueOf @i) (toList xs))
 
 -- | Return the 'Vec' composed of the 'm' elements of the given 'Vec' starting
 --   at index 'idx'
