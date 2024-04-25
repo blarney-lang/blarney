@@ -149,7 +149,7 @@ data NetConf = NetConf {
   stateType :: Doc
 , stateConstr :: Doc
 , stateFields :: [(InstId, Int)]
-, stateInit :: [Doc]
+, stateFieldsInit :: [Maybe Doc]
 , inputType :: Doc
 , inputConstr :: Doc
 , inputFields :: [(InstId, Int)]
@@ -164,7 +164,7 @@ mkNetConf netlist =
     stateType = text "State"
   , stateConstr = text "mkState"
   , stateFields = stateFields
-  , stateInit = stateInit
+  , stateFieldsInit = stateFieldsInit
   , inputType = text "Input"
   , inputConstr = text "mkInput"
   , inputFields = inputFields
@@ -173,15 +173,14 @@ mkNetConf netlist =
   , transitionName = text "transition"
   }
   where
-    dontCare = error "todo"
-
-    (stateFields, stateInit) = unzip $ catMaybes [
+    (stateFields, stateFieldsInit) = unzip $ catMaybes [
       case netPrim of
-        RegisterEn init w -> Just ((netInstId, w), smtBV w $ fromMaybe dontCare init)
-        Register init w -> Just ((netInstId, w), smtBV w $ fromMaybe dontCare init)
+        RegisterEn init w -> Just ((netInstId, w), fmap (smtBV w) init)
+        Register init w -> Just ((netInstId, w), fmap (smtBV w) init)
         _ -> Nothing
       | Net{..} <- elems netlist]
     inputFields = [(netInstId, w) | Net{netPrim=Input w _, netInstId} <- elems netlist]
+               ++ [(netInstId, w) | Net{netPrim=DontCare w, netInstId} <- elems netlist]
 
 data SeqConf = SeqConf {
   stateName :: Int -> Doc
@@ -276,6 +275,7 @@ wireName nl (iId, m_outnm) = name ++ richNm ++ outnm ++ "_" ++ show iId
                                 _       -> ""
         net = getNet nl iId
         richNm = case netPrim net of Input      _ nm -> "inpt_" ++ nm
+                                     DontCare   _    -> "dontcare"
                                      RegisterEn _ _  -> "reg"
                                      Register   _ _  -> "reg"
                                      _               -> ""
@@ -294,9 +294,13 @@ defineDatatypes (VerifConf{..}, NetConf{..}) netlist = do
   write SMTCommand $ smtDatatype inputType inputConstr $ map (\(id, w) -> (fmtWire netlist (id, Nothing), w)) inputFields
 
 -- | Define state initial value
-defineInit :: (VerifConf, NetConf) -> IO ()
-defineInit (VerifConf{..}, NetConf{..}) =
-  write SMTCommand $ smtOpN "define-const" [initName, stateType, smtGroup' $ stateConstr : stateInit]
+defineInit :: (VerifConf, NetConf) -> Netlist -> IO ()
+defineInit (VerifConf{..}, NetConf{..}) netlist = do
+  write SMTCommand $ smtOp2 "declare-const" initName stateType
+  forM_ (zip stateFields stateFieldsInit) \((id, _), maybeVal) ->
+    case maybeVal of
+      Just val -> write SMTCommand $ smtOp1 "assert" $ smtOp2 "=" (smtGroup [(fmtWire netlist (id, Nothing)), initName]) val
+      Nothing -> return ()
 
 -- | Define transition function
 defineTransition :: (VerifConf, NetConf) -> Netlist -> Net -> IO ()
@@ -340,7 +344,6 @@ defineTransition (VerifConf{..}, NetConf{..}) netlist net = do
     fmtPrim :: Prim -> [Doc] -> Maybe Doc
     fmtPrim prim args = case (prim, args) of
       (Const w n, []) -> Just $ smtBV w n
-      (DontCare w, []) -> Just $ error "todo"
       (Identity _, [x]) -> Just $ x
       (ReplicateBit w, [x]) -> Just $ smtGroup [(smtBVOp1 "repeat" w), x]
       (ZeroExtend iw ow, [x]) -> Just $ smtGroup [(smtBVOp1 "zero_extend" (ow-iw)), x]
@@ -366,6 +369,7 @@ defineTransition (VerifConf{..}, NetConf{..}) netlist net = do
       (Mux _ wsel w, sel:xs) -> Just $ mux sel (wsel, 0) xs
       (MergeWrites MStratOr _ w, _) -> Just $ mergeWrites w args
       (Input _ _, _) -> Nothing
+      (DontCare w, []) -> Nothing
       (RegisterEn _ _, _) -> Nothing
       (Register _ _, _) -> Nothing
       (Output _ _, _) -> Nothing
@@ -383,6 +387,7 @@ defineTransition (VerifConf{..}, NetConf{..}) netlist net = do
     fmtNetInput :: NetInput -> Doc
     fmtNetInput (InputWire wi) = case netPrim $ getNet netlist (fst wi) of
       Input _ _ -> smtGroup [fmtWire netlist wi, inputCurr]
+      DontCare _ -> smtGroup [fmtWire netlist wi, inputCurr]
       Register _ _ -> smtGroup [fmtWire netlist wi, stateCurr]
       RegisterEn _ _ -> smtGroup [fmtWire netlist wi, stateCurr]
       _ -> fmtWire netlist wi
@@ -392,7 +397,7 @@ defineTransition (VerifConf{..}, NetConf{..}) netlist net = do
 defineAll :: (VerifConf, NetConf) -> Netlist -> Net -> IO ()
 defineAll conf netlist net = do
   defineDatatypes conf netlist
-  defineInit conf
+  defineInit conf netlist
   defineTransition conf netlist net
 
 
@@ -484,7 +489,8 @@ assertInductionFixed (vconf@VerifConf{write}, FixedConf{depth}, nconf, sconf) = 
 forEachAssert :: Modular a => a -> String -> (Netlist -> Net -> String -> IO ()) -> IO ()
 forEachAssert circuit name f =
   onNetlists circuit name \netlists ->
-    forM_ (Map.toList netlists) \(name, netlist) ->
+    forM_ (Map.toList netlists) \(name, netlist') ->
+      let netlist = runNetlistPass dontCareDeInline netlist' in -- give instance ids to DontCare values
       forM_ (elems netlist) \net ->
         case netPrim net of
           Assert title -> f netlist net title
