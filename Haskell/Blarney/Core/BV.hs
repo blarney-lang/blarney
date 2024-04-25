@@ -383,7 +383,8 @@ getInitBV BV{..} = case bvPrim of
         y = getInitBV (bvInputs !! 1)
     in case (x, y) of
          (Nothing, Nothing) -> Nothing
-         other -> Just $ getSemVal x `B.shiftL` wy + getSemVal y
+         (Just x, Just y) -> Just $ x `B.shiftL` wy + y
+         _ -> error "Register cannot be partially uninitialized"
   SelectBits w hi lo ->
     let x = getInitBV (bvInputs !! 0)
         mask = (1 `B.shiftL` (hi+1)) - 1
