@@ -21,6 +21,7 @@ module Blarney.Backend.SMT.BasicDefinitions (
 , defineDistinctListX
 -- * miscellaneous
 , defineChain
+, inlineChain
 ) where
 
 -- Standard imports
@@ -163,7 +164,29 @@ defineChain name (f, (a0Sort, a1Sort), retSort) =
                                  [( text "(mkTuple2 rets ys)", recRet)]
         recRet = applyOp (text "mkTuple2")
                          [ applyOp (text "cons") [text "ret", text "rets"]
-                         , applyOp (text "cons") [text "next", text "ys"] ]
+                         , applyOp (text "cons") [text "prev", text "ys"] ]
         retLst = "(ListX " ++ retSort ++ ")"
         a0Lst = "(ListX " ++ a0Sort ++ ")"
         a1Lst = "(ListX " ++ a1Sort ++ ")"
+
+-- | Inlined chaining (avoiding recursion in SMT output)
+inlineChain :: Int -> (String, (String, String), String) -> Doc
+inlineChain n (f, (inSort, stSort), retSort) = fBody 0
+  where
+    fBody i
+      | i == n = applyOp (text "mkTuple2")
+                         [list 0 "ret" retLst, list 0 "s" stLst]
+      | otherwise =
+          matchBind (applyOp (text f) [ text ("in" ++ show i),
+                                        text ("s" ++ show i) ])
+            [(text ("(mkTuple2 ret" ++ show i ++ " s" ++ show (i+1) ++ ")"),
+               fBody (i+1))]
+
+    list i v sort
+      | i == n = qualify (text "nil") (text sort)
+      | otherwise =
+          applyOp (text "cons") [text (v ++ show i), list (i+1) v sort]
+
+    inLst  = "(ListX " ++ inSort ++ ")"
+    stLst  = "(ListX " ++ stSort ++ ")"
+    retLst = "(ListX " ++ retSort ++ ")"
