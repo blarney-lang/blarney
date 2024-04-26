@@ -158,8 +158,8 @@ data NetConf = NetConf {
 , transitionName :: Doc
 }
 
-mkNetConf :: Netlist -> NetConf
-mkNetConf netlist =
+mkNetConf :: Netlist -> Net -> NetConf
+mkNetConf netlist net =
   NetConf {
     stateType = text "State"
   , stateConstr = text "mkState"
@@ -178,9 +178,11 @@ mkNetConf netlist =
         RegisterEn init w -> Just ((netInstId, w), fmap (smtBV w) init)
         Register init w -> Just ((netInstId, w), fmap (smtBV w) init)
         _ -> Nothing
-      | Net{..} <- elems netlist]
-    inputFields = [(netInstId, w) | Net{netPrim=Input w _, netInstId} <- elems netlist]
-               ++ [(netInstId, w) | Net{netPrim=DontCare w, netInstId} <- elems netlist]
+      | Net{..} <- elems netlist
+      , elem netInstId support]
+    inputFields = [(netInstId, w) | Net{netPrim=Input w _, netInstId} <- elems netlist, elem netInstId support]
+               ++ [(netInstId, w) | Net{netPrim=DontCare w, netInstId} <- elems netlist, elem netInstId support]
+    support = partialTopologicalSort netlist $ netInstId net
 
 data SeqConf = SeqConf {
   stateName :: Int -> Doc
@@ -339,7 +341,7 @@ defineTransition (VerifConf{..}, NetConf{..}) netlist net = do
       (Register _ _, [input]) -> fmtNetInput input
       _ -> undefined
 
-    bindings = catMaybes [fmap (\def -> smtGroup [text "v_" <> int netInstId, def]) (fmtPrim netPrim (map fmtNetInput netInputs)) | Net{..} <- map (getNet netlist) $ partialTopologicalSort netlist $ netInstId net]
+    bindings = catMaybes [fmap (\def -> smtGroup [fmtWire netlist (netInstId, Nothing), def]) (fmtPrim netPrim (map fmtNetInput netInputs)) | Net{..} <- map (getNet netlist) $ partialTopologicalSort netlist $ netInstId net]
 
     fmtPrim :: Prim -> [Doc] -> Maybe Doc
     fmtPrim prim args = case (prim, args) of
@@ -363,7 +365,7 @@ defineTransition (VerifConf{..}, NetConf{..}) netlist net = do
       (ArithShiftRight _ _, [_, _]) -> Just $ smtOpN "bvashr" args
       (Concat _ _, [_, _]) -> Just $ smtOpN "concat" args
       (LessThan _, [_, _]) -> Just $ smtBool2BV $ smtOpN "bvult" args
-      (LessThanEq _, [_, _]) -> Just $ smtOpN "bvule" args
+      (LessThanEq _, [_, _]) -> Just $ smtBool2BV $ smtOpN "bvule" args
       (Equal _, [_, _]) -> Just $ smtBool2BV $ smtOpN "=" args
       (NotEqual _, [_, _]) -> Just $ smtBool2BV $ smtOpN "distinct" args
       (Mux _ wsel w, sel:xs) -> Just $ mux sel (wsel, 0) xs
@@ -561,7 +563,7 @@ verifyLive (verb, vconf'@VerifConf{write=write'}) circuit verifier = do
     do
       hSetBuffering hIn LineBuffering
       forEachAssert circuit "#circuit#" \netlist net title ->
-        let nconf = mkNetConf netlist in do
+        let nconf = mkNetConf netlist net in do
           sayInfoFlush verb $ "Assertion '" ++ title ++ "': "
           sayVerboseLn verb $ ""
           smtScope write do
@@ -626,7 +628,7 @@ verifyOfflineFixed (verb, vconf'@VerifConf{write=write'}, fconf@FixedConf{depth}
     let vconf = vconf'{write} in
     forEachAssert circuit name \netlist net title -> do
       write SMTEcho (smtOp1 "echo" (smtText ("\"Assertion '" ++ title ++ "':\"")))
-      let nconf = mkNetConf netlist in do
+      let nconf = mkNetConf netlist net in do
         defineAll (vconf, nconf) netlist net
         if depth > 0 then
           smtScope write do
