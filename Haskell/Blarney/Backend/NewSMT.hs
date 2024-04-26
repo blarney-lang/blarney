@@ -161,16 +161,16 @@ data NetConf = NetConf {
 mkNetConf :: Netlist -> Net -> NetConf
 mkNetConf netlist net =
   NetConf {
-    stateType = text "State"
-  , stateConstr = text "mkState"
+    stateType = text $ "State_" ++ (show $ netInstId net)
+  , stateConstr = text $ "mkState_" ++ (show $ netInstId net)
   , stateFields = stateFields
   , stateFieldsInit = stateFieldsInit
-  , inputType = text "Input"
-  , inputConstr = text "mkInput"
+  , inputType = text $ "Input" ++ (show $ netInstId net)
+  , inputConstr = text $ "mkInput" ++ (show $ netInstId net)
   , inputFields = inputFields
-  , initName = text "state_init"
-  , lastName = text "state_last"
-  , transitionName = text "transition"
+  , initName = text $ "state_init" ++ (show $ netInstId net)
+  , lastName = text $ "state_last" ++ (show $ netInstId net)
+  , transitionName = text $ "transition" ++ (show $ netInstId net)
   }
   where
     (stateFields, stateFieldsInit) = unzip $ catMaybes [
@@ -563,7 +563,8 @@ verifyLive (verb, vconf'@VerifConf{write=write'}) circuit verifier = do
     do
       hSetBuffering hIn LineBuffering
       forEachAssert circuit "#circuit#" \netlist net title ->
-        let nconf = mkNetConf netlist net in do
+        let nconf = mkNetConf netlist net in
+        smtScope write do
           sayInfoFlush verb $ "Assertion '" ++ title ++ "': "
           sayVerboseLn verb $ ""
           smtScope write do
@@ -626,7 +627,7 @@ verifyOfflineFixed (verb, vconf'@VerifConf{write=write'}, fconf@FixedConf{depth}
   withFile fileName WriteMode \h ->
     let write t x = write' t x >> write_smt (hPutStrLn h . render) t x in
     let vconf = vconf'{write} in
-    forEachAssert circuit name \netlist net title -> do
+    forEachAssert circuit name \netlist net title -> smtScope write do
       write SMTEcho (smtOp1 "echo" (smtText ("\"Assertion '" ++ title ++ "':\"")))
       let nconf = mkNetConf netlist net in do
         defineAll (vconf, nconf) netlist net
