@@ -148,11 +148,11 @@ iconfDefault = IncrementalConf { limit = Nothing }
 data NetConf = NetConf {
   stateType :: Doc
 , stateConstr :: Doc
-, stateFields :: [(InstId, Int)]
+, stateFields :: [(InstId, Doc, Int)]
 , stateFieldsInit :: [Maybe Doc]
 , inputType :: Doc
 , inputConstr :: Doc
-, inputFields :: [(InstId, Int)]
+, inputFields :: [(InstId, Doc, Int)]
 , initName :: Doc
 , lastName :: Doc
 , transitionName :: Doc
@@ -175,13 +175,13 @@ mkNetConf netlist net =
   where
     (stateFields, stateFieldsInit) = unzip $ catMaybes [
       case netPrim of
-        RegisterEn init w -> Just ((netInstId, w), fmap (smtBV w) init)
-        Register init w -> Just ((netInstId, w), fmap (smtBV w) init)
+        RegisterEn init w -> Just ((netInstId, fmtWire netlist (netInstId, Nothing), w), fmap (smtBV w) init)
+        Register init w -> Just ((netInstId, fmtWire netlist (netInstId, Nothing), w), fmap (smtBV w) init)
         _ -> Nothing
       | Net{..} <- elems netlist
       , elem netInstId support]
-    inputFields = [(netInstId, w) | Net{netPrim=Input w _, netInstId} <- elems netlist, elem netInstId support]
-               ++ [(netInstId, w) | Net{netPrim=DontCare w, netInstId} <- elems netlist, elem netInstId support]
+    inputFields = [(netInstId, fmtWire netlist (netInstId, Nothing), w) | Net{netPrim=Input w _, netInstId} <- elems netlist, elem netInstId support]
+               ++ [(netInstId, fmtWire netlist (netInstId, Nothing), w) | Net{netPrim=DontCare w, netInstId} <- elems netlist, elem netInstId support]
     support = partialTopologicalSort netlist $ netInstId net
 
 data SeqConf = SeqConf {
@@ -292,16 +292,16 @@ fmtWire netlist wi = text $ wireName netlist wi
 -- | Define datatypes
 defineDatatypes :: (VerifConf, NetConf) -> Netlist -> IO ()
 defineDatatypes (VerifConf{..}, NetConf{..}) netlist = do
-  write SMTCommand $ smtDatatype stateType stateConstr $ map (\(id, w) -> (fmtWire netlist (id, Nothing), w)) stateFields
-  write SMTCommand $ smtDatatype inputType inputConstr $ map (\(id, w) -> (fmtWire netlist (id, Nothing), w)) inputFields
+  write SMTCommand $ smtDatatype stateType stateConstr $ map (\(_, name, w) -> (name, w)) stateFields
+  write SMTCommand $ smtDatatype inputType inputConstr $ map (\(_, name, w) -> (name, w)) inputFields
 
 -- | Define state initial value
 defineInit :: (VerifConf, NetConf) -> Netlist -> IO ()
 defineInit (VerifConf{..}, NetConf{..}) netlist = do
   write SMTCommand $ smtOp2 "declare-const" initName stateType
-  forM_ (zip stateFields stateFieldsInit) \((id, _), maybeVal) ->
+  forM_ (zip stateFields stateFieldsInit) \((_, name, _), maybeVal) ->
     case maybeVal of
-      Just val -> write SMTCommand $ smtOp1 "assert" $ smtOp2 "=" (smtGroup [(fmtWire netlist (id, Nothing)), initName]) val
+      Just val -> write SMTCommand $ smtOp1 "assert" $ smtOp2 "=" (smtGroup [name, initName]) val
       Nothing -> return ()
 
 -- | Define transition function
@@ -331,7 +331,7 @@ defineTransition (VerifConf{..}, NetConf{..}) netlist net = do
       (Assert _, [enable, prop]) -> smtOp2 "=>" (smtBV2Bool $ fmtNetInput enable) (smtBV2Bool $ fmtNetInput prop)
       _ -> undefined
 
-    stateComputed = smtGroup' $ stateConstr : map (regInput . getNet netlist . fst) stateFields
+    stateComputed = smtGroup' $ stateConstr : map (regInput . getNet netlist . (\(id, _, _) -> id)) stateFields
 
     regInput Net{..} = case (netPrim, netInputs) of
       (RegisterEn _ _, [enable, input]) -> smtOpN "ite" [
