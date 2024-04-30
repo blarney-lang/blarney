@@ -146,37 +146,29 @@ data IncrementalConf = IncrementalConf {
 iconfDefault = IncrementalConf { limit = Nothing }
 
 data NetConf = NetConf {
-  stateType :: Doc
-, stateConstr :: Doc
-, stateFields :: [(InstId, Doc, Int)]
+  stateFields :: [(InstId, Doc, Int)]
 , stateFieldsInit :: [Maybe Doc]
-, inputType :: Doc
-, inputConstr :: Doc
 , inputFields :: [(InstId, Doc, Int)]
-, initName :: Doc
-, lastName :: Doc
+, initName :: Doc -> Doc
+, lastName :: Doc -> Doc
 , transitionName :: Doc
 }
 
 mkNetConf :: Netlist -> Net -> NetConf
 mkNetConf netlist net =
   NetConf {
-    stateType = text $ "State_" ++ (show $ netInstId net)
-  , stateConstr = text $ "mkState_" ++ (show $ netInstId net)
-  , stateFields = stateFields
+    stateFields = stateFields
   , stateFieldsInit = stateFieldsInit
-  , inputType = text $ "Input" ++ (show $ netInstId net)
-  , inputConstr = text $ "mkInput" ++ (show $ netInstId net)
   , inputFields = inputFields
-  , initName = text $ "state_init" ++ (show $ netInstId net)
-  , lastName = text $ "state_last" ++ (show $ netInstId net)
+  , initName = \field -> (text $ "state_init" ++ (show $ netInstId net) ++ "_") <> field
+  , lastName = \field -> (text $ "state_last" ++ (show $ netInstId net) ++ "_") <> field
   , transitionName = text $ "transition" ++ (show $ netInstId net)
   }
   where
     (stateFields, stateFieldsInit) = unzip $ catMaybes [
       case netPrim of
-        RegisterEn init w -> Just ((netInstId, fmtWire netlist (netInstId, Nothing), w), fmap (smtBV w) init)
-        Register init w -> Just ((netInstId, fmtWire netlist (netInstId, Nothing), w), fmap (smtBV w) init)
+        RegisterEn init w -> Just ((netInstId, fmtWire netlist (netInstId, Nothing), w), fmap (smtBVLit w) init)
+        Register init w -> Just ((netInstId, fmtWire netlist (netInstId, Nothing), w), fmap (smtBVLit w) init)
         _ -> Nothing
       | Net{..} <- elems netlist
       , elem netInstId support]
@@ -185,16 +177,16 @@ mkNetConf netlist net =
     support = partialTopologicalSort netlist $ netInstId net
 
 data SeqConf = SeqConf {
-  stateName :: Int -> Doc
-, inputName :: Int -> Doc
+  stateName :: Int -> Doc -> Doc
+, inputName :: Int -> Doc -> Doc
 , okName :: Int -> Doc
 , distinctStates :: Bool
 }
 
 mkSeqConf :: String -> Bool -> SeqConf
 mkSeqConf suffix distinctStates = SeqConf {
-  stateName = \n -> text $ "state_" ++ suffix ++ show n
-, inputName = \n -> text $ "input_" ++ suffix ++ show n
+  stateName = \n field -> (text $ "state_" ++ suffix ++ show n ++ "_") <> field
+, inputName = \n field -> (text $ "input_" ++ suffix ++ show n ++ "_") <> field
 , okName = \n -> text $ "ok_" ++ suffix ++ show n
 , distinctStates = distinctStates
 }
@@ -214,8 +206,8 @@ smtText = text
 smtInt :: Int -> Doc
 smtInt = int
 
-smtBV :: Int -> Integer -> Doc
-smtBV w n = text $ printf ("#b%0" ++ show w ++ "b") n
+smtBVLit :: Int -> Integer -> Doc
+smtBVLit w n = text $ printf ("#b%0" ++ show w ++ "b") n
 
 smtOpN :: String -> [Doc] -> Doc
 smtOpN op xs = smtGroup (text op : xs)
@@ -242,19 +234,23 @@ smtScope write body = do
   write SMTCommand $ smtOp0 "pop"
   return ret
 
+smtConfig :: Writer -> IO ()
+smtConfig write = do
+  write SMTCommand $ smtOp0 "set-logic QF_BV"
+  write SMTCommand $ smtOp0 "set-option :parallel.enable true"
+  write SMTCommand $ smtOp0 "set-option :parallel.threads.max 4"
+
 smtCheckSat :: Writer -> IO ()
 smtCheckSat write = write SMTCommand $ smtOp0 "check-sat"
 
+smtBVType :: Int -> Doc
+smtBVType w = smtOp2 "_" (smtText "BitVec") (smtInt w)
+
 smtBool2BV :: Doc -> Doc
-smtBool2BV x = smtOpN "ite" [x, smtBV 1 1, smtBV 1 0]
+smtBool2BV x = smtOpN "ite" [x, smtBVLit 1 1, smtBVLit 1 0]
 
 smtBV2Bool :: Doc -> Doc
-smtBV2Bool x = smtOp2 "=" x $ smtBV 1 1
-
-smtDatatype :: Doc -> Doc -> [(Doc, Int)] -> Doc
-smtDatatype name constr fields =
-  smtOp2 "declare-datatype" name $ smtGroup [
-    smtGroup' $ constr : map (\(field, w) -> smtGroup [field, smtOp2 "_" (smtText "BitVec") (smtInt w)]) fields]
+smtBV2Bool x = smtOp2 "=" x $ smtBVLit 1 1
 
 
 -- Netlist helpers --
@@ -289,55 +285,48 @@ fmtWire netlist wi = text $ wireName netlist wi
 
 -- SMT Definitions --
 
--- | Define datatypes
-defineDatatypes :: (VerifConf, NetConf) -> Netlist -> IO ()
-defineDatatypes (VerifConf{..}, NetConf{..}) netlist = do
-  write SMTCommand $ smtDatatype stateType stateConstr $ map (\(_, name, w) -> (name, w)) stateFields
-  write SMTCommand $ smtDatatype inputType inputConstr $ map (\(_, name, w) -> (name, w)) inputFields
-
 -- | Define state initial value
 defineInit :: (VerifConf, NetConf) -> Netlist -> IO ()
 defineInit (VerifConf{..}, NetConf{..}) netlist = do
-  write SMTCommand $ smtOp2 "declare-const" initName stateType
-  forM_ (zip stateFields stateFieldsInit) \((_, name, _), maybeVal) ->
+  forM_ (zip stateFields stateFieldsInit) \((_, field, w), maybeVal) ->
     case maybeVal of
-      Just val -> write SMTCommand $ smtOp1 "assert" $ smtOp2 "=" (smtGroup [name, initName]) val
-      Nothing -> return ()
+      Just val -> write SMTCommand $ smtOpN "define-const" [initName field, smtBVType w, val]
+      Nothing -> write SMTCommand $ smtOpN "declare-const" [initName field, smtBVType w]
 
 -- | Define transition function
 defineTransition :: (VerifConf, NetConf) -> Netlist -> Net -> IO ()
 defineTransition (VerifConf{..}, NetConf{..}) netlist net = do
   write SMTCommand (smtOpN "define-fun" [
       transitionName -- function name
-    , smtGroup [ -- arguments
-        smtGroup [stateCurr, stateType]
-      , smtGroup [inputCurr, inputType]
-      , smtGroup [okCurr, (smtText "Bool")]
-      , smtGroup [stateNext, stateType]
-      ]
+    , smtGroup ( -- arguments
+      (map (\(_, field, w) -> smtGroup [stateCurr field, smtBVType w]) stateFields)
+      ++ (map (\(_, field, w) -> smtGroup [inputCurr field, smtBVType w]) inputFields)
+      ++ [smtGroup [okCurr, (smtText "Bool")]]
+      ++ (map (\(_, field, w) -> smtGroup [stateNext field, smtBVType w]) stateFields)
+      )
     , smtText "Bool" -- return type
     , body -- function body
     ])
   where
-    stateCurr = smtText "state_curr"
-    inputCurr = smtText "input_curr"
-    okCurr = smtText "ok_curr"
-    stateNext = smtText "state_next"
+    stateCurr field = text "state_curr_" <> field
+    inputCurr field = text "input_curr_" <> field
+    okCurr = text "ok_curr"
+    stateNext field = text "state_next_" <> field
 
     body = foldr (\x y -> smtOp2 "let" (smtGroup [x]) y) ret bindings
-    ret = (smtOp2 "and" (smtOp2 "=" okCurr okComputed) (smtOp2 "=" stateNext stateComputed))
+    ret = smtOpN "and" $ (smtOp2 "=" okCurr okComputed):stateEq
 
     okComputed = case (netPrim net, netInputs net) of
       (Assert _, [enable, prop]) -> smtOp2 "=>" (smtBV2Bool $ fmtNetInput enable) (smtBV2Bool $ fmtNetInput prop)
       _ -> undefined
 
-    stateComputed = smtGroup' $ stateConstr : map (regInput . getNet netlist . (\(id, _, _) -> id)) stateFields
+    stateEq = map (\(id, field, _) -> smtOp2 "=" (stateNext field) (regInput $ getNet netlist id)) stateFields
 
     regInput Net{..} = case (netPrim, netInputs) of
       (RegisterEn _ _, [enable, input]) -> smtOpN "ite" [
         smtBV2Bool $ fmtNetInput enable,
         fmtNetInput input,
-        smtGroup [fmtWire netlist (netInstId, Nothing), stateCurr]]
+        stateCurr $ fmtWire netlist (netInstId, Nothing)]
       (Register _ _, [input]) -> fmtNetInput input
       _ -> undefined
 
@@ -345,7 +334,7 @@ defineTransition (VerifConf{..}, NetConf{..}) netlist net = do
 
     fmtPrim :: Prim -> [Doc] -> Maybe Doc
     fmtPrim prim args = case (prim, args) of
-      (Const w n, []) -> Just $ smtBV w n
+      (Const w n, []) -> Just $ smtBVLit w n
       (Identity _, [x]) -> Just $ x
       (ReplicateBit w, [x]) -> Just $ smtGroup [(smtBVOp1 "repeat" w), x]
       (ZeroExtend iw ow, [x]) -> Just $ smtGroup [(smtBVOp1 "zero_extend" (ow-iw)), x]
@@ -380,25 +369,33 @@ defineTransition (VerifConf{..}, NetConf{..}) netlist net = do
       where
         mux :: Doc -> (Int, Integer) -> [Doc] -> Doc
         mux _ _ [x] = x
-        mux sel (wsel, idx) (x:xs) = smtOpN "ite" [smtOp2 "=" sel $ smtBV wsel idx, x, mux sel (wsel, idx+1) xs]
+        mux sel (wsel, idx) (x:xs) = smtOpN "ite" [smtOp2 "=" sel $ smtBVLit wsel idx, x, mux sel (wsel, idx+1) xs]
 
         mergeWrites :: Int -> [Doc] -> Doc
-        mergeWrites w [] = smtBV w 0
-        mergeWrites w (en:val:xs) = smtOp2 "bvor" (smtOpN "ite" [(smtOp2 "=" en $ smtBV 1 1), val, smtBV w 0]) (mergeWrites w xs)
+        mergeWrites w [] = smtBVLit w 0
+        mergeWrites w (en:val:xs) = smtOp2 "bvor" (smtOpN "ite" [(smtOp2 "=" en $ smtBVLit 1 1), val, smtBVLit w 0]) (mergeWrites w xs)
 
     fmtNetInput :: NetInput -> Doc
     fmtNetInput (InputWire wi) = case netPrim $ getNet netlist (fst wi) of
-      Input _ _ -> smtGroup [fmtWire netlist wi, inputCurr]
-      DontCare _ -> smtGroup [fmtWire netlist wi, inputCurr]
-      Register _ _ -> smtGroup [fmtWire netlist wi, stateCurr]
-      RegisterEn _ _ -> smtGroup [fmtWire netlist wi, stateCurr]
+      Input _ _ -> inputCurr $ fmtWire netlist wi
+      DontCare _ -> inputCurr $ fmtWire netlist wi
+      Register _ _ -> stateCurr $ fmtWire netlist wi
+      RegisterEn _ _ -> stateCurr $ fmtWire netlist wi
       _ -> fmtWire netlist wi
     fmtNetInput (InputTree prim xs) = fromJust $ fmtPrim prim $ map fmtNetInput xs
+
+assertTransition :: (VerifConf, NetConf) -> (Doc -> Doc) -> (Doc -> Doc) -> Doc -> (Doc -> Doc) -> IO ()
+assertTransition (VerifConf{..}, NetConf{..}) stateCurr inputCurr okCurr stateNext =
+  write SMTCommand $ smtOp1 "assert" $ smtGroup $
+    [transitionName]
+    ++ map (\(_, field, _) -> stateCurr field) stateFields
+    ++ map (\(_, field, _) -> inputCurr field) inputFields
+    ++ [okCurr]
+    ++ map (\(_, field, _) -> stateNext field) stateFields
 
 -- | All SMT definitions
 defineAll :: (VerifConf, NetConf) -> Netlist -> Net -> IO ()
 defineAll conf netlist net = do
-  defineDatatypes conf netlist
   defineInit conf netlist
   defineTransition conf netlist net
 
@@ -408,17 +405,22 @@ defineAll conf netlist net = do
 -- | Assert state is distinct from states with lesser indices
 assertDistinctState :: (VerifConf, NetConf, SeqConf) -> Int -> IO ()
 assertDistinctState (VerifConf{..}, NetConf{..}, SeqConf{..}) n =
-  forM_ [0..(n-1)] \k -> write SMTCommand $ smtOp1 "assert" $ smtOp2 "distinct" (stateName n) (stateName k)
+  forM_ [0..(n-1)] \k ->
+    if length stateFields == 0 then return ()
+    else write SMTCommand $ smtOp1 "assert" $ smtOpN "or" $ map (\(_, field, _) -> smtOp2 "distinct" (stateName n field) (stateName k field)) stateFields
 
 -- | Add a new state variable (taking into account SeqConf.distinctStates)
 addState :: (VerifConf, NetConf, SeqConf) -> Int -> IO ()
-addState conf@(VerifConf{write}, nconf@NetConf{stateType}, sconf@SeqConf{stateName, distinctStates}) n = do
-  write SMTCommand $ smtOp2 "declare-const" (stateName n) stateType
+addState conf@(VerifConf{write}, nconf@NetConf{stateFields}, sconf@SeqConf{stateName, distinctStates}) n = do
+  forM_ stateFields \(_, field, w) ->
+    write SMTCommand $ smtOp2 "declare-const" (stateName n field) (smtBVType w)
   if distinctStates then assertDistinctState conf n else return ()
 
 -- | Add a new input variable
 addInput :: (VerifConf, NetConf, SeqConf) -> Int -> IO ()
-addInput (VerifConf{..}, NetConf{..}, SeqConf{..}) n = write SMTCommand $ smtOp2 "declare-const" (inputName n) inputType
+addInput (VerifConf{..}, NetConf{..}, SeqConf{..}) n =
+  forM_ inputFields \(_, field, w) ->
+    write SMTCommand $ smtOp2 "declare-const" (inputName n field) (smtBVType w)
 
 -- | Add a new ok (assertion result) variable
 addOk :: (VerifConf, NetConf, SeqConf) -> Int -> IO ()
@@ -428,16 +430,17 @@ addOk (VerifConf{..}, NetConf{..}, SeqConf{..}) n = write SMTCommand $ smtOp2 "d
 addBoundedInit :: (VerifConf, NetConf, SeqConf) -> IO ()
 addBoundedInit conf@(VerifConf{..}, NetConf{..}, SeqConf{..}) = do
   addState conf 0
-  write SMTCommand $ smtOp1 "assert" $ smtOp2 "=" (stateName 0) initName
+  if length stateFields == 0 then return ()
+  else write SMTCommand $ smtOp1 "assert" $ smtOpN "and" $ map (\(_, field, _) -> smtOp2 "=" (stateName 0 field) (initName field)) stateFields
 
 -- | Add 1 depth to bounded verification
 addBoundedStep :: (VerifConf, NetConf, SeqConf) -> Int -> IO ()
-addBoundedStep conf@(VerifConf{..}, NetConf{..}, SeqConf{..}) depth =
+addBoundedStep conf@(vconf@VerifConf{..}, nconf@NetConf{..}, SeqConf{..}) depth =
   if depth <= 0 then error "bounded depth must be at least 1" else do
   addInput conf (depth-1)
   addOk conf (depth-1)
   addState conf depth
-  write SMTCommand $ smtOp1 "assert" $ smtGroup [transitionName, stateName (depth-1), inputName (depth-1), okName (depth-1), stateName depth]
+  assertTransition (vconf, nconf) (stateName (depth-1)) (inputName (depth-1)) (okName (depth-1)) (stateName depth)
 
 -- | Assert bounded property for a given depth
 assertBoundedFixed :: (VerifConf, FixedConf, NetConf, SeqConf) -> IO ()
@@ -446,7 +449,7 @@ assertBoundedFixed (vconf@VerifConf{write}, FixedConf{depth}, nconf, sconf@SeqCo
   write SMTEcho (smtOp1 "echo" (smtText ("\"(depth " ++ show depth ++ ") Bounded refutation:\"")))
   addBoundedInit conf
   forM_ [1..depth] \k -> addBoundedStep conf k
-  write SMTCommand $ smtOp1 "assert" $ smtOp1 "not" $ foldr1 (smtOp2 "and") [okName (depth-1) | k <- [1..depth]]
+  write SMTCommand $ smtOp1 "assert" $ smtOp1 "not" $ smtOpN "and" [okName (depth-1) | k <- [1..depth]]
   where conf = (vconf, nconf, sconf)
 
 -- | Add partial bounded property for the given depth
@@ -459,19 +462,20 @@ assertBoundedIncremental (VerifConf{..}, NetConf{..}, SeqConf{..}) depth =
 -- Note: Also serves as combinational verification assertion
 -- Note: Called by addAndAssertInductionStep
 addInductionInit :: (VerifConf, NetConf, SeqConf) -> IO ()
-addInductionInit conf@(VerifConf{..}, NetConf{..}, SeqConf{..}) = do
-  write SMTCommand $ smtOp2 "declare-const" lastName stateType
+addInductionInit conf@(vconf@VerifConf{..}, nconf@NetConf{..}, SeqConf{..}) = do
+  forM_ stateFields \(_, field, w) ->
+    write SMTCommand $ smtOp2 "declare-const" (lastName field) (smtBVType w)
   addInput conf 0
   addState conf 0
-  write SMTCommand $ smtOp1 "assert" $ smtGroup [transitionName, stateName 0, inputName 0, smtText "false", lastName]
+  assertTransition (vconf, nconf) (stateName 0) (inputName 0) (smtText "false") lastName
 
 -- | Add 1 depth to induction verification, and assert partial property
 addAndAssertInductionStep :: (VerifConf, NetConf, SeqConf) -> Int -> IO ()
-addAndAssertInductionStep conf@(VerifConf{..}, NetConf{..}, SeqConf{..}) depth = do
+addAndAssertInductionStep conf@(vconf@VerifConf{..}, nconf@NetConf{..}, SeqConf{..}) depth = do
   if depth == 0 then addInductionInit conf else do
     addInput conf depth
     addState conf depth
-    write SMTCommand $ smtOp1 "assert" $ smtGroup [transitionName, stateName depth, inputName depth, smtText "true", stateName (depth-1)]
+    assertTransition (vconf, nconf) (stateName depth) (inputName depth) (smtText "true") (stateName (depth-1))
 
 -- | Assert induction property for a given depth
 assertInductionFixed :: (VerifConf, FixedConf, NetConf, SeqConf) -> IO ()
@@ -540,7 +544,7 @@ verifyLiveStep (verb, VerifConf{write, giveModel}) depth bounded induction handl
         "unsat" -> unsat
         _ -> error $ "Unexpected SMT output: '" ++ ln ++ "'"
     getModel = do
-      write SMTCommand $ smtOp1 "get-value" $ smtGroup (map (inputName boundedConf) [0..(depth-1)])
+      write SMTCommand $ smtOp0 "get-model"
       write SMTCommand $ smtOp1 "echo" $ smtText "\"###END###\""
       untilEND
       where
@@ -562,6 +566,7 @@ verifyLive (verb, vconf'@VerifConf{write=write'}) circuit verifier = do
     let vconf = vconf'{write} in
     do
       hSetBuffering hIn LineBuffering
+      smtConfig write
       forEachAssert circuit "#circuit#" \netlist net title ->
         let nconf = mkNetConf netlist net in
         smtScope write do
@@ -626,7 +631,8 @@ verifyOfflineFixed (verb, vconf'@VerifConf{write=write'}, fconf@FixedConf{depth}
   system ("mkdir -p " ++ dir)
   withFile fileName WriteMode \h ->
     let write t x = write' t x >> write_smt (hPutStrLn h . render) t x in
-    let vconf = vconf'{write} in
+    let vconf = vconf'{write} in do
+    smtConfig write
     forEachAssert circuit name \netlist net title -> smtScope write do
       write SMTEcho (smtOp1 "echo" (smtText ("\"Assertion '" ++ title ++ "':\"")))
       let nconf = mkNetConf netlist net in do
