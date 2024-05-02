@@ -29,8 +29,10 @@ module Blarney.Backend.NewSMT (
 , Blarney.Backend.NewSMT.IncrementalConf (..)
 , Blarney.Backend.NewSMT.iconfDefault
 , Blarney.Backend.NewSMT.verifyOfflineFixed
+, Blarney.Backend.NewSMT.verifyOfflineQIFixed
 , Blarney.Backend.NewSMT.verifyLiveBounded
 , Blarney.Backend.NewSMT.verifyLiveFixed
+, Blarney.Backend.NewSMT.verifyLiveQIFixed
 , Blarney.Backend.NewSMT.verifyLiveIncremental
 ) where
 
@@ -489,6 +491,32 @@ assertInductionFixed (vconf@VerifConf{write}, FixedConf{depth}, nconf, sconf) = 
   forM_ [1..depth] \k -> addAndAssertInductionStep conf k
   where conf = (vconf, nconf, sconf)
 
+-- | Assert induction property for a given depth
+assertQIFixed :: (VerifConf, FixedConf, NetConf) -> IO ()
+assertQIFixed (vconf@VerifConf{write}, FixedConf{depth}, nconf@NetConf{transitionName, inputFields, stateFields}) = do
+  if depth == 0 then
+    write SMTEcho (smtOp1 "echo" (smtText ("\"Combinational refutation:\"")))
+  else
+    write SMTEcho (smtOp1 "echo" (smtText ("\"(depth " ++ show depth ++ ") Induction refutation:\"")))
+  addInductionInit (vconf, nconf, sconfTail)
+  forM_ [1..depth] \k -> addAndAssertInductionStep (vconf, nconf, sconfTail) k
+  if depth == 0 then return ()
+  else write SMTCommand $ smtOp1 "assert" $ smtOp2 "forall" (smtGroup $ inputvars) $ smtOp2 "exists" (smtGroup $ statevars) $ transitions
+  where
+    sconfTail = mkSeqConf "tail" False
+    sconfQuant' = mkSeqConf "quant" False
+    sconfQuant = sconfQuant'{stateName=(\d -> if d == depth then stateName sconfTail d else stateName sconfQuant' d)}
+    inputvars = concat $ map (\d -> map (\(_, field, w) -> smtGroup [inputName sconfQuant d field, smtBVType w]) inputFields) [1..depth]
+    statevars = concat $ map (\d -> map (\(_, field, w) -> smtGroup [stateName sconfQuant d field, smtBVType w]) stateFields) [0..(depth-1)]
+    transitions = smtOpN "and" $ map (\d ->
+        smtGroup $
+          [transitionName]
+          ++ map (\(_, field, _) -> stateName sconfQuant d field) stateFields
+          ++ map (\(_, field, _) -> inputName sconfQuant d field) inputFields
+          ++ [smtText "true"]
+          ++ map (\(_, field, _) -> stateName sconfQuant (d-1) field) stateFields
+      ) [1..depth]
+
 
 -- Top level verification helpers --
 
@@ -567,7 +595,7 @@ verifyLive (verb, vconf'@VerifConf{write=write'}) circuit verifier = do
     let vconf = vconf'{write} in
     do
       hSetBuffering hIn LineBuffering
-      smtConfig write
+      --smtConfig write
       forEachAssert circuit "#circuit#" \netlist net title ->
         let nconf = mkNetConf netlist net in
         smtScope write do
@@ -665,6 +693,30 @@ verifyLiveBounded (verb, vconf, fconf@FixedConf{depth}) circuit =
         hook)
       hOut
 
+verifyOfflineQIFixed :: Modular a => (Verbosity, VerifConf, FixedConf) -> a -> String -> String -> IO ()
+verifyOfflineQIFixed (verb, vconf'@VerifConf{write=write'}, fconf@FixedConf{depth}) circuit name dir = do
+  sayInfoLn verb $ "Writing SMT script to '" ++ fileName ++ "'..."
+  system ("mkdir -p " ++ dir)
+  withFile fileName WriteMode \h ->
+    let write t x = write' t x >> write_smt (hPutStrLn h . render) t x in
+    let vconf = vconf'{write} in do
+    --smtConfig write
+    forEachAssert circuit name \netlist net title -> smtScope write do
+      write SMTEcho (smtOp1 "echo" (smtText ("\"Assertion '" ++ title ++ "':\"")))
+      let nconf = mkNetConf netlist net in do
+        defineAll (vconf, nconf) netlist net
+        if depth > 0 then
+          smtScope write do
+            assertBoundedFixed (vconf, fconf, nconf, boundedConf)
+            smtCheckSat write
+        else return ()
+        smtScope write do
+          assertQIFixed (vconf, fconf, nconf)
+          smtCheckSat write
+  where
+    fileName = dir ++ "/" ++ name ++ ".smt2"
+    render = renderStyle $ Style PageMode 80 1.05
+
 -- | Perform live fixed depth verification
 verifyLiveFixed :: Modular a => (Verbosity, VerifConf, FixedConf) -> a -> IO ()
 verifyLiveFixed (verb, vconf, fconf@FixedConf{depth}) circuit =
@@ -677,6 +729,21 @@ verifyLiveFixed (verb, vconf, fconf@FixedConf{depth}) circuit =
         hook)
       (\hook -> smtScope write do
         assertInductionFixed (vconf, fconf, nconf, inductionConf vconf)
+        smtCheckSat write
+        hook)
+      hOut
+
+verifyLiveQIFixed :: Modular a => (Verbosity, VerifConf, FixedConf) -> a -> IO ()
+verifyLiveQIFixed (verb, vconf, fconf@FixedConf{depth}) circuit =
+  verifyLive (verb, vconf) circuit \(verb, vconf@VerifConf{write}, nconf) hOut netlist net -> do
+    defineAll (vconf, nconf) netlist net
+    verifyLiveStep (verb, vconf) depth
+      (\hook -> smtScope write do
+        assertBoundedFixed (vconf, fconf, nconf, boundedConf)
+        smtCheckSat write
+        hook)
+      (\hook -> smtScope write do
+        assertQIFixed (vconf, fconf, nconf)
         smtCheckSat write
         hook)
       hOut
