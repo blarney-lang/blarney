@@ -29,6 +29,7 @@ module Blarney.Backend.NewSMT (
 , Blarney.Backend.NewSMT.IncrementalConf (..)
 , Blarney.Backend.NewSMT.iconfDefault
 , Blarney.Backend.NewSMT.verifyOfflineFixed
+, Blarney.Backend.NewSMT.verifyLiveBounded
 , Blarney.Backend.NewSMT.verifyLiveFixed
 , Blarney.Backend.NewSMT.verifyLiveIncremental
 ) where
@@ -642,6 +643,21 @@ verifyOfflineFixed (verb, vconf'@VerifConf{write=write'}, fconf@FixedConf{depth}
   where
     fileName = dir ++ "/" ++ name ++ ".smt2"
     render = renderStyle $ Style PageMode 80 1.05
+
+-- | Perform live bounded verification
+verifyLiveBounded :: Modular a => (Verbosity, VerifConf, FixedConf) -> a -> IO ()
+verifyLiveBounded (verb, vconf, fconf@FixedConf{depth}) circuit =
+  verifyLive (verb, vconf) circuit \(verb, vconf@VerifConf{write}, nconf) hOut netlist net -> do
+    defineAll (vconf, nconf) netlist net
+    verifyLiveStep (verb, vconf) depth
+      (\hook -> smtScope write do
+        assertBoundedFixed (vconf, fconf, nconf, boundedConf)
+        smtCheckSat write
+        hook)
+      (\hook -> smtScope write do
+        write SMTCommand $ smtOp1 "echo" $ smtText "\"sat\"" -- Fake counter example
+        hook)
+      hOut
 
 -- | Perform live fixed depth verification
 verifyLiveFixed :: Modular a => (Verbosity, VerifConf, FixedConf) -> a -> IO ()
