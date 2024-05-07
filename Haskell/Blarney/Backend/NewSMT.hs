@@ -452,7 +452,7 @@ assertBoundedFixed (vconf@VerifConf{write}, FixedConf{depth}, nconf, sconf@SeqCo
   write SMTEcho (smtOp1 "echo" (smtText ("\"(depth " ++ show depth ++ ") Bounded refutation:\"")))
   addBoundedInit conf
   forM_ [1..depth] \k -> addBoundedStep conf k
-  write SMTCommand $ smtOp1 "assert" $ smtOp1 "not" $ smtOpN "and" [okName (depth-1) | k <- [1..depth]]
+  write SMTCommand $ smtOp1 "assert" $ smtOp1 "not" $ smtOpN "and" [okName (k-1) | k <- [1..depth]]
   where conf = (vconf, nconf, sconf)
 
 -- | Add partial bounded property for the given depth
