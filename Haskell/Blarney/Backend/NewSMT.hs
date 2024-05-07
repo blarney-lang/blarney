@@ -882,7 +882,7 @@ quantIndGenerator conf net m =
 
 defaultGenerator :: (Verbosity, VerifConf, NetConf) -> (Netlist, Net) -> ProofPartGenerator
 defaultGenerator conf net m =
-  concurrently_ (boundedGenerator conf net m) (restrIndGenerator conf net m)
+  foldr1 concurrently_ [boundedGenerator conf net m, restrIndGenerator conf net m, quantIndGenerator conf net m]
 
 checkConcurrent :: Modular a => ((Verbosity, VerifConf, NetConf) -> (Netlist, Net) -> ProofPartGenerator) -> (Verbosity, VerifConf) -> a -> IO ()
 checkConcurrent gen (verb, vconf) circuit =
