@@ -96,6 +96,7 @@ library
       array
     , base
     , containers
+    , async
     , ghc-prim
     , mtl
     , pretty

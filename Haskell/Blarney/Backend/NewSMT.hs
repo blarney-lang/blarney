@@ -34,6 +34,7 @@ module Blarney.Backend.NewSMT (
 , Blarney.Backend.NewSMT.verifyLiveFixed
 , Blarney.Backend.NewSMT.verifyLiveQIFixed
 , Blarney.Backend.NewSMT.verifyLiveIncremental
+, Blarney.Backend.NewSMT.checkDefault
 ) where
 
 -- Standard imports
@@ -49,6 +50,8 @@ import Data.Array.IArray
 import Prelude hiding ((<>))
 import qualified Data.Set as Set
 import qualified Data.Map as Map
+import Control.Concurrent.MVar
+import Control.Concurrent.Async
 
 -- Blarney imports
 import Blarney.Netlist
@@ -245,6 +248,14 @@ smtConfig write = do
 
 smtCheckSat :: Writer -> IO ()
 smtCheckSat write = write SMTCommand $ smtOp0 "check-sat"
+
+smtIfSat :: Handle -> IO a -> IO a -> IO a
+smtIfSat handle sat unsat = do
+  ln <- hGetLine handle
+  case ln of
+    "sat" -> sat
+    "unsat" -> unsat
+    _ -> error $ "Unexpected SMT output: '" ++ ln ++ "'"
 
 smtBVType :: Int -> Doc
 smtBVType w = smtOp2 "_" (smtText "BitVec") (smtInt w)
@@ -543,7 +554,7 @@ verifyLiveStep (verb, VerifConf{write, giveModel}) depth bounded induction handl
       if depth == 0 then return Insufficient else
         bounded do
           sayVerboseFlush verb $ "(depth " ++ show depth ++ ") bounded ...... "
-          ifSat
+          smtIfSat handle
             do
               sayVerboseLn verb $ red "falsifiable"
               if giveModel then getModel else return ()
@@ -558,20 +569,13 @@ verifyLiveStep (verb, VerifConf{write, giveModel}) depth bounded induction handl
           sayVerboseFlush verb $ "combinational .......... "
         else
           sayVerboseFlush verb $ "(depth " ++ show depth ++ ") induction .... "
-        ifSat
+        smtIfSat handle
           do
             sayVerboseLn verb $ yellow "insufficient"
             return Insufficient
           do
             sayVerboseLn verb $ green "verified"
             return Verified
-    getLine = hGetLine handle
-    ifSat sat unsat = do
-      ln <- getLine
-      case ln of
-        "sat" -> sat
-        "unsat" -> unsat
-        _ -> error $ "Unexpected SMT output: '" ++ ln ++ "'"
     getModel = do
       write SMTCommand $ smtOp0 "get-model"
       write SMTCommand $ smtOp1 "echo" $ smtText "\"###END###\""
@@ -583,36 +587,40 @@ verifyLiveStep (verb, VerifConf{write, giveModel}) depth bounded induction handl
             "###END###" -> return ()
             _ -> sayVerboseLn verb line >> untilEND
 
--- | Helper function for live verification
-verifyLive :: Modular a => (Verbosity, VerifConf) -> a -> ((Verbosity, VerifConf, NetConf) -> Handle -> Netlist -> Net -> IO VerifyResult) -> IO ()
-verifyLive (verb, vconf'@VerifConf{write=write'}) circuit verifier = do
+-- | Start SMT session
+withSMT :: (Verbosity, VerifConf) -> ((Verbosity, VerifConf) -> Handle -> IO a) -> IO a
+withSMT (verb, vconf'@VerifConf{write=write'}) action =
   withCreateProcess smtP \(Just hIn) (Just hOut) _ _ ->
     let write t x =
           case verb of
             Verbose -> write' t x >> write_smt_commands (hPutStrLn hIn . render) t x
             _ -> write_smt_commands (hPutStrLn hIn . render) t x
     in
-    let vconf = vconf'{write} in
-    do
-      hSetBuffering hIn LineBuffering
-      --smtConfig write
-      forEachAssert circuit "#circuit#" \netlist net title ->
-        let nconf = mkNetConf netlist net in
-        smtScope write do
-          sayInfoFlush verb $ "Assertion '" ++ title ++ "': "
-          sayVerboseLn verb $ ""
-          smtScope write do
-            ret <- verifier (verb, vconf, nconf) hOut netlist net
-            case ret of
-              Verified -> sayInfoLn verb $ green "verified"
-              Insufficient -> sayInfoLn verb $ yellow "insufficient"
-              Falsifiable -> sayInfoLn verb $ red "falsifiable"
+    let vconf = vconf'{write} in do
+    hSetBuffering hIn LineBuffering
+    action (verb, vconf) hOut
   where
-    render = renderStyle $ Style PageMode 80 1.05
+    render = renderStyle $ Style OneLineMode 0 0
     solverCmd = ("z3", ["-in"])
     smtP = (uncurry proc solverCmd){ std_in  = CreatePipe
                                    , std_out = CreatePipe
                                    , std_err = CreatePipe }
+
+-- | Helper function for live verification
+verifyLive :: Modular a => (Verbosity, VerifConf) -> a -> ((Verbosity, VerifConf, NetConf) -> Handle -> Netlist -> Net -> IO VerifyResult) -> IO ()
+verifyLive (verb', vconf') circuit verifier = do
+  withSMT (verb', vconf') \(verb, vconf@VerifConf{write}) hOut ->
+    forEachAssert circuit "#circuit#" \netlist net title ->
+      let nconf = mkNetConf netlist net in
+      smtScope write do
+        sayInfoFlush verb $ "Assertion '" ++ title ++ "': "
+        sayVerboseLn verb $ ""
+        smtScope write do
+          ret <- verifier (verb, vconf, nconf) hOut netlist net
+          case ret of
+            Verified -> sayInfoLn verb $ green "verified"
+            Insufficient -> sayInfoLn verb $ yellow "insufficient"
+            Falsifiable -> sayInfoLn verb $ red "falsifiable"
 
 
 -- Top level verification procedures --
@@ -773,3 +781,121 @@ verifyLiveIncremental (verb, vconf, iconf) circuit =
       case (ret, fromMaybe True $ fmap (depth <) limit) of
         (Insufficient, True) -> verifier params (depth+1)
         _ -> return ret
+
+
+-- Concurrent verification --
+
+type CounterEx = (Int, String)
+
+data ProofPart = Bounded Int
+               | Induction Int
+               | Counter CounterEx
+               | Abort
+
+type ProofPartGenerator = (MVar ProofPart -> IO ())
+
+data ProofResult = PVerified
+                 | PFalsifiable CounterEx
+                 | PUnknown
+
+proofMerge :: MVar ProofPart -> Int -> Maybe Int -> IO ProofResult
+proofMerge m bounded induction =
+  if maybe False (bounded >=) induction then return PVerified else do
+  x <- takeMVar m
+  case x of
+    Bounded bounded' -> proofMerge m (max bounded bounded') induction
+    Induction induction' -> proofMerge m bounded $ Just (maybe induction' (min induction') induction)
+    Counter ex -> return $ PFalsifiable ex
+    Abort -> return PUnknown
+
+runJobs :: (a -> IO ()) -> [a] -> Int -> IO ()
+runJobs f jobs count = do
+  m <- newEmptyMVar
+  src <- async $ feed m
+  ret <- async $ foldr1 concurrently_ $ replicate count (process m)
+  waitEither src ret
+  cancel src
+  wait ret
+  where
+    feed m = forM_ jobs (putMVar m . Just) >> forever (putMVar m Nothing)
+    process m = do
+      opt <- takeMVar m
+      case opt of
+        Just x -> f x >> process m
+        Nothing -> return ()
+
+checkNetConcurrent :: ProofPartGenerator -> IO ProofResult
+checkNetConcurrent gen = do
+  m <- newEmptyMVar
+  src <- async (gen m >> putMVar m Abort)
+  ret <- async (proofMerge m 0 Nothing)
+  waitEither src ret
+  cancel src
+  wait ret
+
+checkNetBounded :: (Verbosity, VerifConf, NetConf) -> (Netlist, Net) -> Int -> IO ProofPart
+checkNetBounded (verb', vconf', nconf) (netlist, net) depth =
+  withSMT (verb', vconf') \(verb, vconf@VerifConf{write}) handle -> do
+    defineAll (vconf, nconf) netlist net
+    assertBoundedFixed (vconf, FixedConf{depth}, nconf, boundedConf)
+    smtCheckSat write
+    smtIfSat handle
+      (sayVerboseLn verb ("Bounded, depth " ++ show depth ++ ": " ++ red "falsifiable") >> (return $ Counter (depth, "")))
+      (sayVerboseLn verb ("Bounded, depth " ++ show depth ++ ": " ++ blue "verified") >> (return $ Bounded depth))
+
+checkNetRestrInd :: (Verbosity, VerifConf, NetConf) -> (Netlist, Net) -> Int -> IO (Maybe ProofPart)
+checkNetRestrInd (verb', vconf', nconf) (netlist, net) depth =
+  withSMT (verb', vconf') \(verb, vconf@VerifConf{write}) handle -> do
+    defineAll (vconf, nconf) netlist net
+    assertInductionFixed (vconf{restrictedStates=True}, FixedConf{depth}, nconf, inductionConf vconf)
+    smtCheckSat write
+    smtIfSat handle
+      (sayVerboseLn verb ("Restr induction, depth " ++ show depth ++ ": " ++ yellow "insufficient") >> (return $ Nothing))
+      (sayVerboseLn verb ("Restr induction, depth " ++ show depth ++ ": " ++ blue "verified") >> (return $ Just $ Induction depth))
+
+checkNetQuantInd :: (Verbosity, VerifConf, NetConf) -> (Netlist, Net) -> Int -> IO (Maybe ProofPart)
+checkNetQuantInd (verb', vconf', nconf) (netlist, net) depth =
+  withSMT (verb', vconf') \(verb, vconf@VerifConf{write}) handle -> do
+    defineAll (vconf, nconf) netlist net
+    assertQIFixed (vconf, FixedConf{depth}, nconf)
+    smtCheckSat write
+    smtIfSat handle
+      (sayVerboseLn verb ("Quant induction, depth " ++ show depth ++ ": " ++ yellow "insufficient") >> (return $ Nothing))
+      (sayVerboseLn verb ("Quant induction, depth " ++ show depth ++ ": " ++ blue "verified") >> (return $ Just $ Induction depth))
+
+increasing :: Int -> Int -> [Int]
+increasing n curr =
+  curr : increasing n next
+  where next = if n==0 then curr+1 else (((curr * (n+1)) `div` n) + 1)
+
+boundedGenerator :: (Verbosity, VerifConf, NetConf) -> (Netlist, Net) -> ProofPartGenerator
+boundedGenerator conf net m =
+  runJobs (\depth -> checkNetBounded conf net depth >>= putMVar m) (increasing 4 1) 2
+
+restrIndGenerator :: (Verbosity, VerifConf, NetConf) -> (Netlist, Net) -> ProofPartGenerator
+restrIndGenerator conf net m =
+  runJobs (\depth -> checkNetRestrInd conf net depth >>= maybe (return ()) (putMVar m)) (increasing 8 1) 4
+
+quantIndGenerator :: (Verbosity, VerifConf, NetConf) -> (Netlist, Net) -> ProofPartGenerator
+quantIndGenerator conf net m =
+  runJobs (\depth -> checkNetQuantInd conf net depth >>= maybe (return ()) (putMVar m)) (increasing 8 1) 4
+
+defaultGenerator :: (Verbosity, VerifConf, NetConf) -> (Netlist, Net) -> ProofPartGenerator
+defaultGenerator conf net m =
+  concurrently_ (boundedGenerator conf net m) (restrIndGenerator conf net m)
+
+checkConcurrent :: Modular a => ((Verbosity, VerifConf, NetConf) -> (Netlist, Net) -> ProofPartGenerator) -> (Verbosity, VerifConf) -> a -> IO ()
+checkConcurrent gen (verb, vconf) circuit =
+  forEachAssert circuit "#circuit#" \netlist net title ->
+    let nconf = mkNetConf netlist net in do
+    sayVerboseLn verb $ "Assertion '" ++ title ++ "'..."
+    ret <- checkNetConcurrent $ gen (verb, vconf, nconf) (netlist, net)
+    sayInfoLn verb ("Assertion '" ++ title ++ "': " ++
+      case ret of
+        PVerified -> green "verified"
+        PUnknown -> yellow "unknown"
+        PFalsifiable _ -> red "falsifiable")
+
+
+checkDefault :: Modular a => (Verbosity, VerifConf) -> a -> IO ()
+checkDefault = checkConcurrent defaultGenerator
