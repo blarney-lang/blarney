@@ -874,11 +874,11 @@ boundedGenerator conf net m =
 
 restrIndGenerator :: (Verbosity, VerifConf, NetConf) -> (Netlist, Net) -> ProofPartGenerator
 restrIndGenerator conf net m =
-  runJobs (\depth -> checkNetRestrInd conf net depth >>= maybe (return ()) (putMVar m)) (increasing 8 1) 4
+  runJobs (\depth -> checkNetRestrInd conf net depth >>= maybe (return ()) (putMVar m)) (increasing 8 0) 4
 
 quantIndGenerator :: (Verbosity, VerifConf, NetConf) -> (Netlist, Net) -> ProofPartGenerator
 quantIndGenerator conf net m =
-  runJobs (\depth -> checkNetQuantInd conf net depth >>= maybe (return ()) (putMVar m)) (increasing 8 1) 4
+  runJobs (\depth -> checkNetQuantInd conf net depth >>= maybe (return ()) (putMVar m)) (increasing 16 0) 6
 
 defaultGenerator :: (Verbosity, VerifConf, NetConf) -> (Netlist, Net) -> ProofPartGenerator
 defaultGenerator conf net m =
