@@ -870,7 +870,7 @@ increasing n curr =
 
 boundedGenerator :: (Verbosity, VerifConf, NetConf) -> (Netlist, Net) -> ProofPartGenerator
 boundedGenerator conf net m =
-  runJobs (\depth -> checkNetBounded conf net depth >>= putMVar m) (increasing 4 1) 2
+  runJobs (\depth -> checkNetBounded conf net depth >>= putMVar m) (increasing 3 1) 4
 
 restrIndGenerator :: (Verbosity, VerifConf, NetConf) -> (Netlist, Net) -> ProofPartGenerator
 restrIndGenerator conf net m =
@@ -878,7 +878,7 @@ restrIndGenerator conf net m =
 
 quantIndGenerator :: (Verbosity, VerifConf, NetConf) -> (Netlist, Net) -> ProofPartGenerator
 quantIndGenerator conf net m =
-  runJobs (\depth -> checkNetQuantInd conf net depth >>= maybe (return ()) (putMVar m)) (increasing 16 0) 6
+  runJobs (\depth -> checkNetQuantInd conf net depth >>= maybe (return ()) (putMVar m)) (increasing 16 0) 4
 
 defaultGenerator :: (Verbosity, VerifConf, NetConf) -> (Netlist, Net) -> ProofPartGenerator
 defaultGenerator conf net m =
