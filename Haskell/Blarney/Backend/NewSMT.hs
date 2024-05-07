@@ -557,7 +557,7 @@ verifyLiveStep (verb, VerifConf{write, giveModel}) depth bounded induction handl
           smtIfSat handle
             do
               sayVerboseLn verb $ red "falsifiable"
-              if giveModel then getModel else return ()
+              if giveModel then getModel handle else return ()
               return Falsifiable
             do
               sayVerboseLn verb $ blue "verified"
@@ -576,13 +576,13 @@ verifyLiveStep (verb, VerifConf{write, giveModel}) depth bounded induction handl
           do
             sayVerboseLn verb $ green "verified"
             return Verified
-    getModel = do
+    getModel handle = do
       write SMTCommand $ smtOp0 "get-model"
       write SMTCommand $ smtOp1 "echo" $ smtText "\"###END###\""
       untilEND
       where
         untilEND = do
-          line <- getLine
+          line <- hGetLine handle
           case line of
             "###END###" -> return ()
             _ -> sayVerboseLn verb line >> untilEND
