@@ -811,11 +811,11 @@ proofMerge m bounded induction =
 runJobs :: (a -> IO ()) -> [a] -> Int -> IO ()
 runJobs f jobs count = do
   m <- newEmptyMVar
-  src <- async $ feed m
-  ret <- async $ foldr1 concurrently_ $ replicate count (process m)
-  waitEither src ret
-  cancel src
-  wait ret
+  withAsync (feed m) $ \src ->
+    withAsync (foldr1 concurrently_ $ replicate count (process m)) $ \ret -> do
+      waitEither src ret
+      cancel src
+      wait ret
   where
     feed m = forM_ jobs (putMVar m . Just) >> forever (putMVar m Nothing)
     process m = do
@@ -827,11 +827,11 @@ runJobs f jobs count = do
 checkNetConcurrent :: ProofPartGenerator -> IO ProofResult
 checkNetConcurrent gen = do
   m <- newEmptyMVar
-  src <- async (gen m >> putMVar m Abort)
-  ret <- async (proofMerge m 0 Nothing)
-  waitEither src ret
-  cancel src
-  wait ret
+  withAsync (gen m >> putMVar m Abort) $ \src ->
+    withAsync (proofMerge m 0 Nothing) $ \ret -> do
+      waitEither src ret
+      cancel src
+      wait ret
 
 checkNetBounded :: (Verbosity, VerifConf, NetConf) -> (Netlist, Net) -> Int -> IO ProofPart
 checkNetBounded (verb', vconf', nconf) (netlist, net) depth =
