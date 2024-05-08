@@ -79,7 +79,7 @@ module Blarney.Vector (
 , Blarney.Vector.zip4
 , Blarney.Vector.unzip
 --
-, Blarney.Vector.mapElems
+, Blarney.Vector.vectorise
 , Blarney.Vector.map
 , Blarney.Vector.mapM
 , Blarney.Vector.mapM_
@@ -368,8 +368,8 @@ unzip xys = (Vec xs, Vec ys)
             where (xs, ys) = L.unzip (toList xys)
 
 -- | Appy list function to elements of vector
-mapElems :: ([a] -> [b]) -> Vec n a -> Vec n b
-mapElems f v
+vectorise :: ([a] -> [b]) -> Vec n a -> Vec n b
+vectorise f v
   | L.length inputs == L.length outputs = Vec outputs
   | otherwise =
       error "Blarney.Vector.onElems: function does not preserve length"
