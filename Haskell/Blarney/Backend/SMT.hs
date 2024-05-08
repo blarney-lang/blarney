@@ -244,6 +244,7 @@ showSpecificAssert ctxt@Context{..} vMode =
   check test0 $+$ if doInduction then check test1 else empty
   where check x = text "(push)" $+$ x $+$ text "(check-sat)" $+$ text "(pop)"
         test0 = cmnt0 $+$ assertBounded ctxtCFunName
+                                        ctxtTFunName
                                         (ctxtInputType, ctxtStateType)
                                         ctxtStateInits
                                         depth
@@ -350,6 +351,7 @@ verifyWithSMT VerifyConf{..} nl =
     deepen c@Context{..} (hI, hO) (curD, maxD) = do
       -- send assertion for the bounded proof of current depth
       let bounded = assertBounded ctxtCFunName
+                                  ctxtTFunName
                                   (ctxtInputType, ctxtStateType)
                                   ctxtStateInits
                                   curD

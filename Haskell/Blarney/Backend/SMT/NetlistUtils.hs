@@ -101,27 +101,33 @@ defineChainTransition tName argTypes cName =
 --   provided chaining function, with a given initial state, and for a given
 --   depth
 assertBounded :: String
+              -> String
               -> (String, String)
               -> [(Integer, InputWidth)]
               -> Int
               -> Bool
               -> Doc
-assertBounded cFun (inptType, stType) initS depth implies = decls $+$ assertion
+assertBounded cFun tFun (inptType, stType) initS depth implies =
+  decls $+$ assertion
   where inpts = [ "in" ++ show i | i <- [0 .. depth-1] ]
         decls = vcat $
                   map (\i -> text $ "(declare-const "++i++" "++inptType++")")
                       inpts
         assertion = applyOp (text "assert") [ letBind bindArgs matchInvoke ]
-        bindArgs = [ (text "inpts", mkListX inpts inptType)
-                   , (text "initS", createState initS) ]
+        bindArgs = [ (text "s0", createState initS)
+                   , (text "inpts", mkListX inpts inptType) ]
         createState xs = mkNLDatatype stType (map (\(v, w) -> int2bv w v) xs)
         reduce = if implies then "impliesReduce" else "andReduce"
-        matchInvoke = matchBind (applyOp (text cFun)
-                                         [text "inpts", text "initS"])
-                                [( text "(mkTuple2 oks ss)"
-                                 , applyOp (text "not")
-                                           [applyOp (text reduce)
-                                                    [text "oks"]] )]
+        matchInvoke =
+          matchBind oksAndStates
+                    [( text "(mkTuple2 oks ss)"
+                     , applyOp (text "not")
+                               [applyOp (text reduce)
+                                        [text "oks"]] )]
+        oksAndStates =
+          inlineChain depth (tFun, (inptType, stType), "Bool")
+          -- The following line is preferable but hits z3 performance issues
+          --applyOp (text cFun) [text "inpts", text "s0"]
 
 -- | Define inputs and assertion of the induction step for proof by induction of
 --   the provided chaining function for the checked property, for a given

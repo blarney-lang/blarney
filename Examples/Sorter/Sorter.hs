@@ -1,5 +1,5 @@
 import Blarney
-import Blarney.Vector (Vec, fromList, toList, mapElems)
+import Blarney.Vector (Vec, fromList, toList, vectorise)
 import System.Environment
 
 twoSort :: (Bit 8, Bit 8) -> (Bit 8, Bit 8)
@@ -35,7 +35,7 @@ main = do
      | otherwise -> writeVerilogTop top "Sorter" "Sorter-Verilog/"
 
 vecSort :: Vec n (Bit 8) -> Vec n (Bit 8)
-vecSort = mapElems sort
+vecSort = vectorise sort
 
 gen :: IO ()
 gen = writeVerilogModule (vecSort @8) "Sorter8" "Sorter8-Verilog/"
