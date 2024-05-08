@@ -864,8 +864,8 @@ checkBounded (verb', vconf', nconf) (netlist, net) depth =
       assertBoundedFixed (vconf, FixedConf{depth}, nconf, boundedConf)
       smtCheckSat write
       smtIfSat handle
-        (sayVerboseLn verb ("Bounded, depth " ++ show depth ++ ": " ++ red "falsifiable") >> (if giveModel then getModel write handle else return "") >>= (\model -> return $ Just $ Counter (depth, model)))
-        (sayVerboseLn verb ("Bounded, depth " ++ show depth ++ ": " ++ blue "verified") >> (return $ Just $ Bounded depth))
+        (sayVerboseLn verb ("  Bounded, depth " ++ show depth ++ ": " ++ red "falsifiable") >> (if giveModel then getModel write handle else return "") >>= (\model -> return $ Just $ Counter (depth, model)))
+        (sayVerboseLn verb ("  Bounded, depth " ++ show depth ++ ": " ++ blue "verified") >> (return $ Just $ Bounded depth))
   where
     getModel write handle = do
       write SMTCommand $ smtOp0 "get-model"
@@ -888,8 +888,8 @@ checkRestrInd (verb', vconf', nconf) (netlist, net) depth =
       assertInductionFixed (vconf, FixedConf{depth}, nconf, inductionConf True)
       smtCheckSat write
       smtIfSat handle
-        (sayVerboseLn verb ("Restr induction, depth " ++ show depth ++ ": " ++ yellow "insufficient") >> (return $ Nothing))
-        (sayVerboseLn verb ("Restr induction, depth " ++ show depth ++ ": " ++ blue "verified") >> (return $ Just $ Induction depth))
+        (sayVerboseLn verb ("  Restr induction, depth " ++ show depth ++ ": " ++ yellow "insufficient") >> (return $ Nothing))
+        (sayVerboseLn verb ("  Restr induction, depth " ++ show depth ++ ": " ++ blue "verified") >> (return $ Just $ Induction depth))
 
 -- | Run quantified induction verification
 checkQuantInd :: ProofPartRunner
@@ -900,8 +900,8 @@ checkQuantInd (verb', vconf', nconf) (netlist, net) depth =
       assertQIFixed (vconf, FixedConf{depth}, nconf)
       smtCheckSat write
       smtIfSat handle
-        (sayVerboseLn verb ("Quant induction, depth " ++ show depth ++ ": " ++ yellow "insufficient") >> (return $ Nothing))
-        (sayVerboseLn verb ("Quant induction, depth " ++ show depth ++ ": " ++ blue "verified") >> (return $ Just $ Induction depth))
+        (sayVerboseLn verb ("  Quant induction, depth " ++ show depth ++ ": " ++ yellow "insufficient") >> (return $ Nothing))
+        (sayVerboseLn verb ("  Quant induction, depth " ++ show depth ++ ": " ++ blue "verified") >> (return $ Just $ Induction depth))
 
 -- | A stricty increasing sequence.
 -- `n` (strictly positive) controls growth rate, the bigger the slower.
@@ -934,13 +934,15 @@ verifyCircuit :: Modular a => AssertProofPartGenerator -> (Verbosity, VerifConf)
 verifyCircuit gen (verb, vconf@VerifConf{giveModel}) circuit =
   forEachAssert circuit "#circuit#" \netlist net title ->
     let nconf = mkNetConf netlist net in do
-    sayVerboseLn verb $ "Assertion '" ++ title ++ "'..."
+    sayInfoFlush verb $ "Assertion '" ++ title ++ "'... "
+    sayVerboseLn verb $ ""
     ret <- verifyAssert $ gen (verb, vconf, nconf) (netlist, net)
-    sayInfoLn verb ("Assertion '" ++ title ++ "': " ++
+    sayVerboseFlush verb $ "Assertion '" ++ title ++ "': "
+    sayInfoLn verb $
       case ret of
         PVerified -> green "verified"
         PUnknown -> yellow "unknown"
-        PFalsifiable (_, model) -> red "falsifiable" ++ if giveModel then "\n" ++ model else "")
+        PFalsifiable (_, model) -> red "falsifiable" ++ if giveModel then "\n" ++ model else ""
 
 -- | Default concurrent verification, good enough for most purposes
 -- Best used with (Verbose, vconfQuiet) or (Info, vconfQuiet)
