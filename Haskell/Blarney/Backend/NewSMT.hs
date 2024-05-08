@@ -837,31 +837,34 @@ checkNetBounded :: (Verbosity, VerifConf, NetConf) -> (Netlist, Net) -> Int -> I
 checkNetBounded (verb', vconf', nconf) (netlist, net) depth =
   withSMT (verb', vconf') \(verb, vconf@VerifConf{write}) handle -> do
     defineAll (vconf, nconf) netlist net
-    assertBoundedFixed (vconf, FixedConf{depth}, nconf, boundedConf)
-    smtCheckSat write
-    smtIfSat handle
-      (sayVerboseLn verb ("Bounded, depth " ++ show depth ++ ": " ++ red "falsifiable") >> (return $ Counter (depth, "")))
-      (sayVerboseLn verb ("Bounded, depth " ++ show depth ++ ": " ++ blue "verified") >> (return $ Bounded depth))
+    smtScope write do
+      assertBoundedFixed (vconf, FixedConf{depth}, nconf, boundedConf)
+      smtCheckSat write
+      smtIfSat handle
+        (sayVerboseLn verb ("Bounded, depth " ++ show depth ++ ": " ++ red "falsifiable") >> (return $ Counter (depth, "")))
+        (sayVerboseLn verb ("Bounded, depth " ++ show depth ++ ": " ++ blue "verified") >> (return $ Bounded depth))
 
 checkNetRestrInd :: (Verbosity, VerifConf, NetConf) -> (Netlist, Net) -> Int -> IO (Maybe ProofPart)
 checkNetRestrInd (verb', vconf', nconf) (netlist, net) depth =
   withSMT (verb', vconf') \(verb, vconf@VerifConf{write}) handle -> do
     defineAll (vconf, nconf) netlist net
-    assertInductionFixed (vconf{restrictedStates=True}, FixedConf{depth}, nconf, inductionConf vconf)
-    smtCheckSat write
-    smtIfSat handle
-      (sayVerboseLn verb ("Restr induction, depth " ++ show depth ++ ": " ++ yellow "insufficient") >> (return $ Nothing))
-      (sayVerboseLn verb ("Restr induction, depth " ++ show depth ++ ": " ++ blue "verified") >> (return $ Just $ Induction depth))
+    smtScope write do
+      assertInductionFixed (vconf{restrictedStates=True}, FixedConf{depth}, nconf, inductionConf vconf)
+      smtCheckSat write
+      smtIfSat handle
+        (sayVerboseLn verb ("Restr induction, depth " ++ show depth ++ ": " ++ yellow "insufficient") >> (return $ Nothing))
+        (sayVerboseLn verb ("Restr induction, depth " ++ show depth ++ ": " ++ blue "verified") >> (return $ Just $ Induction depth))
 
 checkNetQuantInd :: (Verbosity, VerifConf, NetConf) -> (Netlist, Net) -> Int -> IO (Maybe ProofPart)
 checkNetQuantInd (verb', vconf', nconf) (netlist, net) depth =
   withSMT (verb', vconf') \(verb, vconf@VerifConf{write}) handle -> do
     defineAll (vconf, nconf) netlist net
-    assertQIFixed (vconf, FixedConf{depth}, nconf)
-    smtCheckSat write
-    smtIfSat handle
-      (sayVerboseLn verb ("Quant induction, depth " ++ show depth ++ ": " ++ yellow "insufficient") >> (return $ Nothing))
-      (sayVerboseLn verb ("Quant induction, depth " ++ show depth ++ ": " ++ blue "verified") >> (return $ Just $ Induction depth))
+    smtScope write do
+      assertQIFixed (vconf, FixedConf{depth}, nconf)
+      smtCheckSat write
+      smtIfSat handle
+        (sayVerboseLn verb ("Quant induction, depth " ++ show depth ++ ": " ++ yellow "insufficient") >> (return $ Nothing))
+        (sayVerboseLn verb ("Quant induction, depth " ++ show depth ++ ": " ++ blue "verified") >> (return $ Just $ Induction depth))
 
 increasing :: Int -> Int -> [Int]
 increasing n curr =
@@ -878,11 +881,11 @@ restrIndGenerator conf net m =
 
 quantIndGenerator :: (Verbosity, VerifConf, NetConf) -> (Netlist, Net) -> ProofPartGenerator
 quantIndGenerator conf net m =
-  runJobs (\depth -> checkNetQuantInd conf net depth >>= maybe (return ()) (putMVar m)) (increasing 16 0) 4
+  runJobs (\depth -> checkNetQuantInd conf net depth >>= maybe (return ()) (putMVar m)) (increasing 9 0) 4
 
 defaultGenerator :: (Verbosity, VerifConf, NetConf) -> (Netlist, Net) -> ProofPartGenerator
 defaultGenerator conf net m =
-  foldr1 concurrently_ [boundedGenerator conf net m, restrIndGenerator conf net m, quantIndGenerator conf net m]
+  foldr1 concurrently_ [boundedGenerator conf net m, quantIndGenerator conf net m]
 
 checkConcurrent :: Modular a => ((Verbosity, VerifConf, NetConf) -> (Netlist, Net) -> ProofPartGenerator) -> (Verbosity, VerifConf) -> a -> IO ()
 checkConcurrent gen (verb, vconf) circuit =
