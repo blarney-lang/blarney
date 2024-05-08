@@ -528,8 +528,10 @@ assertQIFixed (vconf@VerifConf{write}, FixedConf{depth}, nconf@NetConf{transitio
   addInductionInit (vconf, nconf, sconfTail)
   forM_ [1..depth] \k -> addAndAssertInductionStep (vconf, nconf, sconfTail) k
   if depth == 0 then return ()
-  else write SMTCommand $ smtOp1 "assert" $ smtOp2 "forall" (smtGroup $ inputvars) $ smtOp2 "exists" (smtGroup $ statevars) $ transitions
+  else write SMTCommand $ smtOp1 "assert" $ quantify "forall" inputvars $ quantify "exists" statevars $ transitions
   where
+    quantify quantifier [] body = body
+    quantify quantifier vars body = smtOp2 quantifier (smtGroup vars) body
     sconfTail = mkSeqConf "tail" False
     sconfQuant' = mkSeqConf "quant" False
     sconfQuant = sconfQuant'{stateName=(\d -> if d == depth then stateName sconfTail d else stateName sconfQuant' d)}
