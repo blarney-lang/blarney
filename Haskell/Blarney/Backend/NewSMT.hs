@@ -129,13 +129,12 @@ write_smt_commands w t x = case t of
 
 -- | Generic Verification Config
 data VerifConf = VerifConf {
-  restrictedStates :: Bool
-, write :: Writer
+  write :: Writer
 , giveModel :: Bool
 }
 
-vconfDefault = VerifConf { restrictedStates=True, write=write_nothing, giveModel=True }
-vconfDebug = VerifConf { restrictedStates=True, write=write_screen, giveModel=True }
+vconfDefault = VerifConf { write=write_nothing, giveModel=True }
+vconfDebug = VerifConf { write=write_screen, giveModel=True }
 
 -- | Verification Config for fixed depth
 data FixedConf = FixedConf {
@@ -200,8 +199,8 @@ mkSeqConf suffix distinctStates = SeqConf {
 boundedConf :: SeqConf
 boundedConf = mkSeqConf "head" False
 
-inductionConf :: VerifConf -> SeqConf
-inductionConf VerifConf{..} = mkSeqConf "tail" restrictedStates
+inductionConf :: Bool -> SeqConf
+inductionConf restricted = mkSeqConf "tail" restricted
 
 
 -- SMT helpers --
@@ -680,7 +679,7 @@ verifyOfflineFixed (verb, vconf'@VerifConf{write=write'}, fconf@FixedConf{depth}
             smtCheckSat write
         else return ()
         smtScope write do
-          assertInductionFixed (vconf, fconf, nconf, inductionConf vconf)
+          assertInductionFixed (vconf, fconf, nconf, inductionConf True)
           smtCheckSat write
   where
     fileName = dir ++ "/" ++ name ++ ".smt2"
@@ -736,7 +735,7 @@ verifyLiveFixed (verb, vconf, fconf@FixedConf{depth}) circuit =
         smtCheckSat write
         hook)
       (\hook -> smtScope write do
-        assertInductionFixed (vconf, fconf, nconf, inductionConf vconf)
+        assertInductionFixed (vconf, fconf, nconf, inductionConf True)
         smtCheckSat write
         hook)
       hOut
@@ -774,7 +773,7 @@ verifyLiveIncremental (verb, vconf, iconf) circuit =
             smtCheckSat write
             hook)
         (\hook -> do
-          addAndAssertInductionStep (vconf, nconf, inductionConf vconf) (depth)
+          addAndAssertInductionStep (vconf, nconf, inductionConf True) (depth)
           smtCheckSat write
           hook)
         hOut
@@ -849,7 +848,7 @@ checkNetRestrInd (verb', vconf', nconf) (netlist, net) depth =
   withSMT (verb', vconf') \(verb, vconf@VerifConf{write}) handle -> do
     defineAll (vconf, nconf) netlist net
     smtScope write do
-      assertInductionFixed (vconf{restrictedStates=True}, FixedConf{depth}, nconf, inductionConf vconf)
+      assertInductionFixed (vconf, FixedConf{depth}, nconf, inductionConf True)
       smtCheckSat write
       smtIfSat handle
         (sayVerboseLn verb ("Restr induction, depth " ++ show depth ++ ": " ++ yellow "insufficient") >> (return $ Nothing))
