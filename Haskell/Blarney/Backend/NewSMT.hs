@@ -28,6 +28,7 @@ module Blarney.Backend.NewSMT (
 , Blarney.Backend.NewSMT.write_nothing
 , Blarney.Backend.NewSMT.write_screen
 , Blarney.Backend.NewSMT.VerifConf (..)
+, Blarney.Backend.NewSMT.vconfQuiet
 , Blarney.Backend.NewSMT.vconfDefault
 , Blarney.Backend.NewSMT.vconfDebug
 , Blarney.Backend.NewSMT.FixedConf (..)
@@ -148,6 +149,7 @@ data VerifConf = VerifConf {
 , giveModel :: Bool
 }
 
+vconfQuiet = VerifConf { write=write_nothing, giveModel=False }
 vconfDefault = VerifConf { write=write_nothing, giveModel=True }
 vconfDebug = VerifConf { write=write_screen, giveModel=True }
 
@@ -856,14 +858,26 @@ verifyAssert gen = do
 -- | Run bounded verification
 checkBounded :: ProofPartRunner
 checkBounded (verb', vconf', nconf) (netlist, net) depth =
-  withSMT (verb', vconf') \(verb, vconf@VerifConf{write}) handle -> do
+  withSMT (verb', vconf') \(verb, vconf@VerifConf{write, giveModel}) handle -> do
     defineAll (vconf, nconf) netlist net
     smtScope write do -- makes z3 faster for some unknown reason
       assertBoundedFixed (vconf, FixedConf{depth}, nconf, boundedConf)
       smtCheckSat write
       smtIfSat handle
-        (sayVerboseLn verb ("Bounded, depth " ++ show depth ++ ": " ++ red "falsifiable") >> (return $ Just $ Counter (depth, "")))
+        (sayVerboseLn verb ("Bounded, depth " ++ show depth ++ ": " ++ red "falsifiable") >> (if giveModel then getModel write handle else return "") >>= (\model -> return $ Just $ Counter (depth, model)))
         (sayVerboseLn verb ("Bounded, depth " ++ show depth ++ ": " ++ blue "verified") >> (return $ Just $ Bounded depth))
+  where
+    getModel write handle = do
+      write SMTCommand $ smtOp0 "get-model"
+      write SMTCommand $ smtOp1 "echo" $ smtText "\"###END###\""
+      untilEND
+      where
+        untilEND :: IO String
+        untilEND = do
+          line <- hGetLine handle
+          case line of
+            "###END###" -> return ""
+            _ -> untilEND >>= \rest -> return (line ++ "\n" ++ rest)
 
 -- | Run restricted states induction verification
 checkRestrInd :: ProofPartRunner
@@ -917,7 +931,7 @@ defaultGenerator =
 
 -- | Concurrent verification
 verifyCircuit :: Modular a => AssertProofPartGenerator -> (Verbosity, VerifConf) -> a -> IO ()
-verifyCircuit gen (verb, vconf) circuit =
+verifyCircuit gen (verb, vconf@VerifConf{giveModel}) circuit =
   forEachAssert circuit "#circuit#" \netlist net title ->
     let nconf = mkNetConf netlist net in do
     sayVerboseLn verb $ "Assertion '" ++ title ++ "'..."
@@ -926,8 +940,9 @@ verifyCircuit gen (verb, vconf) circuit =
       case ret of
         PVerified -> green "verified"
         PUnknown -> yellow "unknown"
-        PFalsifiable _ -> red "falsifiable")
+        PFalsifiable (_, model) -> red "falsifiable" ++ if giveModel then "\n" ++ model else "")
 
 -- | Default concurrent verification, good enough for most purposes
+-- Best used with (Verbose, vconfQuiet) or (Info, vconfQuiet)
 verifyDefault :: Modular a => (Verbosity, VerifConf) -> a -> IO ()
 verifyDefault = verifyCircuit defaultGenerator
