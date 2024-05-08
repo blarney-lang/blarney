@@ -11,7 +11,13 @@ License     : MIT
 Stability   : experimental
 
 Verify circuit properties using SMT solver.
-See last section for verification strategy layout.
+
+TLDR: Use `verifyDefault`.
+
+- the `verifyOffline` family can be used to produce SMT-LIB input files.
+- the `verifyLive` family allows one to run simple verification schemes.
+- `verifyCircuit` provides concurrent verification.
+- `verifyDefault` is general-purpose, efficient verification scheme.
 -}
 
 module Blarney.Backend.NewSMT (
@@ -28,13 +34,22 @@ module Blarney.Backend.NewSMT (
 , Blarney.Backend.NewSMT.fconfCombinational
 , Blarney.Backend.NewSMT.IncrementalConf (..)
 , Blarney.Backend.NewSMT.iconfDefault
+
 , Blarney.Backend.NewSMT.verifyOfflineFixed
 , Blarney.Backend.NewSMT.verifyOfflineQIFixed
 , Blarney.Backend.NewSMT.verifyLiveBounded
 , Blarney.Backend.NewSMT.verifyLiveFixed
 , Blarney.Backend.NewSMT.verifyLiveQIFixed
 , Blarney.Backend.NewSMT.verifyLiveIncremental
-, Blarney.Backend.NewSMT.checkDefault
+
+, Blarney.Backend.NewSMT.checkBounded
+, Blarney.Backend.NewSMT.checkRestrInd
+, Blarney.Backend.NewSMT.checkQuantInd
+, Blarney.Backend.NewSMT.incrSeq
+, Blarney.Backend.NewSMT.proofPartGenerator
+, Blarney.Backend.NewSMT.defaultGenerator
+, Blarney.Backend.NewSMT.verifyCircuit
+, Blarney.Backend.NewSMT.verifyDefault
 ) where
 
 -- Standard imports
@@ -791,12 +806,15 @@ data ProofPart = Bounded Int
                | Counter CounterEx
                | Abort
 
+type ProofPartRunner = (Verbosity, VerifConf, NetConf) -> (Netlist, Net) -> Int -> IO (Maybe ProofPart)
 type ProofPartGenerator = (MVar ProofPart -> IO ())
+type AssertProofPartGenerator = (Verbosity, VerifConf, NetConf) -> (Netlist, Net) -> ProofPartGenerator
 
 data ProofResult = PVerified
                  | PFalsifiable CounterEx
                  | PUnknown
 
+-- | Collect proof parts and stop once a complete proof can be assembled.
 proofMerge :: MVar ProofPart -> Int -> Maybe Int -> IO ProofResult
 proofMerge m bounded induction =
   if maybe False (bounded >=) induction then return PVerified else do
@@ -807,6 +825,8 @@ proofMerge m bounded induction =
     Counter ex -> return $ PFalsifiable ex
     Abort -> return PUnknown
 
+-- | Run jobs using up to `count` concurrent workers.
+-- Works with both finite and infinite jobs lists
 runJobs :: (a -> IO ()) -> [a] -> Int -> IO ()
 runJobs f jobs count = do
   m <- newEmptyMVar
@@ -823,8 +843,9 @@ runJobs f jobs count = do
         Just x -> f x >> process m
         Nothing -> return ()
 
-checkNetConcurrent :: ProofPartGenerator -> IO ProofResult
-checkNetConcurrent gen = do
+-- | Verify a single assertion
+verifyAssert :: ProofPartGenerator -> IO ProofResult
+verifyAssert gen = do
   m <- newEmptyMVar
   withAsync (gen m >> putMVar m Abort) $ \src ->
     withAsync (proofMerge m 0 Nothing) $ \ret -> do
@@ -832,72 +853,81 @@ checkNetConcurrent gen = do
       cancel src
       wait ret
 
-checkNetBounded :: (Verbosity, VerifConf, NetConf) -> (Netlist, Net) -> Int -> IO ProofPart
-checkNetBounded (verb', vconf', nconf) (netlist, net) depth =
+-- | Run bounded verification
+checkBounded :: ProofPartRunner
+checkBounded (verb', vconf', nconf) (netlist, net) depth =
   withSMT (verb', vconf') \(verb, vconf@VerifConf{write}) handle -> do
     defineAll (vconf, nconf) netlist net
-    smtScope write do
+    smtScope write do -- makes z3 faster for some unknown reason
       assertBoundedFixed (vconf, FixedConf{depth}, nconf, boundedConf)
       smtCheckSat write
       smtIfSat handle
-        (sayVerboseLn verb ("Bounded, depth " ++ show depth ++ ": " ++ red "falsifiable") >> (return $ Counter (depth, "")))
-        (sayVerboseLn verb ("Bounded, depth " ++ show depth ++ ": " ++ blue "verified") >> (return $ Bounded depth))
+        (sayVerboseLn verb ("Bounded, depth " ++ show depth ++ ": " ++ red "falsifiable") >> (return $ Just $ Counter (depth, "")))
+        (sayVerboseLn verb ("Bounded, depth " ++ show depth ++ ": " ++ blue "verified") >> (return $ Just $ Bounded depth))
 
-checkNetRestrInd :: (Verbosity, VerifConf, NetConf) -> (Netlist, Net) -> Int -> IO (Maybe ProofPart)
-checkNetRestrInd (verb', vconf', nconf) (netlist, net) depth =
+-- | Run restricted states induction verification
+checkRestrInd :: ProofPartRunner
+checkRestrInd (verb', vconf', nconf) (netlist, net) depth =
   withSMT (verb', vconf') \(verb, vconf@VerifConf{write}) handle -> do
     defineAll (vconf, nconf) netlist net
-    smtScope write do
+    smtScope write do -- makes z3 faster for some unknown reason
       assertInductionFixed (vconf, FixedConf{depth}, nconf, inductionConf True)
       smtCheckSat write
       smtIfSat handle
         (sayVerboseLn verb ("Restr induction, depth " ++ show depth ++ ": " ++ yellow "insufficient") >> (return $ Nothing))
         (sayVerboseLn verb ("Restr induction, depth " ++ show depth ++ ": " ++ blue "verified") >> (return $ Just $ Induction depth))
 
-checkNetQuantInd :: (Verbosity, VerifConf, NetConf) -> (Netlist, Net) -> Int -> IO (Maybe ProofPart)
-checkNetQuantInd (verb', vconf', nconf) (netlist, net) depth =
+-- | Run quantified induction verification
+checkQuantInd :: ProofPartRunner
+checkQuantInd (verb', vconf', nconf) (netlist, net) depth =
   withSMT (verb', vconf') \(verb, vconf@VerifConf{write}) handle -> do
     defineAll (vconf, nconf) netlist net
-    smtScope write do
+    smtScope write do -- makes z3 faster for some unknown reason
       assertQIFixed (vconf, FixedConf{depth}, nconf)
       smtCheckSat write
       smtIfSat handle
         (sayVerboseLn verb ("Quant induction, depth " ++ show depth ++ ": " ++ yellow "insufficient") >> (return $ Nothing))
         (sayVerboseLn verb ("Quant induction, depth " ++ show depth ++ ": " ++ blue "verified") >> (return $ Just $ Induction depth))
 
-increasing :: Int -> Int -> [Int]
-increasing n curr =
-  curr : increasing n next
-  where next = if n==0 then curr+1 else (((curr * (n+1)) `div` n) + 1)
+-- | A stricty increasing sequence.
+-- `n` (strictly positive) controls growth rate, the bigger the slower.
+-- `curr` is the initial value.
+incrSeq :: Int -> Int -> [Int]
+incrSeq n curr =
+  curr : incrSeq n (((curr * (n+1)) `div` n) + 1)
 
-boundedGenerator :: (Verbosity, VerifConf, NetConf) -> (Netlist, Net) -> ProofPartGenerator
-boundedGenerator conf net m =
-  runJobs (\depth -> checkNetBounded conf net depth >>= putMVar m) (increasing 3 1) 4
+-- | Parametric proof part generator
+-- `depths` is a sequence of depths
+-- `count` is the number of concurrent jobs
+-- `runner` is the proof part runner
+proofPartGenerator :: [Int] -> Int -> ProofPartRunner -> AssertProofPartGenerator
+proofPartGenerator depths count runner conf net m =
+  runJobs (\depth -> runner conf net depth >>= maybe (return ()) (putMVar m)) depths count
 
-restrIndGenerator :: (Verbosity, VerifConf, NetConf) -> (Netlist, Net) -> ProofPartGenerator
-restrIndGenerator conf net m =
-  runJobs (\depth -> checkNetRestrInd conf net depth >>= maybe (return ()) (putMVar m)) (increasing 8 0) 4
+compositeGenerator :: [AssertProofPartGenerator] -> AssertProofPartGenerator
+compositeGenerator gens conf net m = foldr1 concurrently_ $ map (\f -> f conf net m) gens
 
-quantIndGenerator :: (Verbosity, VerifConf, NetConf) -> (Netlist, Net) -> ProofPartGenerator
-quantIndGenerator conf net m =
-  runJobs (\depth -> checkNetQuantInd conf net depth >>= maybe (return ()) (putMVar m)) (increasing 9 0) 4
+-- | Default proof part generator, good enough for most purposes
+defaultGenerator :: AssertProofPartGenerator
+defaultGenerator =
+  compositeGenerator [
+    proofPartGenerator (incrSeq 3 1) 4 checkBounded
+  , proofPartGenerator (incrSeq 9 0) 4 checkQuantInd
+  ]
 
-defaultGenerator :: (Verbosity, VerifConf, NetConf) -> (Netlist, Net) -> ProofPartGenerator
-defaultGenerator conf net m =
-  foldr1 concurrently_ [boundedGenerator conf net m, quantIndGenerator conf net m]
-
-checkConcurrent :: Modular a => ((Verbosity, VerifConf, NetConf) -> (Netlist, Net) -> ProofPartGenerator) -> (Verbosity, VerifConf) -> a -> IO ()
-checkConcurrent gen (verb, vconf) circuit =
+-- | Concurrent verification
+verifyCircuit :: Modular a => AssertProofPartGenerator -> (Verbosity, VerifConf) -> a -> IO ()
+verifyCircuit gen (verb, vconf) circuit =
   forEachAssert circuit "#circuit#" \netlist net title ->
     let nconf = mkNetConf netlist net in do
     sayVerboseLn verb $ "Assertion '" ++ title ++ "'..."
-    ret <- checkNetConcurrent $ gen (verb, vconf, nconf) (netlist, net)
+    ret <- verifyAssert $ gen (verb, vconf, nconf) (netlist, net)
     sayInfoLn verb ("Assertion '" ++ title ++ "': " ++
       case ret of
         PVerified -> green "verified"
         PUnknown -> yellow "unknown"
         PFalsifiable _ -> red "falsifiable")
 
-
-checkDefault :: Modular a => (Verbosity, VerifConf) -> a -> IO ()
-checkDefault = checkConcurrent defaultGenerator
+-- | Default concurrent verification, good enough for most purposes
+verifyDefault :: Modular a => (Verbosity, VerifConf) -> a -> IO ()
+verifyDefault = verifyCircuit defaultGenerator
