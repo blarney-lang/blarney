@@ -251,6 +251,7 @@ showSpecificAssert ctxt@Context{..} vMode =
                                         False
         test1 = (if restrictStates then rStDefs else empty) $+$ cmnt1
                 $+$ assertInduction ctxtCFunName
+                                    ctxtTFunName
                                     (ctxtInputType, ctxtStateType)
                                     depth
                                     restrictStates
@@ -372,6 +373,7 @@ verifyWithSMT VerifyConf{..} nl =
                 say 3 "(pop)"
                 sndLn "(pop)"
                 let step = assertInduction ctxtCFunName
+                                           ctxtTFunName
                                            (ctxtInputType, ctxtStateType)
                                            curD
                                            restrictSt

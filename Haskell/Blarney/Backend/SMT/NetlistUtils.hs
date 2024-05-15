@@ -133,16 +133,16 @@ assertBounded cFun tFun (inptType, stType) initS depth implies =
 --   the provided chaining function for the checked property, for a given
 --   induction depth and with optional state restriction.
 --   To assert a base case, the 'assertBounded' function can be used.
-assertInduction :: String -> (String, String) -> Int -> Bool -> Doc
-assertInduction cFun (inptType, stType) depth restrict = decls $+$ assertion
+assertInduction :: String -> String -> (String, String) -> Int -> Bool -> Doc
+assertInduction cFun tFun (inptType, stType) depth restrict =
+  decls $+$ assertion
   where inpts = [ "in" ++ show i | i <- [0 .. depth] ]
-        decls = vcat $ (text $ "(declare-const startS " ++ stType ++ ")") :
+        decls = vcat $ (text $ "(declare-const s0 " ++ stType ++ ")") :
                   map (\i -> text $ "(declare-const "++i++" "++inptType++")")
                       inpts
         assertion = applyOp (text "assert") [ letBind bindArgs matchInvoke ]
         bindArgs = [ (text "inpts", mkListX inpts inptType) ]
-        matchInvoke = matchBind (applyOp (text cFun)
-                                         [text "inpts", text "startS"])
+        matchInvoke = matchBind okAndStates
                                 [( text "(mkTuple2 oks ss)"
                                  , applyOp (text "not") [propHolds] )]
         propHolds =
@@ -154,6 +154,10 @@ assertInduction cFun (inptType, stType) depth restrict = decls $+$ assertion
                                      [applyOp (text $ "init_ListX_" ++ stType)
                                               [text "ss"]]
                                  , text "oks" ]]
+        okAndStates =
+          inlineChain depth (tFun, (inptType, stType), "Bool")
+          --(applyOp (text cFun) [text "inpts", text "s0"])
+
 
 -- | Derive the name of the signal referred to by the given 'WireId'
 wireName :: Netlist -> WireId -> String
