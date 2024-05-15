@@ -94,12 +94,12 @@ evalConstNet n@Net{..} = case n of
   NetP (MergeWrites _ 1 w) [Lit 0, _] -> modNet (DontCare w) []
   NetP (MergeWrites _ 1 w) [Lit 1, x] -> modNet (Identity w) [x]
   -- Registers
-  NetP (RegisterEn Nothing w) [_, LitDontCare] -> modNet (DontCare w) []
-  NetP (RegisterEn Nothing w) [Lit 0, _] -> modNet (DontCare w) []
-  NetP (RegisterEn (Just i) w) [Lit 0, _] -> modNet (Const w i) []
+  --NetP (RegisterEn Nothing w) [_, LitDontCare] -> modNet (DontCare w) []
+  --NetP (RegisterEn Nothing w) [Lit 0, _] -> modNet (DontCare w) []
+  --NetP (RegisterEn (Just i) w) [Lit 0, _] -> modNet (Const w i) []
   NetP (RegisterEn i w) [Lit 1, a] -> modNet (Register i w) [a]
-  NetP (Register Nothing w) [LitDontCare] -> modNet (DontCare w) []
-  NetP (Register (Just i) w) [Lit x] | i == x -> modNet (Const w i) []
+  --NetP (Register Nothing w) [LitDontCare] -> modNet (DontCare w) []
+  --NetP (Register (Just i) w) [Lit x] | i == x -> modNet (Const w i) []
   -- general unary op on literal --
   NetP _ [Lit a0] | Just f <- eval ->
     modNet (Const (primOutWidth netPrim Nothing) (head $ f [a0])) []

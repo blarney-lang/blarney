@@ -38,6 +38,7 @@ import Blarney.Netlist
 import Blarney.Core.Utils
 import Blarney.Misc.MonadLoops
 import Blarney.Core.Opts
+import Blarney.Core.Ternary qualified as T
 
 -- debugging facilities
 --import Debug.Trace
@@ -299,9 +300,9 @@ compilePrim CompCtxt{..} currentIns childrenOutputs
   (Const w val, []) -> repeat $ clamp w $ fromInteger val
   (DontCare w, []) -> repeat simDontCare
   -- stateful primitives
-  (Register i _, [inpts]) -> fromMaybe simDontCare i : inpts
+  (Register i _, [inpts]) -> T.ternaryToInteger i : inpts
   (RegisterEn i _, [ens, inpts]) ->
-    scanl f (fromMaybe simDontCare i) (zip ens inpts)
+    scanl f (T.ternaryToInteger i) (zip ens inpts)
     where f prev (en, inpt) = if en /= 0 then inpt else prev
   (Input _ nm, _) -> currentIns Map.! nm
   (Custom{..}, _) -> childOuts Map.! nm

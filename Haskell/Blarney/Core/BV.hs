@@ -67,7 +67,7 @@ module Blarney.Core.BV (
 , regEnBV        -- :: Width -> Integer -> BV -> BV -> BV
 , mergeWritesBV  -- :: MergeStrategy -> Width -> [(BV, BV)] -> BV
 , regFileReadBV  -- :: RegFileInfo -> BV -> BV
-, getInitBV      -- :: BV -> Maybe Integer
+, getInitBV      -- :: InitVal -> Maybe Integer
 , ramBV          -- Single port block RAM
 , dualRamBV      -- Simple dual port block RAM
 , trueDualRamBV  -- True dual port block RAM
@@ -94,6 +94,7 @@ import Data.Maybe
 
 -- Blarney imports
 import Blarney.Core.Prim
+import Blarney.Core.Ternary qualified as T
 
 -- |Given a parameter name, return the parameter value
 lookupParam :: [Param] -> String -> String
@@ -370,37 +371,17 @@ regFileReadBV inf a = makePrim1 (RegFileRead inf) [a]
 -- |Get the value of a constant bit vector,
 -- which may involve bit manipulations.
 -- Used to determine the initial value of a register.
--- TODO: generalise semantic functions to understand "dont care" values.
-getInitBV :: BV -> Maybe Integer
+getInitBV :: BV -> InitVal
 getInitBV BV{..} = case bvPrim of
   Const w i
     | i >= 2^w || i < -(2^w) -> error "Initial register value out of range"
-    | i < 0 -> Just (2^w + i)
-    | otherwise -> Just i
-  DontCare w -> Nothing
-  Concat wx wy ->
-    let x = getInitBV (bvInputs !! 0)
-        y = getInitBV (bvInputs !! 1)
-    in case (x, y) of
-         (Nothing, Nothing) -> Nothing
-         other -> Just $ getSemVal x `B.shiftL` wy + getSemVal y
-  SelectBits w hi lo ->
-    let x = getInitBV (bvInputs !! 0)
-        mask = (1 `B.shiftL` (hi+1)) - 1
-    in case x of
-         Nothing -> Nothing
-         Just x -> Just $ (x B..&. mask) `B.shiftR` lo
-  ReplicateBit w ->
-    let x = getInitBV (bvInputs !! 0)
-    in case x of
-         Nothing -> Nothing
-         Just x -> Just $ x * ((2^w) - 1)
-  _ | Just f <- eval ->
-    Just $ head $ f (map getInitBVSemVal bvInputs)
+    | i < 0 -> T.integerToTernary w (2^w + i)
+    | otherwise -> T.integerToTernary w i
+  DontCare w -> T.dontCare w
+  Concat wx wy -> getInitBV (bvInputs !! 0) `T.concat`
+                  getInitBV (bvInputs !! 1)
+  SelectBits w hi lo -> T.select hi lo $ getInitBV (bvInputs !! 0)
+  ReplicateBit w -> foldr T.concat (T.integerToTernary 0 0) $
+                      replicate w $ getInitBV (bvInputs !! 0)
   _ -> error $ "Register initialiser must be a constant. Encountered: " ++
                show bvPrim
-  where
-    eval = primSemEvalRaw bvPrim
-    dontCareSemVal = 0
-    getSemVal = fromMaybe dontCareSemVal
-    getInitBVSemVal bv = getSemVal (getInitBV bv)
