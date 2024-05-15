@@ -23,11 +23,13 @@ import Data.List qualified as L
 import Data.Bits
 
 -- | Ternary bit vectors represented as a list of width/value pairs.
--- 'Nothing' values represent don't care values.
+-- 'Nothing' values represent don't care values. Least significant
+-- bits come first.
 type Ternary = [(Int, Maybe Integer)]
 
 -- | Construct don't care bit-vector of given width
 dontCare :: Int -> Ternary
+dontCare 0 = []
 dontCare w = [(w, Nothing)]
 
 -- | Convert non-negative integer to ternary bit-vector of given width
