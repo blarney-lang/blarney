@@ -250,7 +250,7 @@ genNetVerilog netlist net = case netPrim net of
   showIntLit w v = int w <> text "'h" <> hexInt v
   showDontCare :: Int -> Doc
   showDontCare w = int w <> text "'b" <> text (replicate w 'x')
-  showInitVal t = braces (argStyle (map chunk t))
+  showInitVal t = braces (argStyle $ map chunk $ reverse t)
     where chunk (w, Nothing) = text (show w ++ "'hx")
           chunk (w, Just x) = text (show w ++ "'h" ++ show x)
   showWire :: (InstId, OutputName) -> Doc
