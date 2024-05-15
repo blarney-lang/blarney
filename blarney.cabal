@@ -75,6 +75,7 @@ library
     Blarney.Core.Prim
     Blarney.Core.RAM
     Blarney.Core.RTL
+    Blarney.Core.Ternary
     Blarney.Core.Utils
     Blarney.Misc.ANSIEscapeSequences
     Blarney.Misc.MonadLoops
