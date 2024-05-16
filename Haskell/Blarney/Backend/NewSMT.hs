@@ -169,7 +169,7 @@ iconfDefault = IncrementalConf { limit = Nothing }
 
 data NetConf = NetConf {
   stateFields :: [(InstId, Doc, Int)]
-, stateFieldsInit :: [Maybe Doc]
+, stateFieldsInit :: [[(Int, Maybe Integer)]]
 , inputFields :: [(InstId, Doc, Int)]
 , initName :: Doc -> Doc
 , lastName :: Doc -> Doc
@@ -189,8 +189,8 @@ mkNetConf netlist net =
   where
     (stateFields, stateFieldsInit) = unzip $ catMaybes [
       case netPrim of
-        RegisterEn init w -> Just ((netInstId, fmtWire netlist (netInstId, Nothing), w), fmap (smtBVLit w) init)
-        Register init w -> Just ((netInstId, fmtWire netlist (netInstId, Nothing), w), fmap (smtBVLit w) init)
+        RegisterEn init w -> Just ((netInstId, fmtWire netlist (netInstId, Nothing), w), init)
+        Register init w -> Just ((netInstId, fmtWire netlist (netInstId, Nothing), w), init)
         _ -> Nothing
       | Net{..} <- elems netlist
       , elem netInstId support]
@@ -318,10 +318,14 @@ fmtWire netlist wi = text $ wireName netlist wi
 -- | Define state initial value
 defineInit :: (VerifConf, NetConf) -> Netlist -> IO ()
 defineInit (VerifConf{..}, NetConf{..}) netlist = do
-  forM_ (zip stateFields stateFieldsInit) \((_, field, w), maybeVal) ->
-    case maybeVal of
-      Just val -> write SMTCommand $ smtOpN "define-const" [initName field, smtBVType w, val]
-      Nothing -> write SMTCommand $ smtOpN "declare-const" [initName field, smtBVType w]
+  forM_ (zip stateFields stateFieldsInit) \((_, field, w), initVals) -> do
+    write SMTCommand $ smtOpN "declare-const" [initName field, smtBVType w]
+    snd $ foldl (\(pos, io) (len, maybeVal) -> (pos+len, do
+        io
+        if len == 0 then return () else
+          maybe (return ()) (\val ->
+            write SMTCommand $ smtOp1 "assert" $ smtOp2 "=" (smtGroup [(smtBVOp2 "extract" (pos+len-1) pos), initName field]) (smtBVLit len val)) maybeVal
+      )) (0, return ()) initVals
 
 -- | Define transition function
 defineTransition :: (VerifConf, NetConf) -> Netlist -> Net -> IO ()
