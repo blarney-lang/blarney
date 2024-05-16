@@ -37,6 +37,7 @@ module Blarney.Core.Prim (
 , InputWidth          -- Width of an input to a component
 , OutputWidth         -- Width of an output from a component
 , OutputName          -- Reference to a named output of a 'Prim'
+, InitVal             -- Initial values for registers
 , BitIndex            -- For indexing a bit vector
 , MergeStrategy(..)   -- Merging strategy for a 'Merge' 'Prim'
 , RegFileInfo(..)     -- Register file primitive parameters
@@ -62,6 +63,7 @@ import Data.Maybe
 import Data.Array
 
 import Blarney.Core.Utils
+import Blarney.Core.Ternary qualified as T
 
 -- module-local "error" helper
 err str = error $ "Blarney.Core.prim: " ++ str
@@ -89,6 +91,9 @@ type OutputWidth = Width
 
 -- | Reference to a named output of a 'Prim'
 type OutputName = Maybe String
+
+-- | Initial value for registers
+type InitVal = T.Ternary
 
 -- | Index into a bit vector
 type BitIndex = Int
@@ -316,22 +321,20 @@ data Prim =
   | Identity OutputWidth
 
     -- | @Register initial w@ represents a register with an initial value.
-    --   An initial value of 'Nothing' denotes "dont care".
     --
     --   [__inputs__]  @[x]@, a single @w@-bit value
     --   [__outputs__] a single output, the @w@-bit value @initial@ or the last
     --                 written input value @x@
-  | Register (Maybe Integer) InputWidth
+  | Register InitVal InputWidth
 
     -- | @RegisterEn initial w@ represents a register with an initial value
-    --   and an enable signal. An initial value of 'Nothing' denotes
-    --   "dont care"
+    --   and an enable signal.
     --
     --   [__inputs__]  @[en, x]@, with @en@ a 1-bit value and @x@ a @w@-bit
     --                 value
     --   [__outputs__] a single output, the @w@-bit value @initial@ or the last
     --                 written input value @x@ when @en@ was asserted
-  | RegisterEn (Maybe Integer) InputWidth
+  | RegisterEn InitVal InputWidth
 
     -- | @MergeWrites mStrat n w@ represents a merging primitive with the
     --   @mStrat@ merging strategy, @n@ pairs of 1-bit enables and associated

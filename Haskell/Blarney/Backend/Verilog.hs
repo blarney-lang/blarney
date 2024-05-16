@@ -250,6 +250,9 @@ genNetVerilog netlist net = case netPrim net of
   showIntLit w v = int w <> text "'h" <> hexInt v
   showDontCare :: Int -> Doc
   showDontCare w = int w <> text "'b" <> text (replicate w 'x')
+  showInitVal t = braces (argStyle $ map chunk $ reverse t)
+    where chunk (w, Nothing) = text (show w ++ "'hx")
+          chunk (w, Just x) = text (show w ++ "'h" ++ show x)
   showWire :: (InstId, OutputName) -> Doc
   showWire (iId, m_nm) = text name <> case m_nm of Just nm -> text nm
                                                    _       -> mempty
@@ -334,8 +337,9 @@ genNetVerilog netlist net = case netPrim net of
   declRegInit width reg init =
     text "reg" <+> showWireWidth width reg <+>
       case init of
-        Nothing -> semi
-        Just i -> equals <+> showIntLit width i <> semi
+        [(_, Nothing)] -> semi
+        [(_, Just i)]  -> equals <+> showIntLit width i <> semi
+        other          -> equals <+> showInitVal init <> semi
   declMux wsel w net | numIns == 2 && wsel == 1 =
       declWire w (netInstId net, Nothing)
     where numIns = length (netInputs net) - 1
@@ -383,10 +387,13 @@ genNetVerilog netlist net = case netPrim net of
   -- reset helpers
   --------------------------------------------------------------------------------
 
-  resetRegister width reg Nothing = mempty
-  resetRegister width reg (Just init) =
+  resetRegister width reg [] = mempty
+  resetRegister width reg [(_, Nothing)] = mempty
+  resetRegister width reg [(_, Just init)] =
         showWire reg <+> text "<="
     <+> int width <> text "'h" <> hexInt init <> semi
+  resetRegister width reg init =
+        showWire reg <+> text "<=" <+> showInitVal init <> semi
 
   -- instantiation helpers
   --------------------------------------------------------------------------------
