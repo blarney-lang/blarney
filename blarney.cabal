@@ -31,6 +31,7 @@ library
   hs-source-dirs: Haskell
   exposed-modules:
     Blarney
+    Blarney.Backend.NewSMT
     Blarney.BitPat
     Blarney.BitScan
     Blarney.ClientServer
@@ -75,6 +76,7 @@ library
     Blarney.Core.Prim
     Blarney.Core.RAM
     Blarney.Core.RTL
+    Blarney.Core.Ternary
     Blarney.Core.Utils
     Blarney.Misc.ANSIEscapeSequences
     Blarney.Misc.MonadLoops
@@ -95,6 +97,7 @@ library
       array
     , base
     , containers
+    , async
     , ghc-prim
     , mtl
     , pretty
