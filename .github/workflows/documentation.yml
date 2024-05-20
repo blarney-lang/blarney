@@ -22,7 +22,7 @@ jobs:
                --optghc=-XNoImplicitPrelude \
                --html \
                --odir doc \
-               $(find Haskell/ -name "*.hs" | grep -v BlarneyPlugins)
+               $(find Haskell/ -name "*.hs" | grep -v BlarneyPlugins | grep -v NewSMT)
     - name: Upload documentation artifact
       uses: actions/upload-artifact@v2
       with:
