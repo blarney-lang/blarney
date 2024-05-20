@@ -18,7 +18,7 @@ jobs:
       run: |
        cabal haddock \
          --haddock-html \
-         --haddock-option "--odir=dir" \
+         --haddock-option "--odir=doc" \
          --haddock-option "--title=blarney" \
          --haddock-option "--source-module=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$GITHUB_SHA/%{FILE}" \
          --haddock-option "--source-entity=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$GITHUB_SHA/%{FILE}#L%{LINE}" \
