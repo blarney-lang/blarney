@@ -16,7 +16,6 @@ jobs:
         ghc-version: '9.2.1'
     - name: Generate documentation
       run: |
-       cabal install --lib async
        haddock --source-module=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$GITHUB_SHA/%{FILE} \
                --source-entity=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$GITHUB_SHA/%{FILE}#L%{LINE} \
                --title=blarney \

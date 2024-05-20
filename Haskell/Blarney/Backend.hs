@@ -26,11 +26,12 @@ module Blarney.Backend (
 , verifyWith
 , verifyToDepth
   -- * New, improved SMT backend
-, Verbosity(..)
-, checkAuto
-, checkFixed
-, debugAuto
-, debugFixed
+--Currently not exported by default
+--, Verbosity(..)
+--, checkAuto
+--, checkFixed
+--, debugAuto
+--, debugFixed
   -- * Simulation backend
 , module Blarney.Backend.Simulation
 , simulate
@@ -54,7 +55,7 @@ import Blarney.Netlist
 import Blarney.Backend.Simulation
 import Blarney.Backend.Verilog
 import Blarney.Backend.SMT
-import Blarney.Backend.NewSMT (Verbosity(..), checkAuto, checkFixed, debugAuto, debugFixed)
+--import Blarney.Backend.NewSMT (Verbosity(..), checkAuto, checkFixed, debugAuto, debugFixed)
 
 -- Verilog backend
 --------------------------------------------------------------------------------
