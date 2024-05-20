@@ -16,13 +16,12 @@ jobs:
         ghc-version: '9.2.1'
     - name: Generate documentation
       run: |
-       haddock --source-module=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$GITHUB_SHA/%{FILE} \
-               --source-entity=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$GITHUB_SHA/%{FILE}#L%{LINE} \
-               --title=blarney \
-               --optghc=-XNoImplicitPrelude \
-               --html \
-               --odir doc \
-               $(find Haskell/ -name "*.hs" | grep -v BlarneyPlugins | grep -v NewSMT)
+       cabal haddock \
+         --haddock-html \
+         --haddock-option "--odir=dir" \
+         --haddock-option "--title=blarney" \
+         --haddock-option "--source-module=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$GITHUB_SHA/%{FILE}" \
+         --haddock-option "--source-entity=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/tree/$GITHUB_SHA/%{FILE}#L%{LINE}" \
     - name: Upload documentation artifact
       uses: actions/upload-artifact@v2
       with:
