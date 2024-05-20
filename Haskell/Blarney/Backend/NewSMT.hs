@@ -48,9 +48,7 @@ module Blarney.Backend.NewSMT (
 , Blarney.Backend.NewSMT.checkQuantInd
 , Blarney.Backend.NewSMT.incrSeq
 , Blarney.Backend.NewSMT.proofPartGenerator
-, Blarney.Backend.NewSMT.defaultGenerator
 , Blarney.Backend.NewSMT.verifyCircuit
-, Blarney.Backend.NewSMT.verifyDefault
 
 , Blarney.Backend.NewSMT.checkAuto
 , Blarney.Backend.NewSMT.checkFixed
@@ -869,6 +867,7 @@ verifyAssert gen = do
 -- | Run bounded verification
 checkBounded :: ProofPartRunner
 checkBounded (verb', vconf', nconf) (netlist, net) depth =
+  if depth == 0 then (return $ Just $ Bounded 0) else
   withSMT (verb', vconf') \(verb, vconf@VerifConf{write, giveModel}) handle -> do
     defineAll (vconf, nconf) netlist net
     smtScope write do -- makes z3 faster for some unknown reason
@@ -932,14 +931,6 @@ proofPartGenerator depths count runner conf net m =
 compositeGenerator :: [AssertProofPartGenerator] -> AssertProofPartGenerator
 compositeGenerator gens conf net m = foldr1 concurrently_ $ map (\f -> f conf net m) gens
 
--- | Default proof part generator, good enough for most purposes
-defaultGenerator :: AssertProofPartGenerator
-defaultGenerator =
-  compositeGenerator [
-    proofPartGenerator (incrSeq 3 1) 4 checkBounded
-  , proofPartGenerator (incrSeq 9 0) 4 checkQuantInd
-  ]
-
 -- | Concurrent verification
 verifyCircuit :: Modular a => AssertProofPartGenerator -> (Verbosity, VerifConf) -> a -> IO ()
 verifyCircuit gen (verb, vconf@VerifConf{giveModel}) circuit =
@@ -955,28 +946,33 @@ verifyCircuit gen (verb, vconf@VerifConf{giveModel}) circuit =
         PUnknown -> yellow "unknown"
         PFalsifiable (_, model) -> red "falsifiable" ++ if giveModel then "\n" ++ model else ""
 
--- | Default concurrent verification, good enough for most purposes
--- Best used with (Verbose, vconfQuiet) or (Info, vconfQuiet)
-verifyDefault :: Modular a => (Verbosity, VerifConf) -> a -> IO ()
-verifyDefault = verifyCircuit defaultGenerator
-
 -- | Automatic verification procedure
 -- Aimed at giving a result as soon as possible
 checkAuto :: Modular a => Verbosity -> a -> IO ()
-checkAuto verb = verifyCircuit defaultGenerator (verb, vconfQuiet)
+checkAuto verb = verifyCircuit generator (verb, vconfQuiet)
+  where generator = compositeGenerator [
+                      proofPartGenerator (incrSeq 3 1) 4 checkBounded
+                    , proofPartGenerator (incrSeq 9 0) 4 checkQuantInd
+                    ]
 
 -- | Fixed depth verification procedure
 -- Aimed at giving a result as soon as possible
 checkFixed :: Modular a => Int -> Verbosity -> a -> IO ()
-checkFixed depth verb = verifyCircuit defaultGenerator (verb, vconfQuiet)
+checkFixed depth verb = verifyCircuit generator (verb, vconfQuiet)
+  where generator = compositeGenerator [
+                    proofPartGenerator [depth] 1 checkBounded
+                  , proofPartGenerator [depth] 1 checkQuantInd
+                  ]
 
 -- | Automatic minimal depth counterexample generation
 -- Note: Will run forever if there are no counterexamples
 -- TODO: Compare performance with incremental solution
 debugAuto :: Modular a => Verbosity -> a -> IO ()
-debugAuto verb = verifyCircuit (proofPartGenerator [1..] 1 checkBounded) (verb, vconfDefault)
+debugAuto verb = verifyCircuit generator (verb, vconfDefault)
+  where generator = proofPartGenerator [1..] 1 checkBounded
 
 -- | Fixed depth counterexample generation
 -- Note: Returns Unknown if there is no such counterexample
 debugFixed :: Modular a => Int -> Verbosity -> a -> IO ()
-debugFixed depth verb = verifyCircuit (proofPartGenerator [1] 1 checkBounded) (verb, vconfDefault)
+debugFixed depth verb = verifyCircuit generator (verb, vconfDefault)
+  where generator = proofPartGenerator [depth] 1 checkBounded
