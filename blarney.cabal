@@ -31,6 +31,7 @@ library
   hs-source-dirs: Haskell
   exposed-modules:
     Blarney
+    Blarney.Backend.NewSMT
     Blarney.BitPat
     Blarney.BitScan
     Blarney.ClientServer
@@ -56,7 +57,6 @@ library
     Blarney.Backend.SMT.BasicDefinitions
     Blarney.Backend.SMT.NetlistUtils
     Blarney.Backend.SMT.Utils
-    Blarney.Backend.NewSMT
     Blarney.Backend.Simulation
     Blarney.Backend.Verilog
     Blarney.Core

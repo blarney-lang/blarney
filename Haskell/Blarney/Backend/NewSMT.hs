@@ -51,6 +51,11 @@ module Blarney.Backend.NewSMT (
 , Blarney.Backend.NewSMT.defaultGenerator
 , Blarney.Backend.NewSMT.verifyCircuit
 , Blarney.Backend.NewSMT.verifyDefault
+
+, Blarney.Backend.NewSMT.checkAuto
+, Blarney.Backend.NewSMT.checkFixed
+, Blarney.Backend.NewSMT.debugAuto
+, Blarney.Backend.NewSMT.debugFixed
 ) where
 
 -- Standard imports
@@ -954,3 +959,24 @@ verifyCircuit gen (verb, vconf@VerifConf{giveModel}) circuit =
 -- Best used with (Verbose, vconfQuiet) or (Info, vconfQuiet)
 verifyDefault :: Modular a => (Verbosity, VerifConf) -> a -> IO ()
 verifyDefault = verifyCircuit defaultGenerator
+
+-- | Automatic verification procedure
+-- Aimed at giving a result as soon as possible
+checkAuto :: Modular a => Verbosity -> a -> IO ()
+checkAuto verb = verifyCircuit defaultGenerator (verb, vconfQuiet)
+
+-- | Fixed depth verification procedure
+-- Aimed at giving a result as soon as possible
+checkFixed :: Modular a => Int -> Verbosity -> a -> IO ()
+checkFixed depth verb = verifyCircuit defaultGenerator (verb, vconfQuiet)
+
+-- | Automatic minimal depth counterexample generation
+-- Note: Will run forever if there are no counterexamples
+-- TODO: Compare performance with incremental solution
+debugAuto :: Modular a => Verbosity -> a -> IO ()
+debugAuto verb = verifyCircuit (proofPartGenerator [1..] 1 checkBounded) (verb, vconfDefault)
+
+-- | Fixed depth counterexample generation
+-- Note: Returns Unknown if there is no such counterexample
+debugFixed :: Modular a => Int -> Verbosity -> a -> IO ()
+debugFixed depth verb = verifyCircuit (proofPartGenerator [1] 1 checkBounded) (verb, vconfDefault)
