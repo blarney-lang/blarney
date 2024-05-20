@@ -12,11 +12,11 @@ Stability   : experimental
 
 Verify circuit properties using SMT solver.
 
-- `checkAuto Info` is the one-size-fits-all verification procedure (or
-  `checkAuto Verbose` to get progress reports).
+- 'checkAuto Info' is the one-size-fits-all verification procedure (or
+  'checkAuto Verbose' to get progress reports).
 - `checkFixed depth Info` is the same for fixed-depth (therefore more efficient).
-- `debugAuto Info` is not focusing on speed, but on producing minimal counter-examples.
-- `debugFixed depth Info` is the same for fixed-depth (therefore more efficient).
+- 'debugAuto Info' is not focusing on speed, but on producing minimal counter-examples.
+- 'debugFixed depth Info' is the same for fixed-depth (therefore more efficient).
 -}
 
 module Blarney.Backend.NewSMT (
