@@ -12,12 +12,11 @@ Stability   : experimental
 
 Verify circuit properties using SMT solver.
 
-TLDR: Use `verifyDefault`.
-
-- the `verifyOffline` family can be used to produce SMT-LIB input files.
-- the `verifyLive` family allows one to run simple verification schemes.
-- `verifyCircuit` provides concurrent verification.
-- `verifyDefault` is general-purpose, efficient verification scheme.
+- `checkAuto Info` is the one-size-fits-all verification procedure (or
+  `checkAuto Verbose` to get progress reports).
+- `checkFixed depth Info` is the same for fixed-depth (therefore more efficient).
+- `debugAuto Info` is not focusing on speed, but on producing minimal counter-examples.
+- `debugFixed depth Info` is the same for fixed-depth (therefore more efficient).
 -}
 
 module Blarney.Backend.NewSMT (
