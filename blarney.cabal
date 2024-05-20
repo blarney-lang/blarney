@@ -36,7 +36,6 @@ library
     Blarney.BitScan
     Blarney.ClientServer
     Blarney.Connectable
-    Blarney.Core.Module
     Blarney.Interconnect
     Blarney.Option
     Blarney.PulseReg
@@ -70,6 +69,7 @@ library
     Blarney.Core.Interface
     Blarney.Core.JList
     Blarney.Core.Lookup
+    Blarney.Core.Module
     Blarney.Core.NetHelpers
     Blarney.Core.Opts
     Blarney.Core.Prelude

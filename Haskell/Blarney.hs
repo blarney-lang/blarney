@@ -10,9 +10,7 @@ Maintainer  : mattfn@gmail.com
 Stability   : experimental
 
 This is the top-level of the Blarney library. It essentially exports a set of
-other Blarney modules. Note that it also re-exports the Haskell 'Prelude',
-claiming the '.' operator for reverse function application (field selection is
-common in hardware description).
+other Blarney modules. Note that it also re-exports the Haskell 'Prelude'.
 -}
 
 module Blarney (
