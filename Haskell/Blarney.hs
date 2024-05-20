@@ -1,5 +1,3 @@
-{-# OPTIONS_HADDOCK prune #-}
-
 {- |
 Module      : Blarney
 Description : Hardware description in Haskell
@@ -18,21 +16,11 @@ module Blarney (
   module Blarney.Core
 , module Blarney.Netlist
 , module Blarney.Backend
--- Other modules
-, module Control.Monad
-, module Control.Monad.Fix
-, HasField(..)
-, Generic(..)
-, module GHC.TypeLits
-, module P
+-- * Re-exported Haskell modules
+, module Blarney.Haskell
 ) where
 
 import Blarney.Core
 import Blarney.Netlist
 import Blarney.Backend
-import Control.Monad hiding (when)
-import Control.Monad.Fix
-import GHC.Records (HasField(..))
-import GHC.Generics (Generic(..))
-import GHC.TypeLits
-import Prelude as P hiding (truncate)
+import Blarney.Haskell
