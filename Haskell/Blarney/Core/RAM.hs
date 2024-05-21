@@ -74,7 +74,7 @@ import Blarney.Core.BV
 import Blarney.Core.Bit
 import Blarney.Core.Bits
 import Blarney.Core.Module
-import Blarney.Core.Prelude
+import Blarney.Core.Common
 
 -- GHC imports
 import GHC.Records

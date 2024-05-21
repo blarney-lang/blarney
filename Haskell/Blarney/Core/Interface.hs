@@ -86,7 +86,7 @@ import Blarney.Core.Bit
 import Blarney.Core.Bits
 import Blarney.Core.Prim
 import Blarney.Core.Module
-import Blarney.Core.Prelude
+import Blarney.Core.Common
 import Blarney.Core.Flatten
 import Blarney.Core.ClockReset
 import qualified Blarney.Core.RTL as RTL

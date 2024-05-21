@@ -10,7 +10,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 {-|
-Module      : Blarney.Core.Prelude
+Module      : Blarney.Core.Common
 Description : Commonly used HDL functions
 Copyright   : (c) Matthew Naylor, 2019
               (c) Alexandre Joannou, 2019
@@ -18,7 +18,7 @@ License     : MIT
 Maintainer  : mattfn@gmail.com
 Stability   : experimental
 -}
-module Blarney.Core.Prelude
+module Blarney.Core.Common
   ( tree1           -- Tree fold (for non-empty lists)
   , treeM1          -- Monadic tree fold (for non-empty lists)
   , tree            -- Tree fold

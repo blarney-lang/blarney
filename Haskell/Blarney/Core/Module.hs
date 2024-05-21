@@ -81,7 +81,7 @@ import Blarney.Core.Bit
 import Blarney.Core.Bits
 import Blarney.Core.Prim
 import Blarney.Core.FShow
-import Blarney.Core.Prelude
+import Blarney.Core.Common
 import Blarney.Core.IfThenElse
 import qualified Blarney.Core.RTL as RTL
 import qualified Blarney.Core.JList as JL

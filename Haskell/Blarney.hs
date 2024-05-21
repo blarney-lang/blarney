@@ -17,10 +17,10 @@ module Blarney (
 , module Blarney.Netlist
 , module Blarney.Backend
 -- * Re-exported Haskell modules
-, module Blarney.Haskell
+, module Blarney.Prelude
 ) where
 
 import Blarney.Core
 import Blarney.Netlist
 import Blarney.Backend
-import Blarney.Haskell
+import Blarney.Prelude

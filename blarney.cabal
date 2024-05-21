@@ -37,6 +37,7 @@ library
     Blarney.Connectable
     Blarney.Interconnect
     Blarney.Option
+    Blarney.Prelude
     Blarney.PulseReg
     Blarney.PulseWire
     Blarney.QuadPortRAM
@@ -62,6 +63,7 @@ library
     Blarney.Core.Bits
     Blarney.Core.BV
     Blarney.Core.ClockReset
+    Blarney.Core.Common
     Blarney.Core.Flatten
     Blarney.Core.FShow
     Blarney.Core.IfThenElse
@@ -71,7 +73,6 @@ library
     Blarney.Core.Module
     Blarney.Core.NetHelpers
     Blarney.Core.Opts
-    Blarney.Core.Prelude
     Blarney.Core.Prim
     Blarney.Core.RAM
     Blarney.Core.RTL

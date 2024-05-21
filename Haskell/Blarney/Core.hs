@@ -20,7 +20,7 @@ module Blarney.Core (
 , module Blarney.Core.FShow
 , module Blarney.Core.Module
 , module Blarney.Core.Lookup
-, module Blarney.Core.Prelude
+, module Blarney.Core.Common
 , module Blarney.Core.Interface
 , module Blarney.Core.IfThenElse
 , module Blarney.Core.ClockReset
@@ -33,7 +33,7 @@ import Blarney.Core.Utils
 import Blarney.Core.FShow
 import Blarney.Core.Module
 import Blarney.Core.Lookup
-import Blarney.Core.Prelude
+import Blarney.Core.Common
 import Blarney.Core.Interface
 import Blarney.Core.IfThenElse
 import Blarney.Core.ClockReset

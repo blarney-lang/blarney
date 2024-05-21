@@ -1,5 +1,5 @@
 {- |
-Module      : Blarney
+Module      : Blarney.Prelude
 Description : Hardware description in Haskell
 Copyright   : (c) Matthew Naylor, 2024
 License     : MIT
@@ -10,7 +10,7 @@ Re-export (most of) the Haskell Prelude and other important standard
 Haskell modules.
 -}
 
-module Blarney.Haskell (
+module Blarney.Prelude (
   module Control.Monad
 , module Control.Monad.Fix
 , HasField(..)
