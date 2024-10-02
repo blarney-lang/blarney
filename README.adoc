@@ -96,3 +96,11 @@ compiled Erlang code.
 https://cheri-cpu.org[CHERI]-enabled
 RISC-V GPGPU with dynamic scalarisation features and high performance
 density on Intel's Stratix 10 FPGA.
+
+* https://github.com/blarney-lang/five/[Five]: A formally verified
+implementation of the classic 5-stage RISC pipeline as an abstract component,
+largely independent of any specific instruction set.
+
+* https://github.com/blarney-lang/five-alive/[FiveAlive]: A proof-of-concept
+instantiation of the https://github.com/blarney-lang/five/[Five] pipeline with
+the RISC-V instruction set to give a simple 32-bit microcontroller.
