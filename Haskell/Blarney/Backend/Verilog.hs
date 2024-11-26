@@ -23,6 +23,7 @@ import qualified Data.Set as Set
 import Data.Bits ( (.&.), shiftR )
 import Data.List
 import System.IO
+import Data.Char
 import Data.Maybe
 import System.Process
 import Text.PrettyPrint
@@ -524,11 +525,16 @@ genNetVerilog netlist net = case netPrim net of
     <+> text "rf" <> int id <> brackets (showNetInput (netInputs net !! 1))
     <+> text "<=" <+> showNetInput (netInputs net !! 2) <> semi
   alwsAssert Net{netInputs=[cond, pred]} msg =
-    hang ifCond 2 (hang ifPred 2 body $+$ text "end") $+$ text "end"
+    hang ifCond 2 body $+$ text "end"
     where
       ifCond = text "if" <+> parens (showNetInput cond <+> text "== 1")
                          <+> text "begin"
-      ifPred = text "if" <+> parens (showNetInput pred <+> text "== 0")
-                         <+> text "begin"
-      body =     text "$write" <> parens (doubleQuotes $ text msg) <> semi
-             $+$ text "$finish" <> semi
+
+      body = text (concatMap repl msg)
+         <+> text ":"
+         <+> text "assert" <> parens (showNetInput pred <+> text "== 1")
+          <> semi
+
+      repl c | isAlpha c = [c]
+      repl ' ' = "_"
+      repl other = ""
