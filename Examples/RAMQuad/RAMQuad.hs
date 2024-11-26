@@ -27,8 +27,8 @@ top = do
         ramA.load (100 + i.val)
         ramB.load i.val
       action do
-        display "ramA[100+" i.val "] = 0x" (formatHex 32 ramA.out)
-        display "ramB[" i.val "] = 0x" (formatHex 32 ramB.out)
+        display "ramA[100+" i.val "] = 0x" (formatHex 8 ramA.out)
+        display "ramB[" i.val "] = 0x" (formatHex 8 ramB.out)
         i <== i.val + 1
     action do
       finish
