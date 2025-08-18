@@ -219,7 +219,7 @@ ifThenElseRTL c a b = do
   r@RTLEnv{..} <- askEnv
   ra <- localEnv (r { rtlEnvCondition = rtlEnvCondition .&. c }) a
   rb <- localEnv (r { rtlEnvCondition = rtlEnvCondition .&. inv c }) b
-  return $ rtlEnvCondition ? (ra, rb)
+  return $ c ? (ra, rb)
 
 -- | RTL switch statement
 switch :: Bits a => a -> [(a, RTL ())] -> RTL ()
